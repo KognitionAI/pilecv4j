@@ -32,6 +32,7 @@ import javax.media.jai.TiledImage;
 import com.jiminger.houghspace.Transform;
 import com.jiminger.image.PolarLineFit;
 
+@SuppressWarnings("restriction")
 public class Frame
 {
    public static final double worstEdgeStdDevAllowed = 1.0;

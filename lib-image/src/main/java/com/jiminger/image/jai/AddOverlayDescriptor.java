@@ -31,6 +31,7 @@ import com.sun.media.jai.opimage.*;
  * operation on the given source.
  */
 
+@SuppressWarnings("restriction")
 public class AddOverlayDescriptor extends OperationDescriptorImpl 
    implements RenderedImageFactory 
 {

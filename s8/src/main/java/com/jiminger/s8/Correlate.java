@@ -37,6 +37,7 @@ package com.jiminger.s8;
 import java.awt.image.*;
 import javax.media.jai.*;
 
+@SuppressWarnings("restriction")
 public class Correlate
 {
    public static double [] correlation(RenderedImage X, RenderedImage Y)

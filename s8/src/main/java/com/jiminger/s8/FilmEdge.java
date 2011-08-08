@@ -31,6 +31,7 @@ import com.jiminger.image.PolarLineFit;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
+@SuppressWarnings("restriction")
 public class FilmEdge
 {
    // these contain the line in polar coordinates using

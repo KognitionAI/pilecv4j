@@ -35,6 +35,7 @@ import com.jiminger.nr.Minimizer;
  *  coordinates.
  */
 
+@SuppressWarnings("restriction")
 public class PolarLineFit implements Minimizer.Func
 {
    private List<PPoint> points;

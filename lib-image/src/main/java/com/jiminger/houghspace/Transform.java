@@ -43,6 +43,7 @@ import com.jiminger.image.WeightedPoint;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
+@SuppressWarnings("restriction")
 public class Transform
 {
    private double quantFactor = 1.0;

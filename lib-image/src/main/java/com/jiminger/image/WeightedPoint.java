@@ -21,5 +21,5 @@ package com.jiminger.image;
 
 public interface WeightedPoint extends Point
 {
-   public abstract double getWeight();
+   public double getWeight();
 }

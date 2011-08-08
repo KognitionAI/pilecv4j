@@ -89,7 +89,7 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
              *delta_x,        /* The first devivative image, x-direction. */
              *delta_y,        /* The first derivative image, y-direction. */
              *magnitude;      /* The magnitude of the gadient image.      */
-   int r, c, pos;
+//   int r, c, pos;
 //   float *dir_radians=NULL;   /* Gradient direction image.                */
 
    /****************************************************************************
@@ -528,7 +528,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
    int i, center;
    float x, fx, sum=0.0;
 
-   *windowsize = 1 + 2 * ceil(2.5 * sigma);
+   *windowsize = (int)(1 + 2 * ceil(2.5 * sigma));
    center = (*windowsize) / 2;
 
 #if VERBOSE
@@ -541,7 +541,7 @@ void make_gaussian_kernel(float sigma, float **kernel, int *windowsize)
 
    for(i=0;i<(*windowsize);i++){
       x = (float)(i - center);
-      fx = pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853));
+      fx = (float)pow(2.71828, -0.5*x*x/(sigma*sigma)) / (sigma * sqrt(6.2831853));
       (*kernel)[i] = fx;
       sum += fx;
    }
@@ -620,9 +620,9 @@ unsigned char EDGE=255;
 void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
-   int r, c, pos, numedges, lowcount, highcount, lowthreshold, highthreshold,
-       i, hist[32768], rr, cc;
-   short int maximum_mag, sumpix;
+  int r, c, pos, numedges, /*lowcount,*/ highcount, lowthreshold, highthreshold,
+     i, hist[32768]/*, rr, cc*/;
+   short int maximum_mag/*, sumpix*/;
    int x[8] = {1,1,0,-1,-1,-1,0,1};
    int y[8] = {0,1,1,1,0,-1,-1,-1};
    unsigned char unchanged;

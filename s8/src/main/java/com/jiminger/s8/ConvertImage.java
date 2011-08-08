@@ -26,6 +26,7 @@ import com.sun.media.jai.codec.FileSeekableStream;
 
 import com.jiminger.util.*;
 
+@SuppressWarnings("restriction")
 public class ConvertImage
 {
    public static final long megaBytes = 1024L * 1024L;

@@ -40,8 +40,7 @@ import com.sun.media.jai.opimage.RIFUtil;
  *
  */
 
-
-
+@SuppressWarnings("restriction")
 public class EdgeDetectorDescriptor extends OperationDescriptorImpl 
    implements RenderedImageFactory 
 {

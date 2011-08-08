@@ -21,13 +21,19 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-image</artifactId>
     </dependency>
-
     <dependency>
       <groupId>${swtgroup}</groupId>
       <artifactId>${swtartifact}</artifactId>
-      <version>3.3.0-v3346</version>
     </dependency>
   </dependencies>
+
+	<repositories>
+	 <repository>
+       <id>eclipse-testing</id>
+        <url>http://maven.eclipse.org/nexus/content/repositories/testing</url>
+      </repository>
+	</repositories>
+  
   <build>
     <finalName>${artifactId}-${version}</finalName>
     <resources>

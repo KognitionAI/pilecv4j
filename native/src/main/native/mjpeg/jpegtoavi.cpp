@@ -25,12 +25,18 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef _BCC
-#include <climits.h>
-#include <io.h>
-typedef __int64 off64_t;
+#if (defined _BCC || defined MSVC)
+ #ifdef _BCC
+  #include <climits.h>
+ #else
+  #include <limits.h>
+ #endif  
+ #include <io.h>
+ typedef __int64 off64_t;
 #else
-#include <unistd.h>
+ #ifndef MSVC
+  #include <unistd.h>
+ #endif
 #endif
 #include <fcntl.h>
 #include "byteswap.h"
@@ -69,8 +75,8 @@ void print_quartet(unsigned int i,FILE* ofd)
 
 
 static FILE* ofd = NULL;
-static DWORD width = -1;
-static DWORD height = -1;
+static DWORD width = (DWORD)-1;
+static DWORD height = (DWORD)-1;
 static long f = 0;
 static list<DWORD>* offsets;
 static list<DWORD>* szarray;
@@ -85,14 +91,10 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_initializeMJPEG
   DWORD frames=1;
   DWORD width=1;
   DWORD height=1;
-  unsigned short img0;
 //  const off64_t MAX_RIFF_SZ=2147483648; /* 2 Gb limit */
   DWORD riff_sz;
   DWORD fps = 1;
 
-/*  int fd,f;*/
-  int f;
-  FILE* fd;
   const char * filename = env->GetStringUTFChars(jfilename,NULL);
   ofd = fopen(filename,"wb");
 
@@ -246,8 +248,8 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
       f = 0;
       offsets = new list<DWORD>;
       szarray = new list<DWORD>;
-      prevsz = -1;
-      prevoffset = -1;
+      prevsz = (DWORD)-1;
+      prevoffset = (DWORD)-1;
       tnbw = 0;
       jpg_sz_64 = 0;
    }
@@ -389,11 +391,11 @@ JNIEXPORT void JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_cleanUp
    }
 
    ofd = NULL;
-   height = -1;
-   width = -1;
+   height = (DWORD)-1;
+   width = (DWORD)-1;
    f = 0;
-   prevsz = -1;
-   prevoffset = -1;
+   prevsz = (DWORD)-1;
+   prevoffset = (DWORD)-1;
    tnbw = 0;
    jpg_sz_64 = 0;
    if (offsets) delete offsets;

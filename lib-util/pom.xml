@@ -10,6 +10,14 @@
   <artifactId>lib-util</artifactId>
   <name>lib-util (${project.version})</name>
   <description>Simple utilities for Jiminger.com</description>
+  
+  <dependencies>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+  </dependencies>
+  
   <build>
     <resources>
       <resource>

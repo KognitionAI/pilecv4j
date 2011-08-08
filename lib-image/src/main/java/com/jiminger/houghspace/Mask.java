@@ -24,6 +24,7 @@ import javax.media.jai.*;
 import java.awt.image.*;
 import java.awt.color.*;
 
+@SuppressWarnings("restriction")
 public class Mask
 {
    public static byte EDGE= (byte)-1;

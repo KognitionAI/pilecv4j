@@ -41,10 +41,10 @@ import com.jiminger.mjpeg.MJPEGWriter;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.FilenameUtils;
-import com.jiminger.util.LibraryLoader;
 import com.jiminger.util.PropertiesUtils;
 import com.sun.media.jai.codec.FileSeekableStream;
 
+@SuppressWarnings("restriction")
 public class CorrelateFrames
 {
    public static final long megaBytes = 1024L * 1024L;
@@ -416,10 +416,6 @@ public class CorrelateFrames
          new FrameMatch(fs1,fs1matchframe,fs2,fs2matchframe,coef),true
          );
       return true;
-   }
-
-   static {
-      LibraryLoader.loadLibrary("s8");
    }
 
    static private RenderedImage [] loadImages(FrameSet fs)

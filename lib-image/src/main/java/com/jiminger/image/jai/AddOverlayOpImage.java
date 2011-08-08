@@ -29,6 +29,7 @@ import javax.media.jai.OpImage;
 
 import com.jiminger.image.canny.EdgeDetectorOpImage;
 
+@SuppressWarnings("restriction")
 public class AddOverlayOpImage extends NullOpImage
 {
    public static final byte ROVERLAY = (byte)100;

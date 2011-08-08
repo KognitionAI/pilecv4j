@@ -32,9 +32,9 @@ import java.util.List;
 import javax.media.jai.JAI;
 
 import com.jiminger.util.CommandLineParser;
-import com.jiminger.util.LibraryLoader;
 import com.sun.media.jai.codec.FileSeekableStream;
 
+@SuppressWarnings("restriction")
 public class MJPEGWriter
 {
    static public String parentDir = null;
@@ -154,10 +154,6 @@ public class MJPEGWriter
       }
 
       return doappendFile(filename,width,height);
-   }
-
-   static {
-      LibraryLoader.loadLibrary("jiminger");
    }
 
    static private native boolean doappendFile(String filename, int width, int height);

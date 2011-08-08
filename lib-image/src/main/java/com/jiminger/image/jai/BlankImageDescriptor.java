@@ -49,6 +49,7 @@ import com.sun.media.jai.opimage.RIFUtil;
  *
  */
 
+@SuppressWarnings("restriction")
 public class BlankImageDescriptor extends OperationDescriptorImpl 
    implements RenderedImageFactory 
 {
@@ -150,72 +151,72 @@ public class BlankImageDescriptor extends OperationDescriptorImpl
    {
       return true;
    }
-}
 
-
-/**
- * BlankImageOpImage is an extension of PointOpImage that takes two
- * integer parameters and one source and performs a modified threshold
- * operation on the given source.
- */
-
-@SuppressWarnings("unchecked")
-class BlankImageOpImage extends SourcelessOpImage
-{
-   private static byte defaultValue;
-   private static int [] bandstride = { 0 };
-
-   public BlankImageOpImage(ImageLayout il, Map<?,?> map, 
-                            int w, int h, int defaultValue)
+   /**
+    * BlankImageOpImage is an extension of PointOpImage that takes two
+    * integer parameters and one source and performs a modified threshold
+    * operation on the given source.
+    */
+   @SuppressWarnings("unchecked")
+   private static class BlankImageOpImage extends SourcelessOpImage
    {
-      super(blankImageImageLayout(il == null ? null : il,w,h),
-            map,
-            new PixelInterleavedSampleModel(
-               DataBuffer.TYPE_BYTE,w,h,1,w, bandstride),
-            0,0,w,h);
+      private static byte defaultValue;
+      private static int [] bandstride = { 0 };
 
-      BlankImageOpImage.defaultValue = byteify(defaultValue);
-   }
+      public BlankImageOpImage(ImageLayout il, Map<?,?> map, 
+                               int w, int h, int defaultValue)
+      {
+         super(blankImageImageLayout(il == null ? null : il,w,h),
+               map,
+               new PixelInterleavedSampleModel(
+                  DataBuffer.TYPE_BYTE,w,h,1,w, bandstride),
+               0,0,w,h);
 
-   protected void computeRect(PlanarImage[] pi, WritableRaster dest, Rectangle rect)
-   {
-      RasterFormatTag rft[] = getFormatTags();
-      RasterAccessor destra = new RasterAccessor(dest,rect,rft[0],getColorModel());
-      byte [] b = destra.getByteDataArray(0);
-      for (int i = 0; i < b.length; i++)
-         b[i] = defaultValue;
-   }
+         BlankImageOpImage.defaultValue = byteify(defaultValue);
+      }
 
-   private static ImageLayout blankImageImageLayout(ImageLayout il, int w, int h)
-   {
-      if (il == null)
-         il = new ImageLayout(0,0,w,h);
+      protected void computeRect(PlanarImage[] pi, WritableRaster dest, Rectangle rect)
+      {
+         RasterFormatTag rft[] = getFormatTags();
+         RasterAccessor destra = new RasterAccessor(dest,rect,rft[0],getColorModel());
+         byte [] b = destra.getByteDataArray(0);
+         for (int i = 0; i < b.length; i++)
+            b[i] = defaultValue;
+      }
 
-      byte [] r = new byte[256];
-      byte [] g = new byte[256];
-      byte [] b = new byte[256];
+      private static ImageLayout blankImageImageLayout(ImageLayout il, int w, int h)
+      {
+         if (il == null)
+            il = new ImageLayout(0,0,w,h);
 
-      r[intify(EdgeDetectorOpImage.EDGE)] = 
-         g[intify(EdgeDetectorOpImage.EDGE)] = 
-         b[intify(EdgeDetectorOpImage.EDGE)] = -1;
+         byte [] r = new byte[256];
+         byte [] g = new byte[256];
+         byte [] b = new byte[256];
 
-      r[intify(AddOverlayOpImage.ROVERLAY)] = -1;
-      g[intify(AddOverlayOpImage.GOVERLAY)] = -1;
-      b[intify(AddOverlayOpImage.BOVERLAY)] = -1;
+         r[intify(EdgeDetectorOpImage.EDGE)] = 
+            g[intify(EdgeDetectorOpImage.EDGE)] = 
+            b[intify(EdgeDetectorOpImage.EDGE)] = -1;
 
-      il.setColorModel(
-         new IndexColorModel(8,256,r,g,b));
+         r[intify(AddOverlayOpImage.ROVERLAY)] = -1;
+         g[intify(AddOverlayOpImage.GOVERLAY)] = -1;
+         b[intify(AddOverlayOpImage.BOVERLAY)] = -1;
 
-      return il;
-   }
+         il.setColorModel(
+            new IndexColorModel(8,256,r,g,b));
 
-   private static int intify(byte b)
-   {
-      return (b < 0) ? ((int)b) + 256 : (int)b;
-   }
+         return il;
+      }
 
-   private static byte byteify(int i)
-   {
-      return i > 127 ? (byte)(i - 256) : (byte)i;
+      private static int intify(byte b)
+      {
+         return (b < 0) ? ((int)b) + 256 : (int)b;
+      }
+
+      private static byte byteify(int i)
+      {
+         return i > 127 ? (byte)(i - 256) : (byte)i;
+      }
    }
 }
+
+

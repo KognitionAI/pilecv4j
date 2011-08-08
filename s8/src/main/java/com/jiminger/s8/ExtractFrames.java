@@ -60,7 +60,6 @@ import com.jiminger.image.jai.AddOverlayOpImage;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
-import com.jiminger.util.LibraryLoader;
 import com.jiminger.util.PropertiesUtils;
 
 /*******************************************************************
@@ -80,6 +79,7 @@ import com.jiminger.util.PropertiesUtils;
  *  
  ********************************************************************/
 
+@SuppressWarnings("restriction")
 public class ExtractFrames {
    public static final long megaBytes = 1024L * 1024L;
    public static final long defaultTileCacheSize = 300;
@@ -477,7 +477,7 @@ public class ExtractFrames {
          java.util.List<Transform.Fit> verifiedSprockets = new ArrayList<Transform.Fit>();
          int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
          if (!FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength,
-               (List<WeightedPoint>)((List)sprockets),(List<WeightedPoint>)((List<?>)verifiedSprockets)))
+        		 (List<WeightedPoint>)(Object)sprockets,(List<WeightedPoint>)(Object)verifiedSprockets))
          {
             // in the odd case where this fails, assume it's due to the fact that
             // the first point in the list was actually not a real sprocket hole
@@ -894,10 +894,6 @@ public class ExtractFrames {
    }
 
    private static int [] bandstride = { 0 };
-
-   static {
-      LibraryLoader.loadLibrary("s8");
-   }
 
    private static byte byteify(int i)
    {

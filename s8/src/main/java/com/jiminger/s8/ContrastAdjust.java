@@ -29,13 +29,13 @@ import javax.media.jai.RasterFormatTag;
 import javax.media.jai.TileCache;
 import javax.media.jai.TiledImage;
 
-import com.jiminger.nr.MinimizerException;
 import com.jiminger.nr.Minimizer;
+import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
-import com.jiminger.util.LibraryLoader;
 import com.sun.media.jai.codec.FileSeekableStream;
 
 
+@SuppressWarnings("restriction")
 public class ContrastAdjust
 {
    public static final long megaBytes = 1024L * 1024L;
@@ -612,10 +612,6 @@ public class ContrastAdjust
 
          return ret;
       }
-   }
-
-   static {
-      LibraryLoader.loadLibrary("s8");
    }
 
    static public double [] remap(double [] x)

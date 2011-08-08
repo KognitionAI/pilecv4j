@@ -44,7 +44,7 @@ import javax.media.jai.UntiledOpImage;
  * operation on the given source.
  */
 
-@SuppressWarnings("unchecked") // this is a jai issue so there's nothing I can do
+@SuppressWarnings({"unchecked","restriction"}) // "unchecked" is a jai issue so there's nothing I can do
 public class EdgeDetectorOpImage extends UntiledOpImage
 {
    public static byte EDGE = (byte)-1;

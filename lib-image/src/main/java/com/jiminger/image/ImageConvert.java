@@ -25,6 +25,7 @@ import javax.media.jai.*;
 
 import com.jiminger.util.CommandLineParser;
 
+@SuppressWarnings("restriction")
 public class ImageConvert
 {
    public static final long megaBytes = 1024L * 1024L;
