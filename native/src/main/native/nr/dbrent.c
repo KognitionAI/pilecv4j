@@ -1,5 +1,9 @@
 #include <math.h>
 #include "nrutil.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ITMAX 100
 #define ZEPS 1.0e-10
 #define MOV3(a,b,c, d,e,f) (a)=(d);(b)=(e);(c)=(f);
@@ -101,3 +105,6 @@ float dbrent(float ax, float bx, float cx, float (*f)(float),
    nrerror("Too many iterations in routine dbrent");
    return 0.0; //Never get here.
 }
+#ifdef __cplusplus
+}
+#endif

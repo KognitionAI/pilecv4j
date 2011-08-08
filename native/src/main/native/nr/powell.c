@@ -1,5 +1,10 @@
 #include <math.h>
 #include "nrutil.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define TINY 1.0e-25 /*A small number.*/
 #define ITMAX 100000 /*Maximum allowed iterations.*/
 /** 
@@ -120,3 +125,7 @@ float f1dim(float x)
    free_vector(xt,1,ncom);
    return f;
 }
+
+#ifdef __cplusplus
+}
+#endif

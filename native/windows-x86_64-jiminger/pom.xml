@@ -33,38 +33,37 @@
     <testSourceDirectory>../src/test/java</testSourceDirectory>
     
     <pluginManagement>
-    	<plugins>
-    	    <plugin>
-      <groupId>org.eclipse.m2e</groupId>
-      <artifactId>lifecycle-mapping</artifactId>
-      <version>1.0.0</version>
-      <configuration>
-        <lifecycleMappingMetadata>
-          <pluginExecutions>
-            <pluginExecution>
-              <pluginExecutionFilter>
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>native-maven-plugin</artifactId>
-                <versionRange>[0,)</versionRange>
-                <goals>
-                  <goal>initialize</goal>
-                  <goal>unzipinc</goal>
-                  <goal>compile</goal>
-                  <goal>javah</goal>
-                  <goal>link</goal>
-                  <goal>manifest</goal>
-                </goals>
-              </pluginExecutionFilter>
-              <action>
-                <ignore />
-              </action>
-            </pluginExecution>
-          </pluginExecutions>
-        </lifecycleMappingMetadata>
-      </configuration>
-    </plugin>
-    	
-    	</plugins>
+      <plugins>
+    	<plugin>
+          <groupId>org.eclipse.m2e</groupId>
+          <artifactId>lifecycle-mapping</artifactId>
+          <version>1.0.0</version>
+          <configuration>
+            <lifecycleMappingMetadata>
+              <pluginExecutions>
+                <pluginExecution>
+                  <pluginExecutionFilter>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>native-maven-plugin</artifactId>
+                    <versionRange>[0,)</versionRange>
+                    <goals>
+                      <goal>initialize</goal>
+                      <goal>unzipinc</goal>
+                      <goal>compile</goal>
+                      <goal>javah</goal>
+                      <goal>link</goal>
+                      <goal>manifest</goal>
+                    </goals>
+                  </pluginExecutionFilter>
+                  <action>
+                    <ignore />
+                  </action>
+                </pluginExecution>
+              </pluginExecutions>
+            </lifecycleMappingMetadata>
+          </configuration>
+        </plugin>
+      </plugins>
     </pluginManagement>
     
     <plugins>

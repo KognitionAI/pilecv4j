@@ -32,7 +32,7 @@
    </dependencies>
 
    <profiles>
-     <profile>
+<!--     <profile>
        <id>linux-x86</id>
        <activation>
          <os>
@@ -43,8 +43,9 @@
        <properties>
          <swtgroup>org.eclipse.swt.gtk.linux</swtgroup>
          <swtartifact>x86</swtartifact>
+         <jimingerartifact>linux-jiminger</jimingerartifact>
        </properties>
-     </profile>
+     </profile> -->
      <profile>
        <id>linux-64bit</id>
        <activation>
@@ -56,6 +57,7 @@
        <properties>
          <swtgroup>org.eclipse.swt.gtk.linux</swtgroup>
          <swtartifact>x86_64</swtartifact>
+         <jimingerartifact>linux-amd64-jiminger</jimingerartifact>
        </properties>
      </profile>
      <profile>

@@ -1,5 +1,8 @@
 #include <math.h>
 #include "nrutil.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 #define ITMAX 100
 #define CGOLD 0.3819660
 #define ZEPS 1.0e-10
@@ -78,3 +81,6 @@ float brent(float ax, float bx, float cx, float (*f)(float), float tol,
    *xmin=x; //Never get here.
    return fx;
 }
+#ifdef __cplusplus
+}
+#endif

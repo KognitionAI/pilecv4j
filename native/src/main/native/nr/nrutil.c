@@ -5,6 +5,10 @@
 #define NR_END 1
 #define FREE_ARG char*
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 static char* errorText = NULL;
 static int errorHappens = 0;
 void nrerror2(const char error_text[])
@@ -256,3 +260,6 @@ void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch,
    free((FREE_ARG) (t+nrl-NR_END));
 }
 
+#ifdef __cplusplus
+}
+#endif
