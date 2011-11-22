@@ -1,206 +1,234 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-   <groupId>com.jiminger</groupId>
-   <artifactId>utilities</artifactId>
-   <version>1.0-SNAPSHOT</version>
-   <name>Jiminger utilities (${project.version})</name>
-   <description>Various Utilities for coding support</description>
-   <packaging>pom</packaging>
-   <modelVersion>4.0.0</modelVersion>
+  <groupId>com.jiminger</groupId>
+  <artifactId>utilities</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <name>Jiminger utilities (${project.version})</name>
+  <description>Various Utilities for coding support</description>
+  <packaging>pom</packaging>
+  <modelVersion>4.0.0</modelVersion>
 
-   <properties>
-      <svn.path>svn.traffic.com/svnroot/core/archetypes</svn.path>
-      <continuousbuild.server>continuousBuild.traffic.com</continuousbuild.server>
-      <website.server>repo.traffic.com</website.server>
-      <website.path>website/products</website.path>
-    </properties>
+  <properties>
+    <svn.path>svn.traffic.com/svnroot/core/archetypes</svn.path>
+    <continuousbuild.server>continuousBuild.traffic.com</continuousbuild.server>
+    <website.server>repo.traffic.com</website.server>
+    <website.path>website/products</website.path>
+  </properties>
 
-   <url>http://${website.server}/${website.path}/com.jiminger/utilities/1.0-SNAPSHOT/</url>
+  <url>http://${website.server}/${website.path}/com.jiminger/utilities/1.0-SNAPSHOT/</url>
 
-   <!-- These are global dependencies -->
-   <dependencies>
+  <!-- These are global dependencies -->
+  <dependencies>
+    <dependency>
+      <groupId>log4j</groupId>
+      <artifactId>log4j</artifactId>
+      <scope>provided</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+  <profiles>
+    <profile>
+      <id>linux-x86</id>
+      <activation>
+        <os>
+          <family>linux</family>
+          <arch>i386</arch>
+        </os>
+      </activation>
+      <properties>
+        <swtgroup>org.eclipse.swt.gtk.linux</swtgroup>
+        <swtartifact>x86</swtartifact>
+        <jimingerartifact>linux-x86-jiminger</jimingerartifact>
+      </properties>
+    </profile>
+    <profile>
+      <id>linux-64bit</id>
+      <activation>
+        <os>
+          <family>linux</family>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <swtgroup>org.eclipse.swt.gtk.linux</swtgroup>
+        <swtartifact>x86_64</swtartifact>
+        <jimingerartifact>linux-amd64-jiminger</jimingerartifact>
+      </properties>
+    </profile>
+    <profile>
+      <id>windows-x86_64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <swtgroup>org.eclipse.swt</swtgroup>
+        <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
+        <jimingerartifact>windows-x86_64-jiminger</jimingerartifact>
+      </properties>
+    </profile>
+    <profile>
+      <id>windows-x86</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>x86</arch>
+        </os>
+      </activation>
+      <properties>
+        <swtgroup>org.eclipse.swt</swtgroup>
+        <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
+        <jimingerartifact>windows-x86-jiminger</jimingerartifact>
+      </properties>
+    </profile>
+  </profiles>
+
+  <!-- Make sure all versions are listed in the dependencyManagement section -->
+  <!-- It is WRONG to have ANY version numbers in pom.xml files below the product level
+       (with the exception of the parent tag) -->
+  <dependencyManagement>
+    <dependencies>
+
+      <!-- Internal to the product -->
       <dependency>
-         <groupId>log4j</groupId>
-         <artifactId>log4j</artifactId>
-         <scope>provided</scope>
+        <groupId>com.jiminger</groupId>
+        <artifactId>lib-util</artifactId>
+        <version>${project.version}</version>
       </dependency>
       <dependency>
-         <groupId>junit</groupId>
-         <artifactId>junit</artifactId>
-         <scope>test</scope>
+        <groupId>com.jiminger</groupId>
+        <artifactId>lib-nr</artifactId>
+        <version>${project.version}</version>
       </dependency>
-   </dependencies>
+      <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>lib-image</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>${jimingerartifact}</artifactId>
+        <version>${project.version}</version>
+      </dependency>
 
-   <profiles>
-<!--     <profile>
-       <id>linux-x86</id>
-       <activation>
-         <os>
-           <family>linux</family>
-           <arch>i386</arch>
-         </os>
-       </activation>
-       <properties>
-         <swtgroup>org.eclipse.swt.gtk.linux</swtgroup>
-         <swtartifact>x86</swtartifact>
-         <jimingerartifact>linux-jiminger</jimingerartifact>
-       </properties>
-     </profile> -->
-     <profile>
-       <id>linux-64bit</id>
-       <activation>
-         <os>
-           <family>linux</family>
-           <arch>amd64</arch>
-         </os>
-       </activation>
-       <properties>
-         <swtgroup>org.eclipse.swt.gtk.linux</swtgroup>
-         <swtartifact>x86_64</swtartifact>
-         <jimingerartifact>linux-amd64-jiminger</jimingerartifact>
-       </properties>
-     </profile>
-     <profile>
-       <id>windows-x86_64</id>
-       <activation>
-         <os>
-           <family>windows</family>
-           <arch>amd64</arch>
-         </os>
-       </activation>
-       <properties>
-         <swtgroup>org.eclipse.swt</swtgroup>
-         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
-         <jimingerartifact>windows-x86_64-jiminger</jimingerartifact>
-       </properties>
-     </profile>
-<!--     <profile>
-       <id>windows-x86</id>
-       <activation>
-         <os>
-           <family>windows</family>
-           <arch>x86</arch>
-         </os>
-       </activation>
-       <properties>
-         <swtgroup>org.eclipse.swt</swtgroup>
-         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
-         <jimingerartifact>windows-x86-jiminger</jimingerartifact>
-       </properties>
-     </profile> -->
-   </profiles>
+      <!-- the version number for all dependencies in this section
+           should all be ${project.version} -->
 
-   <!-- Make sure all versions are listed in the dependencyManagement section -->
-   <!-- It is WRONG to have ANY version numbers in pom.xml files below the product level
-        (with the exception of the parent tag) -->
-   <dependencyManagement>
-      <dependencies>
+      <!-- Third party library versions -->
+      <dependency>
+        <groupId>log4j</groupId>
+        <artifactId>log4j</artifactId>
+        <version>1.2.14</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>2.0.1</version>
+      </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.4</version>
+      </dependency>
 
-         <!-- Internal to the product -->
-         <dependency>
-           <groupId>com.jiminger</groupId>
-           <artifactId>lib-util</artifactId>
-           <version>${project.version}</version>
-         </dependency>
-         <dependency>
-           <groupId>com.jiminger</groupId>
-           <artifactId>lib-nr</artifactId>
-           <version>${project.version}</version>
-         </dependency>
-         <dependency>
-           <groupId>com.jiminger</groupId>
-           <artifactId>lib-image</artifactId>
-           <version>${project.version}</version>
-         </dependency>
-         <dependency>
-           <groupId>com.jiminger</groupId>
-           <artifactId>${jimingerartifact}</artifactId>
-           <version>${project.version}</version>
-         </dependency>
+      <dependency>
+        <groupId>${swtgroup}</groupId>
+        <artifactId>${swtartifact}</artifactId>
+        <version>3.6.2</version>
+      </dependency>
 
-         <!-- the version number for all dependencies in this section
-              should all be ${project.version} -->
+    </dependencies>
+  </dependencyManagement>
 
-         <!-- Third party library versions -->
-         <dependency>
-           <groupId>log4j</groupId>
-           <artifactId>log4j</artifactId>
-           <version>1.2.14</version>
-         </dependency>
-         <dependency>
-           <groupId>commons-io</groupId>
-           <artifactId>commons-io</artifactId>
-           <version>2.0.1</version>
-         </dependency>
-         <dependency>
-           <groupId>junit</groupId>
-           <artifactId>junit</artifactId>
-           <version>4.4</version>
-         </dependency>
-
-          <dependency>
-           <groupId>${swtgroup}</groupId>
-           <artifactId>${swtartifact}</artifactId>
-           <version>3.6.2</version>
-         </dependency>
-
-      </dependencies>
-   </dependencyManagement>
-
-   <modules>
+  <modules>
     <module>lib-util</module>
     <module>lib-nr</module>
     <module>lib-image</module>
     <module>native</module>
-<!--    <module>s8</module> -->
+    <!--    <module>s8</module> -->
     <module>test-jiminger</module>
   </modules>
 
-   <distributionManagement>
-      <repository>
-         <id>traffic-release-repo</id>
-         <url>scp://repo.traffic.com/releases/</url>
-         <uniqueVersion>false</uniqueVersion>
-      </repository>
-      <snapshotRepository>
-         <id>traffic-snapshot-repo</id>
-         <url>scp://repo.traffic.com/snapshots/</url>
-         <uniqueVersion>false</uniqueVersion>
-      </snapshotRepository>
-      <site>
-         <id>website</id>
-         <url>scp://${website.server}/${website.path}/com.jiminger/utilities/1.0-SNAPSHOT/</url>
-      </site>
-   </distributionManagement>
+  <distributionManagement>
+    <repository>
+      <id>traffic-release-repo</id>
+      <url>scp://repo.traffic.com/releases/</url>
+      <uniqueVersion>false</uniqueVersion>
+    </repository>
+    <snapshotRepository>
+      <id>traffic-snapshot-repo</id>
+      <url>scp://repo.traffic.com/snapshots/</url>
+      <uniqueVersion>false</uniqueVersion>
+    </snapshotRepository>
+    <site>
+      <id>website</id>
+      <url>scp://${website.server}/${website.path}/com.jiminger/utilities/1.0-SNAPSHOT/</url>
+    </site>
+  </distributionManagement>
 
-   <scm>
-      <connection>scm:svn:http://${svn.path}/trunk</connection>
-      <developerConnection>scm:svn:http://${svn.path}/trunk</developerConnection>
-      <url>http://${svn.path}/trunk</url>
-   </scm>
+  <scm>
+    <connection>scm:svn:http://${svn.path}/trunk</connection>
+    <developerConnection>scm:svn:http://${svn.path}/trunk</developerConnection>
+    <url>http://${svn.path}/trunk</url>
+  </scm>
 
-   <issueManagement>
-      <system>Bugtrack</system>
-      <url>http://bugtrack.traffic.com/</url>
-   </issueManagement>
+  <issueManagement>
+    <system>Bugtrack</system>
+    <url>http://bugtrack.traffic.com/</url>
+  </issueManagement>
 
-   <ciManagement>
-      <system>CruiseControl</system>
-      <url>http://${continuousbuild.server}/</url>
-   </ciManagement>
+  <ciManagement>
+    <system>CruiseControl</system>
+    <url>http://${continuousbuild.server}/</url>
+  </ciManagement>
 
-   <reporting>
+  <reporting>
     <plugins>
-     <plugin>
+      <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
 	<version>2.5</version>
         <configuration>
-           <minmemory>128m</minmemory>
-           <maxmemory>512m</maxmemory>
-           <aggregate>true</aggregate>
+          <minmemory>128m</minmemory>
+          <maxmemory>512m</maxmemory>
+          <aggregate>true</aggregate>
         </configuration>
-     </plugin>
+      </plugin>
     </plugins>
-   </reporting>
+  </reporting>
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/java</directory>
+      </resource>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+    </resources>
+    <testResources>
+      <testResource>
+        <directory>src/test/java</directory>
+      </testResource>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+    </testResources>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>1.6</source>
+          <target>1.6</target>
+          <debug>true</debug>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>
