@@ -8,15 +8,6 @@
   <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
 
-  <properties>
-    <svn.path>svn.traffic.com/svnroot/core/archetypes</svn.path>
-    <continuousbuild.server>continuousBuild.traffic.com</continuousbuild.server>
-    <website.server>repo.traffic.com</website.server>
-    <website.path>website/products</website.path>
-  </properties>
-
-  <url>http://${website.server}/${website.path}/com.jiminger/utilities/1.0-SNAPSHOT/</url>
-
   <!-- These are global dependencies -->
   <dependencies>
     <dependency>
@@ -156,38 +147,11 @@
     <module>test-jiminger</module>
   </modules>
 
-  <distributionManagement>
-    <repository>
-      <id>traffic-release-repo</id>
-      <url>scp://repo.traffic.com/releases/</url>
-      <uniqueVersion>false</uniqueVersion>
-    </repository>
-    <snapshotRepository>
-      <id>traffic-snapshot-repo</id>
-      <url>scp://repo.traffic.com/snapshots/</url>
-      <uniqueVersion>false</uniqueVersion>
-    </snapshotRepository>
-    <site>
-      <id>website</id>
-      <url>scp://${website.server}/${website.path}/com.jiminger/utilities/1.0-SNAPSHOT/</url>
-    </site>
-  </distributionManagement>
-
   <scm>
-    <connection>scm:svn:http://${svn.path}/trunk</connection>
-    <developerConnection>scm:svn:http://${svn.path}/trunk</developerConnection>
-    <url>http://${svn.path}/trunk</url>
+    <connection>scm:ssh://jim@king-homer:443/repo/utilities</connection>
+    <developerConnection>scm:ssh://jim@king-homer:443/repo/utilities</developerConnection>
+    <url>scm:ssh://jim@king-homer:443/repo/utilities</url>
   </scm>
-
-  <issueManagement>
-    <system>Bugtrack</system>
-    <url>http://bugtrack.traffic.com/</url>
-  </issueManagement>
-
-  <ciManagement>
-    <system>CruiseControl</system>
-    <url>http://${continuousbuild.server}/</url>
-  </ciManagement>
 
   <reporting>
     <plugins>
