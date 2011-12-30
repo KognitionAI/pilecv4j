@@ -119,7 +119,7 @@ JNIEXPORT jdouble JNICALL Java_com_jiminger_nr_Minimizer_dominimize
    powell(pf, xif, n, ftol, &iter, &fret, bridgefunc);
    if (nrIsError())
    {
-      JNU_ThrowByName(env,"com/jiminger/util/MinimizerException",nrGetErrorMessage());
+      JNU_ThrowByName(env,"com/jiminger/nr/MinimizerException",nrGetErrorMessage());
       return -1.0;
    }
 
