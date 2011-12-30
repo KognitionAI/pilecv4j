@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<metadata modelVersion="1.1.0">
+  <groupId>com.jiminger</groupId>
+  <artifactId>windows-x86_64-jiminger</artifactId>
+  <version>1.0-SNAPSHOT</version>
+  <versioning>
+    <snapshot>
+      <localCopy>true</localCopy>
+    </snapshot>
+    <lastUpdated>20110808045049</lastUpdated>
+    <snapshotVersions>
+      <snapshotVersion>
+        <extension>jar</extension>
+        <value>1.0-SNAPSHOT</value>
+        <updated>20110808045049</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>lib</extension>
+        <value>1.0-SNAPSHOT</value>
+        <updated>20110808045049</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>dll</extension>
+        <value>1.0-SNAPSHOT</value>
+        <updated>20110808045049</updated>
+      </snapshotVersion>
+      <snapshotVersion>
+        <extension>pom</extension>
+        <value>1.0-SNAPSHOT</value>
+        <updated>20110808045049</updated>
+      </snapshotVersion>
+    </snapshotVersions>
+  </versioning>
+</metadata>
