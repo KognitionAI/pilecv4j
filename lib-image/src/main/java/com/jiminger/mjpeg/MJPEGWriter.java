@@ -32,11 +32,16 @@ import java.util.List;
 import javax.media.jai.JAI;
 
 import com.jiminger.util.CommandLineParser;
+import com.jiminger.util.LibraryLoader;
 import com.sun.media.jai.codec.FileSeekableStream;
 
 @SuppressWarnings("restriction")
 public class MJPEGWriter
 {
+   static {
+      new LibraryLoader();
+   }
+
    static public String parentDir = null;
    static public String avifile = "out.avi";
    public static int avifps = 16;

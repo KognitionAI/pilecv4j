@@ -11,4 +11,11 @@
   <name>lib-nr (${project.version})</name>
   <description>Numerical Recipies in C support (${project.version}) </description>
 
+  <dependencies>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>lib-util</artifactId>
+    </dependency>
+  </dependencies>
+
 </project>

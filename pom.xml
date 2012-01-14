@@ -142,7 +142,7 @@
     <module>lib-util</module>
     <module>lib-nr</module>
     <module>lib-image</module>
-<!--    <module>native</module> -->
+    <module>native</module>
     <!--    <module>s8</module> -->
     <module>test-jiminger</module>
   </modules>

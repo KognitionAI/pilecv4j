@@ -20,8 +20,14 @@
 
 package com.jiminger.nr;
 
+import com.jiminger.util.LibraryLoader;
+
 public class Minimizer
 {
+   static {
+      new LibraryLoader();
+   }
+   
    private Func f;
    private double [] minVec;
 
