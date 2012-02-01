@@ -5,18 +5,13 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 import com.jiminger.nr.LinearRegression;
+import com.jiminger.nr.LinearRegressionWithKnownSlope;
 import com.jiminger.nr.Minimizer;
-import com.jiminger.util.LibraryLoader;
 
 public class TestLinearRegression
 {
    public static double[] slopes = { -3.0D, -2.0D, -1.0D, 0.0D, 1.0D, 2.0D, 3.0D };
    public static double[] yintercepts = { -3.0D, -2.0D, -1.0D, 0.0D, 1.0D, 2.0D, 3.0D };
-   
-   static
-   {
-      new LibraryLoader();
-   }
    
    @Test
    public void testLinearRegression() throws Throwable
@@ -53,6 +48,16 @@ public class TestLinearRegression
       
       assertEquals(slope, newm[0], 0.0001);
       assertEquals(yintercept,newm[1], 0.01);
+      assertEquals((0.0345D * 0.0345D) * 10, err, 0.001);
+      
+      LinearRegressionWithKnownSlope lrws = new LinearRegressionWithKnownSlope(slope,x,y);
+      minimizer = new Minimizer(lrws);
+      m = new double[1];
+      m[0] = -yintercept;
+      err = minimizer.minimize(m);
+      newm = minimizer.getFinalPostion();
+      
+      assertEquals(yintercept,newm[0], 0.01);
       assertEquals((0.0345D * 0.0345D) * 10, err, 0.001);
    }
 
