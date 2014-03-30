@@ -105,7 +105,7 @@ public class ImageFile
    public static void transcode(BufferedImage bi,ImageDestinationDefinition dest)
       throws IOException
    {
-      if (infile.equalsIgnoreCase(dest.outfile))
+      if (infile != null && infile.equalsIgnoreCase(dest.outfile))
          throw new IOException("Can't overwrite original file durring transcode (" + infile + ").");
       
       if (dest.maxw != -1 || dest.maxh != -1)
