@@ -24,9 +24,11 @@ import javax.media.jai.*;
 import java.awt.image.*;
 import java.awt.color.*;
 
-@SuppressWarnings("restriction")
-public class Mask
-{
+/**
+ * A mask underpinned by an array of bytes, each containing an indication as to whether or not
+ * that position is an EDGE (255) or NOEDGE (0).
+ */
+public class Mask {
    public static byte EDGE= (byte)-1;
    public static byte NOEDGE= (byte)0;
 
@@ -111,6 +113,7 @@ public class Mask
    /**
     * Generate a tiled image that contains a view of the mask.
     */
+   @SuppressWarnings("restriction")
    public TiledImage getMaskImage()
    {
       TiledImage ti = new TiledImage(

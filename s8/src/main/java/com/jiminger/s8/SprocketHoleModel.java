@@ -79,7 +79,7 @@ public class SprocketHoleModel implements Model
    {
       // a rotation matrix to transform point counter clockwise
       //  around the origin (which is intuitively 'theta' in a 
-      //  standard cartetian world where the first quardrant 
+      //  standard Cartesian world where the first quadrant 
       //  is in the upper-right hand side of the universe)
       //  is given by:
       // 

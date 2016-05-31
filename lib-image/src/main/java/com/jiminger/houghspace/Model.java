@@ -61,7 +61,7 @@ public interface Model
     *  the y axis will be in terms of the 'row' that the pixel is in, referenced
     *  from the upper left and counting HIGHER (+ in the Y direction) as
     *  the position moves DOWN the image. This is reverse of the normal
-    *  mathematical cartetion space. If the model expect the normal cartetian
+    *  mathematical Cartesian space. If the model expect the normal Cartesian
     *  coordinates then it should return 'true' for the following method.
     */
    public boolean flipYAxis();

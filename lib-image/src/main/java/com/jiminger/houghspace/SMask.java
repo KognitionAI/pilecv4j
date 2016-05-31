@@ -24,15 +24,16 @@ import javax.media.jai.*;
 import java.awt.image.*;
 import java.awt.color.*;
 
-@SuppressWarnings("restriction")
-public class SMask
-{
+/**
+ * A mask underpinned by an array of shorts (hence the 'S'). This is used to hold a raster of 
+ * gradient direction indications.
+ */
+public class SMask {
    /**
-    * Instantiate a mask of the given dimentions assuming 
+    * Instantiate a mask of the given dimensions assuming 
     *  that the reference point is the center of the mask.
     */
-   public SMask(int mwidth, int mheight)
-   {
+   public SMask(int mwidth, int mheight) {
       // mwidth and mheight need to be odd 
       //  so that the center falls exactly
       //  on a pixel.
@@ -50,12 +51,11 @@ public class SMask
 
    /**
     * This instantiates a mask with a reference point not
-    *  centered. This contructor will not adjust the height
+    *  centered. This constructor will not adjust the height
     *  and width that are passed in since the reference 
     *  point is not required to be the center.
     */
-   public SMask(int mwidth, int mheight, int refr, int refc)
-   {
+   public SMask(int mwidth, int mheight, int refr, int refc) {
       this.mwidth = mwidth;
       this.mheight = mheight;
       this.mask = new short[mwidth * mheight];
@@ -69,8 +69,7 @@ public class SMask
     *  EDGE or NOEDGE. Entries in the mask are 
     * accessed by row and column (not x,y).
     */
-   public void set(int r, int c, short v)
-   {
+   public void set(int r, int c, short v) {
       mask[ (r * mwidth) + c ] = v;
    }
 
@@ -88,10 +87,11 @@ public class SMask
    /**
     * Generate a tiled image that contains a view of the mask.
     */
+   @SuppressWarnings("restriction")
    public TiledImage getMaskImage()
    {
       TiledImage ti = new TiledImage(
-         0,0,mwidth,mheight,0,0,
+         0,0,mwidth, mheight,0,0,
          new PixelInterleavedSampleModel(
             DataBuffer.TYPE_BYTE,mwidth,mheight,1,mwidth, Transform.bandstride),
          new ComponentColorModel(

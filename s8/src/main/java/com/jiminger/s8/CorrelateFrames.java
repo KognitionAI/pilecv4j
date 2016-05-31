@@ -96,7 +96,7 @@ public class CorrelateFrames
          // 2->4, 1->3, 0->2
          // 1->4, 0->3
          // 0->4
-         //  ... now the bottow 1/2 of this pyrimid is really impossible.
+         //  ... now the bottom 1/2 of this pyramid is really impossible.
          //  as a matter of fact the last frame on the first strip must be 
          //  in the next strip somewhere so that's all we need to find ...
 
