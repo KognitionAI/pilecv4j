@@ -1,4 +1,3 @@
-
 #Eclipse
 .classpath
 .project
@@ -12,4 +11,4 @@ target
 #project build directories
 native/linux-amd64-jiminger/bin
 
-
+hs_err_*.log

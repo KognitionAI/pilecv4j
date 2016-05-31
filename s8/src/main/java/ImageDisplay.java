@@ -17,9 +17,11 @@
  * http://www.eclipse.org/swt/snippets/
  */
 import java.awt.image.BufferedImage;
+import java.awt.image.ComponentColorModel;
 import java.awt.image.DirectColorModel;
 import java.awt.image.IndexColorModel;
 import java.awt.image.WritableRaster;
+import java.util.Arrays;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.GC;
@@ -177,6 +179,29 @@ public class ImageDisplay {
                 for (int x = 0; x < data.width; x++) {
                     raster.getPixel(x, y, pixelArray);
                     data.setPixel(x, y, pixelArray[0]);
+                }
+            }
+            return data;
+        } else if (bufferedImage.getColorModel() instanceof ComponentColorModel) {
+            ComponentColorModel colorModel = (ComponentColorModel)bufferedImage.getColorModel();
+            
+            int pixelSize = (Arrays.stream(colorModel.getComponentSize()).anyMatch(cs -> cs > 8)) ? 24 : colorModel.getPixelSize();
+
+            //ASSUMES: 3 BYTE BGR IMAGE TYPE
+
+            PaletteData palette = new PaletteData(0x0000FF, 0x00FF00,0xFF0000);
+            ImageData data = new ImageData(bufferedImage.getWidth(), bufferedImage.getHeight(), pixelSize, palette);
+
+            //This is valid because we are using a 3-byte Data model with no transparent pixels
+            data.transparentPixel = -1;
+
+            WritableRaster raster = bufferedImage.getRaster();
+            Object pixelArray = raster.getDataElements(0, 0, (Object)null);
+            for (int y = 0; y < data.height; y++) {
+                for (int x = 0; x < data.width; x++) {
+                    raster.getDataElements(x, y, pixelArray);
+                    int pixel = palette.getPixel(new RGB(colorModel.getRed(pixelArray), colorModel.getGreen(pixelArray), colorModel.getBlue(pixelArray)));
+                    data.setPixel(x, y, pixel);
                 }
             }
             return data;
