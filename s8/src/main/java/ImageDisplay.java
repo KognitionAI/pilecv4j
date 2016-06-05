@@ -24,6 +24,8 @@ import java.awt.image.WritableRaster;
 import java.util.Arrays;
 
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.MouseEvent;
+import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
@@ -55,9 +57,10 @@ public class ImageDisplay {
         dialog.setText ("Open an image file or cancel");
         String string = dialog.open ();
 
+        BufferedImage iioimage = null;
         if (string != null) 
         {
-            BufferedImage iioimage = ImageFile.readImageFile(string);
+            iioimage = ImageFile.readImageFile(string);
             originalImage = new Image(display,convertToSWT(iioimage));
         }
         if (originalImage == null) {
@@ -74,6 +77,21 @@ public class ImageDisplay {
         final Point origin = new Point (0, 0);
         final Canvas canvas = new Canvas (shell, SWT.NO_BACKGROUND |
                 SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL);
+        WritableRaster raster = iioimage.getRaster();
+        canvas.addMouseListener( new MouseListener() {
+			@Override
+			public void mouseUp(MouseEvent e) {}
+			
+			@Override
+			public void mouseDown(MouseEvent e) {
+		        Object pixelArray = raster.getDataElements(e.x, e.y, (Object)null);
+
+            	System.out.println("(" + e.x + ", " + e.y + ")" + Arrays.toString((short[]) pixelArray));
+			}
+			
+			@Override
+			public void mouseDoubleClick(MouseEvent e) {}
+		});
         final ScrollBar hBar = canvas.getHorizontalBar ();
         hBar.addListener (SWT.Selection, new Listener () {
             public void handleEvent (Event e) {

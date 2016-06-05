@@ -36,6 +36,7 @@ import java.awt.image.renderable.RenderedImageFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
@@ -48,6 +49,12 @@ import javax.media.jai.RasterFactory;
 import javax.media.jai.TileCache;
 import javax.media.jai.TiledImage;
 import javax.media.jai.registry.RIFRegistry;
+
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 
 import com.jiminger.houghspace.Transform;
 import com.jiminger.image.ImageFile;
@@ -109,7 +116,7 @@ public class ExtractFrames {
    public static int filmLayout = -1;
    public static int filmType = FilmSpec.superEightFilmType;
    public static int sprocketLayout;
-   public static boolean writeDebugImages = false;
+   public static boolean writeDebugImages = true;
 
    public static String outputType = "JPEG";
 //   public static String outputType = "BMP";
@@ -123,6 +130,27 @@ public class ExtractFrames {
    public static double clusterFactor = 0.2;
 
    public static boolean allowInterframeGeometry = true;
+   
+   static char[] hexChars = new char[] { '0', '1', '2', '3', '4', '5', '6', '7' ,'8', '9' , 'a' ,'b', 'c', 'd', 'e', 'f' };
+   private static String fromHex(byte[] vals) {
+	   StringBuilder sb = new StringBuilder();
+	   for (byte b : vals) sb.append(" ").append(fromHex(b));
+	   return sb.toString();
+   }
+   
+   private static String fromHex(byte b) {
+	   return new StringBuilder().append(hexChars[(int)((b >>> 4) & 0xf)]).append((int)(b & 0xf)).toString();
+   }
+   
+   private static String toShorts(byte[] vals) {
+	   int num = vals.length/2;
+	   short[] res = new short[num];
+	   for (int i = 0; i < num; i++) {
+		   int bi = i * 2;
+		   res[i] = (short)(((short)vals[bi] << 8) & 0xff00  | ((short)vals[bi+1] & 0xff));
+	   }
+	   return Arrays.toString(res);
+   }
 
 //   public static int clampValue = 200;
 
@@ -131,6 +159,7 @@ public class ExtractFrames {
    public static void main(String[] args) 
       throws IOException, InterruptedException, MinimizerException
    {
+	  System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
       com.jiminger.util.Timer totalTime = new com.jiminger.util.Timer();
       totalTime.start();
 
@@ -151,8 +180,7 @@ public class ExtractFrames {
 
       // parse the source filename
       int index = sourceFileName.lastIndexOf(".");
-      if (index < 0)
-      {
+      if (index < 0) {
          System.err.println("\"" + sourceFileName + 
                             "\" has no extention and so I cannot create a subdirectory of the same name.");
          return;
@@ -173,10 +201,22 @@ public class ExtractFrames {
 
       String propertyFileName = outDir + File.separator + "frames.properties";
 
+      /* OpenCV */
+      Mat ocvOrigImage = Imgcodecs.imread(sourceFileName, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+      Imgcodecs.imwrite("ocvOrig.tif", ocvOrigImage);
+      System.out.println("CV image depth: " + ocvOrigImage.depth());
+      System.out.println("CV num channels: " + ocvOrigImage.channels());
+      int origImageHeight = ocvOrigImage.height();
+      int origImageWidth = ocvOrigImage.width();
+
+      short[] pixel = new short[3];
+      ocvOrigImage.get(302, 40, pixel);
+      System.out.println(Arrays.toString(pixel));
+      
       /* Create an operator to decode the image file. */
       RenderedImage origImage = ImageFile.readImageFile(sourceFileName);
-      int origImageWidth = origImage.getWidth();
-      int origImageHeight = origImage.getHeight();
+      System.out.println("" + origImageWidth  + "=" + origImage.getWidth());
+      System.out.println("" + origImageHeight + "=" + origImage.getHeight());
 
       com.jiminger.util.Timer timer = new com.jiminger.util.Timer();
 
@@ -186,6 +226,15 @@ public class ExtractFrames {
       // Create a grayscale color model.
       timer.start();
       System.out.print("converting image to grayscale ... ");
+      
+      /* OpenCV */
+      Mat ocvGrayscaleImage = new Mat(origImageHeight,origImageWidth,CvType.CV_16UC1);
+      Imgproc.cvtColor(ocvOrigImage, ocvGrayscaleImage, Imgproc.COLOR_RGB2GRAY);
+      System.out.println("Depth of grayscale:" + ocvGrayscaleImage.depth());
+      if (writeDebugImages)
+    	  Imgcodecs.imwrite("ocvtmpgray.bmp", ocvGrayscaleImage);
+      
+      /* JAI */
       ColorSpace colorSpace = ColorSpace.getInstance(ColorSpace.CS_GRAY);
       int bits[] = new int[] {8};
       ColorModel cm = new ComponentColorModel(colorSpace, bits, false, false,
@@ -207,7 +256,7 @@ public class ExtractFrames {
       // Perform the color conversion.
       RenderedImage grayscaleImage = JAI.create("ColorConvert", pb1, rh);
       if (writeDebugImages)
-         ImageFile.writeImageFile(grayscaleImage,"tmpgray.bmp", "BMP");
+         ImageFile.writeImageFile(grayscaleImage,"tmpgray.tif", "TIF");
       System.out.println("done (" + timer.stop() + ")");
       //------------------------------------------------------------
 
