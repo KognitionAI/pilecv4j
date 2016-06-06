@@ -19,40 +19,25 @@ package com.jiminger.s8;
 ****************************************************************************/
 
 import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.awt.Transparency;
-import java.awt.color.ColorSpace;
+import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
-import java.awt.image.ComponentColorModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.IndexColorModel;
 import java.awt.image.PixelInterleavedSampleModel;
 import java.awt.image.Raster;
-import java.awt.image.RenderedImage;
-import java.awt.image.SampleModel;
-import java.awt.image.renderable.ParameterBlock;
-import java.awt.image.renderable.RenderedImageFactory;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
-import javax.media.jai.ImageLayout;
-import javax.media.jai.JAI;
-import javax.media.jai.OperationDescriptor;
-import javax.media.jai.OperationRegistry;
-import javax.media.jai.RasterFactory;
-import javax.media.jai.TileCache;
 import javax.media.jai.TiledImage;
-import javax.media.jai.registry.RIFRegistry;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
@@ -61,7 +46,6 @@ import com.jiminger.image.ImageFile;
 import com.jiminger.image.Point;
 import com.jiminger.image.PolarLineFit;
 import com.jiminger.image.WeightedPoint;
-import com.jiminger.image.canny.EdgeDetectorDescriptor;
 import com.jiminger.image.canny.EdgeDetectorOpImage;
 import com.jiminger.image.jai.AddOverlayOpImage;
 import com.jiminger.nr.Minimizer;
@@ -100,8 +84,8 @@ public class ExtractFrames {
    public static long tileCacheSize = defaultTileCacheSize * megaBytes;
    public static String sourceFileName = null;
    public static int resolutiondpi = 3200;
-   public static float tlow = 0.5f;
-   public static float thigh = 0.9f;
+   public static int tlow = 50;
+   public static int thigh = 200;
    public static float sigma = 6.0f;
    public static int houghThreshold = 150;
    public static boolean reverseImage = false;
@@ -131,31 +115,68 @@ public class ExtractFrames {
 
    public static boolean allowInterframeGeometry = true;
    
-   static char[] hexChars = new char[] { '0', '1', '2', '3', '4', '5', '6', '7' ,'8', '9' , 'a' ,'b', 'c', 'd', 'e', 'f' };
-   private static String fromHex(byte[] vals) {
-	   StringBuilder sb = new StringBuilder();
-	   for (byte b : vals) sb.append(" ").append(fromHex(b));
-	   return sb.toString();
+   public static final double[] cvrtScaleDenom = new double[ 6 ];
+   
+   static {
+	   cvrtScaleDenom[CvType.CV_16U] = (double)((int) 0xffff);
+	   cvrtScaleDenom[CvType.CV_16S] = (double)((int) 0x7fff);
+	   cvrtScaleDenom[CvType.CV_8U] = (double)((int) 0xff);
+	   cvrtScaleDenom[CvType.CV_8S] = (double)((int) 0x7f);
    }
    
-   private static String fromHex(byte b) {
-	   return new StringBuilder().append(hexChars[(int)((b >>> 4) & 0xf)]).append((int)(b & 0xf)).toString();
+   public static BufferedImage mat2Img(Mat in) {
+       BufferedImage out;
+       byte[] data = new byte[in.width() * in.height() * (int)in.elemSize()];
+       int type;
+       in.get(0, 0, data);
+
+       if(in.channels() == 1)
+           type = BufferedImage.TYPE_BYTE_GRAY;
+       else
+           type = BufferedImage.TYPE_3BYTE_BGR;
+
+       out = new BufferedImage(in.width(), in.height(), type);
+
+       out.getRaster().setDataElements(0, 0, in.width(), in.height(), data);
+       return out;
    }
    
-   private static String toShorts(byte[] vals) {
-	   int num = vals.length/2;
-	   short[] res = new short[num];
-	   for (int i = 0; i < num; i++) {
-		   int bi = i * 2;
-		   res[i] = (short)(((short)vals[bi] << 8) & 0xff00  | ((short)vals[bi+1] & 0xff));
-	   }
-	   return Arrays.toString(res);
+   public static void print(String prefix, Mat im) {
+	   System.out.println(prefix + "{ depth=(" + CvType.ELEM_SIZE(im.type()) + ", " + im.depth() + "), channels=" + im.channels() + " HxW=" + im.height() + "x" + im.width() );
+   }
+   
+   public static final double _256Ov2Pi = (256.0/(2.0 * Math.PI));
+
+   public static byte angle_byte(double x, double y) {
+      double xu, yu, ang;
+      double ret;
+      int rret;
+
+      xu = Math.abs(x);
+      yu = Math.abs(y);
+
+      if((xu == 0) && (yu == 0)) return(0);
+
+      ang = Math.atan(yu/xu);
+
+      if(x >= 0){
+         if(y >= 0) ret=ang;
+         else ret=(2.0*Math.PI - ang);
+      }
+      else{
+         if(y >= 0) ret=(Math.PI - ang);
+         else ret=(Math.PI + ang);
+      }
+
+      rret = (int)(0.5 + (ret * _256Ov2Pi));
+      if (rret >= 256)
+         rret = 0;
+
+      return byteify((int)rret);
    }
 
-//   public static int clampValue = 200;
-
+   
    /** The main method. */
-   @SuppressWarnings("unchecked")
    public static void main(String[] args) 
       throws IOException, InterruptedException, MinimizerException
    {
@@ -172,12 +193,6 @@ public class ExtractFrames {
       if (!commandLine(args))
          return;
 
-      // Set the tile cache up on JAI
-      TileCache tc = JAI.createTileCache(tileCacheSize);
-      JAI jai = JAI.getDefaultInstance();
-      jai.setTileCache(tc);
-      registerOps();
-
       // parse the source filename
       int index = sourceFileName.lastIndexOf(".");
       if (index < 0) {
@@ -186,37 +201,24 @@ public class ExtractFrames {
          return;
       }
 
-      // create the output directory (if necessary)
-      //  for the individual frames
+      // create the output directory (if necessary) for the individual frames
       String outDir = sourceFileName.substring(0,index);
       File dir = new File(outDir);
       dir.mkdir();
       int lastSlashIndex = sourceFileName.lastIndexOf("\\");
       if (lastSlashIndex <0)
          lastSlashIndex = sourceFileName.lastIndexOf("/");
-//      String baseImageFilename = sourceFileName.substring(lastSlashIndex + 1);
       String destFileName = outDir + File.separator + frameFilenameBase;
-      System.out.println("going to write frames to " + destFileName + "xx." + 
-                         outputExt);
+      System.out.println("going to write frames to " + destFileName + "xx." + outputExt);
 
       String propertyFileName = outDir + File.separator + "frames.properties";
 
-      /* OpenCV */
-      Mat ocvOrigImage = Imgcodecs.imread(sourceFileName, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
-      Imgcodecs.imwrite("ocvOrig.tif", ocvOrigImage);
-      System.out.println("CV image depth: " + ocvOrigImage.depth());
-      System.out.println("CV num channels: " + ocvOrigImage.channels());
-      int origImageHeight = ocvOrigImage.height();
-      int origImageWidth = ocvOrigImage.width();
-
-      short[] pixel = new short[3];
-      ocvOrigImage.get(302, 40, pixel);
-      System.out.println(Arrays.toString(pixel));
-      
-      /* Create an operator to decode the image file. */
-      RenderedImage origImage = ImageFile.readImageFile(sourceFileName);
-      System.out.println("" + origImageWidth  + "=" + origImage.getWidth());
-      System.out.println("" + origImageHeight + "=" + origImage.getHeight());
+      Mat origImage = Imgcodecs.imread(sourceFileName, Imgcodecs.CV_LOAD_IMAGE_UNCHANGED);
+      if (writeDebugImages)
+    	  Imgcodecs.imwrite("orig.tif", origImage);
+      print("origImage", origImage);
+      int origImageHeight = origImage.height();
+      int origImageWidth = origImage.width();
 
       com.jiminger.util.Timer timer = new com.jiminger.util.Timer();
 
@@ -225,97 +227,88 @@ public class ExtractFrames {
       //------------------------------------------------------------
       // Create a grayscale color model.
       timer.start();
-      System.out.print("converting image to grayscale ... ");
+      Mat workingImage = new Mat();
+      if (origImage.depth() != CvType.CV_8U) {
+    	  System.out.print("converting image to 8-bit grayscale ... ");
+    	  origImage.convertTo(workingImage, CvType.CV_8U, 255.0 / cvrtScaleDenom[origImage.depth()]);
+          if (writeDebugImages)
+        	  Imgcodecs.imwrite("8bit.bmp", workingImage);
+          print("converted", workingImage);
+      } else
+    	  origImage.copyTo(workingImage);
       
-      /* OpenCV */
-      Mat ocvGrayscaleImage = new Mat(origImageHeight,origImageWidth,CvType.CV_16UC1);
-      Imgproc.cvtColor(ocvOrigImage, ocvGrayscaleImage, Imgproc.COLOR_RGB2GRAY);
-      System.out.println("Depth of grayscale:" + ocvGrayscaleImage.depth());
+      Mat grayImage = new Mat();
+      Imgproc.cvtColor(workingImage, grayImage, Imgproc.COLOR_BGR2GRAY);
       if (writeDebugImages)
-    	  Imgcodecs.imwrite("ocvtmpgray.bmp", ocvGrayscaleImage);
+    	  Imgcodecs.imwrite("gray.bmp", grayImage);
+      print("workingImage", workingImage);
       
-      /* JAI */
-      ColorSpace colorSpace = ColorSpace.getInstance(ColorSpace.CS_GRAY);
-      int bits[] = new int[] {8};
-      ColorModel cm = new ComponentColorModel(colorSpace, bits, false, false,
-                                              Transparency.OPAQUE,
-                                              DataBuffer.TYPE_BYTE);
-
-      ImageLayout il = new ImageLayout(origImage);
-      il.setColorModel(cm);
-      SampleModel srcSM = il.getSampleModel(origImage);
-      il.setSampleModel(RasterFactory.createComponentSampleModel(srcSM,srcSM.getDataType(),
-                                                                 srcSM.getWidth(),
-                                                                 srcSM.getHeight(),1));
-      RenderingHints rh = new RenderingHints(JAI.KEY_IMAGE_LAYOUT,il);
-
-      ParameterBlock pb1 = new ParameterBlock();
-      pb1.addSource(origImage);
-      pb1.add(cm);
-
-      // Perform the color conversion.
-      RenderedImage grayscaleImage = JAI.create("ColorConvert", pb1, rh);
-      if (writeDebugImages)
-         ImageFile.writeImageFile(grayscaleImage,"tmpgray.tif", "TIF");
       System.out.println("done (" + timer.stop() + ")");
       //------------------------------------------------------------
 
-//      //------------------------------------------------------------
-//      // now we clamp the grayscale image since the holes and edges
-//      //  should be bright wight
-//      //------------------------------------------------------------
-//      timer.start();
-//      System.out.print("clamping image ... ");
-//      double [] lowerBound = new double[1];
-//      lowerBound[0] = (double)clampValue;
-//      RenderedImage clampedImage = JAI.create("Clamp", grayscaleImage, lowerBound);
-//      JAI.create("filestore",clampedImage,"tmpclamp.bmp", "BMP", null);
-//      System.out.println("done (" + timer.stop() + ")");
-
       //------------------------------------------------------------
       //   This does a canny edge detection and puts the gradient
-      //    directrion image in the GradientDirectionImageHolder
+      //    direction image in the GradientDirectionImageHolder
       //    object (if one is supplied).
       //------------------------------------------------------------
       timer.start();
       System.out.print("performing canny edge detection ... ");
-      EdgeDetectorOpImage.GradientDirectionImageHolder ih = new EdgeDetectorOpImage.GradientDirectionImageHolder();
-
-      //--------------------------------------
-// The following create call has been deprecated. Instead JAI wants us to use
-// a ParameterBlock to set the values to pass to create.
-//      RenderedImage edgeImage = JAI.create("EdgeDetector",grayscaleImage, new Float(tlow), new Float(thigh), new Float(sigma),ih);
-      ParameterBlock pb2 = new ParameterBlock();
-      pb2.addSource(grayscaleImage);
-      pb2.add(new Float(tlow));
-      pb2.add(new Float(thigh));
-      pb2.add(new Float(sigma));
-      pb2.add(ih);
-      RenderedImage edgeImage = JAI.create("EdgeDetector",pb2);
+      System.out.print("blurring ... ");
+      Imgproc.blur(grayImage, grayImage, new Size(3, 3));
+      Imgcodecs.imwrite("blur.bmp", grayImage);
+      System.out.print("canny ... "); 
+      Mat edgeImage = new Mat();
+      Imgproc.Canny(grayImage, edgeImage, 50, 200, 3, true);
+      System.out.println("done.");
+      if (writeDebugImages)
+    	  Imgcodecs.imwrite("edge.tiff", edgeImage);
+      print("edge", edgeImage);
       //--------------------------------------
       
+      //--------------------------------------
+      //   Make the gradient images
+      //--------------------------------------
+      System.out.print("Making gradient image ... ");
+      Mat dx = new Mat();
+      Mat dy = new Mat();
+      Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0);
+      Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1);
+      if (writeDebugImages) {
+    	  Imgcodecs.imwrite("dx.tiff", dx);
+    	  Imgcodecs.imwrite("dy.tiff", dy);
+      }
+      short[] dxs = new short[dx.height() * dx.width()];
+      dx.get(0, 0, dxs);
+      short[] dys = new short[dy.height() * dy.width()];
+      byte[] dirs = new byte[dx.height() * dx.width()];
+      dy.get(0, 0, dys);
+      for (int pos=0; pos < dxs.length; pos++) {
+    	  final double dxv = (double)dxs[pos];
+    	  final double dyv = 0.0 - (double)dys[pos];
+    	  dirs[pos] = angle_byte(dxv,dyv);
+      }
+      Mat gradientDirImage = new Mat(dx.height(), dx.width(), CvType.CV_8UC1);
+      gradientDirImage.put(0,0,dirs);
       if (writeDebugImages)
-         ImageFile.writeImageFile(edgeImage,"tmpedge.bmp", "BMP");
-      Raster edgeRaster = edgeImage.getData();
-      TiledImage gradient = ih.ti;
-      Raster gradientRaster = gradient.getData();
-      if (writeDebugImages)
-         ImageFile.writeImageFile(gradient,"tmpgrad.bmp", "BMP");
-      System.out.println("done (" + timer.stop() + ")");
-      //------------------------------------------------------------
-
+    	  Imgcodecs.imwrite("gradDir.bmp", gradientDirImage);
+      System.out.println("done.");
+      print("dx",dx);
+      print("dy",dy);
+      
+      Raster edgeRaster = mat2Img(edgeImage).getRaster();
+      Raster gradientDirRaster = mat2Img(gradientDirImage).getRaster();
+      
       //------------------------------------------------------------
       //  Now load up the edges of the image. This will set the values
       //   of sprocketEdge and farEdge to the appropriate value
       //------------------------------------------------------------
       timer.start();
       System.out.print("finding the edges of the film ... ");
-      FilmEdge [] filmedges = FilmEdge.getEdges(filmLayout,edgeRaster,EdgeDetectorOpImage.EDGE,gradientRaster,true);
+      FilmEdge [] filmedges = FilmEdge.getEdges(filmLayout,edgeRaster,EdgeDetectorOpImage.EDGE,gradientDirRaster,true);
       FilmEdge sprocketEdge = reverseImage ? filmedges[0] : filmedges[1];
       FilmEdge farEdge = reverseImage ? filmedges[1] : filmedges[0];
-//      System.out.println("done (" + timer.stop() + ")");
-//      System.out.println("film edges:" + sprocketEdge + " " + farEdge);
-//      System.exit(0);
+      System.out.println("done (" + timer.stop() + ")");
+      System.out.println("film edges:" + sprocketEdge + " " + farEdge);
       //------------------------------------------------------------
 
       //------------------------------------------------------------
@@ -371,7 +364,7 @@ public class ExtractFrames {
       // Execute the hough transform on the edge image
       System.out.print("executing hough transform (" + rowstart + "->" + 
                        rowend + "," + colstart + "->" + colend + ")" + "... ");
-      Transform.HoughSpace houghSpace = transform.transform(edgeRaster,gradientRaster,houghThreshold,
+      Transform.HoughSpace houghSpace = transform.transform(edgeRaster,gradientDirRaster,houghThreshold,
                                                             rowstart,rowend,colstart,colend);
       if (writeDebugImages)
          ImageFile.writeImageFile(transform.getTransformImage(houghSpace),"tmpht.bmp", "BMP");
@@ -386,7 +379,7 @@ public class ExtractFrames {
             DataBuffer.TYPE_BYTE,origImageWidth,origImageHeight,1,origImageWidth, bandstride),
          getOverlayCM());
 
-// This commented out code if for me to look at the resulting edges.
+//      // This commented out code if for me to look at the resulting edges.
 //      PolarLineFit.drawPolarLine(sprocketEdge.r,sprocketEdge.c,sprocketInfoTiledImage,Color.cyan);
 //      PolarLineFit.drawPolarLine(farEdge.r,farEdge.c,sprocketInfoTiledImage,Color.cyan);
 //      JAI.create("filestore",sprocketInfoTiledImage,"tmpsprockets.bmp", "BMP", null);
@@ -526,7 +519,7 @@ public class ExtractFrames {
          java.util.List<Transform.Fit> verifiedSprockets = new ArrayList<Transform.Fit>();
          int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
          if (!FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength,
-        		 (List<WeightedPoint>)(Object)sprockets,(List<WeightedPoint>)(Object)verifiedSprockets))
+        		 sprockets,(List<WeightedPoint>)(Object)verifiedSprockets))
          {
             // in the odd case where this fails, assume it's due to the fact that
             // the first point in the list was actually not a real sprocket hole
@@ -536,7 +529,7 @@ public class ExtractFrames {
                verifiedSprockets.clear();
                // try again
                done = FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength,
-                     (List<WeightedPoint>)((List<?>)sprockets),(List<WeightedPoint>)((List<?>)verifiedSprockets));
+                     sprockets,(List<WeightedPoint>)((List<?>)verifiedSprockets));
 
                if (done)
                   sprockets = verifiedSprockets;
@@ -639,50 +632,54 @@ public class ExtractFrames {
          String frameNumStr = (i < 10) ? ("0" + i) : Integer.toString(i);
 
          System.out.print(".");
-         TiledImage frameTiledImage = frame.cutFrame(
+         Mat frameTiledImageMat = frame.cutFrame(
             origImage,resolutiondpi,frameWidthPix, frameHeightPix, reverseImage,i, frameOversizeMult,
             rescale, correctrotation);
-
-         if (frameTiledImage != null)
-         {
-            if (dowatermark)
-            {
-               Graphics2D fg = frameTiledImage.createGraphics();
-               fg.setColor(Color.white);
-               fg.drawString(sourceFileName + " " + frameNumStr,watermarkPositionX,watermarkPositionY);
-            }
-
-//// This commented out code writes the cyan edge into the original picture and then recuts the 
-////  the frame so that it can get picked up in the final image         
-////         System.out.println (" frame " + i + " bound by " + frame.topmostRow + "," + frame.leftmostCol + "," + frame.bottommostRow + "," + frame.rightmostCol);
-//            com.jiminger.util.PolarLineFit.drawPolarLine(sprocketEdgePiece.r,sprocketEdgePiece.c, origImageOverlayer,Color.cyan,
-//                          0, frame.leftmostCol, origImageHeight-1, frame.rightmostCol/*, frame.topmostRow,0*/);
+         
+         Imgcodecs.imwrite("f" + frameNumStr + ".tiff", frameTiledImageMat);
+         
+//         BufferedImage frameTiledImage = mat2Img(frameTiledImageMat);
 //
-//            com.jiminger.util.PolarLineFit.drawPolarLine(farEdgePiece.r,farEdgePiece.c,origImageOverlayer,Color.cyan,
-//                          0, frame.leftmostCol, origImageHeight-1,frame.rightmostCol/*, -(origImageHeight-1-frame.bottommostRow),0*/);
+//         if (frameTiledImage != null)
+//         {
+//            if (dowatermark)
+//            {
+//               Graphics2D fg = frameTiledImage.createGraphics();
+//               fg.setColor(Color.white);
+//               fg.drawString(sourceFileName + " " + frameNumStr,watermarkPositionX,watermarkPositionY);
+//            }
 //
-//            frameTiledImage = frame.cutFrame(
-//               origImage,resolutiondpi,frameWidthPix, frameHeightPix, reverseImage,i,frameOversizeMult);
-////--------------------------------------------------------------------------
-
-            // there is no reason
-            if (!frame.isOutOfBounds())
-               ImageFile.writeImageFile(frameTiledImage, 
-                                        destFileName + frameNumStr + "." + outputExt, 
-                                        outputType);
-
-            // callculate the resolution
-//            double calcedSprocketResDPI = resolutiondpi * frameReference.scale;
-            resolutionsum += calcedEdgeResDPI;
-
-            prop.setProperty("frames." + Integer.toString(i) + ".filename",
-                             frameFilenameBase + frameNumStr + "." + outputExt);
-         }
-         else
-         {
-            System.out.println("Failed to cut image for frame " + i);
-            prop.setProperty("frame." + Integer.toString(i) + ".dropped","true");
-         }
+////// This commented out code writes the cyan edge into the original picture and then recuts the 
+//////  the frame so that it can get picked up in the final image         
+//////         System.out.println (" frame " + i + " bound by " + frame.topmostRow + "," + frame.leftmostCol + "," + frame.bottommostRow + "," + frame.rightmostCol);
+////            com.jiminger.util.PolarLineFit.drawPolarLine(sprocketEdgePiece.r,sprocketEdgePiece.c, origImageOverlayer,Color.cyan,
+////                          0, frame.leftmostCol, origImageHeight-1, frame.rightmostCol/*, frame.topmostRow,0*/);
+////
+////            com.jiminger.util.PolarLineFit.drawPolarLine(farEdgePiece.r,farEdgePiece.c,origImageOverlayer,Color.cyan,
+////                          0, frame.leftmostCol, origImageHeight-1,frame.rightmostCol/*, -(origImageHeight-1-frame.bottommostRow),0*/);
+////
+////            frameTiledImage = frame.cutFrame(
+////               origImage,resolutiondpi,frameWidthPix, frameHeightPix, reverseImage,i,frameOversizeMult);
+//////--------------------------------------------------------------------------
+//
+//            // there is no reason
+//            if (!frame.isOutOfBounds())
+//               ImageFile.writeImageFile(frameTiledImage, 
+//                                        destFileName + frameNumStr + "." + outputExt, 
+//                                        outputType);
+//
+//            // callculate the resolution
+////            double calcedSprocketResDPI = resolutiondpi * frameReference.scale;
+//            resolutionsum += calcedEdgeResDPI;
+//
+//            prop.setProperty("frames." + Integer.toString(i) + ".filename",
+//                             frameFilenameBase + frameNumStr + "." + outputExt);
+//         }
+//         else
+//         {
+//            System.out.println("Failed to cut image for frame " + i);
+//            prop.setProperty("frame." + Integer.toString(i) + ".dropped","true");
+//         }
 
          frame.addProperties("frames." + Integer.toString(i), prop);
       }
@@ -704,20 +701,8 @@ public class ExtractFrames {
    }
 
    static double [] startingPowell = { 512.0, 512.0 };
+   private static int [] bandstride = { 0 };
 
-   static private void registerOps()
-   {
-      {
-         EdgeDetectorDescriptor edDescriptor = new EdgeDetectorDescriptor();
-         OperationDescriptor odesc = edDescriptor;
-         RenderedImageFactory rif = edDescriptor;
-         String operationName = "edgeDetector";
-         String productName = "com.jiminger";
-         OperationRegistry or = JAI.getDefaultInstance().getOperationRegistry();
-         or.registerDescriptor(odesc);
-         RIFRegistry.register(or, operationName, productName, rif);
-      }
-   }
 
    static private boolean commandLine(String[] args)
    {
@@ -807,11 +792,11 @@ public class ExtractFrames {
 
       tmps = cl.getProperty("tl");
       if (tmps != null)
-         tlow = Float.parseFloat(tmps);
+         tlow = Integer.parseInt(tmps);
 
       tmps = cl.getProperty("th");
       if (tmps != null)
-         thigh = Float.parseFloat(tmps);
+         thigh = Integer.parseInt(tmps);
 
       System.out.println("   Canny details:");
       System.out.println("     using a canny hysteresis high threshold of " + thigh);
@@ -942,15 +927,11 @@ public class ExtractFrames {
       return new IndexColorModel(8,256,r,g,b);
    }
 
-   private static int [] bandstride = { 0 };
-
-   private static byte byteify(int i)
-   {
+   private static byte byteify(int i) {
       return i > 127 ? (byte)(i - 256) : (byte)i;
    }
 
-   private static int intify(byte b)
-   {
+   private static int intify(byte b) {
       return (b < 0) ? ((int)b) + 256 : (int)b;
    }
 

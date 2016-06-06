@@ -12,3 +12,7 @@ target
 native/linux-amd64-jiminger/bin
 
 hs_err_*.log
+
+s8/*.tif
+s8/*.bmp
+s8/*.tiff

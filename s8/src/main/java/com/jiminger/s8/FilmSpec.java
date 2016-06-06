@@ -145,7 +145,7 @@ public class FilmSpec
    @SuppressWarnings("unchecked") // this is about the STUPIDEST needed annotation ever. Java simply SUCKS!
    // If I have a list of Points, then I have a list of WeightedPoints. Why the F@&^ doesn't java know this?
    public static boolean interframeFilter(int filmType, int filmLayout, int resolutiondpi, int imgLength, 
-                                          List<WeightedPoint> points, 
+                                          List<? extends WeightedPoint> points, 
                                           List<WeightedPoint> verifiedClusters)
    {
       List<WeightedPoint> sprockets = new ArrayList<WeightedPoint>();

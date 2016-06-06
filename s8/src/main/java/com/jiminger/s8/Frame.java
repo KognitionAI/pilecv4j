@@ -29,6 +29,8 @@ import javax.media.jai.RasterAccessor;
 import javax.media.jai.RasterFormatTag;
 import javax.media.jai.TiledImage;
 
+import org.opencv.core.Mat;
+
 import com.jiminger.houghspace.Transform;
 import com.jiminger.image.PolarLineFit;
 
@@ -181,6 +183,69 @@ public class Frame
 
       frameCut = true;
       return ret;
+   }
+   
+   public Mat cutFrame(Mat image, double resdpi,
+		   int frameWidthPix, int frameHeightPix, 
+		   boolean reverseImage, int frameNum, 
+		   double scaleMult, boolean rescale, 
+		   boolean correctrotation)
+   {
+	   noCut = false;
+	   if (farEdge == null || farEdge.stdDev > worstEdgeStdDevAllowed)
+	   {
+		   System.out.println("WARNING: far film edge for frame " + frameNum + " has a stdDev of " + 
+				   (farEdge == null ? "null" : Double.toString(farEdge.stdDev)) + 
+				   " and will not be used.");
+
+		   if (sprocketEdge == null || sprocketEdge.stdDev > worstEdgeStdDevAllowed)
+		   {
+			   System.out.println("WARNING: near film edge for frame " + frameNum + " has a stdDev of " + 
+					   (sprocketEdge == null ? "null" : Double.toString(sprocketEdge.stdDev)) + 
+					   " and will not be used.");
+			   noCut = true;
+			   return null;
+		   }
+		   else
+			   preMapSetupUsingSprocketEdge(frameWidthPix,frameHeightPix,scaleMult,reverseImage,rescale,correctrotation);
+	   }
+	   else
+		   preMapSetupUsingFarEdge(frameWidthPix,frameHeightPix,scaleMult,reverseImage,rescale,correctrotation);
+
+	   outOfBounds = false;
+
+	   CvRaster srcraster = CvRaster.create(image.height(), image.width(), image.type());
+	   srcraster.loadFrom(image);
+	   CvRaster dstraster = CvRaster.create(frameHeightPix, frameWidthPix, srcraster.type);
+
+	   int srcwidth = srcraster.cols;
+	   int srcheight = srcraster.rows;
+
+	   int dstwidth = dstraster.cols;
+	   int dstheight = dstraster.rows;
+
+	   for(int dstRow = 0; dstRow < dstheight; dstRow++) {
+		   for(int dstCol = 0; dstCol < dstwidth; dstCol++) {
+			   Point srclocation = map(dstRow,dstCol,frameWidthPix,frameHeightPix,reverseImage);
+
+			   if (leftmostCol > srclocation.x) leftmostCol = srclocation.x;
+			   if (rightmostCol < srclocation.x) rightmostCol = srclocation.x;
+			   if (topmostRow > srclocation.y) topmostRow = srclocation.y;
+			   if (bottommostRow < srclocation.y) bottommostRow = srclocation.y;
+
+			   if (srclocation.y < 0 || srclocation.y >= srcheight || 
+					   srclocation.x < 0 || srclocation.x >= srcwidth) {
+				   dstraster.zero(dstRow, dstCol);
+				   outOfBounds = true;
+			   }
+			   else
+				   dstraster.set(dstRow, dstCol, srcraster.get(srclocation.y, srclocation.x));
+		   }
+	   }
+
+	   frameCut = true;
+	   
+	   return dstraster.toMat();
    }
 
    public void addProperties(String section, Properties prop)

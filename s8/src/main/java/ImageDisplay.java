@@ -86,7 +86,7 @@ public class ImageDisplay {
 			public void mouseDown(MouseEvent e) {
 		        Object pixelArray = raster.getDataElements(e.x, e.y, (Object)null);
 
-            	System.out.println("(" + e.x + ", " + e.y + ")" + Arrays.toString((short[]) pixelArray));
+            	System.out.println("(" + e.x + ", " + e.y + ")" + Arrays.toString((byte[]) pixelArray));
 			}
 			
 			@Override
