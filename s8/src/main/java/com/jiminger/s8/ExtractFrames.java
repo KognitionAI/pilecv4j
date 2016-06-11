@@ -24,7 +24,6 @@ import java.awt.image.ColorModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.IndexColorModel;
 import java.awt.image.PixelInterleavedSampleModel;
-import java.awt.image.Raster;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -42,6 +41,8 @@ import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import com.jiminger.houghspace.Transform;
+import com.jiminger.image.CvRaster;
+import com.jiminger.image.CvRaster.PixelAggregate;
 import com.jiminger.image.ImageFile;
 import com.jiminger.image.Point;
 import com.jiminger.image.PolarLineFit;
@@ -115,15 +116,6 @@ public class ExtractFrames {
 
    public static boolean allowInterframeGeometry = true;
    
-   public static final double[] cvrtScaleDenom = new double[ 6 ];
-   
-   static {
-	   cvrtScaleDenom[CvType.CV_16U] = (double)((int) 0xffff);
-	   cvrtScaleDenom[CvType.CV_16S] = (double)((int) 0x7fff);
-	   cvrtScaleDenom[CvType.CV_8U] = (double)((int) 0xff);
-	   cvrtScaleDenom[CvType.CV_8S] = (double)((int) 0x7f);
-   }
-   
    public static BufferedImage mat2Img(Mat in) {
        BufferedImage out;
        byte[] data = new byte[in.width() * in.height() * (int)in.elemSize()];
@@ -142,7 +134,7 @@ public class ExtractFrames {
    }
    
    public static void print(String prefix, Mat im) {
-	   System.out.println(prefix + "{ depth=(" + CvType.ELEM_SIZE(im.type()) + ", " + im.depth() + "), channels=" + im.channels() + " HxW=" + im.height() + "x" + im.width() );
+	   System.out.println(prefix + " { depth=(" + CvType.ELEM_SIZE(im.type()) + ", " + im.depth() + "), channels=" + im.channels() + " HxW=" + im.height() + "x" + im.width()  + " }");
    }
    
    public static final double _256Ov2Pi = (256.0/(2.0 * Math.PI));
@@ -174,7 +166,29 @@ public class ExtractFrames {
 
       return byteify((int)rret);
    }
-
+   
+   public static final double[] cvrtScaleDenom = new double[ 6 ];
+   
+   static {
+	   cvrtScaleDenom[CvType.CV_16U] = (double)((int) 0xffff);
+	   cvrtScaleDenom[CvType.CV_16S] = (double)((int) 0x7fff);
+	   cvrtScaleDenom[CvType.CV_8U] = (double)((int) 0xff);
+	   cvrtScaleDenom[CvType.CV_8S] = (double)((int) 0x7f);
+   }
+   
+   public static Mat convertToGray(Mat src) {
+	   Mat workingImage = new Mat();
+	   if (src.depth() != CvType.CV_8U) {
+		   System.out.print("converting image to 8-bit grayscale ... ");
+		   src.convertTo(workingImage, CvType.CV_8U, 255.0 / cvrtScaleDenom[src.depth()]);
+		   Imgproc.cvtColor(workingImage, workingImage, Imgproc.COLOR_BGR2GRAY);
+		   return workingImage;
+	   } else {
+		   src.copyTo(workingImage);
+		   Imgproc.cvtColor(src, workingImage, Imgproc.COLOR_BGR2GRAY);
+		   return workingImage;
+	   }
+   }
    
    /** The main method. */
    public static void main(String[] args) 
@@ -227,21 +241,10 @@ public class ExtractFrames {
       //------------------------------------------------------------
       // Create a grayscale color model.
       timer.start();
-      Mat workingImage = new Mat();
-      if (origImage.depth() != CvType.CV_8U) {
-    	  System.out.print("converting image to 8-bit grayscale ... ");
-    	  origImage.convertTo(workingImage, CvType.CV_8U, 255.0 / cvrtScaleDenom[origImage.depth()]);
-          if (writeDebugImages)
-        	  Imgcodecs.imwrite("8bit.bmp", workingImage);
-          print("converted", workingImage);
-      } else
-    	  origImage.copyTo(workingImage);
-      
-      Mat grayImage = new Mat();
-      Imgproc.cvtColor(workingImage, grayImage, Imgproc.COLOR_BGR2GRAY);
+      Mat grayImage = convertToGray(origImage);
       if (writeDebugImages)
     	  Imgcodecs.imwrite("gray.bmp", grayImage);
-      print("workingImage", workingImage);
+      print("grayImage", grayImage);
       
       System.out.println("done (" + timer.stop() + ")");
       //------------------------------------------------------------
@@ -258,10 +261,10 @@ public class ExtractFrames {
       Imgcodecs.imwrite("blur.bmp", grayImage);
       System.out.print("canny ... "); 
       Mat edgeImage = new Mat();
-      Imgproc.Canny(grayImage, edgeImage, 50, 200, 3, true);
+      Imgproc.Canny(grayImage, edgeImage, tlow, thigh, 3, true);
       System.out.println("done.");
       if (writeDebugImages)
-    	  Imgcodecs.imwrite("edge.tiff", edgeImage);
+    	  Imgcodecs.imwrite("edge.bmp", edgeImage);
       print("edge", edgeImage);
       //--------------------------------------
       
@@ -295,8 +298,8 @@ public class ExtractFrames {
       print("dx",dx);
       print("dy",dy);
       
-      Raster edgeRaster = mat2Img(edgeImage).getRaster();
-      Raster gradientDirRaster = mat2Img(gradientDirImage).getRaster();
+      CvRaster edgeRaster = CvRaster.create(edgeImage);
+      CvRaster gradientDirRaster = CvRaster.create(gradientDirImage);
       
       //------------------------------------------------------------
       //  Now load up the edges of the image. This will set the values
@@ -354,12 +357,12 @@ public class ExtractFrames {
       SprocketHoleModel sm = new SprocketHoleModel(resolutiondpi,filmType,filmLayout);
       Transform transform = new Transform(sm,quantFactor,10.0);
 
-      // write out the mask and the gradient mask 
-      //  for debugging purposes
-      if (writeDebugImages)
-         ImageFile.writeImageFile(transform.getMask().getMaskImage(),"tmpmask.bmp", "BMP");
-      if (writeDebugImages)
-         ImageFile.writeImageFile(transform.getGradientDirMask().getMaskImage(),"tmpgradmask.bmp", "BMP");
+//      // write out the mask and the gradient mask 
+//      //  for debugging purposes
+//      if (writeDebugImages)
+//         ImageFile.writeImageFile(transform.getMask().getMaskImage(),"tmpmask.bmp", "BMP");
+//      if (writeDebugImages)
+//         ImageFile.writeImageFile(transform.getGradientDirMask().getMaskImage(),"tmpgradmask.bmp", "BMP");
 
       // Execute the hough transform on the edge image
       System.out.print("executing hough transform (" + rowstart + "->" + 
@@ -618,8 +621,7 @@ public class ExtractFrames {
          //  scanners) we will measure the distance from the sprocket hole to each edge
          //  and add them.
          double calcedEdgeResDPI = -1.0;
-         if (sprocketEdgePiece != null && farEdgePiece != null)
-         {
+         if (sprocketEdgePiece != null && farEdgePiece != null) {
             double distPix = PolarLineFit.perpendicularDistance(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r) +
                PolarLineFit.perpendicularDistance(frameReference,farEdgePiece.c, farEdgePiece.r);
 
@@ -636,7 +638,9 @@ public class ExtractFrames {
             origImage,resolutiondpi,frameWidthPix, frameHeightPix, reverseImage,i, frameOversizeMult,
             rescale, correctrotation);
          
-         Imgcodecs.imwrite("f" + frameNumStr + ".tiff", frameTiledImageMat);
+         frameTiledImageMat = linearContrast(frameTiledImageMat,0, 0.3);
+         
+         Imgcodecs.imwrite("f" + frameNumStr + ".tif", frameTiledImageMat);
          
 //         BufferedImage frameTiledImage = mat2Img(frameTiledImageMat);
 //
@@ -698,6 +702,179 @@ public class ExtractFrames {
       PropertiesUtils.saveProps(prop,propertyFileName,"frame properties for source image " + sourceFileName);
 
       System.out.println("total time for entire process is " + totalTime.stop());
+   }
+   
+   private static class Hist {
+	   public final int[] h = new int[0xffff + 1];
+	   public int max = 0;
+   }
+   
+   private static Mat applyCdf(int[] cdf, CvRaster src) {
+	   int maxPixVal = cdf.length - 1; // should be either 0xff or 0xffff
+	   if (maxPixVal != 0xff && maxPixVal != 0xffff)
+		   throw new RuntimeException();
+	   double maxPixValD = (double)maxPixVal;
+       double max = cdf[maxPixVal];
+       double[] scale = new double[maxPixVal + 1];
+       double factor = maxPixValD / max;
+       for (int idx = 0; idx < scale.length; idx++)
+      	 scale[idx] = (double)cdf[idx] * factor;
+       
+       final CvRaster tmp = CvRaster.create(src.rows, src.cols, CvType.CV_32SC3);
+       
+       int maxChannel = 0;
+       for (int r = 0; r < src.rows; r++) {
+      	 for (int c = 0; c < src.cols; c++) {
+      		 short[] sbgr = (short[])src.get(r, c);
+          	 double intensity = ((int)sbgr[0] & maxPixVal);
+          	 for (int idx=1; idx<sbgr.length;idx++) intensity += (double)((int)sbgr[idx] & maxPixVal);
+          	 intensity /= 3.0;
+          	 double boost = scale[(int)Math.round(intensity)] / intensity;
+          	 int[] newpix = new int[3];
+          	 for (int idx = 0; idx < 3; idx++) {
+          		 int cv = (int) Math.round(((int)sbgr[idx] & maxPixVal) * boost);
+          		 if (maxChannel < cv) maxChannel = cv;
+          		 newpix[idx] = cv;
+          	 }
+          	 tmp.set(r, c, newpix);
+      	 }
+       }
+       
+       // now rescale so maxChannel is 0xffff.
+       double rescale = maxPixValD / (double) maxChannel;
+       for (int r = 0; r < tmp.rows; r++) {
+    	   for (int c = 0; c < tmp.cols; c++) {
+    		   int[] bgr = (int[])tmp.get(r, c);
+    		   short[] sbgr = new short[3];
+    		   for (int i =0; i < 3; i++) sbgr[i] = (short)((int)Math.round((double)bgr[i] * rescale) & 0xffff); 
+    		   src.set(r, c, sbgr);
+    	   }
+       }
+       
+       return src.toMat();
+   }
+   
+   public static PixelAggregate<Object, Hist> histogram(int maxPixVal) {
+	   return (h, pixel, row, col) -> {
+    	 short[] sbgr = (short[])pixel;
+    	 final int b = ((int)sbgr[0] & maxPixVal);
+    	 final int g = ((int)sbgr[1] & maxPixVal);
+    	 final int r = ((int)sbgr[2] & maxPixVal);
+    	 int intensity = r + g + b;
+    	 h.h[(int)Math.round((double)intensity / 3.0)]++;
+    	 if (h.max < r) h.max = r;
+    	 if (h.max < g) h.max = g;
+    	 if (h.max < b) h.max = b;
+    	 return h;
+     };
+   }
+
+   public static Mat linearContrast(Mat src, double lowerpct, double upperpct) {
+       CvRaster raster = CvRaster.create(src);
+       final int maxPixVal = 0xffff;
+       
+       System.out.print("|");
+       Hist cdf = raster.reduce(new Hist(), histogram(maxPixVal));
+       
+       // convert hist to cdf
+       for (int idx = 1; idx < cdf.h.length; idx++) 
+      	 cdf.h[idx] = cdf.h[idx - 1] + cdf.h[idx];
+
+       int pixelCount = raster.rows * raster.cols;
+       
+       int lowerBoundCount = (int) Math.round((double)pixelCount * lowerpct);
+       int upperBoundCount = pixelCount - (int) Math.round((double)pixelCount * upperpct);
+       
+       int lowerBound = -1;
+       int upperBound = -1;
+       for (int i = 0; i < cdf.h.length; i++) {
+    	   if (cdf.h[i] >= lowerBoundCount) {
+    		   lowerBound = i;
+    		   break;
+    	   }
+       }
+       
+       for (int i = cdf.h.length - 1; i >= 0; i--) {
+    	   if (cdf.h[i] <= upperBoundCount) {
+    		   upperBound = i;
+    		   break;
+    	   }
+       }
+       
+       // line goes from lowerBound, 0.0 -> upperBound, maxPixVal
+       double range = (double)(upperBound - lowerBound);
+       double maxPixValD = (double)maxPixVal;
+       int[] mapping = new int[cdf.h.length];
+       for (int i = 0; i < mapping.length; i++) {
+    	   if (i <= lowerBound) mapping[i] = 0;
+    	   else if (i >= upperBound) mapping[i] = maxPixVal;
+    	   else {
+    		   double x = (double) (i - lowerBound);
+    		   double v = (x / range) * maxPixValD;
+    		   mapping[i] = (int)Math.round(v);
+    	   }
+       }
+
+       System.out.print("+");
+       return applyCdf(mapping,raster);
+   }
+
+   public static Mat equalize(Mat src) {
+       CvRaster raster = CvRaster.create(src);
+       
+       final int maxPixVal = 0xffff;
+       
+       System.out.print("|");
+       Hist cdf = raster.reduce(new Hist(), histogram(maxPixVal));
+       System.out.print("+");
+       
+       // convert hist to cdf
+       for (int idx = 1; idx < cdf.h.length; idx++) 
+      	 cdf.h[idx] = cdf.h[idx - 1] + cdf.h[idx];
+       
+       return applyCdf(cdf.h, raster);
+   }
+
+   public static Mat sigmoidNormalize(Mat src) {
+       CvRaster raster = CvRaster.create(src);
+       
+       System.out.print("|");
+       final Hist dfunc = raster.reduce(new Hist(), histogram(0xffff));
+       System.out.print("+");
+       
+       // convert hist to cdf
+       for (int idx = 1; idx < dfunc.h.length; idx++) 
+      	 dfunc.h[idx] = dfunc.h[idx - 1] + dfunc.h[idx];
+       
+       double max = (double) dfunc.h[dfunc.h.length - 1];
+       
+       // minimize the error to a sigmoid
+	   final int[] mapping = new int[dfunc.h.length];
+       Minimizer.Func sigmoidError = p -> {
+    	   double sumerr2 = 0.0;
+		   double mn = sigmoid(0.0,p[0], p[1]);
+		   double mx = sigmoid((double)0xffff, p[0],p[1]);
+    	   for (int i = 0; i < mapping.length; i++) {
+    		   double sigmoid = sigmoid((double)i, p[0], p[1]);
+    		   double val = (sigmoid - mn) / (mx - mn);
+    		   mapping[i] = (int)Math.round(val * max);
+    		   double err = (val * max) - (double)dfunc.h[i];
+    		   double err2 = err * err;
+    		   sumerr2 += err2;
+    	   }
+    	   return sumerr2;
+       };
+       
+       Minimizer mm = new Minimizer(sigmoidError);
+       double finalerr = mm.minimize(new double[] { (double)0xffff / 6.0, (double)0xffff / 2.0 });
+       System.out.print("(m=" + mm.getFinalPostion()[0] + ",b=" + mm.getFinalPostion()[1] + ")");
+       
+       return applyCdf(mapping,raster);
+   }
+   
+   static double sigmoid(double x, double m, double b) {
+	   double mt = 0.0 - (x - b) / m;
+	   return 1.0 / (1.0 + Math.pow(Math.E, mt));
    }
 
    static double [] startingPowell = { 512.0, 512.0 };

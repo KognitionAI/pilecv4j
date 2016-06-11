@@ -27,6 +27,7 @@ import java.util.List;
 
 import javax.media.jai.TiledImage;
 
+import com.jiminger.image.CvRaster;
 import com.jiminger.image.PolarLineFit;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
@@ -57,8 +58,7 @@ public class FilmEdge
     * This method will cut a piece of the film edge at r,c (or the closest
     *  point along the edge line) with a total length of 'extent'.
     */
-   public FilmEdge edgePiece(double x0r, double x0c, double extent, boolean usedPruned)
-   {
+   public FilmEdge edgePiece(double x0r, double x0c, double extent, boolean usedPruned) {
 //      // Using a polar defined line P we need to find the point on that
 //      //  line closest to another point X0 (defined as Xi)
 //      //
@@ -157,9 +157,7 @@ public class FilmEdge
     *  will be the edge that is closest to the sprocket if the image is 
     *  not reversed.
     */
-   public static FilmEdge [] getEdges(
-      int filmLayout, Raster edgeImage, byte edgeVal, 
-      Raster gradientRaster, boolean prune)
+   public static FilmEdge [] getEdges(int filmLayout, CvRaster edgeImage, byte edgeVal, CvRaster gradientRaster, boolean prune)
       throws MinimizerException
    {
       List<Point> l1;
@@ -348,9 +346,7 @@ public class FilmEdge
          image.setSample(p.x,p.y,0,(int)overlayPixelValue);
    }
 
-   private static List<Point> getTopEdge(Raster edgeImage, byte edgeVal, 
-                                  Raster gradientRaster)
-   {
+   private static List<Point> getTopEdge(CvRaster edgeImage, byte edgeVal, CvRaster gradientRaster) {
       double requiredGradDirDeg = 90.0; // X axis is 0 degrees
       double gradientDirSlopDeg = 90.0; // tolerance degrees
       short gradientDirSlopBytePM = // translated to short
@@ -358,13 +354,11 @@ public class FilmEdge
       short requiredGradDir = // looking for upward pointing gradient
          (short)(1.0 + (requiredGradDirDeg * (256.0/360.0))); 
 
-      byte [] image = 
-         ((DataBufferByte)edgeImage.getDataBuffer()).getData();
-      byte [] gradient = 
-         ((DataBufferByte)gradientRaster.getDataBuffer()).getData();
+      byte [] image = (byte[])edgeImage.data;
+      byte [] gradient = (byte[])gradientRaster.data;
 
-      int height = edgeImage.getHeight();
-      int width = edgeImage.getWidth();
+      int height = edgeImage.rows;
+      int width = edgeImage.cols;
       List<Point> ret = new ArrayList<Point>();
 
       for (int c = 0; c < width; c++)
@@ -395,8 +389,7 @@ public class FilmEdge
       return ret;
    }
 
-   private static List<Point> getBottomEdge(Raster edgeImage, byte edgeVal,
-                                     Raster gradientRaster)
+   private static List<Point> getBottomEdge(CvRaster edgeImage, byte edgeVal, CvRaster gradientRaster)
    {
       double requiredGradDirDeg = 270.0; // X axis is 0 degrees
       double gradientDirSlopDeg = 90.0; // tolerance degrees
@@ -405,13 +398,11 @@ public class FilmEdge
       short requiredGradDir = // looking for upward pointing gradient
          (short)(1.0 + (requiredGradDirDeg * (256.0/360.0))); 
 
-      byte [] image = 
-         ((DataBufferByte)edgeImage.getDataBuffer()).getData();
-      byte [] gradient = 
-         ((DataBufferByte)gradientRaster.getDataBuffer()).getData();
+      byte [] image = (byte[])edgeImage.data;
+      byte [] gradient = (byte[])gradientRaster.data;
 
-      int height = edgeImage.getHeight();
-      int width = edgeImage.getWidth();
+      int height = edgeImage.rows;
+      int width = edgeImage.cols;
       List<Point> ret = new ArrayList<Point>();
 
       for (int c = 0; c < width; c++)
@@ -442,9 +433,7 @@ public class FilmEdge
       return ret;
    }
 
-   private static List<Point> getLeftEdge(Raster edgeImage, byte edgeVal,
-                                   Raster gradientRaster)
-   {
+   private static List<Point> getLeftEdge(CvRaster edgeImage, byte edgeVal, CvRaster gradientRaster) {
       double requiredGradDirDeg = 0.0; // X axis is 0 degrees
       double gradientDirSlopDeg = 90.0; // tolerance degrees
       short gradientDirSlopBytePM = // translated to short
@@ -452,13 +441,11 @@ public class FilmEdge
       short requiredGradDir = // looking for upward pointing gradient
          (short)(1.0 + (requiredGradDirDeg * (256.0/360.0))); 
 
-      byte [] image = 
-         ((DataBufferByte)edgeImage.getDataBuffer()).getData();
-      byte [] gradient = 
-         ((DataBufferByte)gradientRaster.getDataBuffer()).getData();
+      byte [] image = (byte[])edgeImage.data;
+      byte [] gradient = (byte[])gradientRaster.data;
 
-      int height = edgeImage.getHeight();
-      int width = edgeImage.getWidth();
+      int height = edgeImage.rows;
+      int width = edgeImage.cols;
       List<Point> ret = new ArrayList<Point>();
 
 //      for (int i = 0; i < height; i++)
@@ -492,8 +479,7 @@ public class FilmEdge
       return ret;
    }
 
-   private static List<Point> getRightEdge(Raster edgeImage, byte edgeVal,
-                                    Raster gradientRaster)
+   private static List<Point> getRightEdge(CvRaster edgeImage, byte edgeVal, CvRaster gradientRaster)
    {
       double requiredGradDirDeg = 180.0; // X axis is 0 degrees
       double gradientDirSlopDeg = 90.0; // tolerance degrees
@@ -502,13 +488,11 @@ public class FilmEdge
       short requiredGradDir = // looking for upward pointing gradient
          (short)(1.0 + (requiredGradDirDeg * (256.0/360.0))); 
 
-      byte [] image = 
-         ((DataBufferByte)edgeImage.getDataBuffer()).getData();
-      byte [] gradient = 
-         ((DataBufferByte)gradientRaster.getDataBuffer()).getData();
+      byte [] image = (byte[])edgeImage.data;
+      byte [] gradient = (byte[])gradientRaster.data;
 
-      int height = edgeImage.getHeight();
-      int width = edgeImage.getWidth();
+      int height = edgeImage.rows;
+      int width = edgeImage.cols;
       List<Point> ret = new ArrayList<Point>();
 
 //      for (int i = 0; i < height; i++)

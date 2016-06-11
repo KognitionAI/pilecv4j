@@ -20,7 +20,7 @@
 
 package com.jiminger.nr;
 
-public class MinimizerException extends Exception
+public class MinimizerException extends RuntimeException
 {
     private static final long serialVersionUID = 2687515753273397453L;
 

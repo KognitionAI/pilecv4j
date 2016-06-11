@@ -32,6 +32,7 @@ import javax.media.jai.TiledImage;
 import org.opencv.core.Mat;
 
 import com.jiminger.houghspace.Transform;
+import com.jiminger.image.CvRaster;
 import com.jiminger.image.PolarLineFit;
 
 @SuppressWarnings("restriction")
@@ -192,8 +193,7 @@ public class Frame
 		   boolean correctrotation)
    {
 	   noCut = false;
-	   if (farEdge == null || farEdge.stdDev > worstEdgeStdDevAllowed)
-	   {
+	   if (farEdge == null || farEdge.stdDev > worstEdgeStdDevAllowed) {
 		   System.out.println("WARNING: far film edge for frame " + frameNum + " has a stdDev of " + 
 				   (farEdge == null ? "null" : Double.toString(farEdge.stdDev)) + 
 				   " and will not be used.");

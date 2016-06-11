@@ -27,7 +27,6 @@ import java.awt.image.ComponentColorModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.PixelInterleavedSampleModel;
-import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -39,6 +38,7 @@ import java.util.Map;
 
 import javax.media.jai.TiledImage;
 
+import com.jiminger.image.CvRaster;
 import com.jiminger.image.WeightedPoint;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
@@ -91,21 +91,21 @@ public class Transform
     * This method assumes raster is an edge detected image. If gradient raster is supplied
     *   then it will be used to greatly improve the results.
     */
-   public HoughSpace transform(Raster raster, Raster gradientRaster,int houghThreshold)
+   public HoughSpace transform(CvRaster raster, CvRaster gradientRaster,int houghThreshold)
    {
-      int height = raster.getHeight();
-      int width = raster.getWidth();
+      int height = raster.rows;
+      int width = raster.cols;
       return transform(raster,gradientRaster,houghThreshold,0,height-1,0,width-1);
    }
 
-   public HoughSpace transform(Raster raster, Raster gradientRaster,int houghThreshold,
+   public HoughSpace transform(CvRaster raster, CvRaster gradientRaster,int houghThreshold,
                                int rowstart, int rowend, int colstart, int colend)
    {
-      byte [] image = ((DataBufferByte)raster.getDataBuffer()).getData();
-      int height = raster.getHeight();
-      int width = raster.getWidth();
+      byte [] image = (byte[])raster.data;
+      int height = raster.rows;
+      int width = raster.cols;
 
-      byte [] gradientDirImage = gradientRaster == null ? null : ((DataBufferByte)gradientRaster.getDataBuffer()).getData();
+      byte [] gradientDirImage = gradientRaster == null ? null : (byte[])gradientRaster.data;
 
       // the size of the hough space should be quantFactor smaller
       int htheight = (int)(((double)height)/quantFactor) + 1;

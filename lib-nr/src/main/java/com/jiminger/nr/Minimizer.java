@@ -38,8 +38,7 @@ public class Minimizer
    // static lock ... JNI code used is not threadsafe
    public static Object lock = new Object();
 
-   public Minimizer(Func f)
-   {
+   public Minimizer(Func f) {
       this.f = f;
    }
 
@@ -65,8 +64,8 @@ public class Minimizer
       return minVec;
    }
 
-   public interface Func
-   {
+   @FunctionalInterface
+   public interface Func {
       public double func(double [] x);
    }
 
