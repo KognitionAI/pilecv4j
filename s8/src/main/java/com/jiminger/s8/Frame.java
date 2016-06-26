@@ -18,24 +18,16 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
-
 import java.awt.Point;
-import java.awt.image.Raster;
-import java.awt.image.RenderedImage;
 import java.util.Properties;
-
-import javax.media.jai.RasterAccessor;
-import javax.media.jai.RasterFormatTag;
-import javax.media.jai.TiledImage;
 
 import org.opencv.core.Mat;
 
 import com.jiminger.houghspace.Transform;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.PolarLineFit;
+import com.jiminger.image.drawing.Utils;
 
-@SuppressWarnings("restriction")
 public class Frame
 {
    public static final double worstEdgeStdDevAllowed = 1.0;
@@ -78,114 +70,6 @@ public class Frame
 
    }
 
-   public TiledImage cutFrame(RenderedImage image, double resdpi,
-                              int frameWidthPix, int frameHeightPix, 
-                              boolean reverseImage, int frameNum, 
-                              double scaleMult, boolean rescale, 
-                              boolean correctrotation)
-   {
-      noCut = false;
-      if (farEdge == null || farEdge.stdDev > worstEdgeStdDevAllowed)
-      {
-         System.out.println("WARNING: far film edge for frame " + frameNum + " has a stdDev of " + 
-                            (farEdge == null ? "null" : Double.toString(farEdge.stdDev)) + 
-                            " and will not be used.");
-
-         if (sprocketEdge == null || sprocketEdge.stdDev > worstEdgeStdDevAllowed)
-         {
-            System.out.println("WARNING: near film edge for frame " + frameNum + " has a stdDev of " + 
-                               (sprocketEdge == null ? "null" : Double.toString(sprocketEdge.stdDev)) + 
-                               " and will not be used.");
-            noCut = true;
-            return null;
-         }
-         else
-            preMapSetupUsingSprocketEdge(frameWidthPix,frameHeightPix,scaleMult,reverseImage,rescale,correctrotation);
-      }
-      else
-         preMapSetupUsingFarEdge(frameWidthPix,frameHeightPix,scaleMult,reverseImage,rescale,correctrotation);
-
-      outOfBounds = false;
-
-//      double resdpmm = resdpi / FilmSpec.mmPerInch;
-//      double [] spec = FilmSpec.filmModel(filmType);
-
-      TiledImage ret = new TiledImage(
-         0,0,frameWidthPix,frameHeightPix,0,0,
-         image.getSampleModel().createCompatibleSampleModel(frameWidthPix,frameHeightPix),
-         image.getColorModel());
-
-      RenderedImage [] srcs = new RenderedImage[1];
-      srcs[0] = image;
-      RasterFormatTag[] tags = RasterAccessor.findCompatibleTags(srcs,ret);
-      RasterFormatTag srctag = tags[0];
-      RasterFormatTag dsttag = tags[1];
-
-      Raster srcraster = image.getData();
-      RasterAccessor srcra = 
-         new RasterAccessor(srcraster, srcraster.getBounds(), srctag, image.getColorModel());
-
-      Raster dstraster = ret.getWritableTile(0,0);
-      RasterAccessor dstra = 
-         new RasterAccessor(dstraster, dstraster.getBounds(), dsttag, ret.getColorModel());
-
-      int srcwidth = srcra.getWidth();
-      int srcheight = srcra.getHeight();
-//      int srcbandcount = srcra.getNumBands();
-      byte bandedsrc[][] = srcra.getByteDataArrays();
-      int srcBandOffsets[] = srcra.getBandOffsets();
-      int srcPixelStride = srcra.getPixelStride();
-      int srcScanLineStride = srcra.getScanlineStride();
-
-      int dstwidth = dstra.getWidth();
-      int dstheight = dstra.getHeight();
-      int dstbandcount = dstra.getNumBands();
-      byte bandeddst[][] = dstra.getByteDataArrays();
-      int dstBandOffsets[] = dstra.getBandOffsets();
-      int dstPixelStride = dstra.getPixelStride();
-      int dstScanLineStride = dstra.getScanlineStride();
-
-      for(int band = 0; band < dstbandcount; band++)
-      {
-         byte dst[] = bandeddst[band];
-         byte src[] = bandedsrc[band];
-         int srcBegCurBand = srcBandOffsets[band];
-         int dstBegCurRow = dstBandOffsets[band];
-         for(int dstRow = 0; dstRow < dstheight; dstRow++)
-         {
-            int dstpos = dstBegCurRow;
-
-            for(int dstCol = 0; dstCol < dstwidth; dstCol++)
-            {
-               Point srclocation = map(dstRow,dstCol,frameWidthPix,frameHeightPix,reverseImage);
-
-               if (leftmostCol > srclocation.x) leftmostCol = srclocation.x;
-               if (rightmostCol < srclocation.x) rightmostCol = srclocation.x;
-               if (topmostRow > srclocation.y) topmostRow = srclocation.y;
-               if (bottommostRow < srclocation.y) bottommostRow = srclocation.y;
-
-               if (srclocation.y < 0 || srclocation.y >= srcheight || 
-                   srclocation.x < 0 || srclocation.x >= srcwidth)
-               {
-                  dst[dstpos] = (byte)0;
-                  outOfBounds = true;
-               }
-               else
-                  dst[dstpos] = src[srcBegCurBand + 
-                                    ((srclocation.y * srcScanLineStride) + 
-                                     (srclocation.x * srcPixelStride))];
-
-               dstpos += dstPixelStride;
-            }
-
-            dstBegCurRow += dstScanLineStride;
-         }
-      }
-
-      frameCut = true;
-      return ret;
-   }
-   
    public Mat cutFrame(Mat image, double resdpi,
 		   int frameWidthPix, int frameHeightPix, 
 		   boolean reverseImage, int frameNum, 
@@ -378,7 +262,7 @@ public class Frame
       //  move cfc along the line between the sprocket hole center and 
       //  the far edge starting from the point right in the middle.
       com.jiminger.image.Point nearPoint = 
-          PolarLineFit.closest(fit,sprocketEdge.c,sprocketEdge.r);
+          Utils.closest(fit,sprocketEdge.c,sprocketEdge.r);
 
       double nearPointRow = nearPoint.getRow();
       double nearPointCol = nearPoint.getCol();
@@ -488,7 +372,7 @@ public class Frame
       //  and relative to the center of the frame. So now we need to
       //  move cfc along the line between the sprocket hole center and 
       //  the far edge starting from the point right in the middle.
-      com.jiminger.image.Point farPoint = PolarLineFit.closest(fit,farEdge.c,farEdge.r);
+      com.jiminger.image.Point farPoint = Utils.closest(fit,farEdge.c,farEdge.r);
 
       double farPointRow = farPoint.getRow();
       double farPointCol = farPoint.getCol();

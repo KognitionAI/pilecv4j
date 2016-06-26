@@ -29,13 +29,12 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import javax.media.jai.JAI;
-
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.LibraryLoader;
-import com.sun.media.jai.codec.FileSeekableStream;
 
-@SuppressWarnings("restriction")
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.core.Mat;
+
 public class MJPEGWriter
 {
    static {
@@ -74,14 +73,12 @@ public class MJPEGWriter
          );
       
       List<File> fileList = Arrays.asList(files);
-      Collections.sort(fileList, new Comparator<File>()
-      {
+      Collections.sort(fileList, new Comparator<File>() {
          @Override
          public int compare(File o1, File o2)
          {
             return o1.getName().compareTo(o2.getName());
          }
-         
       });
 
       
@@ -96,18 +93,15 @@ public class MJPEGWriter
       cleanUp();
    }
 
-   private static void usage()
-   {
+   private static void usage() {
       System.out.println("usage: java [javaargs] com.jiminger.mjpeg.MJPEGWriter -pdir parentDir [-avifile out.avi] [-avifps 16]");
    }
 
-   public static boolean commandLine(String [] args)
-   {
+   public static boolean commandLine(String [] args) {
       CommandLineParser cl = new CommandLineParser(args);
       // see if we are asking for help
       if (cl.getProperty("help") != null || 
-          cl.getProperty("-help") != null)
-      {
+          cl.getProperty("-help") != null) {
          usage();
          return false;
       }
@@ -135,29 +129,12 @@ public class MJPEGWriter
    static private int width = -1;
    static private int height = -1;
 
-   static public boolean appendFile(String filename)
-   {
-//      System.out.println("File: " + filename);
-      if (height == -1)
-      {
-         FileSeekableStream stream = null;
-         try 
-         {
-            stream = new FileSeekableStream(filename);
-
-            RenderedImage origImage = JAI.create("stream", stream);
-            width = origImage.getWidth();
-            height = origImage.getHeight();
-
-            stream.close();
-         } 
-         catch (IOException e)
-         {
-            return false;
-         }
-
+   static public boolean appendFile(String filename) {
+      if (height == -1) {
+          Mat origImage = Imgcodecs.imread(filename);
+          width = origImage.cols();
+          height = origImage.rows();
       }
-
       return doappendFile(filename,width,height);
    }
 

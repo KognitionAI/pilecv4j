@@ -19,7 +19,7 @@ package com.jiminger.s8;
 ****************************************************************************/
 
 import java.awt.Color;
-import java.awt.image.BufferedImage;
+import java.awt.Graphics2D;
 import java.awt.image.ColorModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.IndexColorModel;
@@ -31,9 +31,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
 
-import javax.media.jai.TiledImage;
-
-import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
@@ -47,12 +44,14 @@ import com.jiminger.image.ImageFile;
 import com.jiminger.image.Point;
 import com.jiminger.image.PolarLineFit;
 import com.jiminger.image.WeightedPoint;
-import com.jiminger.image.canny.EdgeDetectorOpImage;
-import com.jiminger.image.jai.AddOverlayOpImage;
+import com.jiminger.image.drawing.Utils;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
+import com.jiminger.util.LibraryLoader;
 import com.jiminger.util.PropertiesUtils;
+
+import static com.jiminger.image.drawing.Utils.*;
 
 /*******************************************************************
  * Because I had to look this up 8000 times I decided to document it.
@@ -71,7 +70,6 @@ import com.jiminger.util.PropertiesUtils;
  *  
  ********************************************************************/
 
-@SuppressWarnings("restriction")
 public class ExtractFrames {
    public static final long megaBytes = 1024L * 1024L;
    public static final long defaultTileCacheSize = 300;
@@ -81,6 +79,17 @@ public class ExtractFrames {
    public static int frameWidthPix = -1;
 
    public static double frameOversizeMult = 1.0;
+   
+   private static byte EDGE = (byte)-1;
+   private static final byte ROVERLAY = (byte)100;
+   private static final byte GOVERLAY = (byte)101;
+   private static final byte BOVERLAY = (byte)102;
+   private static final byte YOVERLAY = (byte)103;
+   private static final byte COVERLAY = (byte)104;
+   private static final byte MOVERLAY = (byte)105;
+   private static final byte OOVERLAY = (byte)106;
+   private static final byte GRAYOVERLAY = (byte)107;
+
 
    public static long tileCacheSize = defaultTileCacheSize * megaBytes;
    public static String sourceFileName = null;
@@ -115,27 +124,6 @@ public class ExtractFrames {
    public static double clusterFactor = 0.2;
 
    public static boolean allowInterframeGeometry = true;
-   
-   public static BufferedImage mat2Img(Mat in) {
-       BufferedImage out;
-       byte[] data = new byte[in.width() * in.height() * (int)in.elemSize()];
-       int type;
-       in.get(0, 0, data);
-
-       if(in.channels() == 1)
-           type = BufferedImage.TYPE_BYTE_GRAY;
-       else
-           type = BufferedImage.TYPE_3BYTE_BGR;
-
-       out = new BufferedImage(in.width(), in.height(), type);
-
-       out.getRaster().setDataElements(0, 0, in.width(), in.height(), data);
-       return out;
-   }
-   
-   public static void print(String prefix, Mat im) {
-	   System.out.println(prefix + " { depth=(" + CvType.ELEM_SIZE(im.type()) + ", " + im.depth() + "), channels=" + im.channels() + " HxW=" + im.height() + "x" + im.width()  + " }");
-   }
    
    public static final double _256Ov2Pi = (256.0/(2.0 * Math.PI));
 
@@ -191,10 +179,8 @@ public class ExtractFrames {
    }
    
    /** The main method. */
-   public static void main(String[] args) 
-      throws IOException, InterruptedException, MinimizerException
-   {
-	  System.loadLibrary(Core.NATIVE_LIBRARY_NAME);
+   public static void main(String[] args) throws IOException, InterruptedException, MinimizerException {
+	  /*LibraryLoader ll =*/ new LibraryLoader(); // load all libs on classpath.
       com.jiminger.util.Timer totalTime = new com.jiminger.util.Timer();
       totalTime.start();
 
@@ -307,7 +293,7 @@ public class ExtractFrames {
       //------------------------------------------------------------
       timer.start();
       System.out.print("finding the edges of the film ... ");
-      FilmEdge [] filmedges = FilmEdge.getEdges(filmLayout,edgeRaster,EdgeDetectorOpImage.EDGE,gradientDirRaster,true);
+      FilmEdge [] filmedges = FilmEdge.getEdges(filmLayout,edgeRaster,EDGE,gradientDirRaster,true);
       FilmEdge sprocketEdge = reverseImage ? filmedges[0] : filmedges[1];
       FilmEdge farEdge = reverseImage ? filmedges[1] : filmedges[0];
       System.out.println("done (" + timer.stop() + ")");
@@ -369,19 +355,14 @@ public class ExtractFrames {
                        rowend + "," + colstart + "->" + colend + ")" + "... ");
       Transform.HoughSpace houghSpace = transform.transform(edgeRaster,gradientDirRaster,houghThreshold,
                                                             rowstart,rowend,colstart,colend);
-      if (writeDebugImages)
-         ImageFile.writeImageFile(transform.getTransformImage(houghSpace),"tmpht.bmp", "BMP");
+      if (writeDebugImages) Imgcodecs.imwrite("tmpht.bmp", transform.getTransformImage(houghSpace));
       System.out.println("done (" + timer.stop() + ")");
       //------------------------------------------------------------
 
       timer.start();
       System.out.print("writing transform information to debug image ... ");
-      TiledImage sprocketInfoTiledImage = new TiledImage(
-         0,0,origImageWidth, origImageHeight,0,0,
-         new PixelInterleavedSampleModel(
-            DataBuffer.TYPE_BYTE,origImageWidth,origImageHeight,1,origImageWidth, bandstride),
-         getOverlayCM());
-
+      CvRaster sprocketInfoTiledImage = CvRaster.create(origImageHeight, origImageWidth, CvType.CV_8UC1);
+      
 //      // This commented out code if for me to look at the resulting edges.
 //      PolarLineFit.drawPolarLine(sprocketEdge.r,sprocketEdge.c,sprocketInfoTiledImage,Color.cyan);
 //      PolarLineFit.drawPolarLine(farEdge.r,farEdge.c,sprocketInfoTiledImage,Color.cyan);
@@ -392,9 +373,9 @@ public class ExtractFrames {
 
       timer.start();
       System.out.print("calculating inverse hough transform ...");
-      java.util.List<Transform.HoughSpaceEntry> hse = transform.inverseTransform(houghSpace,sprocketInfoTiledImage,AddOverlayOpImage.GOVERLAY,Color.red);
+      List<Transform.HoughSpaceEntry> hse = transform.inverseTransform(houghSpace,sprocketInfoTiledImage,GOVERLAY,ROVERLAY);
       System.out.println("done (" + timer.stop() + ")");
-
+      
       //------------------------------------------------------------
       // locate the clusters in the transform and prune off
       //  clusters that cant be appropriate based on known information
@@ -420,7 +401,7 @@ public class ExtractFrames {
          double distToFarEdge = 
             PolarLineFit.perpendicularDistance(cluster, farEdge.c, farEdge.r);
          Point p = 
-            PolarLineFit.closest(cluster, sprocketEdge.c, sprocketEdge.r);
+            Utils.closest(cluster, sprocketEdge.c, sprocketEdge.r);
          double distBetweenEdgesAtCluster = 
             PolarLineFit.perpendicularDistance(p, farEdge.c, farEdge.r);
          double distToCloseEdge = PolarLineFit.distance(cluster,p);
@@ -457,7 +438,7 @@ public class ExtractFrames {
             done = true;
       }
 
-      Transform.drawClusters(clusters,sprocketInfoTiledImage,Color.blue);
+      Transform.drawClusters(clusters,sprocketInfoTiledImage,BOVERLAY);
       System.out.println("done (" + timer.stop() + ")");
       //------------------------------------------------------------
 
@@ -477,13 +458,11 @@ public class ExtractFrames {
       double sprocketWidthPix = FilmSpec.inPixels(filmType,FilmSpec.widthIndex,resolutiondpi);
       double sprocketHeightPix = FilmSpec.inPixels(filmType,FilmSpec.heightIndex,resolutiondpi);
       int minNumPixels = (int)((sprocketWidthPix > sprocketHeightPix ? sprocketWidthPix : sprocketHeightPix) + 0.5);
-      for (int i = clusters.size() - 1; i >= 0; i--)
-      {
+      for (int i = clusters.size() - 1; i >= 0; i--) {
          prunnedEdges.clear();
          Transform.Cluster cluster = (Transform.Cluster)clusters.get(i);
          Transform.Fit fit = 
-            transform.bestFit(cluster, sprocketInfoTiledImage, AddOverlayOpImage.ROVERLAY, 
-                              AddOverlayOpImage.GOVERLAY, prunnedEdges);
+            transform.bestFit(cluster, sprocketInfoTiledImage, ROVERLAY, GOVERLAY, prunnedEdges);
          sprockets.add(fit);
 
          if (fit.edgeVals.size() < minNumPixels)
@@ -493,8 +472,7 @@ public class ExtractFrames {
       //------------------------------------------------------------
 
       //------------------------------------------------------------
-      if (allowInterframeGeometry)
-      {
+      if (allowInterframeGeometry) {
          timer.start();
          System.out.print("Using interframe geometry to validate clusters ... ");
 
@@ -522,12 +500,10 @@ public class ExtractFrames {
          java.util.List<Transform.Fit> verifiedSprockets = new ArrayList<Transform.Fit>();
          int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
          if (!FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength,
-        		 sprockets,(List<WeightedPoint>)(Object)verifiedSprockets))
-         {
+        		 sprockets,(List<WeightedPoint>)(Object)verifiedSprockets)) {
             // in the odd case where this fails, assume it's due to the fact that
             // the first point in the list was actually not a real sprocket hole
-            for (boolean done = false; !done && sprockets.size() > 0;)
-            {
+            for (boolean done = false; !done && sprockets.size() > 0;) {
                sprockets.remove(0);
                verifiedSprockets.clear();
                // try again
@@ -553,7 +529,7 @@ public class ExtractFrames {
 
       // Put the fits in sprocket hole order
       Collections.sort(sprockets,new FilmSpec.SprocketHoleOrder(filmLayout));
-      Transform.drawFits(sprockets,sprocketInfoTiledImage,Color.yellow);
+      Transform.drawFits(sprockets,sprocketInfoTiledImage,YOVERLAY);
       //------------------------------------------------------------
 
       // use the film edge and calculate the resolution average
@@ -567,8 +543,9 @@ public class ExtractFrames {
       int numFrames = filmType == FilmSpec.eightMMFilmType ? 
          sprockets.size() - 1 : sprockets.size();
 
-      for (int i = 0; i < numFrames; i++)
-      {
+      Graphics2D g = Utils.wrap(sprocketInfoTiledImage);
+      Color cyan = new Color(COVERLAY,COVERLAY,COVERLAY);
+      for (int i = 0; i < numFrames; i++) {
          Transform.Fit fit = (Transform.Fit)sprockets.get(i);
 
          // if we are dealing with 8mm then we need to take successive
@@ -588,29 +565,26 @@ public class ExtractFrames {
          FilmEdge farEdgePiece = farEdge.edgePiece(frameReference.cr,frameReference.cc,(double)frameHeightPix,false);
          if (farEdgePiece == null) farEdgePiece = farEdge.edgePiece(frameReference.cr,frameReference.cc,(double)frameHeightPix,true);
 
-         if (sprocketEdgePiece != null)
-         {
-            sprocketEdgePiece.writeEdge(sprocketInfoTiledImage,AddOverlayOpImage.BOVERLAY);
-            sprocketEdgePiece.writePruned(sprocketInfoTiledImage,AddOverlayOpImage.ROVERLAY);
+         if (sprocketEdgePiece != null) {
+            sprocketEdgePiece.writeEdge(sprocketInfoTiledImage,BOVERLAY);
+            sprocketEdgePiece.writePruned(sprocketInfoTiledImage,ROVERLAY);
 
             // for debug purposes draw a circle around the point along the sprocketEdgePiece
             //  that is closest to the sprocket. This line is the axis of the frame and
             //  passes through the center.
-            PolarLineFit.drawCircle(PolarLineFit.closest(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r),
-                                    sprocketInfoTiledImage,Color.cyan);
+            Utils.drawCircle(Utils.closest(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r), g, cyan);
          }
-         if (farEdgePiece != null)
-         {
-            farEdgePiece.writeEdge(sprocketInfoTiledImage,AddOverlayOpImage.BOVERLAY);
-            farEdgePiece.writePruned(sprocketInfoTiledImage,AddOverlayOpImage.ROVERLAY);
+         if (farEdgePiece != null) {
+            farEdgePiece.writeEdge(sprocketInfoTiledImage,BOVERLAY);
+            farEdgePiece.writePruned(sprocketInfoTiledImage,ROVERLAY);
 
 
             // for debug purposes draw a circle around the point along the far edge
             //  that is closest to the sprocket. This line is the axis of the frame and
             //  passes through the center.
-            Point closest = PolarLineFit.closest(frameReference,farEdgePiece.c, farEdgePiece.r);
-            PolarLineFit.drawCircle(closest,sprocketInfoTiledImage,Color.cyan);
-            PolarLineFit.drawLine(frameReference,closest,sprocketInfoTiledImage,Color.cyan);
+            Point closest = Utils.closest(frameReference,farEdgePiece.c, farEdgePiece.r);
+            Utils.drawCircle(closest,g,cyan);
+            Utils.drawLine(frameReference,closest,g,cyan);
          }
 
          // figure out what the distance between the two edges are
@@ -620,13 +594,13 @@ public class ExtractFrames {
          // since they are not perfectly parallel (which is a real problem with crappy
          //  scanners) we will measure the distance from the sprocket hole to each edge
          //  and add them.
-         double calcedEdgeResDPI = -1.0;
-         if (sprocketEdgePiece != null && farEdgePiece != null) {
-            double distPix = PolarLineFit.perpendicularDistance(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r) +
-               PolarLineFit.perpendicularDistance(frameReference,farEdgePiece.c, farEdgePiece.r);
-
-            calcedEdgeResDPI = (distPix * FilmSpec.mmPerInch) / FilmSpec.filmAttribute(filmType,FilmSpec.filmWidthIndex);
-         }
+//         double calcedEdgeResDPI = -1.0;
+//         if (sprocketEdgePiece != null && farEdgePiece != null) {
+//            double distPix = PolarLineFit.perpendicularDistance(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r) +
+//               PolarLineFit.perpendicularDistance(frameReference,farEdgePiece.c, farEdgePiece.r);
+//
+//            calcedEdgeResDPI = (distPix * FilmSpec.mmPerInch) / FilmSpec.filmAttribute(filmType,FilmSpec.filmWidthIndex);
+//         }
 
          Frame frame = new Frame(frameReference/*(Transform.Fit)sprockets.get(i)*/,
                                  sprocketEdgePiece,farEdgePiece,/*filmLayout,*/filmType);
@@ -642,49 +616,6 @@ public class ExtractFrames {
          
          Imgcodecs.imwrite("f" + frameNumStr + ".tif", frameTiledImageMat);
          
-//         BufferedImage frameTiledImage = mat2Img(frameTiledImageMat);
-//
-//         if (frameTiledImage != null)
-//         {
-//            if (dowatermark)
-//            {
-//               Graphics2D fg = frameTiledImage.createGraphics();
-//               fg.setColor(Color.white);
-//               fg.drawString(sourceFileName + " " + frameNumStr,watermarkPositionX,watermarkPositionY);
-//            }
-//
-////// This commented out code writes the cyan edge into the original picture and then recuts the 
-//////  the frame so that it can get picked up in the final image         
-//////         System.out.println (" frame " + i + " bound by " + frame.topmostRow + "," + frame.leftmostCol + "," + frame.bottommostRow + "," + frame.rightmostCol);
-////            com.jiminger.util.PolarLineFit.drawPolarLine(sprocketEdgePiece.r,sprocketEdgePiece.c, origImageOverlayer,Color.cyan,
-////                          0, frame.leftmostCol, origImageHeight-1, frame.rightmostCol/*, frame.topmostRow,0*/);
-////
-////            com.jiminger.util.PolarLineFit.drawPolarLine(farEdgePiece.r,farEdgePiece.c,origImageOverlayer,Color.cyan,
-////                          0, frame.leftmostCol, origImageHeight-1,frame.rightmostCol/*, -(origImageHeight-1-frame.bottommostRow),0*/);
-////
-////            frameTiledImage = frame.cutFrame(
-////               origImage,resolutiondpi,frameWidthPix, frameHeightPix, reverseImage,i,frameOversizeMult);
-//////--------------------------------------------------------------------------
-//
-//            // there is no reason
-//            if (!frame.isOutOfBounds())
-//               ImageFile.writeImageFile(frameTiledImage, 
-//                                        destFileName + frameNumStr + "." + outputExt, 
-//                                        outputType);
-//
-//            // callculate the resolution
-////            double calcedSprocketResDPI = resolutiondpi * frameReference.scale;
-//            resolutionsum += calcedEdgeResDPI;
-//
-//            prop.setProperty("frames." + Integer.toString(i) + ".filename",
-//                             frameFilenameBase + frameNumStr + "." + outputExt);
-//         }
-//         else
-//         {
-//            System.out.println("Failed to cut image for frame " + i);
-//            prop.setProperty("frame." + Integer.toString(i) + ".dropped","true");
-//         }
-
          frame.addProperties("frames." + Integer.toString(i), prop);
       }
 
@@ -693,7 +624,7 @@ public class ExtractFrames {
       System.out.println(" done (" + timer.stop() + ")");
 
       if (writeDebugImages)
-         ImageFile.writeImageFile(sprocketInfoTiledImage,"tmpsprockets.bmp", "BMP");
+         ImageFile.writeImageFile(Utils.mat2Img(sprocketInfoTiledImage,getOverlayCM()),"tmpsprockets.bmp", "BMP");
 
       double calculatedResolution = (resolutionsum / (double)sprockets.size());
       System.out.println("calculated resolution based on distance between edges is an average of:" + 
@@ -866,7 +797,7 @@ public class ExtractFrames {
        };
        
        Minimizer mm = new Minimizer(sigmoidError);
-       double finalerr = mm.minimize(new double[] { (double)0xffff / 6.0, (double)0xffff / 2.0 });
+       /*double finalerr =*/ mm.minimize(new double[] { (double)0xffff / 6.0, (double)0xffff / 2.0 });
        System.out.print("(m=" + mm.getFinalPostion()[0] + ",b=" + mm.getFinalPostion()[1] + ")");
        
        return applyCdf(mapping,raster);
@@ -878,7 +809,6 @@ public class ExtractFrames {
    }
 
    static double [] startingPowell = { 512.0, 512.0 };
-   private static int [] bandstride = { 0 };
 
 
    static private boolean commandLine(String[] args)
@@ -1068,38 +998,38 @@ public class ExtractFrames {
 //      System.out.println("  -clamp The grayscale image has a lower clamp applied. You can change this level.");
    }
 
-   static private ColorModel getOverlayCM()
+   static private IndexColorModel getOverlayCM()
    {
       byte [] r = new byte[256];
       byte [] g = new byte[256];
       byte [] b = new byte[256];
 
-      r[intify(EdgeDetectorOpImage.EDGE)] = 
-         g[intify(EdgeDetectorOpImage.EDGE)] = 
-         b[intify(EdgeDetectorOpImage.EDGE)] = -1;
+      r[intify(EDGE)] = 
+         g[intify(EDGE)] = 
+         b[intify(EDGE)] = -1;
 
-      r[intify(AddOverlayOpImage.ROVERLAY)] = -1;
-      g[intify(AddOverlayOpImage.GOVERLAY)] = -1;
-      b[intify(AddOverlayOpImage.BOVERLAY)] = -1;
+      r[intify(ROVERLAY)] = -1;
+      g[intify(GOVERLAY)] = -1;
+      b[intify(BOVERLAY)] = -1;
 
-      r[intify(AddOverlayOpImage.YOVERLAY)] = -1;
-      g[intify(AddOverlayOpImage.YOVERLAY)] = -1;
+      r[intify(YOVERLAY)] = -1;
+      g[intify(YOVERLAY)] = -1;
 
-      r[intify(AddOverlayOpImage.COVERLAY)] = byteify(Color.cyan.getRed());
-      g[intify(AddOverlayOpImage.COVERLAY)] = byteify(Color.cyan.getGreen());
-      b[intify(AddOverlayOpImage.COVERLAY)] = byteify(Color.cyan.getBlue());
+      r[intify(COVERLAY)] = byteify(Color.cyan.getRed());
+      g[intify(COVERLAY)] = byteify(Color.cyan.getGreen());
+      b[intify(COVERLAY)] = byteify(Color.cyan.getBlue());
 
-      r[intify(AddOverlayOpImage.MOVERLAY)] = byteify(Color.magenta.getRed());
-      g[intify(AddOverlayOpImage.MOVERLAY)] = byteify(Color.magenta.getGreen());
-      b[intify(AddOverlayOpImage.MOVERLAY)] = byteify(Color.magenta.getBlue());
+      r[intify(MOVERLAY)] = byteify(Color.magenta.getRed());
+      g[intify(MOVERLAY)] = byteify(Color.magenta.getGreen());
+      b[intify(MOVERLAY)] = byteify(Color.magenta.getBlue());
 
-      r[intify(AddOverlayOpImage.OOVERLAY)] = byteify(Color.orange.getRed());
-      g[intify(AddOverlayOpImage.OOVERLAY)] = byteify(Color.orange.getGreen());
-      b[intify(AddOverlayOpImage.OOVERLAY)] = byteify(Color.orange.getBlue());
+      r[intify(OOVERLAY)] = byteify(Color.orange.getRed());
+      g[intify(OOVERLAY)] = byteify(Color.orange.getGreen());
+      b[intify(OOVERLAY)] = byteify(Color.orange.getBlue());
 
-      r[intify(AddOverlayOpImage.GRAYOVERLAY)] = byteify(Color.gray.getRed());
-      g[intify(AddOverlayOpImage.GRAYOVERLAY)] = byteify(Color.gray.getGreen());
-      b[intify(AddOverlayOpImage.GRAYOVERLAY)] = byteify(Color.gray.getBlue());
+      r[intify(GRAYOVERLAY)] = byteify(Color.gray.getRed());
+      g[intify(GRAYOVERLAY)] = byteify(Color.gray.getGreen());
+      b[intify(GRAYOVERLAY)] = byteify(Color.gray.getBlue());
 
       return new IndexColorModel(8,256,r,g,b);
    }

@@ -22,12 +22,8 @@ package com.jiminger.houghspace;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.color.ColorSpace;
-import java.awt.image.ComponentColorModel;
-import java.awt.image.DataBuffer;
-import java.awt.image.DataBufferByte;
-import java.awt.image.PixelInterleavedSampleModel;
-import java.awt.image.WritableRaster;
+import java.awt.RenderingHints;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -36,16 +32,17 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import javax.media.jai.TiledImage;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
 
 import com.jiminger.image.CvRaster;
+import com.jiminger.image.ImageFile;
 import com.jiminger.image.WeightedPoint;
+import com.jiminger.image.drawing.Utils;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
-@SuppressWarnings("restriction")
-public class Transform
-{
+public class Transform {
    private double quantFactor = 1.0;
    private Mask mask;
    private SMask gradDirMask;
@@ -53,8 +50,7 @@ public class Transform
 //   private short gradientDirSlopBytePM;
    private Model model;
 
-   private Transform(Mask mask, SMask gradDirMask, double quantFactor, double gradientDirSlopDeg)
-   {
+   private Transform(Mask mask, SMask gradDirMask, double quantFactor, double gradientDirSlopDeg) {
       this.quantFactor = quantFactor;
       this.mask = mask;
       this.gradDirMask = gradDirMask;
@@ -62,8 +58,7 @@ public class Transform
 //      this.gradientDirSlopBytePM = (short)(1.0 + (this.gradientDirSlopDeg * (256.0/360.0))/2.0);
    }
 
-   public Transform(Model model, double quantFactor, double gradientDirSlopDeg)
-   {
+   public Transform(Model model, double quantFactor, double gradientDirSlopDeg) {
       this(Mask.generateMask(model,model.featureWidth(),model.featureHeight(),quantFactor),
            SMask.generateGradientMask(model,model.featureWidth(),model.featureHeight(),quantFactor), 
            quantFactor, gradientDirSlopDeg);
@@ -138,67 +133,53 @@ public class Transform
                                            double gradientDirSlopDeg, double quantFactor,
                                            short [] ret, int htwidth, int htheight, HoughSpaceEntryManager hsem,
                                            int houghThreshold, int rowstart, int rowend, int colstart, int colend);
-
+   
    /**
     * This method does not do much any more. Not it simply writes the inverse transform
     *  (that is, the edge pixels identified by the transform) back into the image
     *  for debugging purposes.
     */
-   public List<HoughSpaceEntry> inverseTransform(HoughSpace houghSpace, TiledImage ti, 
-         byte overlayPixelValue, Color peakCircleColor)
-   {
+   public List<HoughSpaceEntry> inverseTransform(HoughSpace houghSpace, CvRaster ti, byte overlayPixelValue, byte peakCircleColorValue) {
       List<HoughSpaceEntry> sortedSet = new LinkedList<HoughSpaceEntry>();
 
       sortedSet.addAll(houghSpace.backMapEntries);
+      Graphics2D g = Utils.wrap(ti);
+      g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
-//      System.out.println("Sorting entries.....");
       Collections.sort(sortedSet, new HoughSpaceEntry.HSEComparator());
-//      System.out.println(" ... Done.");
+      Color peakCircleColor = new Color(peakCircleColorValue,peakCircleColorValue,peakCircleColorValue);
 
-      if (ti != null)
-      {
+      if (ti != null) {
          System.out.println("Constructing reverse hough transform image.");
-         Graphics2D g = ti.createGraphics();
-         g.setColor(peakCircleColor);
 
-//         System.out.println("Entries:(" + sortedSet.size() + "):" + sortedSet);
-
-         for (HoughSpaceEntry e : sortedSet)
-         {
+         byte[] overlayPixel = new byte[] { overlayPixelValue };
+         for (HoughSpaceEntry e : sortedSet) {
             int eir = e.ir;
             int eic = e.ic;
 
-            drawCircle(g,eir,eic);
+            Utils.drawCircle(eir, eic, g, peakCircleColor);
 
             for (java.awt.Point p : e.contributingImagePoints)
-               ti.setSample(p.x,p.y,0,(int)overlayPixelValue);
+               ti.set(p.y, p.x, overlayPixel);
          }
-
-//         System.out.println(" .... Done.");
+      }
+      
+      try {
+    	  ImageFile.writeImageFile(Utils.dbgImage, "bi.bmp");
+      } catch (IOException ioe) {
+    	  ioe.printStackTrace();
       }
 
       return sortedSet;
    }
 
-   static int [] bandstride = { 0 };
-
-   public TiledImage getTransformImage(HoughSpace houghSpace0)
+   public Mat getTransformImage(HoughSpace houghSpace0)
    {
       short [] houghSpace = houghSpace0.houghSpace;
       int width = houghSpace0.hswidth;
       int height = houghSpace0.hsheight;
 
-      TiledImage ti = new TiledImage(
-         0,0,width, height,0,0,
-         new PixelInterleavedSampleModel(
-            DataBuffer.TYPE_BYTE,width,height,1,width, bandstride),
-         new ComponentColorModel(
-            ColorSpace.getInstance(ColorSpace.CS_GRAY),false,false,
-            ComponentColorModel.OPAQUE,DataBuffer.TYPE_BYTE));
-
-      WritableRaster gradRaster = ti.getWritableTile(0,0);
-      DataBufferByte gradDB = (DataBufferByte)gradRaster.getDataBuffer();
-      byte [] dest = gradDB.getData();
+      CvRaster gradRaster = CvRaster.create(height, width, CvType.CV_8UC1); 
 
       int max = 0;
       for (int i = 0; i < houghSpace.length; i++)
@@ -208,6 +189,7 @@ public class Transform
             max = count;
       }
 
+      byte[] dest = (byte[])gradRaster.data;
       for(int i = 0; i < houghSpace.length; i++)
       {
          int intVal = (int)(((double)(houghSpace[i]) / (double)max) * 255.0);
@@ -220,7 +202,7 @@ public class Transform
          dest[i] = (byte)intVal;
       }
 
-      return ti;
+      return gradRaster.toMat();
    }
 
    public List<Cluster> cluster(List<HoughSpaceEntry> houghEntries, double percentModelCoverage)
@@ -261,7 +243,7 @@ public class Transform
     *  and overlay values are for bookkeeping only. A null ti means ignore book
     *  keeping.
     */
-   public Fit bestFit(Cluster cluster,TiledImage ti, byte overlayPixelValueRemovedEdge, byte overlayPixelValueEdge)
+   public Fit bestFit(Cluster cluster,CvRaster ti, byte overlayPixelValueRemovedEdge, byte overlayPixelValueEdge)
       throws MinimizerException
    {
       return bestFit(cluster,ti,overlayPixelValueRemovedEdge,overlayPixelValueEdge,null);
@@ -274,10 +256,8 @@ public class Transform
     *  and overlay values are for bookkeeping only. A null ti means ignore book
     *  keeping.
     */
-   public Fit bestFit(Cluster cluster,TiledImage ti, byte overlayPixelValueRemovedEdge, 
-         byte overlayPixelValueEdge, List<java.awt.Point> savedPruned)
-      throws MinimizerException
-   {
+   public Fit bestFit(Cluster cluster, CvRaster ti, byte overlayPixelValueRemovedEdge, byte overlayPixelValueEdge, List<java.awt.Point> savedPruned)
+      throws MinimizerException {
       // need to go through the raster around the cluster using the highest 
       //  count cluster value
 
@@ -296,8 +276,7 @@ public class Transform
       boolean pruning = true;
       List<java.awt.Point> pruned = new ArrayList<java.awt.Point>();
       double stdDev = -1.0;
-      for (boolean done = false;! done;)
-      {
+      for (boolean done = false;! done;) {
          pruned.clear();
          FitSumSquaresDist func = new FitSumSquaresDist(edgeVals,model);
          Minimizer m = new Minimizer(func);
@@ -322,14 +301,13 @@ public class Transform
 //               func.pruneFurthest(pruned);
 //            }
          }
-
+         
          // if we want to write a debug image, then do it.
-         if (ti != null)
-         {
-            if (pruned.size() > 0)
-            {
+         byte[] overlayRemovedEdgePixel = new byte[] { overlayPixelValueRemovedEdge }; 
+         if (ti != null) {
+            if (pruned.size() > 0) {
                for (java.awt.Point p : pruned)
-                  ti.setSample(p.x,p.y,0,intify(overlayPixelValueRemovedEdge));
+                  ti.set(p.y,p.x,overlayRemovedEdgePixel);
             }
          }
 
@@ -340,27 +318,25 @@ public class Transform
             done = true;
       }
 
-      if (ti != null)
-      {
+      if (ti != null) {
+    	 byte[] overlayPixelEdge = new byte[] { overlayPixelValueEdge };
          for (java.awt.Point p : edgeVals)
-            ti.setSample(p.x,p.y,0,intify(overlayPixelValueEdge));
+            ti.set(p.y,p.x,overlayPixelEdge);
       }
 
       return new Fit(result[1],result[0],result[3],result[2],cluster, stdDev, edgeVals);
    }
 
-   public static void drawClusters(List<Cluster> clusters, TiledImage ti, Color color)
-   {
-      Graphics2D g = ti.createGraphics();
-      g.setColor(color);
+   public static void drawClusters(List<Cluster> clusters, CvRaster ti, byte color) {
+      Graphics2D g = Utils.wrap(ti);
+      g.setColor(new Color(color,color,color));
       for (Cluster c : clusters)
          drawCircle(g,c.imageRow(),c.imageCol());
    }
 
-   public static void drawFits(List<Transform.Fit> fits, TiledImage ti, Color color)
-   {
-      Graphics2D g = ti.createGraphics();
-      g.setColor(color);
+   public static void drawFits(List<Transform.Fit> fits, CvRaster ti, byte color) {
+      Graphics2D g = Utils.wrap(ti);
+      g.setColor(new Color(color,color,color));
       for (Fit c : fits)
          drawCircle(g,(int)Math.round(c.cr),(int)Math.round(c.cc));
    }

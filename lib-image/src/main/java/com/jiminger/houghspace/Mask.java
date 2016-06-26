@@ -20,9 +20,8 @@
 
 package com.jiminger.houghspace;
 
-import javax.media.jai.*;
-import java.awt.image.*;
-import java.awt.color.*;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
 
 /**
  * A mask underpinned by an array of bytes, each containing an indication as to whether or not
@@ -113,24 +112,10 @@ public class Mask {
    /**
     * Generate a tiled image that contains a view of the mask.
     */
-   @SuppressWarnings("restriction")
-   public TiledImage getMaskImage()
-   {
-      TiledImage ti = new TiledImage(
-         0,0,mwidth, mheight,0,0,
-         new PixelInterleavedSampleModel(
-            DataBuffer.TYPE_BYTE,mwidth,mheight,1,mwidth, Transform.bandstride),
-         new ComponentColorModel(
-            ColorSpace.getInstance(ColorSpace.CS_GRAY),false,false,
-            ComponentColorModel.OPAQUE,DataBuffer.TYPE_BYTE));
-
-      WritableRaster gradRaster = ti.getWritableTile(0,0);
-      DataBufferByte gradDB = (DataBufferByte)gradRaster.getDataBuffer();
-      byte [] gradImageData = gradDB.getData();
-
-      System.arraycopy(mask,0,gradImageData,0,mwidth * mheight);
-
-      return ti;
+   public Mat getMaskImage() {
+	   Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
+	   m.put(0, 0, mask);
+	   return m;
    }
 
    public int mwidth;

@@ -23,6 +23,10 @@ package com.jiminger.util;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
 import java.util.Properties;
 
 import org.apache.commons.io.FileUtils;
@@ -32,52 +36,59 @@ public class LibraryLoader
 {
 	static 
 	{
-	   InputStream is = null;
+	   List<InputStream> iss = null;
 	   
-	   try
-	   {
+	   try {
+		   iss = new ArrayList<>();
+		   try {
+			   Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
+			   while (systemResources.hasMoreElements()) {
+				   iss.add(systemResources.nextElement().openStream());
+			   }
+		   } catch (IOException e) {
+	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
+		   }
+		   
 	      // All we're going to do here is load the library from a jar file
 
-	      is = getInputStream("com.jiminger.lib.properties");
-
-	      if (is == null)
+	      if (iss == null || iss.size() == 0)
 	         throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Is the jar file containing the library on the classpath?");
-
-	      Properties libProps = new Properties();
-
-	      try { libProps.load(is); } 
-	      catch (IOException e) 
-	      {
-	         throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
-	      }
 	      
-	      IOUtils.closeQuietly(is);
+	      for (InputStream is : iss) {
+	    	  Properties libProps = new Properties();
 
-	      String libName = libProps.getProperty("library");
-	      String libSuffix = libProps.getProperty("suffix");
-	      is = getInputStream(libName);
-	      if (is == null)
-	         throw new UnsatisfiedLinkError("Couldn't load the library identified as the com.jiminger native library (" + libName + ").");
+	    	  try { libProps.load(is); } 
+	    	  catch (IOException e) {
+	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
+	    	  }
 
-	      File tmpFile = null;
-	      try { tmpFile = File.createTempFile("com.jiminger", libSuffix); }
-	      catch (IOException e) 
-	      {
-	         throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
+	    	  IOUtils.closeQuietly(is);
+
+	    	  String libName = libProps.getProperty("library");
+	    	  String libSuffix = libName.substring(libName.lastIndexOf('.'));
+	    	  is = getInputStream(libName);
+	    	  if (is == null)
+	    		  throw new UnsatisfiedLinkError("Couldn't load the library identified as the com.jiminger native library (" + libName + ").");
+
+	    	  File tmpFile = null;
+	    	  try { tmpFile = File.createTempFile("com.jiminger", libSuffix); }
+	    	  catch (IOException e) {
+	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
+	    	  }
+	    	  tmpFile.deleteOnExit();
+
+	    	  try { FileUtils.copyInputStreamToFile(is, tmpFile); }
+	    	  catch (IOException e) {
+	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
+	    	  }
+
+	    	  System.out.println("Loading:" + tmpFile.getAbsolutePath());
+	    	  System.load(tmpFile.getAbsolutePath());
 	      }
-
-	      try { FileUtils.copyInputStreamToFile(is, tmpFile); }
-	      catch (IOException e) 
-	      {
-	         throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
-	      }
-
-	      System.out.println("Loading:" + tmpFile.getAbsolutePath());
-	      System.load(tmpFile.getAbsolutePath());
 	   }
-	   finally
-	   {
-	      if (is != null) IOUtils.closeQuietly(is);
+	   finally {
+		   for (InputStream is : iss)
+			   if (is != null) IOUtils.closeQuietly(is);
 	   }
 	}
 	

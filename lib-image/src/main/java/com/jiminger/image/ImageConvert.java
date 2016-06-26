@@ -19,13 +19,12 @@
 
 package com.jiminger.image;
 
-import java.awt.image.renderable.ParameterBlock;
-import java.io.*;
-import javax.media.jai.*;
+import java.io.IOException;
+
+import org.opencv.imgcodecs.Imgcodecs;
 
 import com.jiminger.util.CommandLineParser;
 
-@SuppressWarnings("restriction")
 public class ImageConvert
 {
    public static final long megaBytes = 1024L * 1024L;
@@ -47,24 +46,11 @@ public class ImageConvert
       //  settings.
       if (!commandLine(args))
          return;
-
-      // Set the tile cache up on JAI
-      TileCache tc = JAI.createTileCache(tileCacheSize);
-      JAI jai = JAI.getDefaultInstance();
-      jai.setTileCache(tc);
-
-      ParameterBlock pb = new ParameterBlock();
-      pb.add(sourceFileName);
-      pb.add(null);
-      pb.add(null);
-      RenderedOp image = JAI.create("fileload",pb);
-//      RenderedOp image = JAI.create("fileload",sourceFileName, null, null);
-      JAI.create("filestore",image,destFileName, destFileType, null);
       
+      Imgcodecs.imwrite(destFileName, Imgcodecs.imread(sourceFileName));
    }
 
-   static private boolean commandLine(String[] args)
-   {
+   static private boolean commandLine(String[] args) {
       CommandLineParser cl = new CommandLineParser(args);
 
       // see if we are asking for help

@@ -19,5 +19,10 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
     </dependency>
+	<dependency>
+		<groupId>com.jiminger</groupId>
+		<artifactId>opencv-lib-jar</artifactId>
+		<classifier>withlib</classifier>
+	</dependency>
   </dependencies>
 </project>

@@ -18,7 +18,6 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-import java.awt.image.RenderedImage;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
@@ -30,19 +29,20 @@ import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
-import javax.media.jai.JAI;
-import javax.media.jai.TileCache;
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
 
+import com.jiminger.image.CvRaster;
 import com.jiminger.mjpeg.MJPEGWriter;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.FilenameUtils;
 import com.jiminger.util.PropertiesUtils;
-import com.sun.media.jai.codec.FileSeekableStream;
 
 @SuppressWarnings("restriction")
 public class CorrelateFrames
@@ -54,7 +54,6 @@ public class CorrelateFrames
    public static double minCoefConsideredMatch = 0.0;
    public static String outputDir = null;
    public static int maxoverlap = 5;
-   public static boolean contrastAdjust = false;
    public static double [] finalX = null;
    public static boolean listResults = false;
    public static String avifile = null;
@@ -73,11 +72,6 @@ public class CorrelateFrames
       //  settings.
       if (!commandLine(args))
          System.exit(-1);
-
-      // Set the tile cache up on JAI
-      TileCache tc = JAI.createTileCache(tileCacheSize);
-      JAI jai = JAI.getDefaultInstance();
-      jai.setTileCache(tc);
 
       Iterator<FrameSet> iter = frameSets.iterator();
       FrameSet fs1 = (FrameSet)iter.next();
@@ -138,7 +132,7 @@ public class CorrelateFrames
             else
             {
 
-               RenderedImage frameImage1 = loadLastImage(fs1);
+               CvRaster frameImage1 = loadLastImage(fs1);
 
                if (frameImage1 == null)
                {
@@ -148,7 +142,7 @@ public class CorrelateFrames
                else
                {
                   int maxi = fs1.lastValid();
-                  RenderedImage [] frameImage2 = loadImages(fs2);
+                  CvRaster[] frameImage2 = loadImages(fs2);
 
                   // we are only considering a single frame from the first
                   //   frameset
@@ -164,8 +158,7 @@ public class CorrelateFrames
                   int checked = 0;
                   for (int j = 0; j < fs2.numFrames && checked < maxoverlap; j++)
                   {
-                     if (frameImage2[j] != null)
-                     {
+                     if (frameImage2[j] != null) {
                         r[j] = Correlate.correlation(frameImage1,frameImage2[j]);
                         checked++;
                      }
@@ -256,7 +249,7 @@ public class CorrelateFrames
 
          int framenum = 0;
          for (FrameSet fs : frameSets)
-            framenum = fs.moveStrip(framenum,outputDir,"f",5,contrastAdjust,finalX);
+            framenum = fs.moveStrip(framenum,outputDir,"f",5,finalX);
       }
 
       if (avifile != null)
@@ -418,34 +411,26 @@ public class CorrelateFrames
       return true;
    }
 
-   static private RenderedImage [] loadImages(FrameSet fs)
+   static private CvRaster[] loadImages(FrameSet fs)
    {
       /*
        * Create an input stream from the specified file name
        * to be used with the file decoding operator.
        */
-      FileSeekableStream [] stream = new FileSeekableStream[fs.numFrames];
-      for (int i = 0; i < fs.numFrames; i++)
-      {
-         if (!fs.isDropped(i) && !fs.isOutOfBounds(i) && fs.isCut(i))
-         {
-            try {
-               stream[i] = new FileSeekableStream(fs.getFileName(i));
-            } catch (IOException e) {
-               e.printStackTrace();
-               System.exit(0);
-            }
+      String [] filenames = new String[fs.numFrames];
+      for (int i = 0; i < fs.numFrames; i++) {
+         if (!fs.isDropped(i) && !fs.isOutOfBounds(i) && fs.isCut(i)) {
+        	 filenames[i] = fs.getFileName(i);
          }
          else
-            stream[i] = null;
+            filenames[i] = null;
       }
 
       /* Create an operator to decode the image file. */
-      RenderedImage [] frameImage = new RenderedImage[fs.numFrames];
-      for (int i = 0; i < fs.numFrames; i++)
-      {
-         if (stream[i] != null)
-            frameImage[i] = JAI.create("stream", stream[i]);
+      CvRaster[] frameImage = new CvRaster[fs.numFrames];
+      for (int i = 0; i < fs.numFrames; i++) {
+         if (filenames[i] != null)
+            frameImage[i] = CvRaster.create(Imgcodecs.imread(filenames[i]));
          else
             frameImage[i] = null;
       }
@@ -453,32 +438,20 @@ public class CorrelateFrames
       return frameImage;
    }
 
-   static private RenderedImage loadLastImage(FrameSet fs)
+   static private CvRaster loadLastImage(FrameSet fs)
    {
       /*
        * Create an input stream from the specified file name
        * to be used with the file decoding operator.
        */
-      FileSeekableStream stream = null;
-      for (int i = fs.numFrames - 1; i >=0 && stream == null; i--)
-      {
-         if (!fs.isDropped(i) && !fs.isOutOfBounds(i) && fs.isCut(i))
-         {
-            try {
-               stream = new FileSeekableStream(fs.getFileName(i));
-            } catch (IOException e) {
-               e.printStackTrace();
-               System.exit(0);
-            }
+      String filename = null;
+      for (int i = fs.numFrames - 1; i >=0 && filename == null; i--) {
+         if (!fs.isDropped(i) && !fs.isOutOfBounds(i) && fs.isCut(i)) {
+        	 filename = fs.getFileName(i);
          }
       }
 
-      /* Create an operator to decode the image file. */
-      RenderedImage frameImage = null;
-      if (stream != null)
-         frameImage = JAI.create("stream", stream);
-
-      return frameImage;
+      return CvRaster.create(Imgcodecs.imread(filename));
    }
 
    static private boolean commandLine(String[] args)
@@ -572,19 +545,8 @@ public class CorrelateFrames
                finalX[i] = Double.parseDouble(stok.nextToken());
 
             finalX[2] = Math.log((1.0/finalX[2]));
-
-            contrastAdjust = true;
-         }
-         else
-         {
-            tmps = cl.getProperty("contrast");
-            if ("true".equalsIgnoreCase(tmps) || "t".equalsIgnoreCase(tmps) ||
-                "yes".equalsIgnoreCase(tmps) || "y".equalsIgnoreCase(tmps) ||
-                "1".equalsIgnoreCase(tmps))
-               contrastAdjust = true;
          }
       }
-
 
       tmps = cl.getProperty("mo");
       if (tmps != null)
@@ -879,15 +841,10 @@ public class CorrelateFrames
             System.out.println(si.get(i));
       }
 
-      public int moveStrip(int startingFramenum, String destDir, 
-                           String prefix, int integerLength,
-                           boolean contrastAdjust, double [] x)
-         throws IOException, MinimizerException
-      {
-         java.util.List<Integer> si = getStripIndicies();
+      public int moveStrip(int startingFramenum, String destDir, String prefix, int integerLength, double [] x) throws IOException, MinimizerException {
+         List<Integer> si = getStripIndicies();
 
-         for (int ii = 0; ii < si.size(); ii++)
-         {
+         for (int ii = 0; ii < si.size(); ii++) {
             int filenum = si.get(ii).intValue();
             String infilename = getFileName(filenum);
             String outfilename = destDir + File.separator + prefix +
@@ -895,33 +852,23 @@ public class CorrelateFrames
                "." + /*getFileExtention(filenum)*/ "jpeg";
             startingFramenum++;
 
-            if (!contrastAdjust)
-            {
-               FileInputStream fis = new FileInputStream(getFileName(filenum));
-               BufferedInputStream bis = new BufferedInputStream(fis,8096);
-               FileOutputStream fos = new FileOutputStream(outfilename);
-               BufferedOutputStream bos = new BufferedOutputStream(fos,8096);
+            FileInputStream fis = new FileInputStream(getFileName(filenum));
+            BufferedInputStream bis = new BufferedInputStream(fis,8096);
+            FileOutputStream fos = new FileOutputStream(outfilename);
+            BufferedOutputStream bos = new BufferedOutputStream(fos,8096);
 
-               int c;
-               try
-               {
-                  while( (c = bis.read() ) != -1)
-                     bos.write(c);
-               }
-               finally
-               {
-                  try { bos.flush(); } catch (Throwable th) {}
-                  try { fos.flush(); } catch (Throwable th) {}
-                  try { bos.close(); } catch (Throwable th) {}
-                  try { fos.close(); } catch (Throwable th) {}
-                  try { bis.close(); } catch (Throwable th) {}
-                  try { fis.close(); } catch (Throwable th) {}
-               }
+            int c;
+            try {
+            	while( (c = bis.read() ) != -1)
+            		bos.write(c);
             }
-            else // contrastAdjust
-            {
-               ContrastAdjust.contrastAdjust(infilename,outfilename,
-                                             "JPEG",x);
+            finally {
+            	try { bos.flush(); } catch (Throwable th) {}
+            	try { fos.flush(); } catch (Throwable th) {}
+            	try { bos.close(); } catch (Throwable th) {}
+            	try { fos.close(); } catch (Throwable th) {}
+            	try { bis.close(); } catch (Throwable th) {}
+            	try { fis.close(); } catch (Throwable th) {}
             }
          }
 

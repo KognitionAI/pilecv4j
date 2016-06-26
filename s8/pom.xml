@@ -27,12 +27,12 @@
     </dependency>
   </dependencies>
 
-	<repositories>
-	 <repository>
-       <id>eclipse-testing</id>
-        <url>http://maven.eclipse.org/nexus/content/repositories/testing</url>
-      </repository>
-	</repositories>
+  <repositories>
+    <repository>
+      <id>maven-eclipse-repo</id>
+      <url>http://maven-eclipse.github.io/maven</url>
+    </repository>
+  </repositories>
   
   <build>
     <finalName>${artifactId}-${version}</finalName>

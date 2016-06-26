@@ -37,49 +37,27 @@ package com.jiminger.s8;
 import java.awt.image.*;
 import javax.media.jai.*;
 
+import org.opencv.core.Mat;
+
+import com.jiminger.image.CvRaster;
+
 @SuppressWarnings("restriction")
 public class Correlate
 {
-   public static double [] correlation(RenderedImage X, RenderedImage Y)
+   public static double [] correlation(CvRaster X, CvRaster Y)
       throws CorrelateException
    {
-      if (X.getHeight() != Y.getHeight() ||
-          X.getWidth() != Y.getWidth())
+      if (X.rows != Y.rows || X.cols != Y.cols)
          throw new CorrelateException("images don't have the same dimmentions");
+      
+      if (X.channels != Y.channels)
+          throw new CorrelateException("images don't have the same number of bands");
 
-      int width = X.getWidth();
-      int height = X.getHeight();
+      int width = X.cols;
+      int height = X.rows;
       int wh = width * height;
 
-      RenderedImage [] srcs = new RenderedImage[2];
-      srcs[0] = X;
-      srcs[1] = Y;
-      RasterFormatTag[] tags = RasterAccessor.findCompatibleTags(srcs,X);
-      RasterFormatTag xtag = tags[0];
-      RasterFormatTag ytag = tags[1];
-
-      Raster xraster = X.getData();
-      RasterAccessor xra = 
-         new RasterAccessor(xraster, xraster.getBounds(), xtag, X.getColorModel());
-
-      Raster yraster = Y.getData();
-      RasterAccessor yra = 
-         new RasterAccessor(yraster, yraster.getBounds(), ytag, Y.getColorModel());
-
-      byte bandsx[][] = xra.getByteDataArrays();
-      int xBandOffsets[] = xra.getBandOffsets();
-      int xPixelStride = xra.getPixelStride();
-      int xScanLineStride = xra.getScanlineStride();
-
-      byte bandsy[][] = yra.getByteDataArrays();
-      int yBandOffsets[] = yra.getBandOffsets();
-      int yPixelStride = yra.getPixelStride();
-      int yScanLineStride = yra.getScanlineStride();
-
-      if (xBandOffsets.length != yBandOffsets.length)
-         throw new CorrelateException("images don't have the same number of bands");
-
-      int dim = xBandOffsets.length;
+      int dim = X.channels;
       double [] ret = new double [dim];
 
       int xBegCurRow;
@@ -94,8 +72,7 @@ public class Correlate
       byte [] bandx;
       byte [] bandy;
 
-      for (int b = 0; b < dim; b++)
-      {
+      for (int b = 0; b < dim; b++) {
          bandx = bandsx[b];
          bandy = bandsy[b];
          xBegCurRow = xBandOffsets[b];

@@ -31,9 +31,11 @@ public abstract class CvRaster {
 		case CvType.CV_8U:
 		case CvType.CV_8S:
 			return new CvRaster(new byte[rows * cols * channels], type, channels, rows, cols) {
+				final byte[] d  = ((byte[])data);
+				
 				@Override
 				public void zero(int row, int col) {
-					IntStream.range(0, channels).forEach(i -> ((byte[])data)[((row * colsXchannels) + (col * channels)) + i] = 0);
+					IntStream.range(0, channels).forEach(i -> d[((row * colsXchannels) + (col * channels)) + i] = 0);
 				}
 
 				public void loadFrom(Mat image) {
@@ -42,19 +44,33 @@ public abstract class CvRaster {
 
 				public Object get(int row, int col) {
 					byte[] ret = new byte[channels];
-					IntStream.range(0, channels).forEach(i -> ret[i] = ((byte[])data)[((row * colsXchannels) + (col * channels)) + i]);
+					IntStream.range(0, channels).forEach(i -> ret[i] = d[((row * colsXchannels) + (col * channels)) + i]);
 					return ret;
 				}
 
 				public void set(int row, int col, Object pixel) {
 					byte[] p = (byte[])pixel;
-					IntStream.range(0, channels).forEach(i -> ((byte[])data)[((row * colsXchannels) + (col * channels)) + i] = p[i]);
+					IntStream.range(0, channels).forEach(i -> d[((row * colsXchannels) + (col * channels)) + i] = p[i]);
 				}
 
 				public Mat toMat() {
 					Mat ret = new Mat(rows,cols, type);
 					ret.put(0, 0, (byte[])data);
 					return ret;
+				}
+				
+				public <T> void apply(PixelSetter<T> ps) {
+					final BytePixelSetter bps = (BytePixelSetter)ps;
+					byte[] d = (byte[])data;
+					for (int row = 0; row < rows; row++) {
+						final int rowOffset = row * colsXchannels;
+						for (int col = 0; col < cols; col++) {
+							final byte[] pixel = bps.pixel(row, col);
+							final int pixPos = rowOffset + (col * channels);
+							for (int band = 0; band < channels; band++)
+								d[pixPos + band] = pixel[band];
+						}
+					}
 				}
 			};
 		case CvType.CV_16U:
@@ -185,12 +201,22 @@ public abstract class CvRaster {
 	public static interface PixelVisitor<T> {
 		public T apply(Object pixel);
 	}
+	
+	public static interface PixelSetter<T> {
+		public T pixel(int row, int col);
+	}
+	
+	@FunctionalInterface
+	public static interface BytePixelSetter extends PixelSetter<byte[]> {}
 
 	public abstract void zero(int row, int col);
 	public abstract void loadFrom(Mat image);
 	public abstract Object get(int row, int col);
 	public abstract void set(int row, int col, Object pixel);
 	public abstract Mat toMat();
+	public <T> void apply(PixelSetter<T> pixelSetter) {
+		throw new UnsupportedOperationException();
+	}
 	
 	@FunctionalInterface
 	public static interface PixelAggregate<P, R> {

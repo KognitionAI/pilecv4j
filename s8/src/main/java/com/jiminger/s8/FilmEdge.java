@@ -25,10 +25,11 @@ import java.awt.image.Raster;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.media.jai.TiledImage;
+import org.opencv.core.Mat;
 
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.PolarLineFit;
+import com.jiminger.image.drawing.Utils;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
@@ -112,7 +113,7 @@ public class FilmEdge
 //      // now find all of edge point within extent/2 pixels from xipx, xipy
 
 
-      com.jiminger.image.Point Xi = PolarLineFit.closest(new PolarLineFit.DumbPoint(x0r,x0c),c,r);
+      com.jiminger.image.Point Xi = Utils.closest(new Utils.DumbPoint(x0r,x0c),c,r);
       double xix = Xi.getCol();
       double xiy = Xi.getRow();
 
@@ -191,13 +192,11 @@ public class FilmEdge
       return aret;
    }
 
-   public void writeEdge(TiledImage image, byte overlayPixelValue)
-   {
+   public void writeEdge(CvRaster image, byte overlayPixelValue) {
       writePoints(pixels,image,overlayPixelValue);
    }
 
-   public void writePruned(TiledImage image, byte overlayPixelValue)
-   {
+   public void writePruned(CvRaster image, byte overlayPixelValue) {
       if (pruned != null && pruned.size() > 0)
          writePoints(pruned,image,overlayPixelValue);
    }
@@ -340,10 +339,10 @@ public class FilmEdge
 
    private static double [] startingPowell = { 512.0, 512.0 };
 
-   private static void writePoints(List<Point> points, TiledImage image, byte overlayPixelValue)
-   {
+   private static void writePoints(List<Point> points, CvRaster image, byte overlayPixelValue) {
+	  byte[] overlayPixel = new byte[] { overlayPixelValue };
       for (Point p : points)
-         image.setSample(p.x,p.y,0,(int)overlayPixelValue);
+         image.set(p.y,p.x,overlayPixel);
    }
 
    private static List<Point> getTopEdge(CvRaster edgeImage, byte edgeVal, CvRaster gradientRaster) {

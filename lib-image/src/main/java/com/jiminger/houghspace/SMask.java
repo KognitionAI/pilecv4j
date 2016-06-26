@@ -20,15 +20,22 @@
 
 package com.jiminger.houghspace;
 
-import javax.media.jai.*;
-import java.awt.image.*;
-import java.awt.color.*;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+
+import com.jiminger.image.CvRaster;
 
 /**
  * A mask underpinned by an array of shorts (hence the 'S'). This is used to hold a raster of 
  * gradient direction indications.
  */
 public class SMask {
+	public int mwidth;
+	public int mheight;
+	public int maskcr;
+	public int maskcc;
+	public short [] mask;
+
    /**
     * Instantiate a mask of the given dimensions assuming 
     *  that the reference point is the center of the mask.
@@ -87,33 +94,17 @@ public class SMask {
    /**
     * Generate a tiled image that contains a view of the mask.
     */
-   @SuppressWarnings("restriction")
-   public TiledImage getMaskImage()
-   {
-      TiledImage ti = new TiledImage(
-         0,0,mwidth, mheight,0,0,
-         new PixelInterleavedSampleModel(
-            DataBuffer.TYPE_BYTE,mwidth,mheight,1,mwidth, Transform.bandstride),
-         new ComponentColorModel(
-            ColorSpace.getInstance(ColorSpace.CS_GRAY),false,false,
-            ComponentColorModel.OPAQUE,DataBuffer.TYPE_BYTE));
-
-      WritableRaster gradRaster = ti.getWritableTile(0,0);
-      DataBufferByte gradDB = (DataBufferByte)gradRaster.getDataBuffer();
-      byte [] gradImageData = gradDB.getData();
-
-      int maskwh = mwidth * mheight;
-      for (int i = 0; i < maskwh; i++)
-         gradImageData[i] = (byte)mask[i];
-
-      return ti;
+   public Mat getMaskImage() {
+	   Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
+	   CvRaster raster = CvRaster.create(mheight, mwidth, CvType.CV_8UC1);
+	   final byte[] pixel = new byte[1];
+	   raster.apply((row, col) -> {
+		   pixel[0] = (byte)get(row,col);
+		   return pixel;
+	   });
+	   m.put(0, 0, mask);
+	   return m;
    }
-
-   public int mwidth;
-   public int mheight;
-   public int maskcr;
-   public int maskcc;
-   public short [] mask;
 
    public static SMask generateGradientMask(Model m, double w, double h, double quantFactor)
    {

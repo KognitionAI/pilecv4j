@@ -45,7 +45,7 @@ public class ImageFile
       return ImageIO.read(f);
    }
 
-   public static void writeImageFile(RenderedImage ri, String filename, String format)
+   public static void writeImageFile(BufferedImage ri, String filename, String format)
       throws IOException
    {
       File f = new File(filename);
@@ -76,7 +76,7 @@ public class ImageFile
       return bi;
    }
 
-   public static void writeImageFile(RenderedImage ri, String filename)
+   public static void writeImageFile(BufferedImage ri, String filename)
       throws IOException
    {
       int dotindex = filename.lastIndexOf(".");

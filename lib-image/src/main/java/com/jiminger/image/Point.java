@@ -20,8 +20,7 @@
 
 package com.jiminger.image;
 
-public interface Point
-{
+public interface Point {
    public double getRow();
    public double getCol();
 }

@@ -18,15 +18,15 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-import java.awt.image.*;
-import java.awt.image.renderable.*;
-import java.io.*;
-import javax.media.jai.*;
-import com.sun.media.jai.codec.FileSeekableStream;
+import java.io.IOException;
 
-import com.jiminger.util.*;
+import org.opencv.core.Mat;
+import org.opencv.core.Size;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 
-@SuppressWarnings("restriction")
+import com.jiminger.util.CommandLineParser;
+
 public class ConvertImage
 {
    public static final long megaBytes = 1024L * 1024L;
@@ -45,36 +45,11 @@ public class ConvertImage
       //  settings.
       if (!commandLine(args))
          System.exit(-1);
-
-      // Set the tile cache up on JAI
-      TileCache tc = JAI.createTileCache(tileCacheSize);
-      JAI jai = JAI.getDefaultInstance();
-      jai.setTileCache(tc);
-
-      /*
-       * Create an input stream from the specified file name
-       * to be used with the file decoding operator.
-       */
-      FileSeekableStream stream = null;
-      try {
-         stream = new FileSeekableStream(inputImageFilename);
-      } catch (IOException e) {
-         e.printStackTrace();
-         System.exit(0);
-      }
-
-      /* Create an operator to decode the image file. */
-      RenderedImage inputImage = JAI.create("stream", stream);
-
-      ParameterBlock pb = new ParameterBlock();
-      pb.addSource(inputImage);
-      pb.add(new Float(10.0));
-      pb.add(new Float(10.0));
-      // Perform the color conversion.
-      RenderedImage processedImage = JAI.create("Scale", pb, null);
-
-      JAI.create("filestore",processedImage,outputImageFilename, encoder, null);
-
+      
+      Mat img = Imgcodecs.imread(inputImageFilename);
+      Mat processedImage = new Mat();
+      Imgproc.resize(img, processedImage, new Size(img.cols() / 10.0, img.rows()/ 10.0));
+      Imgcodecs.imwrite(outputImageFilename, processedImage);
    }
 
    static private void usage()
