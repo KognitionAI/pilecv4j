@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <modelVersion>4.0.0</modelVersion>
 
@@ -34,7 +34,7 @@
     
     <pluginManagement>
       <plugins>
-    	<plugin>
+        <plugin>
           <groupId>org.eclipse.m2e</groupId>
           <artifactId>lifecycle-mapping</artifactId>
           <version>1.0.0</version>
@@ -92,7 +92,6 @@
           <javahClassNames>
             <javahClassName>com.jiminger.mjpeg.MJPEGWriter</javahClassName>
             <javahClassName>com.jiminger.houghspace.Transform</javahClassName>
-            <javahClassName>com.jiminger.image.canny.EdgeDetectorOpImage</javahClassName>
             <javahClassName>com.jiminger.nr.Minimizer</javahClassName>
           </javahClassNames>
           
@@ -110,33 +109,26 @@
           <sources>
             <source>
               <directory>../src/main/native/mjpeg</directory>
-	      <fileNames>
+              <fileNames>
                 <fileName>jpegtoavi.cpp</fileName>
-	      </fileNames>
+              </fileNames>
             </source>
             <source>
               <directory>../src/main/native/nr</directory>
-	      <fileNames>
+              <fileNames>
                 <fileName>Minimizer.cpp</fileName>
                 <fileName>powell.c</fileName>
                 <fileName>nrutil.c</fileName>
                 <fileName>mnbrak.c</fileName>
                 <fileName>dbrent.c</fileName>
                 <fileName>brent.c</fileName>
-	      </fileNames>
+              </fileNames>
             </source>
             <source>
               <directory>../src/main/native/houghspace</directory>
-	      <fileNames>
+              <fileNames>
                 <fileName>Transform.cpp</fileName>
-	      </fileNames>
-            </source>
-            <source>
-              <directory>../src/main/native/canny</directory>
-	      <fileNames>
-                <fileName>canny_edge.c</fileName>
-                <fileName>EdgeDetectorOpImage.cpp</fileName>
-	      </fileNames>
+              </fileNames>
             </source>
           </sources>
 
@@ -147,7 +139,7 @@
             <linkerStartOption> /INCREMENTAL:NO /DLL </linkerStartOption>
           </linkerStartOptions>
         </configuration>
-           
+        
       </plugin>
 
       <plugin>
