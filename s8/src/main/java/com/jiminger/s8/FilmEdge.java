@@ -20,12 +20,8 @@ package com.jiminger.s8;
 
 
 import java.awt.Point;
-import java.awt.image.DataBufferByte;
-import java.awt.image.Raster;
 import java.util.ArrayList;
 import java.util.List;
-
-import org.opencv.core.Mat;
 
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.PolarLineFit;
@@ -33,9 +29,7 @@ import com.jiminger.image.drawing.Utils;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
-@SuppressWarnings("restriction")
-public class FilmEdge
-{
+public class FilmEdge {
    // these contain the line in polar coordinates using
    //   the row/column (with the origin in the upper left corner)
    //   system.

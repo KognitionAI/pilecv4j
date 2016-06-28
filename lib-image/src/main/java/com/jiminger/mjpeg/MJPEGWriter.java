@@ -20,20 +20,18 @@
 
 package com.jiminger.mjpeg;
 
-import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.FileFilter;
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
+
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.LibraryLoader;
-
-import org.opencv.imgcodecs.Imgcodecs;
-import org.opencv.core.Mat;
 
 public class MJPEGWriter
 {

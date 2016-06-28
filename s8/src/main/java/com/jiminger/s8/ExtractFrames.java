@@ -18,12 +18,11 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
+import static com.jiminger.image.drawing.Utils.print;
+
 import java.awt.Color;
 import java.awt.Graphics2D;
-import java.awt.image.ColorModel;
-import java.awt.image.DataBuffer;
 import java.awt.image.IndexColorModel;
-import java.awt.image.PixelInterleavedSampleModel;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -43,15 +42,12 @@ import com.jiminger.image.CvRaster.PixelAggregate;
 import com.jiminger.image.ImageFile;
 import com.jiminger.image.Point;
 import com.jiminger.image.PolarLineFit;
-import com.jiminger.image.WeightedPoint;
 import com.jiminger.image.drawing.Utils;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.LibraryLoader;
 import com.jiminger.util.PropertiesUtils;
-
-import static com.jiminger.image.drawing.Utils.*;
 
 /*******************************************************************
  * Because I had to look this up 8000 times I decided to document it.
@@ -497,18 +493,16 @@ public class ExtractFrames {
          for (int i = 0; i < sprockets.size(); i++)
             sprockets.get(i).rank += sprockets.size() - i;
 
-         java.util.List<Transform.Fit> verifiedSprockets = new ArrayList<Transform.Fit>();
+         List<Transform.Fit> verifiedSprockets = new ArrayList<Transform.Fit>();
          int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
-         if (!FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength,
-        		 sprockets,(List<WeightedPoint>)(Object)verifiedSprockets)) {
+         if (!FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength, sprockets,verifiedSprockets)) {
             // in the odd case where this fails, assume it's due to the fact that
             // the first point in the list was actually not a real sprocket hole
             for (boolean done = false; !done && sprockets.size() > 0;) {
                sprockets.remove(0);
                verifiedSprockets.clear();
                // try again
-               done = FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength,
-                     sprockets,(List<WeightedPoint>)((List<?>)verifiedSprockets));
+               done = FilmSpec.interframeFilter(filmType,filmLayout,resolutiondpi,imgLength, sprockets,verifiedSprockets);
 
                if (done)
                   sprockets = verifiedSprockets;

@@ -34,7 +34,6 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.StringTokenizer;
 
-import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import com.jiminger.image.CvRaster;
@@ -44,7 +43,6 @@ import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.FilenameUtils;
 import com.jiminger.util.PropertiesUtils;
 
-@SuppressWarnings("restriction")
 public class CorrelateFrames
 {
    public static final long megaBytes = 1024L * 1024L;
@@ -846,7 +844,6 @@ public class CorrelateFrames
 
          for (int ii = 0; ii < si.size(); ii++) {
             int filenum = si.get(ii).intValue();
-            String infilename = getFileName(filenum);
             String outfilename = destDir + File.separator + prefix +
                FilenameUtils.lengthConstToString(startingFramenum, integerLength) + 
                "." + /*getFileExtention(filenum)*/ "jpeg";

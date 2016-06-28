@@ -19,34 +19,12 @@ package com.jiminger.s8;
 ****************************************************************************/
 
 
-/**
- *  The correlation coef for a deterministic (or sample) signal is:
- *
- *                      Sum-over-i( (Xi - Xbar)(Yi - Ybar) )
- * r(x,y) =  --------------------------------------------------------------
- *           sqrt( Sum-over-i( (Xi - Xbar)^ 2) * Sum-over-i( (Yi - Ybar)^ 2)
- *
- * where:
- *   r(X,Y) is the cross-correlation coef between image X and image Y
- *   Xi is the ith pixel value in the RV (image) X 
- *   Yi is the ith pixel value in the RV (image) Y
- *   Xbar is the expected value for X 
- *   Ybar is the expected value for Y 
- */
-
-import java.awt.image.*;
-import javax.media.jai.*;
-
-import org.opencv.core.Mat;
-
 import com.jiminger.image.CvRaster;
 
-@SuppressWarnings("restriction")
 public class Correlate
 {
    public static double [] correlation(CvRaster X, CvRaster Y)
-      throws CorrelateException
-   {
+      throws CorrelateException {
       if (X.rows != Y.rows || X.cols != Y.cols)
          throw new CorrelateException("images don't have the same dimmentions");
       
@@ -60,43 +38,24 @@ public class Correlate
       int dim = X.channels;
       double [] ret = new double [dim];
 
-      int xBegCurRow;
-      int yBegCurRow;
-      int xpos;
-      int ypos;
-
       // find the means
       double Xbar;
       double Ybar;
 
-      byte [] bandx;
-      byte [] bandy;
+      byte [] bandx = (byte[])X.data;
+      byte [] bandy = (byte[])Y.data;
 
       for (int b = 0; b < dim; b++) {
-         bandx = bandsx[b];
-         bandy = bandsy[b];
-         xBegCurRow = xBandOffsets[b];
-         yBegCurRow = yBandOffsets[b];
-
          Xbar = 0.0;
          Ybar = 0.0;
 
-         for(int row = 0; row < height; row++)
-         {
-            xpos = xBegCurRow;
-            ypos = yBegCurRow;
-
-            for (int col = 0; col < width; col++)
-            {
-               Xbar += (double)(bandx[xpos] & 0xff);
-               Ybar += (double)(bandy[ypos] & 0xff);
-
-               xpos += xPixelStride;
-               ypos += yPixelStride;
+         int pos = b;
+         for(int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+               Xbar += (double)(bandx[pos] & 0xff);
+               Ybar += (double)(bandy[pos] & 0xff);
+               pos += dim;
             }
-
-            xBegCurRow += xScanLineStride;
-            yBegCurRow += yScanLineStride;
          }
 
          Xbar /= (double)wh;
@@ -111,53 +70,32 @@ public class Correlate
          double varx = 0.0;
          double vary = 0.0;
 
-         xBegCurRow = xBandOffsets[b];
-         yBegCurRow = yBandOffsets[b];
-         for(int row = 0; row < height; row++)
-         {
-            xpos = xBegCurRow;
-            ypos = yBegCurRow;
-
-            for (int col = 0; col < width; col++)
-            {
-               XmXbar = (double)(bandx[xpos] & 0xff) - Xbar;
-               YmYbar = (double)(bandy[ypos] & 0xff) - Ybar;
+         pos = b;
+         for(int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+               XmXbar = (double)(bandx[pos] & 0xff) - Xbar;
+               YmYbar = (double)(bandy[pos] & 0xff) - Ybar;
 
                // calculate the mag sq
                varx += (XmXbar * XmXbar);
                vary += (YmYbar * YmYbar);
-
-               xpos += xPixelStride;
-               ypos += yPixelStride;
+               
+               pos += dim;
             }
-
-            xBegCurRow += xScanLineStride;
-            yBegCurRow += yScanLineStride;
          }
 
          double denom = Math.sqrt(varx * vary);
-
          double numerator = 0.0;
-         xBegCurRow = xBandOffsets[b];
-         yBegCurRow = yBandOffsets[b];
-         for(int row = 0; row < height; row++)
-         {
-            xpos = xBegCurRow;
-            ypos = yBegCurRow;
-
-            for (int col = 0; col < width; col++)
-            {
-               XmXbar = (double)(bandx[xpos] & 0xff) - Xbar;
-               YmYbar = (double)(bandy[ypos] & 0xff) - Ybar;
-
-               xpos += xPixelStride;
-               ypos += yPixelStride;
+         
+         pos = b;
+         for(int row = 0; row < height; row++) {
+            for (int col = 0; col < width; col++) {
+               XmXbar = (double)(bandx[pos] & 0xff) - Xbar;
+               YmYbar = (double)(bandy[pos] & 0xff) - Ybar;
 
                numerator += XmXbar * YmYbar;
+               pos += dim;
             }
-
-            xBegCurRow += xScanLineStride;
-            yBegCurRow += yScanLineStride;
          }
 
          ret[b] = numerator/denom;

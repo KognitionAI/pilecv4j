@@ -146,7 +146,7 @@ public class FilmSpec
    // If I have a list of Points, then I have a list of WeightedPoints. Why the F@&^ doesn't java know this?
    public static boolean interframeFilter(int filmType, int filmLayout, int resolutiondpi, int imgLength, 
                                           List<? extends WeightedPoint> points, 
-                                          List<WeightedPoint> verifiedClusters)
+                                          @SuppressWarnings("rawtypes") List verifiedClusters)
    {
       List<WeightedPoint> sprockets = new ArrayList<WeightedPoint>();
       sprockets.addAll(points);
