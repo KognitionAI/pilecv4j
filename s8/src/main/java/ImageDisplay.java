@@ -43,12 +43,12 @@ import org.eclipse.swt.widgets.ScrollBar;
 import org.eclipse.swt.widgets.Shell;
 
 import com.jiminger.image.ImageFile;
+import com.jiminger.util.LibraryLoader;
 
 public class ImageDisplay {
+   static {  LibraryLoader.init(); }
     
-    public static void main (String [] args) 
-    throws Exception
-    {
+    public static void main (String [] args) throws Exception {
         Display display = new Display ();
         Shell shell = new Shell (display);
         shell.setLayout(new FillLayout());

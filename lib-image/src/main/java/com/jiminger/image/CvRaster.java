@@ -202,6 +202,7 @@ public abstract class CvRaster {
 		public T apply(Object pixel);
 	}
 	
+	@FunctionalInterface
 	public static interface PixelSetter<T> {
 		public T pixel(int row, int col);
 	}

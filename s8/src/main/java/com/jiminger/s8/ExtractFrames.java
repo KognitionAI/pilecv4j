@@ -158,6 +158,8 @@ public class ExtractFrames {
 	   cvrtScaleDenom[CvType.CV_16S] = (double)((int) 0x7fff);
 	   cvrtScaleDenom[CvType.CV_8U] = (double)((int) 0xff);
 	   cvrtScaleDenom[CvType.CV_8S] = (double)((int) 0x7f);
+	   
+	   LibraryLoader.init();
    }
    
    public static Mat convertToGray(Mat src) {
@@ -176,7 +178,6 @@ public class ExtractFrames {
    
    /** The main method. */
    public static void main(String[] args) throws IOException, InterruptedException, MinimizerException {
-	  /*LibraryLoader ll =*/ new LibraryLoader(); // load all libs on classpath.
       com.jiminger.util.Timer totalTime = new com.jiminger.util.Timer();
       totalTime.start();
 

@@ -24,16 +24,12 @@ import com.jiminger.util.LibraryLoader;
 
 public class Minimizer
 {
-   static {
-      new LibraryLoader();
-   }
+   static {  LibraryLoader.init(); }
    
    private Func f;
    private double [] minVec;
 
    public static double ftol = 1.0e-10;
-//   public static double TINY = 1.0e-10;
-//   public static int NMAX = 5000;
 
    // static lock ... JNI code used is not threadsafe
    public static Object lock = new Object();

@@ -7,15 +7,12 @@ import org.junit.Test;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.util.LibraryLoader;
 
-public class TestMinimizer
-{
-	static LibraryLoader ll = new LibraryLoader();
+public class TestMinimizer {
+	static { LibraryLoader.init(); }
 	
-	static class MyMinFinc implements Minimizer.Func
-	{
+	static class MyMinFinc implements Minimizer.Func {
 
-		public double func(double[] x0) 
-		{
+		public double func(double[] x0) {
 			double x = x0[0] - 2.0;
 			return (x * x) - 3.0;
 		}
@@ -23,8 +20,7 @@ public class TestMinimizer
 	}
 	
 	@Test
-	public void testMinimizer() throws Throwable
-	{
+	public void testMinimizer() throws Throwable {
 		Minimizer.Func f = new MyMinFinc();
 		
 		Minimizer m = new Minimizer(f);
@@ -35,5 +31,4 @@ public class TestMinimizer
 		assertEquals(-3.0,minVal,0.0001);
 		assertEquals(2.0,minParam,0.0001);
 	}
-
 }

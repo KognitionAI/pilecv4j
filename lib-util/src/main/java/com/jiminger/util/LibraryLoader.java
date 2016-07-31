@@ -34,6 +34,8 @@ import org.apache.commons.io.IOUtils;
 
 public class LibraryLoader
 {
+	private LibraryLoader() {}
+	
 	static 
 	{
 	   List<InputStream> iss = null;
@@ -65,6 +67,7 @@ public class LibraryLoader
 	    	  IOUtils.closeQuietly(is);
 
 	    	  String libName = libProps.getProperty("library");
+	    	  System.out.println(libName);
 	    	  String libSuffix = libName.substring(libName.lastIndexOf('.'));
 	    	  is = getInputStream(libName);
 	    	  if (is == null)
@@ -92,8 +95,9 @@ public class LibraryLoader
 	   }
 	}
 	
-	private static InputStream getInputStream(String resource)
-	{
+	public static void init() {}
+	
+	private static InputStream getInputStream(String resource) {
       // I need to find the library. Let's start with the "current" classloader.
       // see http://www.javaworld.com/javaworld/javaqa/2003-06/01-qa-0606-load.html
       // also see: http://www.javaworld.com/javaworld/javaqa/2003-03/01-qa-0314-forname.html
@@ -106,8 +110,7 @@ public class LibraryLoader
 	   return is;
 	}
 	
-	private static InputStream getInputStreamFromClassLoader(ClassLoader loader, String resource)
-	{
+	private static InputStream getInputStreamFromClassLoader(ClassLoader loader, String resource) {
 	   InputStream is = loader.getResourceAsStream(resource);
 	   if (is == null)
 	      is = loader.getResourceAsStream("/" + resource);

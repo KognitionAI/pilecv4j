@@ -36,17 +36,30 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
+
+import com.jiminger.image.drawing.Utils;
+
 public class ImageFile
 {
-   public static BufferedImage readImageFile(String filename)
-      throws IOException
-   {
+   public static BufferedImage readImageFile(String filename) throws IOException {
       File f = new File(filename);
-      return ImageIO.read(f);
+      BufferedImage ret = ImageIO.read(f);
+      if (ret == null) {
+    	  System.out.println("Failed to read '" + filename + "' using ImageIO");
+    	  Mat mat = Imgcodecs.imread(filename, Imgcodecs.IMREAD_ANYCOLOR);
+    	  if (mat == null)
+    		  throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
+    	  if (filename.endsWith(".jp2"))
+    		  Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
+    	  ret = Utils.mat2Img(mat);
+      }
+      return ret;
    }
 
-   public static void writeImageFile(BufferedImage ri, String filename, String format)
-      throws IOException
+   public static void writeImageFile(BufferedImage ri, String filename, String format) throws IOException
    {
       File f = new File(filename);
       // make sure the output directory exists.
@@ -114,8 +127,7 @@ public class ImageFile
          int height = bi.getHeight();
          
          double scale = -1.0;
-         if (dest.maxh != -1)
-         {
+         if (dest.maxh != -1) {
             if (height > dest.maxh)
                // see what we need to scale to make the height the same.
                scale = ((double)dest.maxh) / ((double)height);

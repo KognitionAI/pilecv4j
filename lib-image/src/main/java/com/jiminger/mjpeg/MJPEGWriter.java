@@ -35,9 +35,7 @@ import com.jiminger.util.LibraryLoader;
 
 public class MJPEGWriter
 {
-   static {
-      new LibraryLoader();
-   }
+   static {  LibraryLoader.init(); }
 
    static public String parentDir = null;
    static public String avifile = "out.avi";

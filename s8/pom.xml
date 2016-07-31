@@ -7,7 +7,16 @@
   <modelVersion>4.0.0</modelVersion>
   <artifactId>s8</artifactId>
   <packaging>jar</packaging>
-  <name>s8 application library</name>  
+  <name>s8 application library</name>
+  <dependencyManagement>
+    <dependencies>
+		<dependency>
+			<groupId>com.github.jai-imageio</groupId>
+			<artifactId>jai-imageio-core</artifactId>
+			<version>1.3.1</version>
+		</dependency>
+    </dependencies>
+  </dependencyManagement>
   <dependencies>
     <dependency>
       <groupId>com.jiminger</groupId>
@@ -25,6 +34,12 @@
       <groupId>${swtgroup}</groupId>
       <artifactId>${swtartifact}</artifactId>
     </dependency>
+<!-- 	<dependency>
+	    <groupId>com.github.jai-imageio</groupId>
+	    <artifactId>jai-imageio-jpeg2000</artifactId>
+	    <version>1.3.0</version>
+	    <scope>runtime</scope>
+	</dependency> -->
   </dependencies>
 
   <repositories>

@@ -6,10 +6,10 @@ import com.jiminger.util.LibraryLoader;
 
 public class TestLibraryLoader
 {
+	
 
 	@Test
-	public void testLibraryLoading() throws Throwable
-	{
-		new LibraryLoader(); // all done.
+	public void testLibraryLoading() throws Exception {
+		LibraryLoader.init();
 	}
 }
