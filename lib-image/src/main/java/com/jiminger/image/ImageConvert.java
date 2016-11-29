@@ -24,75 +24,75 @@ import java.io.IOException;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import com.jiminger.util.CommandLineParser;
+import com.jiminger.util.LibraryLoader;
 
-public class ImageConvert
-{
-   public static final long megaBytes = 1024L * 1024L;
-   public static final long defaultTileCacheSize = 300;
-   public static final String defaultDestFilename = "tmp.bmp";
-   public static final String defaultDestFileType = "BMP";
+public class ImageConvert {
+    public static final long megaBytes = 1024L * 1024L;
+    public static final long defaultTileCacheSize = 300;
+    public static final String defaultDestFilename = "tmp.bmp";
+    public static final String defaultDestFileType = "BMP";
 
-   public static long tileCacheSize = defaultTileCacheSize * megaBytes;
+    public static long tileCacheSize = defaultTileCacheSize * megaBytes;
 
-   public static String sourceFileName = null;
-   public static String destFileName = null;
-   public static String destFileType = null;
+    public static String sourceFileName = null;
+    public static String destFileName = null;
+    public static String destFileType = null;
 
-   /** The main method. */
-   public static void main(String[] args) 
-      throws IOException
-   {
-      // First parse the command line and test for various
-      //  settings.
-      if (!commandLine(args))
-         return;
-      
-      Imgcodecs.imwrite(destFileName, Imgcodecs.imread(sourceFileName));
-   }
+    static {
+        LibraryLoader.init();
+    }
 
-   static private boolean commandLine(String[] args) {
-      CommandLineParser cl = new CommandLineParser(args);
+    /** The main method. */
+    public static void main(final String[] args)
+            throws IOException {
+        // First parse the command line and test for various
+        // settings.
+        if (!commandLine(args))
+            return;
 
-      // see if we are asking for help
-      if (cl.getProperty("help") != null || 
-          cl.getProperty("-help") != null)
-      {
-         usage();
-         return false;
-      }
+        Imgcodecs.imwrite(destFileName, Imgcodecs.imread(sourceFileName));
+    }
 
-      sourceFileName = cl.getProperty("f");
-      if (sourceFileName == null)
-      {
-         usage();
-         return false;
-      }
+    static private boolean commandLine(final String[] args) {
+        final CommandLineParser cl = new CommandLineParser(args);
 
-      String tmps = cl.getProperty("cs");
-      if (tmps != null)
-         tileCacheSize = Long.parseLong(tmps) * megaBytes;
+        // see if we are asking for help
+        if (cl.getProperty("help") != null ||
+                cl.getProperty("-help") != null) {
+            usage();
+            return false;
+        }
 
-      destFileName = cl.getProperty("o");
-      if (destFileName == null)
-         destFileName = defaultDestFilename;
+        sourceFileName = cl.getProperty("f");
+        if (sourceFileName == null) {
+            usage();
+            return false;
+        }
 
-      destFileType = cl.getProperty("t");
-      if (destFileType == null)
-         destFileType = defaultDestFileType;
+        final String tmps = cl.getProperty("cs");
+        if (tmps != null)
+            tileCacheSize = Long.parseLong(tmps) * megaBytes;
 
-      return true;
-   }
+        destFileName = cl.getProperty("o");
+        if (destFileName == null)
+            destFileName = defaultDestFilename;
 
-   private static void usage()
-   {
-      System.out.println(
-         "usage: java [javaargs] ImageConvert -f filename [-o " +
-         defaultDestFilename + "] [-cs " +
-         defaultTileCacheSize + "] [-t " + defaultDestFileType + "]");
-      System.out.println();
-      System.out.println("  -f this is how you supply filename of the source image.");
-      System.out.println("  -o destination image filename.");
-      System.out.println("  -cs image tile cache size in mega bytes.");
-      System.out.println("  -t File type of the destination image.");
-   }
+        destFileType = cl.getProperty("t");
+        if (destFileType == null)
+            destFileType = defaultDestFileType;
+
+        return true;
+    }
+
+    private static void usage() {
+        System.out.println(
+                "usage: java [javaargs] ImageConvert -f filename [-o " +
+                        defaultDestFilename + "] [-cs " +
+                        defaultTileCacheSize + "] [-t " + defaultDestFileType + "]");
+        System.out.println();
+        System.out.println("  -f this is how you supply filename of the source image.");
+        System.out.println("  -o destination image filename.");
+        System.out.println("  -cs image tile cache size in mega bytes.");
+        System.out.println("  -t File type of the destination image.");
+    }
 }
