@@ -74,7 +74,6 @@ FILES=`find . -name "*.$SE"`
 TMPIFS="$IFS"
 IFS=$(echo -en "\n\b")
 for entry in $FILES; do
-    echo "converting: \"$entry\""
     BASE=${entry%.*}
     RELDIR=`dirname $entry`
     mkdir -p "$DSTDIR/$RELDIR"
@@ -83,8 +82,9 @@ for entry in $FILES; do
         exit 1
     fi
     if [ -f "$DSTDIR/$BASE.$DE" ]; then
-        echo "File \"$DSTDIR/$BASE.DE\" already exists. Skipping"
+        echo "File \"$DSTDIR/$BASE.$DE\" already exists. Skipping."
     else
+        echo "converting: \"$entry\""
         RESULTS=`java -cp $MAVEN_REPO/com/jiminger/lib-image/1.0-SNAPSHOT/lib-image-1.0-SNAPSHOT.jar:$MAVEN_REPO/com/jiminger/lib-util/1.0-SNAPSHOT/lib-util-1.0-SNAPSHOT.jar:$MAVEN_REPO/com/jiminger/opencv-lib-jar/3.1.0/opencv-lib-jar-3.1.0-withlib.jar:$MAVEN_REPO/com/jiminger/opencv-lib-jar/3.1.0/opencv-lib-jar-3.1.0.jar:$MAVEN_REPO/opencv/opencv/3.1.0/opencv-3.1.0.jar:$MAVEN_REPO/commons-io/commons-io/2.0.1/commons-io-2.0.1.jar com.jiminger.image.ImageFile -i "$SRCDIR/$entry" -o "$DSTDIR/$BASE.$DE"`
         if [ $? -ne 0 ]; then
             echo "FAILED to run the image convert. See the above error."
