@@ -17,7 +17,6 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 package com.jiminger.util;
 
 import java.io.File;
@@ -32,89 +31,94 @@ import java.util.Properties;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
 
-public class LibraryLoader
-{
-	private LibraryLoader() {}
-	
-	static 
-	{
-	   List<InputStream> iss = null;
-	   
-	   try {
-		   iss = new ArrayList<>();
-		   try {
-			   Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
-			   while (systemResources.hasMoreElements()) {
-				   iss.add(systemResources.nextElement().openStream());
-			   }
-		   } catch (IOException e) {
-	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
-		   }
-		   
-	      // All we're going to do here is load the library from a jar file
+public class LibraryLoader {
+    private LibraryLoader() {}
 
-	      if (iss == null || iss.size() == 0)
-	         throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Is the jar file containing the library on the classpath?");
-	      
-	      for (InputStream is : iss) {
-	    	  Properties libProps = new Properties();
+    static {
+        List<InputStream> iss = null;
 
-	    	  try { libProps.load(is); } 
-	    	  catch (IOException e) {
-	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
-	    	  }
+        try {
+            iss = new ArrayList<>();
+            try {
+                final Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
+                while (systemResources.hasMoreElements()) {
+                    iss.add(systemResources.nextElement().openStream());
+                }
+            } catch (final IOException e) {
+                throw new UnsatisfiedLinkError(
+                        "Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
+            }
 
-	    	  IOUtils.closeQuietly(is);
+            // All we're going to do here is load the library from a jar file
 
-	    	  String libName = libProps.getProperty("library");
-	    	  System.out.println(libName);
-	    	  String libSuffix = libName.substring(libName.lastIndexOf('.'));
-	    	  is = getInputStream(libName);
-	    	  if (is == null)
-	    		  throw new UnsatisfiedLinkError("Couldn't load the library identified as the com.jiminger native library (" + libName + ").");
+            if (iss == null || iss.size() == 0)
+                throw new UnsatisfiedLinkError(
+                        "Couldn't load the com.jiminger native library. Is the jar file containing the library on the classpath?");
 
-	    	  File tmpFile = null;
-	    	  try { tmpFile = File.createTempFile("com.jiminger", libSuffix); }
-	    	  catch (IOException e) {
-	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
-	    	  }
-	    	  tmpFile.deleteOnExit();
+            for (InputStream is : iss) {
+                final Properties libProps = new Properties();
 
-	    	  try { FileUtils.copyInputStreamToFile(is, tmpFile); }
-	    	  catch (IOException e) {
-	    		  throw new UnsatisfiedLinkError("Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
-	    	  }
+                try {
+                    libProps.load(is);
+                } catch (final IOException e) {
+                    throw new UnsatisfiedLinkError(
+                            "Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:" + e.getLocalizedMessage());
+                }
 
-	    	  System.out.println("Loading:" + tmpFile.getAbsolutePath());
-	    	  System.load(tmpFile.getAbsolutePath());
-	      }
-	   }
-	   finally {
-		   for (InputStream is : iss)
-			   if (is != null) IOUtils.closeQuietly(is);
-	   }
-	}
-	
-	public static void init() {}
-	
-	private static InputStream getInputStream(String resource) {
-      // I need to find the library. Let's start with the "current" classloader.
-      // see http://www.javaworld.com/javaworld/javaqa/2003-06/01-qa-0606-load.html
-      // also see: http://www.javaworld.com/javaworld/javaqa/2003-03/01-qa-0314-forname.html
-	   InputStream is = getInputStreamFromClassLoader(LibraryLoader.class.getClassLoader(), resource);
-	   if (is == null) // ok, now try the context classloader
-	      is = getInputStreamFromClassLoader(Thread.currentThread().getContextClassLoader(),resource);
-	   if (is == null) // finally try the system classloader though if we're here we're probably screwed
-	      is = getInputStreamFromClassLoader(ClassLoader.getSystemClassLoader(),resource);
+                IOUtils.closeQuietly(is);
 
-	   return is;
-	}
-	
-	private static InputStream getInputStreamFromClassLoader(ClassLoader loader, String resource) {
-	   InputStream is = loader.getResourceAsStream(resource);
-	   if (is == null)
-	      is = loader.getResourceAsStream("/" + resource);
+                final String libName = libProps.getProperty("library");
+                final String libSuffix = libName.substring(libName.lastIndexOf('.'));
+                is = getInputStream(libName);
+                if (is == null)
+                    throw new UnsatisfiedLinkError("Couldn't load the library identified as the com.jiminger native library (" + libName + ").");
 
-	   return is;
-	}
+                File tmpFile = null;
+                try {
+                    tmpFile = File.createTempFile("com.jiminger", libSuffix);
+                } catch (final IOException e) {
+                    throw new UnsatisfiedLinkError(
+                            "Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
+                }
+                tmpFile.deleteOnExit();
+
+                try {
+                    FileUtils.copyInputStreamToFile(is, tmpFile);
+                } catch (final IOException e) {
+                    throw new UnsatisfiedLinkError(
+                            "Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
+                }
+
+                System.out.println("Loading" + libName + " as " + tmpFile.getAbsolutePath());
+                System.load(tmpFile.getAbsolutePath());
+            }
+        } finally {
+            for (final InputStream is : iss)
+                if (is != null)
+                    IOUtils.closeQuietly(is);
+        }
+    }
+
+    public static void init() {}
+
+    private static InputStream getInputStream(final String resource) {
+        // I need to find the library. Let's start with the "current" classloader.
+        // see http://www.javaworld.com/javaworld/javaqa/2003-06/01-qa-0606-load.html
+        // also see: http://www.javaworld.com/javaworld/javaqa/2003-03/01-qa-0314-forname.html
+        InputStream is = getInputStreamFromClassLoader(LibraryLoader.class.getClassLoader(), resource);
+        if (is == null) // ok, now try the context classloader
+            is = getInputStreamFromClassLoader(Thread.currentThread().getContextClassLoader(), resource);
+        if (is == null) // finally try the system classloader though if we're here we're probably screwed
+            is = getInputStreamFromClassLoader(ClassLoader.getSystemClassLoader(), resource);
+
+        return is;
+    }
+
+    private static InputStream getInputStreamFromClassLoader(final ClassLoader loader, final String resource) {
+        InputStream is = loader.getResourceAsStream(resource);
+        if (is == null)
+            is = loader.getResourceAsStream("/" + resource);
+
+        return is;
+    }
 }

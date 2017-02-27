@@ -36,7 +36,6 @@ public class ImageConvert {
 
     public static String sourceFileName = null;
     public static String destFileName = null;
-    public static String destFileType = null;
 
     static {
         LibraryLoader.init();
@@ -77,10 +76,6 @@ public class ImageConvert {
         if (destFileName == null)
             destFileName = defaultDestFilename;
 
-        destFileType = cl.getProperty("t");
-        if (destFileType == null)
-            destFileType = defaultDestFileType;
-
         return true;
     }
 
@@ -93,6 +88,5 @@ public class ImageConvert {
         System.out.println("  -f this is how you supply filename of the source image.");
         System.out.println("  -o destination image filename.");
         System.out.println("  -cs image tile cache size in mega bytes.");
-        System.out.println("  -t File type of the destination image.");
     }
 }

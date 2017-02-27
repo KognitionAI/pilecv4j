@@ -36,6 +36,14 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86</swtartifact>
         <jimingerartifact>linux-x86-jiminger</jimingerartifact>
       </properties>
+      <modules>
+        <module>lib-util</module>
+        <module>lib-nr</module>
+        <module>lib-image</module>
+        <module>native</module>
+        <module>s8</module>
+        <module>test-jiminger</module>
+      </modules>
     </profile>
     <profile>
       <id>linux-64bit</id>
@@ -50,6 +58,14 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <jimingerartifact>linux-amd64-jiminger</jimingerartifact>
       </properties>
+      <modules>
+        <module>lib-util</module>
+        <module>lib-nr</module>
+        <module>lib-image</module>
+        <module>native</module>
+        <module>s8</module>
+        <module>test-jiminger</module>
+      </modules>
     </profile>
     <profile>
       <id>windows-x86_64</id>
@@ -64,6 +80,14 @@
         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
         <jimingerartifact>windows-x86_64-jiminger</jimingerartifact>
       </properties>
+      <modules>
+        <module>lib-util</module>
+        <module>lib-nr</module>
+        <module>lib-image</module>
+<!--        <module>native</module> -->
+        <module>s8</module>
+        <module>test-jiminger</module>
+      </modules>
     </profile>
     <profile>
       <id>windows-x86</id>
@@ -78,6 +102,14 @@
         <swtartifact>org.eclipse.swt.win32.win32.x86</swtartifact>
         <jimingerartifact>windows-x86-jiminger</jimingerartifact>
       </properties>
+      <modules>
+        <module>lib-util</module>
+        <module>lib-nr</module>
+        <module>lib-image</module>
+<!--        <module>native</module> -->
+        <module>s8</module>
+        <module>test-jiminger</module>
+      </modules>
     </profile>
   </profiles>
 
@@ -90,7 +122,7 @@
 	<groupId>com.jiminger</groupId>
 	<artifactId>opencv-lib-jar</artifactId>
 	<classifier>withlib</classifier>
-	<version>3.1.0</version>
+	<version>3.2.0</version>
       </dependency>
 
       <!-- Internal to the product -->
@@ -144,21 +176,19 @@
     </dependencies>
   </dependencyManagement>
 
-  <modules>
-    <module>lib-util</module>
-    <module>lib-nr</module>
-    <module>lib-image</module>
-    <module>native</module>
-    <module>s8</module>
-    <module>test-jiminger</module>
-  </modules>
-
   <scm>
     <connection>scm:ssh://jim@king-homer:443/repo/utilities</connection>
     <developerConnection>scm:ssh://jim@king-homer:443/repo/utilities</developerConnection>
     <url>scm:ssh://jim@king-homer:443/repo/utilities</url>
   </scm>
 
+  <repositories>
+    <repository>
+      <id>maven-eclipse-repo</id>
+      <url>http://maven-eclipse.github.io/maven</url>
+    </repository>
+  </repositories>
+  
   <reporting>
     <plugins>
       <plugin>

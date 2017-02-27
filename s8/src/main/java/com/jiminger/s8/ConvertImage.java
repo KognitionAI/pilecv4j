@@ -27,76 +27,52 @@ import org.opencv.imgproc.Imgproc;
 
 import com.jiminger.util.CommandLineParser;
 
-public class ConvertImage
-{
-   public static final long megaBytes = 1024L * 1024L;
-   public static final long defaultTileCacheSize = 300;
-   public static long tileCacheSize = defaultTileCacheSize * megaBytes;
+public class ConvertImage {
+    private static String inputImageFilename;
+    private static String outputImageFilename;
 
-   private static String inputImageFilename;
-   private static String outputImageFilename;
-   private static String encoder;
+    /** The main method. */
+    public static void main(final String[] args)
+            throws IOException, InterruptedException, Correlate.CorrelateException {
+        // First parse the command line and test for various
+        // settings.
+        if (!commandLine(args))
+            System.exit(-1);
 
-   /** The main method. */
-   public static void main(String[] args) 
-      throws IOException, InterruptedException, Correlate.CorrelateException
-   {
-      // First parse the command line and test for various
-      //  settings.
-      if (!commandLine(args))
-         System.exit(-1);
-      
-      Mat img = Imgcodecs.imread(inputImageFilename);
-      Mat processedImage = new Mat();
-      Imgproc.resize(img, processedImage, new Size(img.cols() / 10.0, img.rows()/ 10.0));
-      Imgcodecs.imwrite(outputImageFilename, processedImage);
-   }
+        final Mat img = Imgcodecs.imread(inputImageFilename);
+        final Mat processedImage = new Mat();
+        Imgproc.resize(img, processedImage, new Size(img.cols() / 10.0, img.rows() / 10.0));
+        Imgcodecs.imwrite(outputImageFilename, processedImage);
+    }
 
-   static private void usage()
-   {
-      System.out.println(
-         "usage: java [javaargs] ConvertImage -i inputImageFilename -o outputImageFilename -e ENCODER [-cs cacheSize]");
-      System.out.println("  -cs image tile cache size in mega bytes. default is " + defaultTileCacheSize);
-   }
+    static private void usage() {
+        System.out.println(
+                "usage: java [javaargs] ConvertImage -i inputImageFilename -o outputImageFilename");
+    }
 
-   static private boolean commandLine(String[] args)
-   {
-      CommandLineParser cl = new CommandLineParser(args);
+    static private boolean commandLine(final String[] args) {
+        final CommandLineParser cl = new CommandLineParser(args);
 
-      // see if we are asking for help
-      if (cl.getProperty("help") != null || 
-          cl.getProperty("-help") != null)
-      {
-         usage();
-         return false;
-      }
+        // see if we are asking for help
+        if (cl.getProperty("help") != null ||
+                cl.getProperty("-help") != null) {
+            usage();
+            return false;
+        }
 
-      inputImageFilename = cl.getProperty("i");
-      if (inputImageFilename == null)
-      {
-         usage();
-         return false;
-      }
+        inputImageFilename = cl.getProperty("i");
+        if (inputImageFilename == null) {
+            usage();
+            return false;
+        }
 
-      outputImageFilename = cl.getProperty("o");
-      if (outputImageFilename == null)
-      {
-         usage();
-         return false;
-      }
+        outputImageFilename = cl.getProperty("o");
+        if (outputImageFilename == null) {
+            usage();
+            return false;
+        }
 
-      encoder = cl.getProperty("e");
-      if (encoder == null)
-      {
-         usage();
-         return false;
-      }
-
-      String tmps = cl.getProperty("cs");
-      if (tmps != null)
-         tileCacheSize = Long.parseLong(tmps) * megaBytes;
-
-      return true;
-   }
+        return true;
+    }
 
 }

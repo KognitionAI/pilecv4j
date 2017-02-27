@@ -19,11 +19,14 @@
 
 package com.jiminger.image;
 
+import static org.opencv.imgcodecs.Imgcodecs.IMREAD_UNCHANGED;
+
 import java.awt.Graphics;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.awt.image.RenderedImage;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -35,6 +38,7 @@ import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
 import javax.imageio.stream.ImageOutputStream;
 
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
@@ -49,35 +53,31 @@ public class ImageFile {
 
     public static BufferedImage readImageFile(final String filename) throws IOException {
         final File f = new File(filename);
+        if (!f.exists())
+            throw new FileNotFoundException(filename);
         BufferedImage ret = ImageIO.read(f);
         if (ret == null) {
             System.out.println("Failed to read '" + filename + "' using ImageIO");
-            final Mat mat = Imgcodecs.imread(filename, Imgcodecs.IMREAD_ANYCOLOR);
+            final Mat mat = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
             if (mat == null)
                 throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
-            if (filename.endsWith(".jp2"))
+            if (filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                 Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
+            // Imgproc.resize(mat, mat, new Size(mat.cols() / 10.0, mat.rows() / 10.0));
+            // mat.convertTo(mat, CvType.CV_8U, 0.00390625);
+            // Imgcodecs.imwrite("C:\\Users\\Jim\\Pictures\\Pictures\\Scanned\\1964\\tmp.jpg", mat);
             ret = Utils.mat2Img(mat);
+            // ImageDisplay.showImage(ret);
+            // synchronized (ret) {
+            // try {
+            // ret.wait();
+            // } catch (final InterruptedException e) {
+            // // TODO Auto-generated catch block
+            // e.printStackTrace();
+            // }
+            // }
         }
         return ret;
-    }
-
-    public static void writeImageFile(final BufferedImage ri, final String filename, final String format) throws IOException {
-        final File f = new File(filename);
-        // make sure the output directory exists.
-        // f.mkdirs();
-        final Iterator<ImageWriter> iter = ImageIO.getImageWritersByFormatName(format);
-        if (!iter.hasNext())
-            throw new IOException("Can't write image of type " + format);
-        final ImageWriter writer = iter.next(); // grab the first one
-        final ImageOutputStream ios = ImageIO.createImageOutputStream(f);
-        final ImageWriteParam param = writer.getDefaultWriteParam();
-
-        writer.setOutput(ios);
-
-        writer.write(null, new IIOImage(ri, null, null), param);
-        ios.flush();
-        ios.close();
     }
 
     public static BufferedImage convert(final Image im) {
@@ -102,17 +102,22 @@ public class ImageFile {
         // make sure the output directory exists.
         p.mkdirs();
         final Iterator<ImageWriter> iter = ImageIO.getImageWritersBySuffix(ext);
-        if (!iter.hasNext())
-            throw new IOException("Can't write with extention " + ext);
-        final ImageWriter writer = iter.next(); // grab the first one
-        final ImageOutputStream ios = ImageIO.createImageOutputStream(f);
-        final ImageWriteParam param = writer.getDefaultWriteParam();
+        if (iter.hasNext()) {
+            final ImageWriter writer = iter.next(); // grab the first one
+            final ImageOutputStream ios = ImageIO.createImageOutputStream(f);
+            final ImageWriteParam param = writer.getDefaultWriteParam();
 
-        writer.setOutput(ios);
+            writer.setOutput(ios);
 
-        writer.write(null, new IIOImage(ri, null, null), param);
-        ios.flush();
-        ios.close();
+            writer.write(null, new IIOImage(ri, null, null), param);
+            ios.flush();
+            ios.close();
+        } else { // we'll try OpenCV
+            // ImageDisplay.showImage(ri);
+            final Mat mat = Utils.img2Mat(ri);
+            if (!Imgcodecs.imwrite(filename, mat))
+                throw new IllegalArgumentException("Failed to write");
+        }
     }
 
     public static void transcode(BufferedImage bi, final ImageDestinationDefinition dest)
@@ -147,15 +152,11 @@ public class ImageFile {
             }
         }
 
-        if (dest.format == null)
-            writeImageFile(bi, dest.outfile);
-        else
-            writeImageFile(bi, dest.outfile, dest.format);
+        writeImageFile(bi, dest.outfile);
     }
 
     public static class ImageDestinationDefinition {
         public String outfile = null;
-        public String format = null;
         public int maxw = -1;
         public int maxh = -1;
         public boolean verify = false;
@@ -226,14 +227,6 @@ public class ImageFile {
                 i++;
             }
 
-            else if ("-f".equalsIgnoreCase(args[i])) {
-                cur = cur == null ? new ImageDestinationDefinition() : cur;
-                if (cur.format != null)
-                    cur = push(cur, ret);
-                cur.format = args[i + 1];
-                i++;
-            }
-
             else if ("-verify".equalsIgnoreCase(args[i])) {
                 cur = cur == null ? new ImageDestinationDefinition() : cur;
                 if (cur.verify == false)
@@ -273,34 +266,8 @@ public class ImageFile {
     }
 
     static private void usage() {
-        System.out.println("usage: java [javaargs] ImageFile -i infile -o outfile [-f format] [-maxw width] [-maxh height] [-verify]");
+        System.out.println("usage: java [javaargs] ImageFile -i infile -o outfile [-maxw width] [-maxh height] [-verify]");
         System.out.println("       options -o through -verify can be repeated to convert an image file");
         System.out.println("       to a number of different formats and dimentions");
     }
-
-    // private static BufferedImage fromRenderedToBuffered(RenderedImage img) {
-    // if (img instanceof BufferedImage) {
-    // return (BufferedImage) img;
-    // }
-    //
-    // ColorModel cm = img.getColorModel();
-    // int w = img.getWidth();
-    // int h = img.getHeight();
-    // WritableRaster raster = cm.createCompatibleWritableRaster(w,h);
-    // boolean isAlphaPremultiplied = cm.isAlphaPremultiplied();
-    // Hashtable<String,Object> props = new Hashtable<String,Object>();
-    // String [] keys = img.getPropertyNames();
-    //
-    // if (keys != null) {
-    // for (int i = 0 ; i < keys.length ; i++) {
-    // props.put(keys[i], img.getProperty(keys[i]));
-    // }
-    // }
-    // BufferedImage ret = new BufferedImage(cm, raster,
-    // isAlphaPremultiplied,
-    // props);
-    // img.copyData(raster);
-    //
-    // return ret;
-    // }
 }
