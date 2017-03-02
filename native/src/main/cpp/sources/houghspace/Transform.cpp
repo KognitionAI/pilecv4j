@@ -26,11 +26,8 @@ using namespace std;
 //public short [] houghTransformNative(int width, int height, byte [] image, byte [] gradientDirImage,
 //                                     byte [] mask, byte [] gradientDirImage, double gradientDirSlopDeg);
 
-extern "C" {
-   extern unsigned char NOEDGE;
-   extern unsigned char POSSIBLE_EDGE;
-   extern unsigned char EDGE;
-}
+static unsigned char EDGE = -1;
+static bool EDGE_set = false;
 
 struct BackMap
 {
@@ -64,7 +61,14 @@ JNIEXPORT void JNICALL Java_com_jiminger_houghspace_Transform_houghTransformNati
  jdouble gradientDirSlopDeg, jdouble quantFactor, jshortArray retA, jint hswidth, jint hsheight,
  jobject hsem, jint houghThreshold, jint rowstart, jint rowend, jint colstart, jint colend)
 {
-//   printf("NOEDGE=%d, POSSIBLE_EDGE=%d, EDGE=%d\n",(int)NOEDGE,(int)POSSIBLE_EDGE,(int)EDGE);
+  if (! EDGE_set) {
+    jclass maskClass = env->FindClass("com.jiminger.houghspace.Mask");
+    jfieldID fid = env->GetStaticFieldID(maskClass, "EDGE", "B");
+    jbyte val = env->GetStaticByteField(maskClass, fid);
+    EDGE = (unsigned char)val;
+    EDGE_set = true;
+  }
+  
    short gradientDirSlopBytePM = (short)((1.0 + gradientDirSlopDeg * (256.0/360.0))/2.0);
 
    jboolean isCopy;

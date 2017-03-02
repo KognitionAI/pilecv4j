@@ -20,10 +20,6 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.jiminger</groupId>
-      <artifactId>${jimingerartifact}</artifactId>
-    </dependency>
     
   </dependencies>
   

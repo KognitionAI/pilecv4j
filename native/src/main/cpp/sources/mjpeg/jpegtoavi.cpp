@@ -25,7 +25,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#if (defined _BCC || defined MSVC)
+#if (defined _BCC || defined _WINDOWS)
  #ifdef _BCC
   #include <climits.h>
  #else
@@ -34,9 +34,7 @@
  #include <io.h>
  typedef __int64 off64_t;
 #else
- #ifndef MSVC
   #include <unistd.h>
- #endif
 #endif
 #include <fcntl.h>
 #include "byteswap.h"

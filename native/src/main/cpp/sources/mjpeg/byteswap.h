@@ -13,13 +13,13 @@
 #ifdef LINUX
 #include <endian.h>
 #else
-# ifdef CYGWIN
-   /* Since we are in CYGWIN this must be
+# ifdef _WINDOWS
+   /* Pm windows we're going to assum little endian on
       an iX86 arch*/
 #  define __BYTE_ORDER __LITTLE_ENDIAN
 #  define BYTE_ORDER __BYTE_ORDER
 # else
-#  error "CAN ONLY BUILD FOR LINUX OR CYGWIN"
+#  error "CAN ONLY BUILD FOR LINUX OR _WINDOWS"
 # endif
 #endif
 #endif

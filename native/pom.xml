@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
-    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <modelVersion>4.0.0</modelVersion>
 
@@ -10,14 +10,140 @@
     <version>1.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>native-pom</artifactId>
-  
-  <name>Parent level - Native POM</name>
-  
+  <artifactId>native-lib</artifactId>
   <packaging>pom</packaging>
+  <name>Native POM</name>
 
-  <modules>
-    <module>${jimingerartifact}</module>
-  </modules>
-
+  <dependencies>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>lib-image</artifactId>
+    </dependency>
+  </dependencies>
+  
+  <build>
+    <directory>${basedir}/target/${platform}-${build.type}</directory>
+    <sourceDirectory>src/main/cpp</sourceDirectory>
+    <plugins>
+      <!-- Copies the dependencies so that javah can find them. -->
+      <!--   see the CMakeLists.txt file -->
+      <plugin>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy-dependencies</id>
+            <phase>initialize</phase>
+            <goals>
+              <goal>copy-dependencies</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/lib</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>com.googlecode.cmake-maven-project</groupId>
+        <artifactId>cmake-maven-plugin</artifactId>
+        <version>3.7.0-b2</version>
+        <executions>
+          <execution>
+            <id>cmake-generate</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <sourcePath>${project.build.directory}/sources</sourcePath>
+              <targetPath>${project.build.directory}/cmake</targetPath>
+              <generator>${cmake.generator}</generator>
+              <classifier>${platform}</classifier>
+              <options>${cmake.options}</options>
+              <environmentVariables>
+                <CMAKE_CLASSIFIER>${platform}</CMAKE_CLASSIFIER>
+                <PROJECT_VERSION>${project.version}</PROJECT_VERSION>
+              </environmentVariables>
+              <downloadBinaries>${download.cmake}</downloadBinaries>
+            </configuration>
+          </execution>
+          <execution>
+            <id>cmake-compile</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <projectDirectory>${project.build.directory}/cmake</projectDirectory>
+              <classifier>${platform}</classifier>
+              <config>${build.type}</config>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>3.0.2</version>
+        <executions>
+          <execution>
+            <id>copy-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <outputDirectory>${project.build.directory}/sources</outputDirectory>
+              <resources>
+                <resource>
+                  <directory>${project.build.sourceDirectory}</directory>
+                </resource>
+              </resources>
+            </configuration>
+          </execution>
+        </executions>
+        <configuration>
+          <encoding>${project.build.sourceEncoding}</encoding>
+        </configuration>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.3</version>
+        <executions>
+          <execution>
+            <phase>process-resources</phase>
+            <configuration>
+              <tasks>
+                <copy todir="${project.build.directory}/dll-staging">
+                  <fileset dir="${project.build.directory}/cmake">
+                    <include name="**/*.dll"/>
+                    <include name="**/*.pdb"/>
+                    <include name="**/*.so"/>
+                    <include name="**/*.dylib"/>
+                  </fileset>
+                  <flattenmapper/>
+                </copy>
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <configuration>
+          <descriptor>assembly.xml</descriptor>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>
