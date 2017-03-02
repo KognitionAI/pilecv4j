@@ -10,7 +10,7 @@
 #define BYTE_ORDER __BYTE_ORDER
 #define EMPTY_ARRAY 1
 #else
-#ifdef LINUX
+#ifdef UNIX
 #include <endian.h>
 #else
 # ifdef _WINDOWS

@@ -20,6 +20,11 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>native-lib</artifactId>
+      <classifier>${platform}</classifier>
+    </dependency>
     
   </dependencies>
   

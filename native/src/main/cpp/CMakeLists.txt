@@ -9,7 +9,10 @@ set(CMAKE_JAVA_COMPILE_FLAGS "-source" "1.8" "-target" "1.8")
 
 set (_stubDir "${CMAKE_CURRENT_BINARY_DIR}")
 
-MESSAGE("../lib/lib-image-$ENV{PROJECT_VERSION}.jar")
+if(UNIX)
+  add_definitions(-DUNIX)
+endif()
+
 
 add_custom_command(
     OUTPUT com_jiminger_houghspace_Transform.h
@@ -18,7 +21,6 @@ add_custom_command(
         -classpath ../lib/lib-image-$ENV{PROJECT_VERSION}.jar
         -d ${_stubDir}
         -jni com.jiminger.houghspace.Transform com.jiminger.mjpeg.MJPEGWriter
-    DEPENDS utilities.jiminger.com
     )
 
 add_custom_command(
@@ -27,7 +29,6 @@ add_custom_command(
         -classpath ../lib/lib-nr-$ENV{PROJECT_VERSION}.jar
         -d ${_stubDir}
         -jni com.jiminger.nr.Minimizer
-    DEPENDS utilities.jiminger.com
     )
 
 include_directories(${JNI_INCLUDE_DIRS} ${_stubDir})

@@ -63,7 +63,7 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
 	<platform>linux-amd64</platform>
 	<cmake.generator>Unix Makefiles</cmake.generator>
-	<cmake.options>-Ax64</cmake.options>
+	<cmake.options></cmake.options>
       </properties>
     </profile>
     <profile>
