@@ -42,7 +42,9 @@ public class LibraryLoader {
             try {
                 final Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
                 while (systemResources.hasMoreElements()) {
-                    iss.add(systemResources.nextElement().openStream());
+                    URL el = systemResources.nextElement();
+                    //System.out.println(el.getPath());
+                    iss.add(el.openStream());
                 }
             } catch (final IOException e) {
                 throw new UnsatisfiedLinkError(
@@ -89,7 +91,7 @@ public class LibraryLoader {
                             "Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:" + e.getLocalizedMessage());
                 }
 
-                System.out.println("Loading" + libName + " as " + tmpFile.getAbsolutePath());
+                System.out.println("Loading \"" + libName + "\" as " + tmpFile.getAbsolutePath());
                 System.load(tmpFile.getAbsolutePath());
             }
         } finally {

@@ -9,6 +9,8 @@ usage() {
 
 . ./env.sh
 
+OPENCV_VERSION=`grep '<opencv.version>' pom.xml  | head -1 | sed -e 's/^.*<opencv.version>//g' | sed -e 's/<\/opencv.version>.*$//g'`
+
 SRCDIR=
 DSTDIR=
 SE=
@@ -84,7 +86,7 @@ for entry in $FILES; do
         echo "File \"$DSTDIR/$BASE.$DE\" already exists. Skipping."
     else
         echo "converting: \"$entry\""
-        CP="`cpath "$MAVEN_REPO/com/jiminger/lib-image/1.0-SNAPSHOT/lib-image-1.0-SNAPSHOT.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/lib-util/1.0-SNAPSHOT/lib-util-1.0-SNAPSHOT.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/opencv-lib-jar/3.1.0/opencv-lib-jar-3.1.0-withlib.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/opencv-lib-jar/3.1.0/opencv-lib-jar-3.1.0.jar"`$CSEP`cpath "$MAVEN_REPO/opencv/opencv/3.1.0/opencv-3.1.0.jar"`$CSEP`cpath "$MAVEN_REPO/commons-io/commons-io/2.0.1/commons-io-2.0.1.jar"`"
+        CP="`cpath "$MAVEN_REPO/com/jiminger/lib-image/1.0-SNAPSHOT/lib-image-1.0-SNAPSHOT.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/lib-util/1.0-SNAPSHOT/lib-util-1.0-SNAPSHOT.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/opencv-lib-jar/$OPENCV_VERSION/opencv-lib-jar-$OPENCV_VERSION-withlib.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/opencv-lib-jar/$OPENCV_VERSION/opencv-lib-jar-$OPENCV_VERSION.jar"`$CSEP`cpath "$MAVEN_REPO/opencv/opencv/$OPENCV_VERSION/opencv-$OPENCV_VERSION.jar"`$CSEP`cpath "$MAVEN_REPO/commons-io/commons-io/2.0.1/commons-io-2.0.1.jar"`"
         SRC=`cpath "$SRCDIR/$entry"`
         DST=`cpath "$DSTDIR/$BASE.$DE"`
         RESULTS=`java -Xmx5G -cp $CP com.jiminger.image.ImageFile -i "$SRC" -o "$DST"`

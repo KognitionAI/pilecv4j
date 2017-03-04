@@ -35,6 +35,8 @@
     <downloadBinaries>true</downloadBinaries>
     <build.type>debug</build.type>
     <swtgroup>org.eclipse.swt</swtgroup>
+    <!-- This property is looked up using 'grep' from the script convert.sh -->
+    <opencv.version>3.2.0</opencv.version>
   </properties>
 
   <profiles>
@@ -105,7 +107,7 @@
 	<groupId>com.jiminger</groupId>
 	<artifactId>opencv-lib-jar</artifactId>
 	<classifier>withlib</classifier>
-	<version>3.2.0</version>
+	<version>${opencv.version}</version>
       </dependency>
 
       <!-- Internal to the product -->
