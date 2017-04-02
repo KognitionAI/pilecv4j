@@ -22,7 +22,6 @@ import java.awt.Graphics;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Method;
 
-import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
@@ -66,7 +65,7 @@ public class ImageDisplay {
             dialog.setText("Open an image file or cancel");
             final String string = dialog.open();
             if (string != null)
-                iioimage = ImageFile.readImageFile(string);
+                iioimage = ImageFile.readBufferedImageFromFile(string);
         }
 
         if (iioimage != null)
@@ -100,7 +99,6 @@ public class ImageDisplay {
                     g.drawImage(image, 0, 0, null);
                 }
             };
-            canvas.add(new JButton("Currently I do nothing"));
             canvas.setPreferredSize(new Dimension(image.getWidth(), image.getHeight()));
             final JScrollPane sp = new JScrollPane(canvas);
             setLayout(new BorderLayout());

@@ -40,6 +40,7 @@ import javax.imageio.stream.ImageOutputStream;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
@@ -49,13 +50,14 @@ import com.jiminger.image.drawing.Utils;
 import com.jiminger.util.LibraryLoader;
 
 public class ImageFile {
-	private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
-	
+    private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
+
     static {
         LibraryLoader.init();
     }
 
-    public static BufferedImage readImageFile(final String filename) throws IOException {
+    public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {
+        LOGGER.trace("Reading image from {}", filename);
         final File f = new File(filename);
         if (!f.exists())
             throw new FileNotFoundException(filename);
@@ -69,6 +71,7 @@ public class ImageFile {
                 Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
             ret = Utils.mat2Img(mat);
         }
+        LOGGER.trace("Read {} from {}", ret, filename);
         return ret;
     }
     
@@ -86,21 +89,59 @@ public class ImageFile {
             if (filename.endsWith(".jp2") && CvType.channels(ret.channels()) > 1)
                 Imgproc.cvtColor(ret, ret, Imgproc.COLOR_RGB2BGR);
         }
+        LOGGER.trace("Read {} from {}", ret, filename);
         return ret;
     }
 
-    public static BufferedImage convert(final Image im) {
+    public static Mat readMatFromFile(final String filename) throws IOException {
+        LOGGER.trace("Reading image from {}", filename);
+        final File f = new File(filename);
+        if (!f.exists())
+            throw new FileNotFoundException(filename);
+
+        Mat ret;
+
+        final Mat mat = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
+        if (mat == null) {
+            LOGGER.debug("Failed to read '" + filename + "' using OpenCV");
+            ret = Utils.img2Mat(ImageIO.read(f));
+        } else {
+            if (filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
+                Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
+            ret = mat;
+        }
+        LOGGER.trace("Read {} from {}", ret, filename);
+        return ret;
+    }
+
+    public static BufferedImage convert(final Image im, final int type) {
         if (im instanceof BufferedImage)
             return (BufferedImage) im;
-        final BufferedImage bi = new BufferedImage(im.getWidth(null), im.getHeight(null), BufferedImage.TYPE_INT_RGB);
+        final BufferedImage bi = new BufferedImage(im.getWidth(null), im.getHeight(null), type);
         final Graphics bg = bi.getGraphics();
         bg.drawImage(im, 0, 0, null);
         bg.dispose();
         return bi;
     }
 
-    public static void writeImageFile(final BufferedImage ri, final String filename)
-            throws IOException {
+    public static void writeImageFile(final BufferedImage ri, final String filename) throws IOException {
+        if (!doWrite(ri, filename)) {
+            LOGGER.debug("Failed to write '" + filename + "' using ImageIO");
+            if (!doWrite(Utils.img2Mat(ri), filename))
+                throw new IllegalArgumentException("Failed to write");
+        }
+    }
+
+    public static void writeImageFile(final Mat ri, final String filename) throws IOException {
+        if (!doWrite(ri, filename)) {
+            LOGGER.debug("Failed to write '" + filename + "' using OpenCV");
+            if (!doWrite(Utils.mat2Img(ri), filename))
+                throw new IllegalArgumentException("Failed to write");
+        }
+    }
+
+    private static boolean doWrite(final BufferedImage ri, final String filename) throws IOException {
+        LOGGER.trace("Writing image {} to {}", ri, filename);
         final int dotindex = filename.lastIndexOf(".");
         if (dotindex < 0)
             throw new IOException("No extention on " + filename);
@@ -111,32 +152,80 @@ public class ImageFile {
         // make sure the output directory exists.
         p.mkdirs();
         final Iterator<ImageWriter> iter = ImageIO.getImageWritersBySuffix(ext);
-        if (iter.hasNext()) {
+        boolean wrote = false;
+        while (iter.hasNext()) {
             final ImageWriter writer = iter.next(); // grab the first one
-            final ImageOutputStream ios = ImageIO.createImageOutputStream(f);
-            final ImageWriteParam param = writer.getDefaultWriteParam();
+            try (final ImageOutputStream ios = ImageIO.createImageOutputStream(f);) {
+                final ImageWriteParam param = writer.getDefaultWriteParam();
 
-            writer.setOutput(ios);
+                writer.setOutput(ios);
 
-            writer.write(null, new IIOImage(ri, null, null), param);
-            ios.flush();
-            ios.close();
-        } else { // we'll try OpenCV
-            // ImageDisplay.showImage(ri);
-            final Mat mat = Utils.img2Mat(ri);
-            if (!Imgcodecs.imwrite(filename, mat))
-                throw new IllegalArgumentException("Failed to write");
+                writer.write(null, new IIOImage(ri, null, null), param);
+            }
+            wrote = true;
         }
+        return wrote;
     }
 
-    public static void transcode(BufferedImage bi, final ImageDestinationDefinition dest)
-            throws IOException {
+    private static boolean doWrite(final Mat ri, final String filename) throws IOException {
+        LOGGER.trace("Writing image {} to {}", ri, filename);
+        return Imgcodecs.imwrite(filename, ri);
+    }
+
+    private static double scale(final int width, final int height, final ImageDestinationDefinition dest) {
+        double scale = -1.0;
+        if (dest.maxh != -1) {
+            if (height > dest.maxh)
+                // see what we need to scale to make the height the same.
+                scale = ((double) dest.maxh) / ((double) height);
+        }
+
+        if (dest.maxw != -1) {
+            final int adjwidth = (scale >= 0.0) ? (int) Math.round(scale * width) : width;
+            if (adjwidth > dest.maxw) {
+                scale = ((double) dest.maxw) / ((double) adjwidth);
+            }
+        }
+
+        if (dest.maxe != -1) {
+            final int adjedge = width > height ? (scale >= 0.0 ? (int) Math.round(scale * width) : width)
+                    : (scale >= 0.0 ? (int) Math.round(scale * height) : height);
+            if (adjedge > dest.maxe) {
+                scale = ((double) (dest.maxe)) / ((double) adjedge);
+            }
+        }
+        return scale;
+    }
+
+    public static void transcode(BufferedImage bi, final ImageDestinationDefinition dest) throws IOException {
         if (infile != null && infile.equalsIgnoreCase(dest.outfile))
             throw new IOException("Can't overwrite original file durring transcode (" + infile + ").");
 
-        if (dest.maxw != -1 || dest.maxh != -1) {
+        if (dest.maxw != -1 || dest.maxh != -1 || dest.maxe != -1) {
             final int width = bi.getWidth();
             final int height = bi.getHeight();
+
+            final double scale = scale(width, height, dest);
+
+            if (scale >= 0.0) {
+
+                final int newwidth = (int) Math.round(scale * (width));
+                final int newheight = (int) Math.round(scale * (height));
+
+                bi = convert(bi.getScaledInstance(newwidth, newheight, BufferedImage.SCALE_DEFAULT), bi.getType());
+            }
+        }
+
+        writeImageFile(bi, dest.outfile);
+    }
+
+    public static void transcode(final Mat bi, final ImageDestinationDefinition dest) throws IOException {
+        if (infile != null && infile.equalsIgnoreCase(dest.outfile))
+            throw new IOException("Can't overwrite original file durring transcode (" + infile + ").");
+
+        if (dest.maxw != -1 || dest.maxh != -1 || dest.maxe != -1) {
+            final int width = bi.width();
+            final int height = bi.height();
 
             double scale = -1.0;
             if (dest.maxh != -1) {
@@ -152,12 +241,19 @@ public class ImageFile {
                 }
             }
 
-            if (scale >= 0.0) {
+            if (dest.maxe != -1) {
+                final int adjedge = width > height ? (scale >= 0.0 ? (int) Math.round(scale * width) : width)
+                        : (scale >= 0.0 ? (int) Math.round(scale * height) : height);
+                if (adjedge > dest.maxe) {
+                    scale = ((double) (dest.maxe)) / ((double) adjedge);
+                }
+            }
 
+            if (scale >= 0.0) {
                 final int newwidth = (int) Math.round(scale * (width));
                 final int newheight = (int) Math.round(scale * (height));
 
-                bi = convert(bi.getScaledInstance(newwidth, newheight, BufferedImage.SCALE_DEFAULT));
+                Imgproc.resize(bi, bi, new Size(newwidth, newheight), 0, 0, Imgproc.INTER_LINEAR);
             }
         }
 
@@ -168,6 +264,7 @@ public class ImageFile {
         public String outfile = null;
         public int maxw = -1;
         public int maxh = -1;
+        public int maxe = -1;
         public boolean verify = false;
 
         public void set() {}
@@ -188,18 +285,17 @@ public class ImageFile {
             return;
         }
 
-        final BufferedImage image = readImageFile(infile);
+        final BufferedImage image = readBufferedImageFromFile(infile);
 
         for (final ImageDestinationDefinition dest : dests) {
             transcode(image, dest);
 
             if (dest.verify) {
-                final RenderedImage im = readImageFile(dest.outfile);
+                final RenderedImage im = readBufferedImageFromFile(dest.outfile);
                 final int width2 = im.getWidth();
                 final int height2 = im.getHeight();
 
-                if (dest.maxw != width2 ||
-                        dest.maxh != height2)
+                if (dest.maxw != width2 || dest.maxh != height2 || dest.maxe != ((width2 > height2) ? width2 : height2))
                     throw new IOException("Verification failed!");
             }
         }
@@ -234,9 +330,7 @@ public class ImageFile {
                     cur = push(cur, ret);
                 cur.outfile = args[i + 1];
                 i++;
-            }
-
-            else if ("-verify".equalsIgnoreCase(args[i])) {
+            } else if ("-verify".equalsIgnoreCase(args[i])) {
                 cur = cur == null ? new ImageDestinationDefinition() : cur;
                 if (cur.verify == false)
                     cur = push(cur, ret);
@@ -252,6 +346,12 @@ public class ImageFile {
                 if (cur.maxh != -1)
                     cur = push(cur, ret);
                 cur.maxh = Integer.parseInt(args[i + 1]);
+                i++;
+            } else if ("-maxe".equalsIgnoreCase(args[i])) {
+                cur = cur == null ? new ImageDestinationDefinition() : cur;
+                if (cur.maxe != -1)
+                    cur = push(cur, ret);
+                cur.maxe = Integer.parseInt(args[i + 1]);
                 i++;
             } else {
                 usage();
@@ -275,7 +375,7 @@ public class ImageFile {
     }
 
     static private void usage() {
-        System.out.println("usage: java [javaargs] ImageFile -i infile -o outfile [-maxw width] [-maxh height] [-verify]");
+        System.out.println("usage: java [javaargs] ImageFile -i infile -o outfile [-maxw width] [-maxh height] [-maxe maxEdge] [-verify]");
         System.out.println("       options -o through -verify can be repeated to convert an image file");
         System.out.println("       to a number of different formats and dimentions");
     }

@@ -71,6 +71,12 @@ if [ $? -ne 0 ]; then
     echo "ERROR: couldn't cd to \"$SRCDIR\""
 fi
 
+if [ "$MAVEN_REPO" = "" ];then
+    cd ~/.m2
+    MAVEN_REPO="`pwd -P`"/repository
+    cd - >/dev/null
+fi
+
 PATH=$PATH$CSEP`cpath /c/Users/Jim/projects/opencv-3.2.0/build/x64/vc14/bin`
 
 env | grep PATH

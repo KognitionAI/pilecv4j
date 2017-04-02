@@ -1,12 +1,9 @@
-
-. ./os.sh
-
-cd ~/.m2
-MAVEN_REPO="`pwd -P`"/repository
-cd - >/dev/null
+# This file can set:
+#
+# 1) MAVEN_REPO to the repository with the jar files. This will assume it's ~/.m2/repository if not set
+# 2) If necessary, LD_LIBRARY_PATH (linux) or PATH (windows) to point to the OpenCV libraries.
 
 if [ "$WINDOWS" = "true" ]; then
-    alias mvn=/c/utils/apache-maven-3.3.9/bin/mvn
     cd ~/projects/opencv-3.2.0
     OPENCV_HOME="`pwd -P`"
     export PATH=$PATH:$OPENCV_HOME/build/x64/vc14/bin

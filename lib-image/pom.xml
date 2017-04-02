@@ -19,15 +19,33 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
     </dependency>
-    <dependency>
+    <dependency> <!-- needed for image work but no numerical recipies -->
       <groupId>com.jiminger</groupId>
       <artifactId>opencv-lib-jar</artifactId>
       <classifier>withlib</classifier>
+      <optional>true</optional>
     </dependency>
     <dependency> <!-- Only needed for ImageDisplay -->
       <groupId>${swtgroup}</groupId>
       <artifactId>${swtartifact}</artifactId>
       <optional>true</optional>
+    </dependency>
+    <dependency> <!-- Only needed to run the main here. -->
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>runtime</scope>
+      <optional>true</optional>
+    </dependency>
+    
+    <dependency>
+      <groupId>com.github.jai-imageio</groupId>
+      <artifactId>jai-imageio-core</artifactId>
+      <version>1.3.0</version>
+    </dependency>
+    <dependency>
+        <groupId>com.github.jai-imageio</groupId>
+        <artifactId>jai-imageio-jpeg2000</artifactId>
+        <version>1.3.0</version>
     </dependency>
   </dependencies>
 </project>

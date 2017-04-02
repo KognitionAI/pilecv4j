@@ -34,6 +34,20 @@
       <groupId>${swtgroup}</groupId>
       <artifactId>${swtartifact}</artifactId>
     </dependency>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>opencv-lib-jar</artifactId>
+      <classifier>withlib</classifier>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>

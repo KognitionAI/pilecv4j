@@ -25,6 +25,7 @@ import java.awt.image.ColorModel;
 import java.awt.image.ComponentColorModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
+import java.awt.image.DataBufferInt;
 import java.awt.image.DataBufferUShort;
 import java.awt.image.IndexColorModel;
 import java.awt.image.Raster;
@@ -106,21 +107,36 @@ public class Utils {
         final int blue = lookup[3];
         final int red = lookup[1];
         final int green = lookup[2];
-        if (hasAlpha) {
-            for (int pos = 0, el = 0; el < numElements; pos += skip, el++) {
-                // BGRA
-                outpixels[pos] = inpixels[pos + blue];
-                outpixels[pos + 1] = inpixels[pos + green];
-                outpixels[pos + 2] = inpixels[pos + red];
+        for (int pos = 0, el = 0; el < numElements; pos += skip, el++) {
+            // BGR, and maybe A
+            outpixels[pos] = inpixels[pos + blue];
+            outpixels[pos + 1] = inpixels[pos + green];
+            outpixels[pos + 2] = inpixels[pos + red];
+            if (hasAlpha)
                 outpixels[pos + 3] = inpixels[pos + alpha];
-            }
-        } else {
-            for (int pos = 0, el = 0; el < numElements; pos += skip, el++) {
-                // BGRA
-                outpixels[pos] = inpixels[pos + blue];
-                outpixels[pos + 1] = inpixels[pos + green];
-                outpixels[pos + 2] = inpixels[pos + red];
-            }
+        }
+        return raster;
+    }
+
+    private static CvRaster argbDataBufferByteToCvRaster(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
+        final boolean hasAlpha = mask[0] != 0x0;
+        final CvRaster raster = CvRaster.create(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+        final int[] inpixels = bi.getData();
+        final byte[] outpixels = (byte[]) raster.data;
+        final int numElements = h * w;
+        final int skip = hasAlpha ? 4 : 3;
+        final int blue = 3;
+        final int red = 1;
+        final int green = 2;
+        final int alpha = 0;
+        for (int pos = 0, el = 0; el < numElements; pos += skip, el++) {
+            final int pixel = inpixels[el];
+            // BGR, and maybe A
+            outpixels[pos] = (byte) ((pixel & mask[blue]) >>> shift[blue]);
+            outpixels[pos + 1] = (byte) ((pixel & mask[green]) >>> shift[green]);
+            outpixels[pos + 2] = (byte) ((pixel & mask[red]) >>> shift[red]);
+            if (hasAlpha)
+                outpixels[pos + 3] = (byte) ((pixel & mask[alpha]) >>> shift[alpha]);
         }
         return raster;
     }
@@ -132,17 +148,48 @@ public class Utils {
         final int type = crappyImage.getType();
 
         switch (type) {
-            case TYPE_3BYTE_BGR:
             case TYPE_INT_RGB: // 8-bit per channel packed into ints
             case TYPE_INT_BGR: // 8-bit per channel packed into ints, BGR order
             case TYPE_INT_ARGB:
-            case TYPE_INT_ARGB_PRE:
+            case TYPE_INT_ARGB_PRE: {
+                final DataBuffer dataBuffer = crappyImage.getRaster().getDataBuffer();
+                if (!(dataBuffer instanceof DataBufferInt))
+                    throw new IllegalArgumentException("BufferedImage of type \"" + type + "\" should have a " + DataBufferInt.class.getSimpleName()
+                            + " but instead has a " + dataBuffer.getClass().getSimpleName());
+                final DataBufferInt bb = (DataBufferInt) dataBuffer;
+                int masks[] = null;
+                int shift[] = null;
+                switch (type) {
+                    case TYPE_INT_RGB:
+                        masks = new int[] { 0x0, 0x00ff0000, 0x0000ff00, 0x000000ff };
+                        shift = new int[] { 24, 16, 8, 0 };
+                        break;
+                    case TYPE_3BYTE_BGR:
+                    case TYPE_INT_BGR:
+                        masks = new int[] { 0x0, 0x000000ff, 0x0000ff00, 0x00ff0000 };
+                        shift = new int[] { 24, 0, 8, 16 };
+                        break;
+                    case TYPE_INT_ARGB:
+                    case TYPE_INT_ARGB_PRE:
+                        masks = new int[] { 0xff000000, 0x00ff0000, 0x0000ff00, 0x000000ff };
+                        shift = new int[] { 24, 16, 8, 0 };
+                        break;
+                    case TYPE_4BYTE_ABGR:
+                    case TYPE_4BYTE_ABGR_PRE:
+                        masks = new int[] { 0xff000000, 0x000000ff, 0x0000ff00, 0x00ff0000 };
+                        shift = new int[] { 24, 0, 8, 16 };
+                        break;
+                }
+                final CvRaster raster = argbDataBufferByteToCvRaster(bb, h, w, masks, shift);
+                return raster.toMat();
+            }
+            case TYPE_3BYTE_BGR:
             case TYPE_4BYTE_ABGR:
             case TYPE_4BYTE_ABGR_PRE: {
                 final DataBuffer dataBuffer = crappyImage.getRaster().getDataBuffer();
                 if (!(dataBuffer instanceof DataBufferByte))
-                    throw new IllegalArgumentException("BufferedImage should have a " + DataBufferByte.class.getSimpleName() + " but instead has a "
-                            + dataBuffer.getClass().getSimpleName());
+                    throw new IllegalArgumentException("BufferedImage of type \"" + type + "\" should have a " + DataBufferByte.class.getSimpleName()
+                            + " but instead has a " + dataBuffer.getClass().getSimpleName());
                 final DataBufferByte bb = (DataBufferByte) dataBuffer;
                 int[] lookup = null;
                 switch (type) {
