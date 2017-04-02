@@ -27,12 +27,12 @@ import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.LibraryLoader;
 
 public class ImageConvert {
-    public static final long megaBytes = 1024L * 1024L;
+    public static final long MEGA_BYTE = 1024L * 1024L;
     public static final long defaultTileCacheSize = 300;
     public static final String defaultDestFilename = "tmp.bmp";
     public static final String defaultDestFileType = "BMP";
 
-    public static long tileCacheSize = defaultTileCacheSize * megaBytes;
+    public static long tileCacheSize = defaultTileCacheSize * MEGA_BYTE;
 
     public static String sourceFileName = null;
     public static String destFileName = null;
@@ -70,7 +70,7 @@ public class ImageConvert {
 
         final String tmps = cl.getProperty("cs");
         if (tmps != null)
-            tileCacheSize = Long.parseLong(tmps) * megaBytes;
+            tileCacheSize = Long.parseLong(tmps) * MEGA_BYTE;
 
         destFileName = cl.getProperty("o");
         if (destFileName == null)

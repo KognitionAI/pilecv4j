@@ -17,67 +17,60 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 package com.jiminger.nr;
 
 import com.jiminger.util.LibraryLoader;
 
-public class Minimizer
-{
-   static {  LibraryLoader.init(); }
-   
-   private Func f;
-   private double [] minVec;
+public class Minimizer {
+    static {
+        LibraryLoader.init();
+    }
 
-   public static double ftol = 1.0e-10;
+    private final Func f;
+    private double[] minVec;
 
-   // static lock ... JNI code used is not threadsafe
-   public static Object lock = new Object();
+    public static double ftol = 1.0e-10;
 
-   public Minimizer(Func f) {
-      this.f = f;
-   }
+    // static lock ... JNI code used is not threadsafe
+    public static Object lock = new Object();
 
-   public double minimize(double [] p)
-      throws MinimizerException
-   {
-      double [][] xi = newUnitMatrix(p.length);
-      return minimize(p,xi);
-   }
+    public Minimizer(final Func f) {
+        this.f = f;
+    }
 
-   public double minimize(double [] p, double [][] xi)
-      throws MinimizerException
-   {
-      minVec = new double[p.length];
-      synchronized(lock)
-      {
-         return dominimize(f,p,xi,ftol,minVec);
-      }
-   }
+    public double minimize(final double[] p)
+            throws MinimizerException {
+        final double[][] xi = newUnitMatrix(p.length);
+        return minimize(p, xi);
+    }
 
-   public double[] getFinalPostion()
-   {
-      return minVec;
-   }
+    public double minimize(final double[] p, final double[][] xi) throws MinimizerException {
+        minVec = new double[p.length];
+        synchronized (lock) {
+            return dominimize(f, p, xi, ftol, minVec);
+        }
+    }
 
-   @FunctionalInterface
-   public interface Func {
-      public double func(double [] x);
-   }
+    public double[] getFinalPostion() {
+        return minVec;
+    }
 
-   private static native double dominimize(Func f, double [] p, double [][] xi, 
-                                           double ftol, double [] minVec)
-      throws MinimizerException;
+    @FunctionalInterface
+    public interface Func {
+        public double func(double[] x);
+    }
 
-   private double [][] newUnitMatrix(int n)
-   {
-      double [][] ret= new double[n][];
-      for (int i = 0; i < n; i++)
-      {
-         ret[i] = new double[n];
-         for (int j = 0; j < n; j++)
-            ret[i][j] = (i == j) ? 1.0 : 0.0;
-      }
-      return ret;
-   }
+    private static native double dominimize(Func f, double[] p, double[][] xi,
+            double ftol, double[] minVec)
+            throws MinimizerException;
+
+    private double[][] newUnitMatrix(final int n) {
+        final double[][] ret = new double[n][];
+        for (int i = 0; i < n; i++) {
+            ret[i] = new double[n];
+            for (int j = 0; j < n; j++)
+                ret[i][j] = (i == j) ? 1.0 : 0.0;
+        }
+        return ret;
+    }
 }

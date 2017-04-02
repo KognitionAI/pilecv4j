@@ -71,6 +71,10 @@ if [ $? -ne 0 ]; then
     echo "ERROR: couldn't cd to \"$SRCDIR\""
 fi
 
+PATH=$PATH$CSEP`cpath /c/Users/Jim/projects/opencv-3.2.0/build/x64/vc14/bin`
+
+env | grep PATH
+
 FILES=`find . -name "*.$SE"`
 TMPIFS="$IFS"
 IFS=$(echo -en "\n\b")
