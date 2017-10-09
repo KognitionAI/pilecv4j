@@ -18,25 +18,38 @@
 ****************************************************************************/
 
 
-package com.jiminger.houghspace;
+package com.jiminger.houghspace.internal;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
+import com.jiminger.houghspace.Model;
+
 /**
- * A mask underpinned by an array of bytes, each containing an indication as to whether or not
- * that position is an EDGE (255) or NOEDGE (0).
+ * <p>A mask underpinned by an array of bytes, each containing an indication as to whether or not
+ * that position is the center of the model, if the center of the mask is on an EDGE in the 
+ * original image.</p>
+ * 
+ * <p>What does that mean? If you take this mask and place it centered at an edge in the original
+ * image, then everywhere that this mask reads NON-zero is potentially a "center" of the model
+ * in the original image.</p>
  */
 public class Mask {
    public static byte EDGE= (byte)-1;
    public static byte NOEDGE= (byte)0;
+   
+   public final int mwidth;
+   public final int mheight;
+   public final int maskcr;
+   public final int maskcc;
+   public final byte [] mask;
+
 
    /**
-    * Instantiate a mask of the given dimentions assuming 
+    * Instantiate a mask of the given dimensions assuming 
     *  that the reference point is the center of the mask.
     */
-   public Mask(int mwidth, int mheight)
-   {
+   private Mask(int mwidth, int mheight) {
       // mwidth and mheight need to be odd 
       //  so that the center falls exactly
       //  on a pixel.
@@ -53,18 +66,12 @@ public class Mask {
    }
 
    /**
-    * This instantiates a mask with a reference point not
-    *  centered. This contructor will not adjust the height
-    *  and width that are passed in since the reference 
-    *  point is not required to be the center.
+    * Generate an OpenCV Mat image that contains a view of the mask.
     */
-   public Mask(int mwidth, int mheight, int refr, int refc)
-   {
-      this.mwidth = mwidth;
-      this.mheight = mheight;
-      this.mask = new byte[mwidth * mheight];
-      this.maskcr = refr;
-      this.maskcc = refc;
+   public Mat getMaskImage() {
+	   Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
+	   m.put(0, 0, mask);
+	   return m;
    }
 
    /**
@@ -73,59 +80,13 @@ public class Mask {
     *  EDGE or NOEDGE. Entries in the mask are 
     * accessed by row and column (not x,y).
     */
-   public void set(int r, int c, byte v)
-   {
+   private void set(int r, int c, byte v) {
       mask[ (r * mwidth) + c ] = v;
    }
 
-   /**
-    * Get the value of the mask at a location 
-    *  The return value should be either
-    *  EDGE or NOEDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
-   public byte get(int r, int c)
-   {
-      return mask[ (r * mwidth) + c ];
-   }
-
-   /**
-    * Set the value of the mask at a location to 
-    *  EDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
-   public void set(int r, int c)
-   {
-      mask[ (r * mwidth) + c ] = EDGE;
-   }
-
-   /**
-    * Set the value of the mask at a location to 
-    *  NOEDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
-   public void clear(int r, int c)
-   {
-      mask[ (r * mwidth) + c ] = NOEDGE;
-   }
- 
-   /**
-    * Generate a tiled image that contains a view of the mask.
-    */
-   public Mat getMaskImage() {
-	   Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
-	   m.put(0, 0, mask);
-	   return m;
-   }
-
-   public int mwidth;
-   public int mheight;
-   public int maskcr;
-   public int maskcc;
-   public byte [] mask;
-
-   public static Mask generateMask(Model m, double w, double h, double quantFactor)
-   {
+   public static Mask generateMask(Model m, double quantFactor, double scaleModel) {
+	  double w = m.featureWidth() * scaleModel;
+      double h = m.featureHeight() * scaleModel;
       Mask mask = new Mask((int)((w/quantFactor) + 1.5),(int)((h/quantFactor) + 1.5));
 
       // now set the mask by sweeping the center
@@ -138,14 +99,14 @@ public class Mask {
          for (int c = 0; c < mask.mwidth; c++)
          {
             // is the point r,c a possible 
-            //  center if the center of the
-            //  mask is the point in question.
+            //  center if and edge appears at the
+        	//  center of the mast?
 
             // to figure this out, translate
             //  r,c to the center.
             // but first, find out what r,c is
             //  in the coordinate system of the
-            //  mask with the origin centerd.
+            //  mask with the origin centered.
             double y1 = (double)(mask.mheight - r - 1) - y0;
             double x1 = ((double)c) - x0;
 
@@ -171,8 +132,7 @@ public class Mask {
       return mask;
    }
 
-   public static void setEdgePixVals(byte edgePixVal, byte noedgePixVal)
-   {
+   public static void setEdgePixVals(byte edgePixVal, byte noedgePixVal) {
       EDGE=edgePixVal;
       NOEDGE=noedgePixVal;
    }

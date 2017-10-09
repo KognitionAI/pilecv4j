@@ -42,11 +42,15 @@ import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.jiminger.image.drawing.Utils;
 import com.jiminger.util.LibraryLoader;
 
 public class ImageFile {
+	private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
+	
     static {
         LibraryLoader.init();
     }
@@ -57,25 +61,30 @@ public class ImageFile {
             throw new FileNotFoundException(filename);
         BufferedImage ret = ImageIO.read(f);
         if (ret == null) {
-            System.out.println("Failed to read '" + filename + "' using ImageIO");
+            LOGGER.info("Failed to read '{}' using ImageIO", filename);
             final Mat mat = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
             if (mat == null)
                 throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
             if (filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                 Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
-            // Imgproc.resize(mat, mat, new Size(mat.cols() / 10.0, mat.rows() / 10.0));
-            // mat.convertTo(mat, CvType.CV_8U, 0.00390625);
-            // Imgcodecs.imwrite("C:\\Users\\Jim\\Pictures\\Pictures\\Scanned\\1964\\tmp.jpg", mat);
             ret = Utils.mat2Img(mat);
-            // ImageDisplay.showImage(ret);
-            // synchronized (ret) {
-            // try {
-            // ret.wait();
-            // } catch (final InterruptedException e) {
-            // // TODO Auto-generated catch block
-            // e.printStackTrace();
-            // }
-            // }
+        }
+        return ret;
+    }
+    
+    public static Mat readImageFileAsMat(final String filename) throws IOException {
+        final File f = new File(filename);
+        if (!f.exists())
+            throw new FileNotFoundException(filename);
+        final Mat ret = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
+        if (ret == null) {
+            LOGGER.info("Failed to read '{}' using OpenCV", filename);
+            BufferedImage bi = ImageIO.read(f);
+            if (bi == null)
+                throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
+        } else {
+            if (filename.endsWith(".jp2") && CvType.channels(ret.channels()) > 1)
+                Imgproc.cvtColor(ret, ret, Imgproc.COLOR_RGB2BGR);
         }
         return ret;
     }

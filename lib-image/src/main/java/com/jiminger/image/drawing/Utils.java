@@ -232,11 +232,11 @@ public class Utils {
                 + im.height() + "x" + im.width() + " }");
     }
 
-    public static class DumbPoint implements Point {
+    public static class SimplePoint implements Point {
         private final double r;
         private final double c;
 
-        public DumbPoint(final double r, final double c) {
+        public SimplePoint(final double r, final double c) {
             this.r = r;
             this.c = c;
         }
@@ -250,6 +250,19 @@ public class Utils {
         public double getCol() {
             return c;
         }
+    }
+    
+    public static class LineSegment {
+    	public final Point p1;
+    	public final Point p2;
+    	
+    	private final double m;
+    	private final double b;
+    	
+    	public LineSegment(Point p1, Point p2) {
+    		this.p1 = p1;
+    		this.p2 = p2;
+    	}
     }
 
     static public Point closest(final Point x, final double polarx, final double polary) {
@@ -272,7 +285,7 @@ public class Utils {
         final double PdotX0 = (x.getRow() * polary) + (x.getCol() * polarx);
 
         final double c = (1.0 - (PdotX0 / Pmagsq));
-        return new DumbPoint((c * polary) + x.getRow(), (c * polarx) + x.getCol());
+        return new SimplePoint((c * polary) + x.getRow(), (c * polarx) + x.getCol());
     }
 
     public static void drawCircle(final Point p, final Mat ti, final Color color) {

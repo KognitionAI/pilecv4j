@@ -18,18 +18,19 @@
 ****************************************************************************/
 
 
-package com.jiminger.houghspace;
+package com.jiminger.houghspace.internal;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
+import com.jiminger.houghspace.Model;
 import com.jiminger.image.CvRaster;
 
 /**
- * A mask underpinned by an array of shorts (hence the 'S'). This is used to hold a raster of 
+ * A mask underpinned by an array of shorts that's used to hold a raster of 
  * gradient direction indications.
  */
-public class SMask {
+public class GradientDirectionMask {
 	public int mwidth;
 	public int mheight;
 	public int maskcr;
@@ -40,7 +41,7 @@ public class SMask {
     * Instantiate a mask of the given dimensions assuming 
     *  that the reference point is the center of the mask.
     */
-   public SMask(int mwidth, int mheight) {
+   public GradientDirectionMask(int mwidth, int mheight) {
       // mwidth and mheight need to be odd 
       //  so that the center falls exactly
       //  on a pixel.
@@ -54,41 +55,6 @@ public class SMask {
 
       this.maskcr = (this.mheight + 1)/2 - 1;
       this.maskcc = (this.mwidth + 1)/2 - 1;
-   }
-
-   /**
-    * This instantiates a mask with a reference point not
-    *  centered. This constructor will not adjust the height
-    *  and width that are passed in since the reference 
-    *  point is not required to be the center.
-    */
-   public SMask(int mwidth, int mheight, int refr, int refc) {
-      this.mwidth = mwidth;
-      this.mheight = mheight;
-      this.mask = new short[mwidth * mheight];
-      this.maskcr = refr;
-      this.maskcc = refc;
-   }
-
-   /**
-    * Set the value of the mask at a location to 
-    *  the given value. The value should be either
-    *  EDGE or NOEDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
-   public void set(int r, int c, short v) {
-      mask[ (r * mwidth) + c ] = v;
-   }
-
-   /**
-    * Get the value of the mask at a location 
-    *  The return value should be either
-    *  EDGE or NOEDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
-   public short get(int r, int c)
-   {
-      return mask[ (r * mwidth) + c ];
    }
 
    /**
@@ -106,9 +72,8 @@ public class SMask {
 	   return m;
    }
 
-   public static SMask generateGradientMask(Model m, double w, double h, double quantFactor)
-   {
-      SMask gradDirMask = new SMask((int)((w/quantFactor) + 1.5),(int)((h/quantFactor) + 1.5));
+   public static GradientDirectionMask generateGradientMask(Model m, double w, double h, double quantFactor) {
+      GradientDirectionMask gradDirMask = new GradientDirectionMask((int)((w/quantFactor) + 1.5),(int)((h/quantFactor) + 1.5));
 
       // now set the mask by sweeping the center
       double x0 = (double)gradDirMask.maskcc; // x0,y0 is the
@@ -145,6 +110,26 @@ public class SMask {
       }
 
       return gradDirMask;
+   }
+
+   /**
+    * Set the value of the mask at a location to 
+    *  the given value. The value should be either
+    *  EDGE or NOEDGE. Entries in the mask are 
+    * accessed by row and column (not x,y).
+    */
+   private void set(int r, int c, short v) {
+      mask[ (r * mwidth) + c ] = v;
+   }
+
+   /**
+    * Get the value of the mask at a location 
+    *  The return value should be either
+    *  EDGE or NOEDGE. Entries in the mask are 
+    * accessed by row and column (not x,y).
+    */
+   private short get(int r, int c)  {
+      return mask[ (r * mwidth) + c ];
    }
 
 }

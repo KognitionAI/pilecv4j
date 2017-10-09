@@ -331,7 +331,7 @@ public class ExtractFrames {
         // Create the sprocket hole model and the Transform for the model.
         // in order to locate the clusters in the transform space
         final SprocketHoleModel sm = new SprocketHoleModel(resolutiondpi, filmType, filmLayout);
-        final Transform transform = new Transform(sm, quantFactor, 10.0);
+        final Transform transform = new Transform(sm, quantFactor, 1.0, 10.0);
 
         // // write out the mask and the gradient mask
         // // for debugging purposes
@@ -470,7 +470,7 @@ public class ExtractFrames {
             // and add that list order to the rank. Those with the highest
             // rank are considered more likely to be real holes and the
             // interframeFilter assumes that the first one on the list
-            // is garunteed to be a hole.
+            // is guaranteed to be a hole.
             // -------------------------------------------
             Collections.sort(sprockets, new Transform.Fit.StdDeviationOrder());
             for (int i = 0; i < sprockets.size(); i++)

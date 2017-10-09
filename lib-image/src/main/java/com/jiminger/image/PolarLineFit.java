@@ -32,32 +32,34 @@ import com.jiminger.nr.Minimizer;
  */
 
 public class PolarLineFit implements Minimizer.Func {
-   private List<PPoint> points;
+   private final List<AwtPoint> points;
+   
    public Point worst = null;
    public double maxErrSq;
-   private boolean weighted;
+   
+   private final boolean weighted;
    private boolean awtp = false;
 
    /**
     * This constructor takes either a list of java.awt.Point's or a list of
-    * PPoints. If you pass it another list the Fit will fail with a 
+    * {@link AwtPoint}. If you pass it another list the Fit will fail with a 
     * RuntimeException dealing with class casting.
     * 
-    * @param points is either a PPoints or java.awt.Points
+    * @param points is either a {@link AwtPoint} or java.awt.Points
     * @param weighted is whether or not the points are weighted.
     */
    @SuppressWarnings("unchecked")
    public PolarLineFit(List<?> points, boolean weighted){
-      this.points = new ArrayList<PPoint>();
+      this.points = new ArrayList<AwtPoint>();
       Object o = points.get(0);
       if (o instanceof java.awt.Point)
       {
          for (int i = 0; i < points.size(); i++)
-            this.points.add(new PPoint((java.awt.Point)points.get(i)));
+            this.points.add(new AwtPoint((java.awt.Point)points.get(i)));
          awtp = true;
       }
       else
-         this.points.addAll((List<PPoint>)points);
+         this.points.addAll((List<AwtPoint>)points);
 
       this.weighted = weighted;
    }
@@ -132,7 +134,7 @@ public class PolarLineFit implements Minimizer.Func {
 
       List<Object> ret = new ArrayList<Object>();
 
-      for (Iterator<PPoint> iter = points.iterator(); iter.hasNext();)
+      for (Iterator<AwtPoint> iter = points.iterator(); iter.hasNext();)
       {
          Point p = iter.next();
          
@@ -144,7 +146,7 @@ public class PolarLineFit implements Minimizer.Func {
 
          if (err > maxDist)
          {
-            ret.add(awtp ? (Object)(((PPoint)p).p) : (Object)p);
+            ret.add(awtp ? (Object)(((AwtPoint)p).p) : (Object)p);
             iter.remove();
          }
       }
@@ -180,10 +182,10 @@ public class PolarLineFit implements Minimizer.Func {
       return Math.sqrt((r*r)+(c*c));
    }
 
-   public static class PPoint implements Point {
+   public static class AwtPoint implements Point {
       private java.awt.Point p;
 
-      PPoint(java.awt.Point p) {
+      AwtPoint(java.awt.Point p) {
          this.p = p;
       }
 

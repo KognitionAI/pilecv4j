@@ -107,7 +107,7 @@ public class FilmEdge {
 //      // now find all of edge point within extent/2 pixels from xipx, xipy
 
 
-      com.jiminger.image.Point Xi = Utils.closest(new Utils.DumbPoint(x0r,x0c),c,r);
+      com.jiminger.image.Point Xi = Utils.closest(new Utils.SimplePoint(x0r,x0c),c,r);
       double xix = Xi.getCol();
       double xiy = Xi.getRow();
 

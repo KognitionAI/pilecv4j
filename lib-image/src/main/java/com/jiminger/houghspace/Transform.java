@@ -35,6 +35,8 @@ import java.util.Map;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
+import com.jiminger.houghspace.internal.Mask;
+import com.jiminger.houghspace.internal.GradientDirectionMask;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.ImageFile;
 import com.jiminger.image.WeightedPoint;
@@ -43,43 +45,18 @@ import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
 public class Transform {
-   private double quantFactor = 1.0;
-   private Mask mask;
-   private SMask gradDirMask;
-   private double gradientDirSlopDeg;
-//   private short gradientDirSlopBytePM;
-   private Model model;
+   public final double quantFactor;
+   public final Mask mask;
+   public final GradientDirectionMask gradDirMask;
+   public final double gradientDirSlopDeg;
+   public final Model model;
 
-   private Transform(Mask mask, SMask gradDirMask, double quantFactor, double gradientDirSlopDeg) {
-      this.quantFactor = quantFactor;
-      this.mask = mask;
-      this.gradDirMask = gradDirMask;
-      this.gradientDirSlopDeg = gradientDirSlopDeg;
-//      this.gradientDirSlopBytePM = (short)(1.0 + (this.gradientDirSlopDeg * (256.0/360.0))/2.0);
-   }
-
-   public Transform(Model model, double quantFactor, double gradientDirSlopDeg) {
-      this(Mask.generateMask(model,model.featureWidth(),model.featureHeight(),quantFactor),
-           SMask.generateGradientMask(model,model.featureWidth(),model.featureHeight(),quantFactor), 
-           quantFactor, gradientDirSlopDeg);
-
-      this.model = model;
-   }
-
-   /**
-    * retrieve the mask
-    */
-   public Mask getMask()
-   {
-      return mask;
-   }
-
-   /**
-    * retrieve the gradient direction mask
-    */
-   public SMask getGradientDirMask()
-   {
-      return gradDirMask;
+   public Transform(Model model, double quantFactor, double scale, double gradientDirSlopDeg) {
+	   this.quantFactor = quantFactor;
+	   this.mask = Mask.generateMask(model,quantFactor, scale);
+	   this.gradDirMask = GradientDirectionMask.generateGradientMask(model,model.featureWidth(),model.featureHeight(),quantFactor);
+	   this.gradientDirSlopDeg = gradientDirSlopDeg;
+	   this.model = model;
    }
 
    /**
