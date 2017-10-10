@@ -31,4 +31,36 @@ public interface Point {
     default public double y() {
         return getRow();
     }
+
+    /**
+     * This will return a point that's translated such that if the point passed in
+     * is the same as {@code this} then the result will be the [0, 0].
+     * 
+     * It basically results in [ this - toOrigin ];
+     */
+    default public Point subtract(final Point toOrigin) {
+        return new SimplePoint(y() - toOrigin.y(), x() - toOrigin.x());
+    }
+
+    default public Point add(final Point toOrigin) {
+        return new SimplePoint(y() + toOrigin.y(), x() + toOrigin.x());
+    }
+
+    default public double magnitudeSquared() {
+        final double y = y();
+        final double x = x();
+        return (y * y) + (x * x);
+    }
+
+    default public double magnitude() {
+        return Math.sqrt(magnitudeSquared());
+    }
+
+    default public double dot(final Point other) {
+        return (x() * other.x()) + (y() * other.y());
+    }
+
+    default public Point multiply(final double scalar) {
+        return new SimplePoint(getRow() * scalar, getCol() * scalar);
+    }
 }
