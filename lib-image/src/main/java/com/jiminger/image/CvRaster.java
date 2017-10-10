@@ -35,7 +35,8 @@ public abstract class CvRaster {
 
                     @Override
                     public void zero(final int row, final int col) {
-                        IntStream.range(0, channels).forEach(i -> d[((row * colsXchannels) + (col * channels)) + i] = 0);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> d[pos + i] = 0);
                     }
 
                     @Override
@@ -46,14 +47,16 @@ public abstract class CvRaster {
                     @Override
                     public Object get(final int row, final int col) {
                         final byte[] ret = new byte[channels];
-                        IntStream.range(0, channels).forEach(i -> ret[i] = d[((row * colsXchannels) + (col * channels)) + i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ret[i] = d[pos + i]);
                         return ret;
                     }
 
                     @Override
                     public void set(final int row, final int col, final Object pixel) {
                         final byte[] p = (byte[]) pixel;
-                        IntStream.range(0, channels).forEach(i -> d[((row * colsXchannels) + (col * channels)) + i] = p[i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> d[pos + i] = p[i]);
                     }
 
                     @Override
@@ -83,7 +86,8 @@ public abstract class CvRaster {
                 return new CvRaster(new short[rows * cols * channels], type, channels, rows, cols) {
                     @Override
                     public void zero(final int row, final int col) {
-                        IntStream.range(0, channels).forEach(i -> ((short[]) data)[((row * colsXchannels) + (col * channels)) + i] = 0);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((short[]) data)[pos + i] = 0);
                     }
 
                     @Override
@@ -94,14 +98,16 @@ public abstract class CvRaster {
                     @Override
                     public Object get(final int row, final int col) {
                         final short[] ret = new short[channels];
-                        IntStream.range(0, channels).forEach(i -> ret[i] = ((short[]) data)[((row * colsXchannels) + (col * channels)) + i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ret[i] = ((short[]) data)[pos + i]);
                         return ret;
                     }
 
                     @Override
                     public void set(final int row, final int col, final Object pixel) {
                         final short[] p = (short[]) pixel;
-                        IntStream.range(0, channels).forEach(i -> ((short[]) data)[((row * colsXchannels) + (col * channels)) + i] = p[i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((short[]) data)[pos + i] = p[i]);
                     }
 
                     @Override
@@ -130,7 +136,8 @@ public abstract class CvRaster {
                 return new CvRaster(new int[rows * cols * channels], type, channels, rows, cols) {
                     @Override
                     public void zero(final int row, final int col) {
-                        IntStream.range(0, channels).forEach(i -> ((int[]) data)[((row * colsXchannels) + (col * channels)) + i] = 0);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((int[]) data)[pos + i] = 0);
                     }
 
                     @Override
@@ -141,14 +148,16 @@ public abstract class CvRaster {
                     @Override
                     public Object get(final int row, final int col) {
                         final int[] ret = new int[channels];
-                        IntStream.range(0, channels).forEach(i -> ret[i] = ((int[]) data)[((row * colsXchannels) + (col * channels)) + i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ret[i] = ((int[]) data)[pos + i]);
                         return ret;
                     }
 
                     @Override
                     public void set(final int row, final int col, final Object pixel) {
                         final int[] p = (int[]) pixel;
-                        IntStream.range(0, channels).forEach(i -> ((int[]) data)[((row * colsXchannels) + (col * channels)) + i] = p[i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((int[]) data)[pos + i] = p[i]);
                     }
 
                     @Override
@@ -162,7 +171,8 @@ public abstract class CvRaster {
                 return new CvRaster(new float[rows * cols * channels], type, channels, rows, cols) {
                     @Override
                     public void zero(final int row, final int col) {
-                        IntStream.range(0, channels).forEach(i -> ((float[]) data)[((row * colsXchannels) + (col * channels)) + i] = 0);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((float[]) data)[pos + i] = 0);
                     }
 
                     @Override
@@ -173,14 +183,16 @@ public abstract class CvRaster {
                     @Override
                     public Object get(final int row, final int col) {
                         final float[] ret = new float[channels];
-                        IntStream.range(0, channels).forEach(i -> ret[i] = ((float[]) data)[((row * colsXchannels) + (col * channels)) + i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ret[i] = ((float[]) data)[pos + i]);
                         return ret;
                     }
 
                     @Override
                     public void set(final int row, final int col, final Object pixel) {
                         final float[] p = (float[]) pixel;
-                        IntStream.range(0, channels).forEach(i -> ((float[]) data)[((row * colsXchannels) + (col * channels)) + i] = p[i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((float[]) data)[pos + i] = p[i]);
                     }
 
                     @Override
@@ -194,7 +206,8 @@ public abstract class CvRaster {
                 return new CvRaster(new double[rows * cols * channels], type, channels, rows, cols) {
                     @Override
                     public void zero(final int row, final int col) {
-                        IntStream.range(0, channels).forEach(i -> ((double[]) data)[((row * colsXchannels) + (col * channels)) + i] = 0);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((double[]) data)[pos + i] = 0);
                     }
 
                     @Override
@@ -205,14 +218,16 @@ public abstract class CvRaster {
                     @Override
                     public Object get(final int row, final int col) {
                         final double[] ret = new double[channels];
-                        IntStream.range(0, channels).forEach(i -> ret[i] = ((double[]) data)[((row * colsXchannels) + (col * channels)) + i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ret[i] = ((double[]) data)[pos + i]);
                         return ret;
                     }
 
                     @Override
                     public void set(final int row, final int col, final Object pixel) {
                         final double[] p = (double[]) pixel;
-                        IntStream.range(0, channels).forEach(i -> ((double[]) data)[((row * colsXchannels) + (col * channels)) + i] = p[i]);
+                        final int pos = (row * colsXchannels) + (col * channels);
+                        IntStream.range(0, channels).forEach(i -> ((double[]) data)[pos + i] = p[i]);
                     }
 
                     @Override

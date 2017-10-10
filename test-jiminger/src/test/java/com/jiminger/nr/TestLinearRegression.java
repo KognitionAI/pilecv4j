@@ -1,4 +1,4 @@
-package com.jiminger.nr.test;
+package com.jiminger.nr;
 
 import static org.junit.Assert.assertEquals;
 

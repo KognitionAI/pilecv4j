@@ -240,38 +240,6 @@ public class Utils {
             default:
                 throw new IllegalArgumentException("Cannot extract pixels from a BufferedImage of type " + crappyImage.getType());
         }
-
-        // public static Mat img2Mat(final BufferedImage in) {
-        // Mat out;
-        // byte[] data;
-        // int r, g, b;
-        //
-        // final int w = in.getWidth();
-        // final int h = in.getHeight();
-        //
-        // if (in.getType() == BufferedImage.TYPE_INT_RGB) {
-        // out = new Mat(h, w, CvType.CV_8UC3);
-        // data = new byte[h * 240 * (int) out.elemSize()];
-        // final int[] dataBuff = in.getRGB(0, 0, 320, 240, null, 0, 320);
-        // for (int i = 0; i < dataBuff.length; i++) {
-        // data[i * 3] = (byte) ((dataBuff[i] >> 16) & 0xFF);
-        // data[i * 3 + 1] = (byte) ((dataBuff[i] >> 8) & 0xFF);
-        // data[i * 3 + 2] = (byte) ((dataBuff[i] >> 0) & 0xFF);
-        // }
-        // } else {
-        // out = new Mat(240, 320, CvType.CV_8UC1);
-        // data = new byte[320 * 240 * (int) out.elemSize()];
-        // final int[] dataBuff = in.getRGB(0, 0, 320, 240, null, 0, 320);
-        // for (int i = 0; i < dataBuff.length; i++) {
-        // r = (byte) ((dataBuff[i] >> 16) & 0xFF);
-        // g = (byte) ((dataBuff[i] >> 8) & 0xFF);
-        // b = (byte) ((dataBuff[i] >> 0) & 0xFF);
-        // data[i] = (byte) ((0.21 * r) + (0.71 * g) + (0.07 * b)); // luminosity
-        // }
-        // }
-        // out.put(0, 0, data);
-        // return out;
-        // }
     }
 
     public static void print(final String prefix, final Mat im) {
@@ -298,21 +266,53 @@ public class Utils {
             return c;
         }
     }
-    
+
     public static class LineSegment {
-    	public final Point p1;
-    	public final Point p2;
-    	
-    	private final double m;
-    	private final double b;
-    	
-    	public LineSegment(Point p1, Point p2) {
-    		this.p1 = p1;
-    		this.p2 = p2;
-    	}
+        public final Point p1;
+        public final Point p2;
+
+        public LineSegment(final Point p1, final Point p2) {
+            this.p1 = p1;
+            this.p2 = p2;
+        }
     }
 
-    static public Point closest(final Point x, final double polarx, final double polary) {
+    /**
+     *  <p>A line defined in "perpendicular line coordinates" is expressed as a single point. This point
+     * is a reference for the line that's perpendicular to the line drawn from the origin to that point.</p>  
+     */
+    public static class PerpendicularLine implements Point {
+        public final Point perpRef;
+
+        public PerpendicularLine(final Point perpRef) {
+            this.perpRef = perpRef;
+        }
+
+        public PerpendicularLine(final double r, final double c) {
+            perpRef = new SimplePoint(r, c);
+        }
+
+        @Override
+        public double getRow() {
+            return perpRef.getRow();
+        }
+
+        @Override
+        public double getCol() {
+            return perpRef.getCol();
+        }
+
+        @Override
+        public String toString() {
+            return "[" + getRow() + "," + getCol() + "]";
+        }
+    }
+
+    public static Point closest(final Point x, final PerpendicularLine perpRef) {
+        return closest(x, perpRef.x(), perpRef.y());
+    }
+
+    static private Point closest(final Point x, final double perpRefX, final double perpRefY) {
         // Here we use the description for the perpendicularDistance.
         // if we translate X0 to the origin then Xi' (defined as
         // Xi translated by X0) will be at |P| - (P.X0)/|P| (which
@@ -328,11 +328,11 @@ public class Utils {
         //
         // Xi = (1 - (P.X0)/|P|^2) P + X0 = c P + X0
         // where c = (1 - (P.X0)/|P|^2)
-        final double Pmagsq = (polarx * polarx) + (polary * polary);
-        final double PdotX0 = (x.getRow() * polary) + (x.getCol() * polarx);
+        final double Pmagsq = (perpRefX * perpRefX) + (perpRefY * perpRefY);
+        final double PdotX0 = (x.y() * perpRefY) + (x.x() * perpRefX);
 
         final double c = (1.0 - (PdotX0 / Pmagsq));
-        return new SimplePoint((c * polary) + x.getRow(), (c * polarx) + x.getCol());
+        return new SimplePoint((c * perpRefY) + x.y(), (c * perpRefX) + x.x());
     }
 
     public static void drawCircle(final Point p, final Mat ti, final Color color) {

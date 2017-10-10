@@ -1,4 +1,4 @@
-package com.jiminger.util.test;
+package com.jiminger.util;
 
 import org.junit.Test;
 

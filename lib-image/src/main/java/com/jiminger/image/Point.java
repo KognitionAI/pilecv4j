@@ -17,10 +17,18 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 package com.jiminger.image;
 
 public interface Point {
-   public double getRow();
-   public double getCol();
+    public double getRow();
+
+    public double getCol();
+
+    default public double x() {
+        return getCol();
+    }
+
+    default public double y() {
+        return getRow();
+    }
 }

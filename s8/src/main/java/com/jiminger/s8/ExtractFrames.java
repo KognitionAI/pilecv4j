@@ -26,9 +26,12 @@ import java.awt.image.IndexColorModel;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -40,8 +43,9 @@ import com.jiminger.houghspace.Transform;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.CvRaster.PixelAggregate;
 import com.jiminger.image.ImageFile;
+import com.jiminger.image.PerpendicularLineCoordFit;
 import com.jiminger.image.Point;
-import com.jiminger.image.PolarLineFit;
+import com.jiminger.image.WeightedPoint;
 import com.jiminger.image.drawing.Utils;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
@@ -167,6 +171,31 @@ public class ExtractFrames {
             src.copyTo(workingImage);
             Imgproc.cvtColor(src, workingImage, Imgproc.COLOR_BGR2GRAY);
             return workingImage;
+        }
+    }
+
+    public static class WeightedFit implements WeightedPoint {
+        public final Transform.Fit fit;
+        private int rank;
+
+        WeightedFit(final Transform.Fit fit, final int rank) {
+            this.fit = fit;
+            this.rank = rank;
+        }
+
+        @Override
+        public double getRow() {
+            return fit.getRow();
+        }
+
+        @Override
+        public double getCol() {
+            return fit.getCol();
+        }
+
+        @Override
+        public double getWeight() {
+            return rank;
         }
     }
 
@@ -386,10 +415,10 @@ public class ExtractFrames {
 
         for (int i = clusters.size() - 1; i >= 0; i--) {
             final Transform.Cluster cluster = clusters.get(i);
-            final double distToFarEdge = PolarLineFit.perpendicularDistance(cluster, farEdge.c, farEdge.r);
-            final Point p = Utils.closest(cluster, sprocketEdge.c, sprocketEdge.r);
-            final double distBetweenEdgesAtCluster = PolarLineFit.perpendicularDistance(p, farEdge.c, farEdge.r);
-            final double distToCloseEdge = PolarLineFit.distance(cluster, p);
+            final double distToFarEdge = PerpendicularLineCoordFit.perpendicularDistance(cluster, farEdge.edge);
+            final Point p = Utils.closest(cluster, sprocketEdge.edge);
+            final double distBetweenEdgesAtCluster = PerpendicularLineCoordFit.perpendicularDistance(p, farEdge.edge);
+            final double distToCloseEdge = PerpendicularLineCoordFit.distance(cluster, p);
 
             if (distToFarEdge >= distBetweenEdgesAtCluster ||
                     distToCloseEdge < closestPixelToLookFor ||
@@ -408,12 +437,13 @@ public class ExtractFrames {
         final double maxDistanceFromLine = (resolutiondpi) / 64.0; // this gives 50 at 3200 dpi
 
         for (boolean done = false; !done;) {
-            final PolarLineFit sprocketErrFunc = new PolarLineFit(clusters, true);
+            final PerpendicularLineCoordFit sprocketErrFunc = new PerpendicularLineCoordFit(clusters, true);
             final Minimizer m = new Minimizer(sprocketErrFunc);
             /* double sumSqErr = */ m.minimize(startingPowell);
             result = m.getFinalPostion();
 
-            final double furthestDist = PolarLineFit.perpendicularDistance(sprocketErrFunc.worst, result[0], result[1]);
+            final double furthestDist = PerpendicularLineCoordFit.perpendicularDistance(sprocketErrFunc.worst,
+                    PerpendicularLineCoordFit.interpretFinalPosition(result));
 
             // this prunes off clusters way out of line
             if (furthestDist > maxDistanceFromLine)
@@ -433,7 +463,7 @@ public class ExtractFrames {
         // ------------------------------------------------------------
         timer.start();
         System.out.print("finding the best fit for the sprocket holes ... ");
-        List<Transform.Fit> sprockets = new ArrayList<Transform.Fit>();
+        final List<Transform.Fit> sprockets = new ArrayList<Transform.Fit>();
         final List<java.awt.Point> prunnedEdges = new ArrayList<java.awt.Point>();
         final List<Transform.Cluster> removedClusters = new ArrayList<Transform.Cluster>();
 
@@ -472,30 +502,35 @@ public class ExtractFrames {
             // interframeFilter assumes that the first one on the list
             // is guaranteed to be a hole.
             // -------------------------------------------
-            Collections.sort(sprockets, new Transform.Fit.StdDeviationOrder());
-            for (int i = 0; i < sprockets.size(); i++)
-                sprockets.get(i).rank = sprockets.size() - i;
+            Collections.sort(sprockets, Transform.Fit.stdDeviationOrder);
+            final int numSprockets = sprockets.size();
+            List<WeightedFit> wfits = Arrays.asList(
+                    IntStream.range(0, numSprockets).mapToObj(i -> new WeightedFit(sprockets.get(i), numSprockets - i)).toArray(WeightedFit[]::new));
 
-            Collections.sort(sprockets, new Transform.Fit.EdgeCountOrder());
-            for (int i = 0; i < sprockets.size(); i++)
-                sprockets.get(i).rank += sprockets.size() - i;
+            Collections.sort(wfits, (o1, o2) -> Transform.Fit.edgeCountOrder.compare(o1.fit, o2.fit));
+            for (int i = 0; i < wfits.size(); i++)
+                wfits.get(i).rank += numSprockets - i;
 
-            final List<Transform.Fit> verifiedSprockets = new ArrayList<Transform.Fit>();
+            final List<WeightedFit> verifiedSprockets = new ArrayList<>();
             final int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
-            if (!FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, sprockets, verifiedSprockets)) {
+            if (!FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, wfits, verifiedSprockets)) {
                 // in the odd case where this fails, assume it's due to the fact that
                 // the first point in the list was actually not a real sprocket hole
-                for (boolean done = false; !done && sprockets.size() > 0;) {
-                    sprockets.remove(0);
+                for (boolean done = false; !done && wfits.size() > 0;) {
+                    wfits.remove(0);
                     verifiedSprockets.clear();
                     // try again
-                    done = FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, sprockets, verifiedSprockets);
+                    done = FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, wfits, verifiedSprockets);
 
                     if (done)
-                        sprockets = verifiedSprockets;
+                        wfits = verifiedSprockets;
                 }
             } else
-                sprockets = verifiedSprockets;
+                wfits = verifiedSprockets;
+
+            // now rebuild the sprockets list
+            sprockets.clear();
+            sprockets.addAll(wfits.stream().map(w -> w.fit).collect(Collectors.toList()));
 
             System.out.println("done (" + timer.stop() + ")");
         }
@@ -551,7 +586,7 @@ public class ExtractFrames {
                 // for debug purposes draw a circle around the point along the sprocketEdgePiece
                 // that is closest to the sprocket. This line is the axis of the frame and
                 // passes through the center.
-                Utils.drawCircle(Utils.closest(frameReference, sprocketEdgePiece.c, sprocketEdgePiece.r), g, cyan);
+                Utils.drawCircle(Utils.closest(frameReference, sprocketEdgePiece.edge), g, cyan);
             }
             if (farEdgePiece != null) {
                 farEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
@@ -560,7 +595,7 @@ public class ExtractFrames {
                 // for debug purposes draw a circle around the point along the far edge
                 // that is closest to the sprocket. This line is the axis of the frame and
                 // passes through the center.
-                final Point closest = Utils.closest(frameReference, farEdgePiece.c, farEdgePiece.r);
+                final Point closest = Utils.closest(frameReference, farEdgePiece.edge);
                 Utils.drawCircle(closest, g, cyan);
                 Utils.drawLine(frameReference, closest, g, cyan);
             }

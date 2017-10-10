@@ -286,6 +286,16 @@ public class ImageFile {
         }
 
         final BufferedImage image = readBufferedImageFromFile(infile);
+        // final CvRaster raster = CvRaster.create(image);
+        // final short[] data = (short[]) raster.data;
+        // final int width = raster.cols;
+        // final short[] pixel = new short[1];
+        // raster.apply((ShortPixelSetter) (r, c) -> {
+        // final short pix = data[r * width + c];
+        // final int pixu = Short.toUnsignedInt(pix);
+        // pixel[0] = (short) (((pixu & 0xff00) >>> 8) | ((pixu & 0xff) << 8));
+        // return pixel;
+        // });
 
         for (final ImageDestinationDefinition dest : dests) {
             transcode(image, dest);
