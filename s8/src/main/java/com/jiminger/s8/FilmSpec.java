@@ -23,9 +23,9 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
-import com.jiminger.image.Point;
-import com.jiminger.image.WeightedPoint;
-import com.jiminger.image.WeightedPointComparator;
+import com.jiminger.image.geometry.Point;
+import com.jiminger.image.geometry.WeightedPoint;
+import com.jiminger.image.geometry.WeightedPointComparator;
 
 public class FilmSpec {
     // general conversion

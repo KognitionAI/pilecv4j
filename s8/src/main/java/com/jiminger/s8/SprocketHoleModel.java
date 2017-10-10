@@ -18,7 +18,7 @@
 ****************************************************************************/
 package com.jiminger.s8;
 
-import com.jiminger.houghspace.*;
+import com.jiminger.image.houghspace.*;
 
 public class SprocketHoleModel implements Model
 {

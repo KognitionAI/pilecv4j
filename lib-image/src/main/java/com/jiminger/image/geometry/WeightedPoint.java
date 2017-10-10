@@ -17,7 +17,7 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-package com.jiminger.image;
+package com.jiminger.image.geometry;
 
 public interface WeightedPoint extends Point
 {

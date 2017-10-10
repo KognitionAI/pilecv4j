@@ -23,9 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.jiminger.image.CvRaster;
-import com.jiminger.image.PerpendicularLineCoordFit;
-import com.jiminger.image.drawing.Utils;
-import com.jiminger.image.drawing.Utils.PerpendicularLine;
+import com.jiminger.image.Utils;
+import com.jiminger.image.geometry.PerpendicularLine;
+import com.jiminger.image.geometry.PerpendicularLineCoordFit;
+import com.jiminger.image.geometry.SimplePoint;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
@@ -51,7 +52,7 @@ public class FilmEdge {
      * This method will cut a piece of the film edge at r,c (or the closest point along the edge line) with a total length of 'extent'.
      */
     public FilmEdge edgePiece(final double x0r, final double x0c, final double extent, final boolean usedPruned) {
-        final com.jiminger.image.Point Xi = Utils.closest(new Utils.SimplePoint(x0r, x0c), edge);
+        final com.jiminger.image.geometry.Point Xi = Utils.closest(new SimplePoint(x0r, x0c), edge);
         final double xix = Xi.getCol();
         final double xiy = Xi.getRow();
 

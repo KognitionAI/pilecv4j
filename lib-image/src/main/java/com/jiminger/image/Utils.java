@@ -1,4 +1,4 @@
-package com.jiminger.image.drawing;
+package com.jiminger.image;
 
 import static java.awt.image.BufferedImage.TYPE_3BYTE_BGR;
 import static java.awt.image.BufferedImage.TYPE_4BYTE_ABGR;
@@ -36,8 +36,9 @@ import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
-import com.jiminger.image.CvRaster;
-import com.jiminger.image.Point;
+import com.jiminger.image.geometry.PerpendicularLine;
+import com.jiminger.image.geometry.Point;
+import com.jiminger.image.geometry.SimplePoint;
 
 public class Utils {
     public static final ColorModel grayColorModel;
@@ -245,67 +246,6 @@ public class Utils {
     public static void print(final String prefix, final Mat im) {
         System.out.println(prefix + " { depth=(" + CvType.ELEM_SIZE(im.type()) + ", " + im.depth() + "), channels=" + im.channels() + " HxW="
                 + im.height() + "x" + im.width() + " }");
-    }
-
-    public static class SimplePoint implements Point {
-        private final double r;
-        private final double c;
-
-        public SimplePoint(final double r, final double c) {
-            this.r = r;
-            this.c = c;
-        }
-
-        @Override
-        public double getRow() {
-            return r;
-        }
-
-        @Override
-        public double getCol() {
-            return c;
-        }
-    }
-
-    public static class LineSegment {
-        public final Point p1;
-        public final Point p2;
-
-        public LineSegment(final Point p1, final Point p2) {
-            this.p1 = p1;
-            this.p2 = p2;
-        }
-    }
-
-    /**
-     *  <p>A line defined in "perpendicular line coordinates" is expressed as a single point. This point
-     * is a reference for the line that's perpendicular to the line drawn from the origin to that point.</p>  
-     */
-    public static class PerpendicularLine implements Point {
-        public final Point perpRef;
-
-        public PerpendicularLine(final Point perpRef) {
-            this.perpRef = perpRef;
-        }
-
-        public PerpendicularLine(final double r, final double c) {
-            perpRef = new SimplePoint(r, c);
-        }
-
-        @Override
-        public double getRow() {
-            return perpRef.getRow();
-        }
-
-        @Override
-        public double getCol() {
-            return perpRef.getCol();
-        }
-
-        @Override
-        public String toString() {
-            return "[" + getRow() + "," + getCol() + "]";
-        }
     }
 
     public static Point closest(final Point x, final PerpendicularLine perpRef) {

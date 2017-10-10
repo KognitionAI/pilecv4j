@@ -17,18 +17,19 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-package com.jiminger.image;
+package com.jiminger.image.geometry;
 
-public interface Point {
-    public double getRow();
+import java.util.Comparator;
 
-    public double getCol();
+public class WeightedPointComparator implements Comparator<WeightedPoint>
+{
+   public WeightedPointComparator() {}
 
-    default public double x() {
-        return getCol();
-    }
-
-    default public double y() {
-        return getRow();
-    }
+   @Override
+   public int compare(WeightedPoint o1, WeightedPoint o2)
+   {
+      double diff = (o2.getWeight() - o1.getWeight());
+      return diff > 0 ? 1 : (diff == 0.0D ? 0 : -1);
+   }
 }
+

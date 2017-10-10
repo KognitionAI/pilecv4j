@@ -18,13 +18,13 @@
 ****************************************************************************/
 
 
-package com.jiminger.houghspace.internal;
+package com.jiminger.image.houghspace.internal;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import com.jiminger.houghspace.Model;
 import com.jiminger.image.CvRaster;
+import com.jiminger.image.houghspace.Model;
 
 /**
  * A mask underpinned by an array of shorts that's used to hold a raster of 

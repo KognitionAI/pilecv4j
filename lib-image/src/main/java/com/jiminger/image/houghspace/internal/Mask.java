@@ -18,12 +18,12 @@
 ****************************************************************************/
 
 
-package com.jiminger.houghspace.internal;
+package com.jiminger.image.houghspace.internal;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import com.jiminger.houghspace.Model;
+import com.jiminger.image.houghspace.Model;
 
 /**
  * <p>A mask underpinned by an array of bytes, each containing an indication as to whether or not

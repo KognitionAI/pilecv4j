@@ -17,13 +17,12 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-package com.jiminger.image;
+package com.jiminger.image.geometry;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-import com.jiminger.image.drawing.Utils.PerpendicularLine;
 import com.jiminger.nr.Minimizer;
 
 /**

@@ -37,7 +37,7 @@ import java.util.StringTokenizer;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import com.jiminger.image.CvRaster;
-import com.jiminger.mjpeg.MJPEGWriter;
+import com.jiminger.image.mjpeg.MJPEGWriter;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.FilenameUtils;

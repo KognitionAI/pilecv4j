@@ -17,7 +17,7 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-package com.jiminger.houghspace;
+package com.jiminger.image.houghspace;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -34,13 +34,13 @@ import java.util.Map;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import com.jiminger.houghspace.internal.GradientDirectionMask;
-import com.jiminger.houghspace.internal.Mask;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.ImageFile;
-import com.jiminger.image.Point;
-import com.jiminger.image.WeightedPoint;
-import com.jiminger.image.drawing.Utils;
+import com.jiminger.image.Utils;
+import com.jiminger.image.geometry.Point;
+import com.jiminger.image.geometry.WeightedPoint;
+import com.jiminger.image.houghspace.internal.GradientDirectionMask;
+import com.jiminger.image.houghspace.internal.Mask;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 

@@ -46,7 +46,6 @@ import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jiminger.image.drawing.Utils;
 import com.jiminger.util.LibraryLoader;
 
 public class ImageFile {

@@ -18,7 +18,7 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-import static com.jiminger.image.drawing.Utils.print;
+import static com.jiminger.image.Utils.print;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -39,14 +39,14 @@ import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
-import com.jiminger.houghspace.Transform;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.CvRaster.PixelAggregate;
 import com.jiminger.image.ImageFile;
-import com.jiminger.image.PerpendicularLineCoordFit;
-import com.jiminger.image.Point;
-import com.jiminger.image.WeightedPoint;
-import com.jiminger.image.drawing.Utils;
+import com.jiminger.image.Utils;
+import com.jiminger.image.geometry.PerpendicularLineCoordFit;
+import com.jiminger.image.geometry.Point;
+import com.jiminger.image.geometry.WeightedPoint;
+import com.jiminger.image.houghspace.Transform;
 import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;

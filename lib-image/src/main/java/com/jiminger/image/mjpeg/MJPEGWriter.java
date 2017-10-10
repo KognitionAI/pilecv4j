@@ -18,7 +18,7 @@
 ****************************************************************************/
 
 
-package com.jiminger.mjpeg;
+package com.jiminger.image.mjpeg;
 
 import java.io.File;
 import java.io.FileFilter;

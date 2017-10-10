@@ -18,7 +18,7 @@
 ****************************************************************************/
 
 
-package com.jiminger.houghspace;
+package com.jiminger.image.houghspace;
 
 /**
  * This interface represents a 'generator' of sorts for patterns
