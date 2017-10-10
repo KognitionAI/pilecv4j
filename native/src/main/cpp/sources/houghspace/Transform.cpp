@@ -18,7 +18,7 @@
 ****************************************************************************/
 
 #include <stdio.h>
-#include "com_jiminger_houghspace_Transform.h"
+#include "com_jiminger_image_houghspace_Transform.h"
 #include <list>
 using namespace std;
 

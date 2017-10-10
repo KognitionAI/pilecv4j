@@ -15,12 +15,12 @@ endif()
 
 
 add_custom_command(
-    OUTPUT com_jiminger_houghspace_Transform.h
-           com_jiminger_mjpeg_MJPEGWriter.h
+    OUTPUT com_jiminger_image_houghspace_Transform.h
+           com_jiminger_image_mjpeg_MJPEGWriter.h
     COMMAND ${Java_JAVAH_EXECUTABLE} -verbose
         -classpath ../lib/lib-image-$ENV{PROJECT_VERSION}.jar
         -d ${_stubDir}
-        -jni com.jiminger.houghspace.Transform com.jiminger.mjpeg.MJPEGWriter
+        -jni com.jiminger.image.houghspace.Transform com.jiminger.image.mjpeg.MJPEGWriter
     )
 
 add_custom_command(
@@ -33,9 +33,9 @@ add_custom_command(
 
 include_directories(${JNI_INCLUDE_DIRS} ${_stubDir})
 add_library(utilities.jiminger.com
-	MODULE com_jiminger_houghspace_Transform.h
+	MODULE com_jiminger_image_houghspace_Transform.h
                com_jiminger_nr_Minimizer.h
-               com_jiminger_mjpeg_MJPEGWriter.h
+               com_jiminger_image_mjpeg_MJPEGWriter.h
                sources/houghspace/Transform.cpp
                sources/mjpeg/jpegtoavi.cpp
                sources/nr/Minimizer.cpp

@@ -40,7 +40,7 @@
 #include "byteswap.h"
 #include <stdlib.h>
 
-#include "com_jiminger_mjpeg_MJPEGWriter.h"
+#include "com_jiminger_image_mjpeg_MJPEGWriter.h"
 #include <list>
 using namespace std;
 
