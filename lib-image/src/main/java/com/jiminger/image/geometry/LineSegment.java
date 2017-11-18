@@ -30,5 +30,6 @@ public class LineSegment {
         if (xbiased) {
 
         }
+        return 0.0;
     }
 }
