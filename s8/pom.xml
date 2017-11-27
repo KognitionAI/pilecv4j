@@ -48,6 +48,12 @@
       <artifactId>slf4j-log4j12</artifactId>
       <scope>runtime</scope>
     </dependency>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>native-lib</artifactId>
+      <classifier>${platform}</classifier>
+      <scope>runtime</scope>
+    </dependency>
   </dependencies>
 
   <build>

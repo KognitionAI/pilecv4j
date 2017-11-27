@@ -60,6 +60,11 @@ public interface Point {
         return (x() * other.x()) + (y() * other.y());
     }
 
+    default public double distance(final Point other) {
+        final Point trans = subtract(other);
+        return trans.magnitude();
+    }
+
     default public Point multiply(final double scalar) {
         return new SimplePoint(getRow() * scalar, getCol() * scalar);
     }

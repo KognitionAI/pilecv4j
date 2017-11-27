@@ -115,7 +115,7 @@ public class Transform {
      * This method does not do much any more. Now it simply writes the inverse transform (that is, the edge pixels identified by the transform) back into the image for debugging purposes.
      */
     public List<HoughSpaceEntry> inverseTransform(final HoughSpace houghSpace, final CvRaster ti, final byte overlayPixelValue,
-            final byte peakCircleColorValue) {
+            final byte peakCircleColorValue, final String outputFileName) {
         final List<HoughSpaceEntry> sortedSet = new LinkedList<HoughSpaceEntry>();
 
         sortedSet.addAll(houghSpace.backMapEntries);
@@ -140,10 +140,12 @@ public class Transform {
             }
         }
 
-        try {
-            ImageFile.writeImageFile(Utils.dbgImage, "bi.bmp");
-        } catch (final IOException ioe) {
-            ioe.printStackTrace();
+        if (outputFileName != null) {
+            try {
+                ImageFile.writeImageFile(Utils.dbgImage, outputFileName);
+            } catch (final IOException ioe) {
+                ioe.printStackTrace();
+            }
         }
 
         return sortedSet;

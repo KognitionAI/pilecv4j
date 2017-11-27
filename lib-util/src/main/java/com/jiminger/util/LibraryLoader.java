@@ -67,6 +67,7 @@ public class LibraryLoader {
                 final MessageDigest digest = java.security.MessageDigest.getInstance("MD5");
 
                 for (final URL propFile : iss) {
+                    LOGGER.debug("Loading native library from: {}", propFile);
                     final Properties libProps = new Properties();
 
                     try (InputStream propFileIs = propFile.openStream()) {
@@ -77,12 +78,15 @@ public class LibraryLoader {
                         throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
                     }
 
+                    LOGGER.debug("Properties for {} are: {}", propFile, libProps);
+
                     final String libName = libProps.getProperty("library");
                     final String libSuffix = libName.substring(libName.lastIndexOf('.'));
                     File tmpFile = null;
                     try (InputStream is = new DigestInputStream(getInputStream(libName), digest);) {
                         try {
                             tmpFile = File.createTempFile("com.jiminger", libSuffix);
+                            LOGGER.debug("Creating MD5 of {} using temp file: {}", propFile, tmpFile);
                         } catch (final IOException e) {
                             final String message = "Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:";
                             LOGGER.error(message, e);
@@ -103,10 +107,16 @@ public class LibraryLoader {
                     }
 
                     final String md5 = StringUtils.bytesToHex(digest.digest());
+                    LOGGER.debug("MD5 of {} is: {}", propFile, md5);
+
                     final File tmpDir = tmpFile.getParentFile();
-                    final String fname = "com.jiminger." + libName + "." + md5 + "." + libSuffix;
+                    final String fname = "com.jiminger." + libName + "." + md5 + libSuffix;
+
                     final File libFile = new File(tmpDir, fname);
+                    LOGGER.debug("Copying dynamic lib from {} to {}", propFile, libFile);
                     if (libFile.exists()) {
+                        LOGGER.debug("dynamic lib file {} already exists.", libFile);
+
                         boolean theSame = false;
 
                         // make sure it has the same md5.
@@ -147,6 +157,7 @@ public class LibraryLoader {
                             }
                         }
                     } else {
+                        LOGGER.debug("renaming dynamic lib file {} to ().", tmpFile, libFile);
                         if (!tmpFile.renameTo(libFile)) {
                             final String message = "Failed to rename the library file from \"" + tmpFile.getAbsolutePath() + "\" to \""
                                     + libFile.getAbsolutePath() + "\".";

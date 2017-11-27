@@ -52,7 +52,7 @@ void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint wi
 int maskcheck(unsigned char * mask, jint maskw, jint maskh, int r, int c, int isBackMapping);
 
 
-JNIEXPORT void JNICALL Java_com_jiminger_houghspace_Transform_houghTransformNative
+JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransformNative
 (JNIEnv * env, jobject /*thethis*/, 
  jbyteArray imageA, jint width, jint /*height*/, jbyteArray gradientDirImageA,
  jbyteArray maskA, jint maskw, jint maskh, jint maskcr, jint maskcc,
@@ -61,7 +61,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_houghspace_Transform_houghTransformNati
  jobject hsem, jint houghThreshold, jint rowstart, jint rowend, jint colstart, jint colend)
 {
   if (! EDGE_set) {
-    jclass maskClass = env->FindClass("com.jiminger.houghspace.Mask");
+    jclass maskClass = env->FindClass("com/jiminger/image/houghspace/internal/Mask");
     jfieldID fid = env->GetStaticFieldID(maskClass, "EDGE", "B");
     jbyte val = env->GetStaticByteField(maskClass, fid);
     EDGE = (unsigned char)val;

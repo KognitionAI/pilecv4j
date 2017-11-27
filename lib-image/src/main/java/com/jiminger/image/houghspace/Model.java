@@ -17,44 +17,72 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 package com.jiminger.image.houghspace;
 
 /**
  * This interface represents a 'generator' of sorts for patterns
  *  to be searched for in the image.
  */
-public interface Model
-{
-   /**
+public interface Model {
+    /**
     * This method needs to be defined to return the distance from the
     *  pixel position supplied, to the nearest edge of the model. This
     *  method will be used to generate a mask as well as called for
     *  error minimization.
     */
-   public double distance(double ox, double oy, double theta, double scale);
+    default public double distance(final double ox, final double oy, final double theta, final double scale) {
+        // a rotation matrix to transform point counter clockwise
+        // around the origin (which is intuitively 'theta' in a
+        // standard Cartesian world where the first quadrant
+        // is in the upper-right hand side of the universe)
+        // is given by:
+        //
+        // | cos(theta) -sin(theta) |
+        // | |
+        // | sin(theta) cos(theta) |
+        //
+        // Since theta means to rotate the entire model by that angle
+        // (counter clockwise around the center) then, instead, we
+        // can simply rotate the point around the center of the sprocket
+        // in the other direction (clockwise) before measuring the
+        // distance - that is, we will simply negate theta
+        final double ang = -theta;
+        double rx, ry;
+        if (ang != 0.0) {
+            final double sinang = Math.sin(ang);
+            final double cosang = Math.cos(ang);
+            rx = (ox * cosang) - (oy * sinang);
+            ry = (ox * sinang) + (oy * cosang);
+        } else {
+            rx = ox;
+            ry = oy;
+        }
+        return distance(rx, ry, scale);
+    }
 
-   /**
+    public double distance(final double rx, final double ry, final double scale);
+
+    /**
     * This method should return the gradient direction expected at the provided
     *  pixel if it is on an edge that makes up the object being searched for.
     *  Currently the result should be in degrees. quantized to a one degree
     *  level.
     */
-   public short gradient(double ox, double oy);
+    public short gradient(double ox, double oy);
 
-   /**
+    /**
     * This should return the extent of the model (at a scale of 1.0)
     *  in pixels.
     */
-   public double featureWidth();
+    public double featureWidth();
 
-   /**
+    /**
     * This should return the extent of the model (at a scale of 1.0)
     *  in pixels.
     */
-   public double featureHeight();
+    public double featureHeight();
 
-   /**
+    /**
     * The model will get edge locations passed to the distance method
     *  in the coordinate system of the model (that is, translated so the
     *  center of the coordinate system is the center of the model). Normally
@@ -64,6 +92,5 @@ public interface Model
     *  mathematical Cartesian space. If the model expect the normal Cartesian
     *  coordinates then it should return 'true' for the following method.
     */
-   public boolean flipYAxis();
+    public boolean flipYAxis();
 }
-

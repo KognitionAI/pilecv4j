@@ -1,5 +1,6 @@
 package com.jiminger.image;
 
+import java.util.function.Function;
 import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
@@ -24,12 +25,115 @@ public abstract class CvRaster {
         this.colsXchannels = cols * channels;
     }
 
+    @FunctionalInterface
+    public static interface GetChannelValueAsInt {
+        public int get(Object pixel, int channel);
+    }
+
+    @FunctionalInterface
+    public static interface PutChannelValueFromInt {
+        public void put(Object pixel, int channel, int channelValue);
+    }
+
+    @FunctionalInterface
+    public static interface PixelToInts extends Function<Object, int[]> {}
+
+    @FunctionalInterface
+    public static interface IntsToPixel extends Function<int[], Object> {}
+
+    public static PutChannelValueFromInt channelValuePutter(final CvRaster raster) {
+        switch (CvType.depth(raster.type)) {
+            case CvType.CV_8S:
+                return (p, ch, chv) -> ((byte[]) p)[ch] = (byte) ((chv > Byte.MAX_VALUE) ? Byte.MAX_VALUE : chv);
+            case CvType.CV_8U:
+                return (p, ch, chv) -> ((byte[]) p)[ch] = (byte) ((chv > 0xFF) ? 0xFF : chv);
+            case CvType.CV_16S:
+                return (p, ch, chv) -> ((short[]) p)[ch] = (short) ((chv > Short.MAX_VALUE) ? Short.MAX_VALUE : chv);
+            case CvType.CV_16U:
+                return (p, ch, chv) -> ((short[]) p)[ch] = (short) ((chv > 0xFFFF) ? 0XFFFF : chv);
+            case CvType.CV_32S:
+                return (p, ch, chv) -> ((int[]) p)[ch] = chv;
+            default:
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+        }
+    }
+
+    public static GetChannelValueAsInt channelValueFetcher(final CvRaster raster) {
+        switch (CvType.depth(raster.type)) {
+            case CvType.CV_8S:
+                return (p, ch) -> (int) ((byte[]) p)[ch];
+            case CvType.CV_8U:
+                return (p, ch) -> (((byte[]) p)[ch] & 0xFF);
+            case CvType.CV_16S:
+                return (p, ch) -> (int) ((short[]) p)[ch];
+            case CvType.CV_16U:
+                return (p, ch) -> (((short[]) p)[ch] & 0xFFFF);
+            case CvType.CV_32S:
+                return (p, ch) -> ((int[]) p)[ch];
+            default:
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+        }
+    }
+
+    public static PixelToInts pixelToIntsConverter(final CvRaster raster) {
+        final GetChannelValueAsInt fetcher = channelValueFetcher(raster);
+        final int numChannels = raster.channels;
+        final int[] ret = new int[numChannels];
+        return (p -> {
+            for (int i = 0; i < numChannels; i++)
+                ret[i] = fetcher.get(p, i);
+            return ret;
+        });
+    }
+
+    public static int numChannelValues(final CvRaster raster) {
+        switch (CvType.depth(raster.type)) {
+            case CvType.CV_8S:
+            case CvType.CV_8U:
+                return 256;
+            case CvType.CV_16S:
+            case CvType.CV_16U:
+                return 65536;
+            default:
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+        }
+    }
+
+    public static Object makePixel(final CvRaster raster) {
+        final int channels = raster.channels;
+        switch (CvType.depth(raster.type)) {
+            case CvType.CV_8S:
+            case CvType.CV_8U:
+                return new byte[channels];
+            case CvType.CV_16S:
+            case CvType.CV_16U:
+                return new short[channels];
+            case CvType.CV_32S:
+                return new int[channels];
+            default:
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+
+        }
+    }
+
+    public static IntsToPixel intsToPixelConverter(final CvRaster raster) {
+        final PutChannelValueFromInt putter = channelValuePutter(raster);
+        final int numChannels = raster.channels;
+        final Object pixel = makePixel(raster);
+        return ints -> {
+            for (int i = 0; i < numChannels; i++)
+                putter.put(pixel, i, ints[i]);
+            return pixel;
+        };
+    }
+
     public static CvRaster create(final int rows, final int cols, final int type) {
         final int channels = CvType.channels(type);
+        final int depth = CvType.depth(type);
 
-        switch (CvType.depth(type)) {
-            case CvType.CV_8U:
+        switch (depth) {
             case CvType.CV_8S:
+            case CvType.CV_8U:
                 return new CvRaster(new byte[rows * cols * channels], type, channels, rows, cols) {
                     final byte[] d = ((byte[]) data);
 

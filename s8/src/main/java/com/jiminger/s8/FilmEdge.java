@@ -146,6 +146,7 @@ public class FilmEdge {
         if (prune) {
             pruned = new ArrayList<Point>();
             for (boolean done = false; !done;) {
+                @SuppressWarnings("unchecked")
                 final List<Point> locallyPruned = (List<Point>) func.prune(3.0 * stdDev, finalPos);
 
                 if (locallyPruned.size() == 0)

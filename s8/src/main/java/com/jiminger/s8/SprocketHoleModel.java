@@ -73,81 +73,58 @@ public class SprocketHoleModel implements Model {
     }
 
     @Override
-    public double distance(final double ox, final double oy, final double theta, final double scale) {
-        // a rotation matrix to transform point counter clockwise
-        // around the origin (which is intuitively 'theta' in a
-        // standard Cartesian world where the first quadrant
-        // is in the upper-right hand side of the universe)
-        // is given by:
-        //
-        // | cos(theta) -sin(theta) |
-        // | |
-        // | sin(theta) cos(theta) |
-        //
-        // Since theta means to rotate the entire model by that angle
-        // (counter clockwise around the center) then, instead, we
-        // can simply rotate the point around the center of the sprocket
-        // in the other direction (clockwise) before measuring the
-        // distance - that is, we will simply negate theta
-        final double ang = -theta;
-        double rx, ry;
-        if (ang != 0.0) {
-            final double sinang = Math.sin(ang);
-            final double cosang = Math.cos(ang);
-            rx = (ox * cosang) - (oy * sinang);
-            ry = (ox * sinang) + (oy * cosang);
-        } else {
-            rx = ox;
-            ry = oy;
-        }
+    public double distance(final double rxx, final double ryx, final double scalex) {
+
+        final double rx = rxx / scalex;
+        final double ry = ryx / scalex;
 
         // to take into account the scale factor
         // we need to extend the edge of the sprocket
         // by that much. Since all of these params
         // are distances from the origin, they scale
         // directly.
-        final double swp = wp * scale;
-        final double shp = hp * scale;
-        final double sh = h * scale;
-        final double sw = w * scale;
-        final double sr = r * scale; // the radius grows by the scale factor
+        // final double swp = wp * scale;
+        // final double shp = hp * scale;
+        // final double sh = h * scale;
+        // final double sw = w * scale;
+        // final double sr = r * scale; // the radius grows by the scale factor
 
         final double x = Math.abs(rx);
         final double y = Math.abs(ry);
 
         // first determine the region
         int region;
-        if (x > swp && y > shp)
+        if (x > wp && y > hp)
             region = 2;
-        else if (x > swp)
+        else if (x > wp)
             region = 1;
-        else if (y > shp)
+        else if (y > hp)
             region = 3;
         // need to find the cross product vector of
         // | i j k |
         // | x1 x2 0 |
         // | y1 y2 0 |
         // which is 0i - 0j + (x1y2 - x2y1)k
-        else if (((x * shp) - (y * swp)) > 0.0)
+        else if (((x * hp) - (y * wp)) > 0.0)
             region = 1;
         else
             region = 3;
 
-        final double sh2 = sh / 2.0;
-        final double sw2 = sw / 2.0;
+        final double h2 = h / 2.0;
+        final double w2 = w / 2.0;
 
         double dist;
         if (region == 1)
-            dist = Math.abs(x - sw2);
+            dist = Math.abs(x - w2);
         else if (region == 3)
-            dist = Math.abs(y - sh2);
+            dist = Math.abs(y - h2);
         else {
-            final double xp = x - swp;
-            final double yp = y - shp;
-            dist = Math.abs(Math.sqrt((xp * xp) + (yp * yp)) - sr);
+            final double xp = x - wp;
+            final double yp = y - hp;
+            dist = Math.abs(Math.sqrt((xp * xp) + (yp * yp)) - r);
         }
 
-        return dist;
+        return dist * scalex;
     }
 
     // This gradient calculation is currently unrotated.

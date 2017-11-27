@@ -29,7 +29,7 @@ import com.jiminger.image.geometry.PerpendicularLineCoordFit;
 import com.jiminger.image.houghspace.Transform;
 
 public class Frame {
-    public static final double worstEdgeStdDevAllowed = 1.0;
+    public static final double worstEdgeStdDevAllowedAt3200Dpi = 1.5;
 
     private final Transform.Fit fit;
     private final double centerFrameToCenterSprocketXmm;
@@ -45,8 +45,11 @@ public class Frame {
     public int rightmostCol = -1;
     public int topmostRow = 99999999;
     public int bottommostRow = -1;
+    public final double resolutiondpi;
+    public final double worstEdgeStdDevToConsider;
 
-    public Frame(final Transform.Fit fit, final FilmEdge sprocketEdge, final FilmEdge farEdge/* , int filmLayout */, final int filmType) {
+    public Frame(final Transform.Fit fit, final FilmEdge sprocketEdge, final FilmEdge farEdge/* , int filmLayout */, final int filmType,
+            final double resolutiondpi) {
         this.fit = fit;
         // this.filmLayout = filmLayout;
         this.filmType = filmType;
@@ -63,7 +66,8 @@ public class Frame {
 
         this.sprocketEdge = sprocketEdge;
         this.farEdge = farEdge;
-
+        this.resolutiondpi = resolutiondpi;
+        this.worstEdgeStdDevToConsider = (worstEdgeStdDevAllowedAt3200Dpi * resolutiondpi) / 3200.0;
     }
 
     public Mat cutFrame(final Mat image, final double resdpi,
@@ -72,12 +76,12 @@ public class Frame {
             final double scaleMult, final boolean rescale,
             final boolean correctrotation) {
         noCut = false;
-        if (farEdge == null || farEdge.stdDev > worstEdgeStdDevAllowed) {
+        if (farEdge == null || farEdge.stdDev > worstEdgeStdDevToConsider) {
             System.out.println("WARNING: far film edge for frame " + frameNum + " has a stdDev of " +
                     (farEdge == null ? "null" : Double.toString(farEdge.stdDev)) +
                     " and will not be used.");
 
-            if (sprocketEdge == null || sprocketEdge.stdDev > worstEdgeStdDevAllowed) {
+            if (sprocketEdge == null || sprocketEdge.stdDev > worstEdgeStdDevToConsider) {
                 System.out.println("WARNING: near film edge for frame " + frameNum + " has a stdDev of " +
                         (sprocketEdge == null ? "null" : Double.toString(sprocketEdge.stdDev)) +
                         " and will not be used.");
@@ -145,8 +149,8 @@ public class Frame {
     }
 
     public double calculateFrameWidthPix() {
-        if (farEdge == null || farEdge.stdDev > worstEdgeStdDevAllowed) {
-            if (sprocketEdge == null || sprocketEdge.stdDev > worstEdgeStdDevAllowed)
+        if (farEdge == null || farEdge.stdDev > worstEdgeStdDevToConsider) {
+            if (sprocketEdge == null || sprocketEdge.stdDev > worstEdgeStdDevToConsider)
                 return -1.0;
             else {
                 // The frame center in the image will happen along the sprocket hole line
