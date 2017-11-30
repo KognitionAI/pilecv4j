@@ -86,7 +86,7 @@ public abstract class CvRaster {
         });
     }
 
-    public static int numChannelValues(final CvRaster raster) {
+    public static int numChannelElementValues(final CvRaster raster) {
         switch (CvType.depth(raster.type)) {
             case CvType.CV_8S:
             case CvType.CV_8U:

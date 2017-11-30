@@ -33,6 +33,7 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
@@ -44,6 +45,7 @@ import com.jiminger.image.CvRaster.PixelAggregate;
 import com.jiminger.image.CvRaster.PixelToInts;
 import com.jiminger.image.ImageFile;
 import com.jiminger.image.Utils;
+import com.jiminger.image.calc.Histogram;
 import com.jiminger.image.geometry.PerpendicularLineCoordFit;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.WeightedPoint;
@@ -87,8 +89,8 @@ public class ExtractFrames {
     public static long tileCacheSize = defaultTileCacheSize * megaBytes;
     public static String sourceFileName = null;
     public static int resolutiondpi = 3200;
-    public static int tlow = 50;
-    public static int thigh = 200;
+    public static int tlowpct = 50;
+    public static double thighpct = 0.6;
     public static float sigma = 6.0f;
     public static int houghThreshold = 150;
     public static boolean reverseImage = false;
@@ -253,6 +255,7 @@ public class ExtractFrames {
         // Create a grayscale color model.
         timer.start();
         final Mat grayImage = convertToGray(origImage);
+        System.out.println("Gray is " + CvType.typeToString(grayImage.type()));
         if (writeDebugImages)
             ImageFile.writeImageFile(grayImage, outDir + File.separator + "gray.bmp");
         print("grayImage", grayImage);
@@ -267,53 +270,98 @@ public class ExtractFrames {
         // ------------------------------------------------------------
         timer.start();
         System.out.print("performing canny edge detection ... ");
+
         System.out.print("blurring ... ");
         // preblur 3,3 for 3200.
         int kernelSize = (int) Math.ceil(((double) resolutiondpi * 3) / 3200);
         if ((kernelSize & 0x01) == 0)
             kernelSize += 1;
+        if (kernelSize > 7)
+            kernelSize = 7;
         Imgproc.blur(grayImage, grayImage, new Size(kernelSize, kernelSize));
         if (writeDebugImages)
             ImageFile.writeImageFile(grayImage, outDir + File.separator + "blur.bmp");
+
+        // --------------------------------------
+        // Make the gradient images
+        // --------------------------------------
+        System.out.println("Performing Sobel deriv calculation");
+        System.out.print("Making gradient image ... ");
+        final Mat dx = new Mat();
+        final Mat dy = new Mat();
+        Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+        Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+        if (writeDebugImages) {
+            ImageFile.writeImageFile(dx, outDir + File.separator + "dx.tiff");
+            ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
+        }
+
+        // innefficent but whatever....
+        final CvRaster dxr = CvRaster.create(dx);
+        final CvRaster dyr = CvRaster.create(dy);
+        final int numPixelsInGradient = dxr.rows * dxr.cols;
+        final CvRaster dirs = CvRaster.create(dxr.rows, dxr.cols, CvType.CV_8UC1); // a byte raster to hold the dirs
+        final byte[] dirsa = (byte[]) dirs.data;
+        final short[] dxa = (short[]) dxr.data;
+        final short[] dya = (short[]) dyr.data;
+
+        // calculate the histogram
+        final CvRaster gradMag = CvRaster.create(dxr.rows, dxr.cols, CvType.CV_16UC1);
+        final short[] gradMagA = (short[]) gradMag.data;
+
+        for (int pos = 0; pos < numPixelsInGradient; pos++) {
+
+            // calculate the angle
+            final double dxv = dxa[pos];
+            final double dyv = 0.0 - dya[pos]; // flip y axis.
+            dirsa[pos] = angle_byte(dxv, dyv);
+
+            // calculate the magnitude
+            final double dxvd = dxv;
+            final double dyvd = dyv;
+            final double magSq = (dxvd * dxvd) + (dyvd * dyvd);
+            final double mag = Math.sqrt(magSq);
+
+            gradMagA[pos] = (short) (((int) mag) & 0xffff);
+        }
+
+        final Mat gradientDirImage = dirs.toMat();
+        gradientDirImage.put(0, 0, dirsa);
+        if (writeDebugImages) {
+            ImageFile.writeImageFile(gradientDirImage, outDir + File.separator + "gradDir.bmp");
+            ImageFile.writeImageFile(gradMag.toMat(), outDir + File.separator + "gradMag.tif");
+        }
+        System.out.println("done.");
+        print("dx", dx);
+        print("dy", dy);
+
+        // how many pixels have 200 or more
+        final Histogram gradMagHist = Histogram.makeHistogram(gradMag);
+        final int highLimit = (int) (gradMag.cols * gradMag.rows * thighpct / 100.0);
+        int tmpTotalPixCount = 0;
+
+        double thigh = 0.0;
+        for (int i = gradMagHist.histograms[0].length - 1; i >= 0; i--) {
+            tmpTotalPixCount += gradMagHist.histograms[0][i];
+            if (tmpTotalPixCount > highLimit) {
+                thigh = i;
+                break;
+            }
+        }
+
         System.out.print("canny ... ");
         final Mat edgeImage = new Mat();
 
-        Imgproc.Canny(grayImage, edgeImage, tlow, thigh, kernelSize, true);
+        final double tlow = (tlowpct / 100.0) * thigh;
+        System.out.println("High threshold for Canny hysteresis is " + thigh);
+        System.out.println("Low threshold for Canny hysteresis is " + tlow);
+        Imgproc.Canny(dx, dy, edgeImage, tlow, thigh);
+
         System.out.println("done.");
         if (writeDebugImages)
             ImageFile.writeImageFile(edgeImage, outDir + File.separator + "edge.bmp");
         print("edge", edgeImage);
         // --------------------------------------
-
-        // --------------------------------------
-        // Make the gradient images
-        // --------------------------------------
-        System.out.print("Making gradient image ... ");
-        final Mat dx = new Mat();
-        final Mat dy = new Mat();
-        Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0);
-        Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1);
-        if (writeDebugImages) {
-            ImageFile.writeImageFile(dx, outDir + File.separator + "dx.tiff");
-            ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
-        }
-        final short[] dxs = new short[dx.height() * dx.width()];
-        dx.get(0, 0, dxs);
-        final short[] dys = new short[dy.height() * dy.width()];
-        final byte[] dirs = new byte[dx.height() * dx.width()];
-        dy.get(0, 0, dys);
-        for (int pos = 0; pos < dxs.length; pos++) {
-            final double dxv = dxs[pos];
-            final double dyv = 0.0 - dys[pos];
-            dirs[pos] = angle_byte(dxv, dyv);
-        }
-        final Mat gradientDirImage = new Mat(dx.height(), dx.width(), CvType.CV_8UC1);
-        gradientDirImage.put(0, 0, dirs);
-        if (writeDebugImages)
-            ImageFile.writeImageFile(gradientDirImage, outDir + File.separator + "gradDir.bmp");
-        System.out.println("done.");
-        print("dx", dx);
-        print("dy", dy);
 
         final CvRaster edgeRaster = CvRaster.create(edgeImage);
         final CvRaster gradientDirRaster = CvRaster.create(gradientDirImage);
@@ -635,14 +683,17 @@ public class ExtractFrames {
             final String frameNumStr = (i < 10) ? ("0" + i) : Integer.toString(i);
 
             System.out.print(".");
-            Mat frameTiledImageMat = frame.cutFrame(
+            final Mat frameTiledImageMat = frame.cutFrame(
                     origImage, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, i, frameOversizeMult,
                     rescale, correctrotation);
 
             if (frameTiledImageMat != null) {
-                frameTiledImageMat = linearContrast(frameTiledImageMat, 0, 0.3);
-
+                // frameTiledImageMat = linearContrast(frameTiledImageMat, 0, 0.3);
                 ImageFile.writeImageFile(frameTiledImageMat, outDir + File.separator + "f" + frameNumStr + ".tif");
+                // final Mat tmp1 = convertToGray(frameTiledImageMat);
+                // final Mat tmp2 = new Mat();
+                // Imgproc.equalizeHist(tmp1, tmp2);
+                // ImageFile.writeImageFile(tmp2, outDir + File.separator + "f" + frameNumStr + ".tif");
             }
 
             frame.addProperties("frames." + Integer.toString(i), prop);
@@ -747,7 +798,7 @@ public class ExtractFrames {
 
         // line goes from lowerBound, 0.0 -> upperBound, maxPixVal
         final double range = upperBound - lowerBound;
-        final int numValues = CvRaster.numChannelValues(raster);
+        final int numValues = CvRaster.numChannelElementValues(raster);
         final int maxPixVal = numValues - 1;
         final double maxPixValD = maxPixVal;
         final int[] mapping = new int[numValues];
@@ -904,17 +955,17 @@ public class ExtractFrames {
         // clampValue = Integer.parseInt(tmps);
         // System.out.println(" Clamping grayscale image at " + clampValue);
 
-        tmps = cl.getProperty("tl");
+        tmps = cl.getProperty("tlpct");
         if (tmps != null)
-            tlow = Integer.parseInt(tmps);
+            tlowpct = Integer.parseInt(tmps);
 
-        tmps = cl.getProperty("th");
+        tmps = cl.getProperty("thpct");
         if (tmps != null)
-            thigh = Integer.parseInt(tmps);
+            thighpct = Double.parseDouble(tmps);
 
         System.out.println("   Canny details:");
-        System.out.println("     using a canny hysteresis high threshold of " + thigh);
-        System.out.println("       percent of max and a low threshold of " + tlow + " percent of high.");
+        System.out.println("     using a canny hysteresis high threshold of " + thighpct + " percent of maximum gradient value");
+        System.out.println("       percent of max and a low threshold of " + tlowpct + " percent of high.");
 
         tmps = cl.getProperty("sigma");
         if (tmps != null)
@@ -966,7 +1017,7 @@ public class ExtractFrames {
     private static void usage() {
         System.out.println(
                 "usage: java [javaargs] ExtractFrames -f filename -lr|-rl|-tb|-bt [-r " + resolutiondpi +
-                        "] [-cs " + defaultTileCacheSize + "] [-tl " + tlow + "] [-th " + thigh + "] [-sigma " +
+                        "] [-cs " + defaultTileCacheSize + "] [-tlpct " + tlowpct + "] [-thpct " + thighpct + "] [-sigma " +
                         sigma + "] [-ht " + houghThreshold + "] [-rev] [-8mm] [-fw #pix] [-fh #pix] [-over " +
                         frameOversizeMult + "] [-norotation] [-norescale] [-wm] [-ot jpeg] [-di]");
         System.out.println();
@@ -980,8 +1031,8 @@ public class ExtractFrames {
         System.out.println("  -rev means the strip was scanned inverted so the mirror image appears.");
         System.out.println("  -r specify the resolution (in dpi) of the source image.");
         System.out.println("  -cs image tile cache size in mega bytes.");
-        System.out.println("  -th high threshold % for the canny edge detector.");
-        System.out.println("  -tl low threshold % for the canny edge detector.");
+        System.out.println("  -thpct high threshold % of maximum gradient magnitude for the canny edge detector.");
+        System.out.println("  -tlpct low threshold % for the canny edge detector.");
         System.out.println("  -sigma std dev for the canny edge detector.");
         System.out.println("  -ht threshold for the pseudo-generalized hough transform.");
         System.out.println("  -8mm is specified to set film model for regular 8mm file. Default is super 8.");
