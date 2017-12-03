@@ -106,7 +106,7 @@ public class Transform {
 
     native public void houghTransformNative(byte[] image, int width, int height, byte[] gradientDirImage,
             byte[] mask, int maskw, int maskh, int maskcr, int maskcc,
-            short[] gradDirMask, int gdmaskw, int gdmaskh, int gdmaskcr, int gdmaskcc,
+            byte[] gradDirMask, int gdmaskw, int gdmaskh, int gdmaskcr, int gdmaskcc,
             double gradientDirSlopDeg, double quantFactor,
             short[] ret, int htwidth, int htheight, HoughSpaceEntryManager hsem,
             int houghThreshold, int rowstart, int rowend, int colstart, int colend);

@@ -24,8 +24,8 @@ public class SprocketHoleModel implements Model {
     // the variables need to be set to the height
     // and the width of the sprocket in pixels. This
     // should be derivable from the resolution.
-    private double h;
-    private double w;
+    private final double h;
+    private final double w;
 
     // the radius of the curvature to use at the corners
     // of the sprocket hole. This should be derivable
@@ -34,8 +34,11 @@ public class SprocketHoleModel implements Model {
 
     // hp (hprime) is h/2 - r
     // wp (wprime) is w/2 - r
-    private double hp;
-    private double wp;
+    private final double hp;
+    private final double wp;
+
+    private final double h2;
+    private final double w2;
 
     private final double resolutiondpmm;
 
@@ -54,21 +57,30 @@ public class SprocketHoleModel implements Model {
         final double widthmm = spec[FilmSpec.widthIndex];
         final double radiusmm = spec[FilmSpec.radiusIndex];
 
-        h = (heightmm * resolutiondpmm);
-        w = (widthmm * resolutiondpmm);
+        final double ht = (heightmm * resolutiondpmm);
+        final double wt = (widthmm * resolutiondpmm);
         r = radiusmm * resolutiondpmm;
-        hp = (h / 2.0) - r;
-        wp = (w / 2.0) - r;
+        final double h2t = (ht / 2.0);
+        final double w2t = (wt / 2.0);
+        final double hpt = h2t - r;
+        final double wpt = w2t - r;
 
         // this ought to be enought to make the
         // mask correct sideways.
-        if (!FilmSpec.isVertical(filmLayout)) {
-            double tmpd = h;
-            h = w;
-            w = tmpd;
-            tmpd = hp;
-            hp = wp;
-            wp = tmpd;
+        if (FilmSpec.isVertical(filmLayout)) {
+            h = ht;
+            w = wt;
+            h2 = h2t;
+            w2 = w2t;
+            hp = hpt;
+            wp = wpt;
+        } else {
+            h = wt;
+            w = ht;
+            hp = wpt;
+            wp = hpt;
+            h2 = w2t;
+            w2 = h2t;
         }
     }
 
@@ -110,9 +122,6 @@ public class SprocketHoleModel implements Model {
         else
             region = 3;
 
-        final double h2 = h / 2.0;
-        final double w2 = w / 2.0;
-
         double dist;
         if (region == 1)
             dist = Math.abs(x - w2);
@@ -130,7 +139,7 @@ public class SprocketHoleModel implements Model {
     // This gradient calculation is currently unrotated.
     // I wonder if this will need to change.
     @Override
-    public short gradient(final double ox, final double oy) {
+    public byte gradientDirection(final double ox, final double oy) {
         final double x = Math.abs(ox);
         final double y = Math.abs(oy);
 
@@ -147,13 +156,13 @@ public class SprocketHoleModel implements Model {
         // | x1 x2 0 |
         // | y1 y2 0 |
         // which is 0i - 0j + (x1y2 - x2y1)k
+        //
+        // this will tell us what side of the diagonal from
+        // the origin to wp, hp the point x, y is.
         else if (((x * hp) - (y * wp)) > 0.0)
             region = 1;
         else
             region = 3;
-
-        // double h2 = h / 2.0;
-        // double w2 = w / 2.0;
 
         // the direction should is always into the sprocket hole
         int gradDeg;
@@ -198,7 +207,7 @@ public class SprocketHoleModel implements Model {
         int gradByte = (int) Math.round((gradDeg * 256.0) / 360.0);
         if (gradByte >= 256)
             gradByte = 0;
-        return (short) gradByte;
+        return (byte) (gradByte & 0xff);
     }
 
     @Override

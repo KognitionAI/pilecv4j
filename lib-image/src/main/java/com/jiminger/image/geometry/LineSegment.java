@@ -6,9 +6,30 @@ public class LineSegment {
     public final Direction direction;
 
     /**
+     * This is the quantified gradient direction.
+     */
+    public final byte gradientDirection;
+
+    /**
      * Direction is whether or not to use the right hand rule (see http://mathworld.wolfram.com/Right-HandRule.html )
-     * indicating the direction is from p1 to p2, or whether or not the coordinate system ought to be considered
-     * left handed. This affect the gradient direction which is right handed by default.
+     * indicating the perpendicular direction is given by ((p2 - p1) / | p2 - p1 |) X [0, 0, 1]. For example:
+     * 
+     * if P1 = [0, 0]
+     *    P2 = [0, 1]
+     * 
+     * then P2 - P1 = [0, 1].
+     * Given the "Direction" = RIGHT, the perpendicular direction to the line would be: [0, 1, 0] X [0, 0, 1] =
+     * 
+     * | i   j  k |
+     * | 0   1  0 |
+     * | 0   0  1 |
+     * 
+     * which is = i ( 1*1 - 0*0) - j (0*1 - 0*0) + k (0*0 - 1*0) =
+     *            i1 + j0 +k0 => (1, 0).
+     *            
+     * So, given a "RIGHT" direction, if you stand on P1 and look at P2, the direction of the perpendicular
+     * will be from left to right. Stand on the origin, look "North" (toward P2 = [0, 1]) and the direction
+     * of the perpendicular will be toward [0, 1] (from your left, to your right). 
      */
     public static enum Direction {
         LEFT,
@@ -37,6 +58,8 @@ public class LineSegment {
         p2Trans = p2.subtract(p1);
         p2TransMagSq = p2Trans.magnitudeSquared();
         xbiased = Math.abs(p1.x() - p2.x()) > Math.abs(p1.y() - p2.y());
+
+        gradientDirection = p2Trans.crossWithZ(direction == Direction.LEFT).quantizedDirection();
     }
 
     public double distance(final Point x) {

@@ -17,18 +17,17 @@ public class SegmentModel implements Model {
 
     @Override
     public double distance(final double ox, final double oy, final double scale) {
-        final double minDist = Double.NEGATIVE_INFINITY;
-        final int minIndex = -1;
-        for (int i = 0; i < num; i++) {
-            final LineSegment seg = segments[i];
+        double minDist = Double.POSITIVE_INFINITY;
+        for (final LineSegment seg : segments) {
             final double dist = seg.distance(new SimplePoint(oy, ox));
+            if (dist < minDist)
+                minDist = dist;
         }
-        return 0;
+        return minDist;
     }
 
     @Override
-    public short gradient(final double ox, final double oy) {
-        // TODO Auto-generated method stub
+    public byte gradientDirection(final double ox, final double oy) {
         return 0;
     }
 

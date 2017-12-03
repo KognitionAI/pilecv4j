@@ -20,6 +20,8 @@
 package com.jiminger.image.geometry;
 
 public interface Point {
+    public static final double twoPi = Math.PI * 2.0;
+
     public double getRow();
 
     public double getCol();
@@ -67,5 +69,22 @@ public interface Point {
 
     default public Point multiply(final double scalar) {
         return new SimplePoint(getRow() * scalar, getCol() * scalar);
+    }
+
+    default public Point crossWithZ(final boolean flipZ) {
+        // !flipZ flipZ
+        // | i j k | | i j k |
+        // | x y 0 | | x y 0 |
+        // | 0 0 1 | | 0 0 -1 |
+        return flipZ ? new SimplePoint(-y(), x()) : new SimplePoint(y(), -x());
+    }
+
+    default public byte quantizedDirection() {
+        final double rawang = Math.atan2(y(), x());
+
+        // angle should be between -Pi and Pi. We want it from 0 -> 2Pi
+        final double ang = rawang < 0.0 ? rawang + Math.PI : rawang;
+        final int bytified = (int) Math.round((ang * 256.0) / twoPi);
+        return (bytified >= 256 ? 0 : (byte) (bytified & 0xff));
     }
 }

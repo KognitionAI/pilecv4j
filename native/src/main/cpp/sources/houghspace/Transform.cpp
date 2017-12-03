@@ -45,7 +45,7 @@ typedef BackMap* BackMapPtr;
 
 void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint width, jint height,
            unsigned char* mask, jint maskw, jint maskh, jint maskcr, jint maskcc,
-           short* gradientDirMask, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
+           unsigned char* gradientDirMask, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
            short gradientDirByte, short gradientDirSlopBytePM, double quantFactor,
            int houghThreshold = -1, short* interimHoughSpace = NULL, list<BackMapPtr>** backMapList = NULL);
 
@@ -56,7 +56,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
 (JNIEnv * env, jobject /*thethis*/, 
  jbyteArray imageA, jint width, jint /*height*/, jbyteArray gradientDirImageA,
  jbyteArray maskA, jint maskw, jint maskh, jint maskcr, jint maskcc,
- jshortArray gradientDirMaskA, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
+ jbyteArray gradientDirMaskA, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
  jdouble gradientDirSlopDeg, jdouble quantFactor, jshortArray retA, jint hswidth, jint hsheight,
  jobject hsem, jint houghThreshold, jint rowstart, jint rowend, jint colstart, jint colend)
 {
@@ -77,8 +77,8 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
     (jbyte*)(env->GetPrimitiveArrayCritical(gradientDirImageA, &isCopy));
   jbyte* mask = 
     (jbyte*)(env->GetPrimitiveArrayCritical(maskA, &isCopy));
-  jshort* gradientDirMask = 
-    (jshort*)(env->GetPrimitiveArrayCritical(gradientDirMaskA, &isCopy));
+  jbyte* gradientDirMask = 
+    (jbyte*)(env->GetPrimitiveArrayCritical(gradientDirMaskA, &isCopy));
   jshort* ret = 
     (jshort*)(env->GetPrimitiveArrayCritical(retA, &isCopy));
 
@@ -115,7 +115,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
         // can be if the center of the mask in placed over an edge in the original image.
         sweep(r,c,hsrow,hscol,interimht,hswidth,hsheight,
               (unsigned char*)mask,maskw,maskh,maskcr,maskcc,
-              (short*)gradientDirMask,gdmaskw,gdmaskh,gdmaskcr,gdmaskcc,
+              (unsigned char*)gradientDirMask,gdmaskw,gdmaskh,gdmaskcr,gdmaskcc,
               (short)(((unsigned char*)gradientDirImage)[pos]),
               gradientDirSlopBytePM, quantFactor);
       }
@@ -136,7 +136,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
 
         sweep(r,c,hsrow,hscol,ret,hswidth,hsheight,
               (unsigned char*)mask,maskw, maskh, maskcr, maskcc,
-              (short*)gradientDirMask,gdmaskw,gdmaskh,gdmaskcr,gdmaskcc,
+              (unsigned char*)gradientDirMask,gdmaskw,gdmaskh,gdmaskcr,gdmaskcc,
               (short)(((unsigned char*)gradientDirImage)[pos]),
               gradientDirSlopBytePM,quantFactor,-1,interimht,backMapListSpace);
       }
@@ -216,7 +216,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
 
 void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint width, jint height,
            unsigned char* mask, jint maskw, jint maskh, jint maskcr, jint maskcc,
-           short* gradDirMask, jint /*gdmaskw*/, jint /*gdmaskh*/, jint /*gdmaskcr*/, jint /*gdmaskcc*/,
+           unsigned char* gradDirMask, jint /*gdmaskw*/, jint /*gdmaskh*/, jint /*gdmaskcr*/, jint /*gdmaskcc*/,
            short gradientDirByte, short gradientDirSlopBytePM,
            double /*quantFactor*/,int houghThreshold,short* interimHoughSpace, 
            list<BackMapPtr>** backMapListSpace)

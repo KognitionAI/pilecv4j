@@ -43,6 +43,49 @@ import org.slf4j.LoggerFactory;
 public class LibraryLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(LibraryLoader.class);
 
+    public static void init() {}
+
+    static {
+        final List<URL> iss = new ArrayList<>();
+        try {
+            final Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
+            while (systemResources.hasMoreElements())
+                iss.add(systemResources.nextElement());
+        } catch (final IOException e) {
+            final String message = "Couldn't load the com.jiminger native library. Couldn't find the com.jiminger.lib.properties files on the classpath:";
+            LOGGER.error(message, e);
+            throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
+        }
+
+        // All we're going to do here is load the library from a jar file
+
+        if (iss.size() == 0) {
+            LOGGER.warn("Couldn't find any com.jiminger native libraries.");
+        } else {
+            for (final URL propFile : iss) {
+                LOGGER.debug("Loading native library from: {}", propFile);
+                final Properties libProps = new Properties();
+
+                try (InputStream propFileIs = propFile.openStream()) {
+                    libProps.load(propFileIs);
+                } catch (final IOException e) {
+                    final String message = "Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:";
+                    LOGGER.error(message, e);
+                    throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
+                }
+
+                LOGGER.debug("Properties for {} are: {}", propFile, libProps);
+
+                final String libName = libProps.getProperty("library");
+
+                final File libFile = getLibFile(libName);
+
+                LOGGER.debug("Loading \"{}\" as \"{}\"", libName, libFile.getAbsolutePath());
+                System.load(libFile.getAbsolutePath());
+            }
+        }
+    }
+
     private LibraryLoader() {}
 
     private static MessageDigest getDigestSilent() {
@@ -56,12 +99,12 @@ public class LibraryLoader {
     }
 
     @FunctionalInterface
-    public static interface SupplierThrows<R, E extends Throwable> {
+    private static interface SupplierThrows<R, E extends Throwable> {
         public R get() throws E;
     }
 
     @FunctionalInterface
-    public static interface Nothing<E extends Throwable> {
+    private static interface Nothing<E extends Throwable> {
         public void doIt() throws E;
     }
 
@@ -168,49 +211,6 @@ public class LibraryLoader {
 
         return getLibFile(libName, libMD5);
     }
-
-    static {
-        final List<URL> iss = new ArrayList<>();
-        try {
-            final Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
-            while (systemResources.hasMoreElements())
-                iss.add(systemResources.nextElement());
-        } catch (final IOException e) {
-            final String message = "Couldn't load the com.jiminger native library. Couldn't find the com.jiminger.lib.properties files on the classpath:";
-            LOGGER.error(message, e);
-            throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
-        }
-
-        // All we're going to do here is load the library from a jar file
-
-        if (iss.size() == 0) {
-            LOGGER.warn("Couldn't find any com.jiminger native libraries.");
-        } else {
-            for (final URL propFile : iss) {
-                LOGGER.debug("Loading native library from: {}", propFile);
-                final Properties libProps = new Properties();
-
-                try (InputStream propFileIs = propFile.openStream()) {
-                    libProps.load(propFileIs);
-                } catch (final IOException e) {
-                    final String message = "Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:";
-                    LOGGER.error(message, e);
-                    throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
-                }
-
-                LOGGER.debug("Properties for {} are: {}", propFile, libProps);
-
-                final String libName = libProps.getProperty("library");
-
-                final File libFile = getLibFile(libName);
-
-                LOGGER.debug("Loading \"{}\" as \"{}\"", libName, libFile.getAbsolutePath());
-                System.load(libFile.getAbsolutePath());
-            }
-        }
-    }
-
-    public static void init() {}
 
     private static InputStream getInputStream(final String resource) {
         // I need to find the library. Let's start with the "current" classloader.

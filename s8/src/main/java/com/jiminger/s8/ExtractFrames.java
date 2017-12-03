@@ -405,8 +405,8 @@ public class ExtractFrames {
         // // for debugging purposes
         // if (writeDebugImages)
         // ImageFile.writeImageFile(transform.mask.getMaskImage(), outDir + File.separator + "tmpmask.bmp");
-        // if (writeDebugImages)
-        // ImageFile.writeImageFile(transform.mask.getMaskImage(), outDir + File.separator + "tmpgradmask.bmp");
+        if (writeDebugImages)
+            ImageFile.writeImageFile(transform.gradDirMask.getMaskImage(), outDir + File.separator + "tmpgradmask.bmp");
 
         // Execute the hough transform on the edge image
         System.out.print("executing hough transform (" + rowstart + "->" +

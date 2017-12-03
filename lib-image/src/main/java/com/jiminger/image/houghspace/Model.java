@@ -64,11 +64,18 @@ public interface Model {
 
     /**
     * This method should return the gradient direction expected at the provided
-    *  pixel if it is on an edge that makes up the object being searched for.
-    *  Currently the result should be in degrees. quantized to a one degree
-    *  level.
+    *  pixel. If the pixel isn't on an edge it should return the gradient at the
+    *  closest edge. The gradient should be quantized to 8-bits unsigned. In other
+    *  words, from 0 to 255. 0 is in the direction parallel to the positive x-axis.
+    *  180 degrees should be parallel to the x-axis in the negative direction and
+    *  would be quantized as:
+    *  <code>
+    *     int q = (int) Math.round((180 * 256)/360);
+    *     if (q == 256) q = 0;
+    *     return (byte)(q & 0xff);
+    *  </code>
     */
-    public short gradient(double ox, double oy);
+    public byte gradientDirection(double ox, double oy);
 
     /**
     * This should return the extent of the model (at a scale of 1.0)
