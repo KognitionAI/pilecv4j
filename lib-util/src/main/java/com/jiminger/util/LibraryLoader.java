@@ -20,12 +20,14 @@
 package com.jiminger.util;
 
 import java.io.BufferedInputStream;
-import java.io.EOFException;
+import java.io.BufferedReader;
+import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -43,10 +45,132 @@ public class LibraryLoader {
 
     private LibraryLoader() {}
 
-    static {
-        List<URL> iss = null;
+    private static MessageDigest getDigestSilent() {
+        try {
+            return java.security.MessageDigest.getInstance("MD5");
+        } catch (final NoSuchAlgorithmException nsa) {
+            final String message = "Missing MD5 algorithm.";
+            LOGGER.error(message);
+            throw new UnsatisfiedLinkError(message);
+        }
+    }
 
-        iss = new ArrayList<>();
+    @FunctionalInterface
+    public static interface SupplierThrows<R, E extends Throwable> {
+        public R get() throws E;
+    }
+
+    @FunctionalInterface
+    public static interface Nothing<E extends Throwable> {
+        public void doIt() throws E;
+    }
+
+    private static <R> R rethrowIOException(final SupplierThrows<R, IOException> suppl, final String libName) {
+        try {
+            return suppl.get();
+        } catch (final IOException ioe) {
+            final String message = "Couldn't load the library identified as the com.jiminger native library (" + libName + "):";
+            LOGGER.error(message, ioe);
+            throw new UnsatisfiedLinkError(message + ioe.getLocalizedMessage());
+        }
+    }
+
+    private static void rethrowIOException(final Nothing<IOException> suppl, final String libName) {
+        try {
+            suppl.doIt();
+        } catch (final IOException ioe) {
+            final String message = "Couldn't load the library identified as the com.jiminger native library (" + libName + "):";
+            LOGGER.error(message, ioe);
+            throw new UnsatisfiedLinkError(message + ioe.getLocalizedMessage());
+        }
+    }
+
+    private static File getLibFile(final String libName, final String libMD5) {
+        final String libSuffix = libName.substring(libName.lastIndexOf('.'));
+
+        final File tmpFile = rethrowIOException(() -> File.createTempFile("com.jiminger", libSuffix), libName);
+
+        try (Closeable tmpFileCleanup = () -> tmpFile.delete()) {
+            final File tmpDir = rethrowIOException(() -> tmpFile.getParentFile(), libName);
+
+            if (libMD5 != null) {
+                final String finalFileNameOfExportedDll = "com.jiminger." + libName + "." + libMD5 + libSuffix;
+                final File finalFileOfExportedDll = new File(tmpDir, finalFileNameOfExportedDll);
+                // if the file is already there then we can skip reading it from the jar
+                if (!finalFileOfExportedDll.exists()) {
+                    // we need to copy it to the final location.
+                    rethrowIOException(() -> {
+                        try (InputStream is = getInputStream(libName)) {
+                            FileUtils.copyInputStreamToFile(is, finalFileOfExportedDll);
+                        }
+                    }, libName);
+                }
+                return finalFileOfExportedDll;
+            } else {
+                LOGGER.warn("The library {} doesn't appear to have an MD5. This will be slower.");
+
+                // otherwise we'll need to copy the file to a temp file while calculating the MD5.
+                final MessageDigest digest = getDigestSilent();
+
+                // calculate the MD5 while moving the DLL from the jar file to the temp file.
+                rethrowIOException(() -> {
+                    try (InputStream is = new BufferedInputStream(new DigestInputStream(getInputStream(libName), digest))) {
+                        LOGGER.debug("Creating MD5 of {} using temp file: {}", libName, tmpFile);
+
+                        FileUtils.copyInputStreamToFile(is, tmpFile);
+                    }
+                }, libName);
+
+                final String md5 = StringUtils.bytesToHex(digest.digest());
+                LOGGER.debug("MD5 of {} is: {}", libName, md5);
+                final String finalFileNameOfExportedDll = "com.jiminger." + libName + "." + md5 + libSuffix;
+                final File finalFileOfExportedDll = new File(tmpDir, finalFileNameOfExportedDll);
+
+                if (finalFileOfExportedDll.exists()) {
+                    LOGGER.debug("dynamic lib file {} already exists.", finalFileOfExportedDll);
+                    return finalFileOfExportedDll;
+                }
+
+                // we need to use the tmp file.
+                if (!tmpFile.renameTo(finalFileOfExportedDll)) {
+                    final String message = "Failed to rename the library file from \"" + tmpFile.getAbsolutePath() + "\" to \""
+                            + finalFileOfExportedDll.getAbsolutePath() + "\".";
+                    LOGGER.error(message);
+                    throw new UnsatisfiedLinkError(message);
+                }
+
+                return finalFileOfExportedDll;
+            }
+        } catch (final IOException ioe) {
+            final String message = "Couldn't load the library identified as the com.jiminger native library (" + libName + "):";
+            LOGGER.error(message, ioe);
+            throw new UnsatisfiedLinkError(message + ioe.getLocalizedMessage());
+        }
+
+    }
+
+    private static File getLibFile(final String libName) {
+        String libMD5 = null;
+
+        // see if there's an MD5 for this already.
+        try (InputStream md5Is = getInputStream(libName + ".MD5")) {
+            if (md5Is != null) {
+                try (final BufferedReader br = new BufferedReader(new InputStreamReader(md5Is, Charset.defaultCharset()))) {
+                    libMD5 = br.readLine();
+                    while (libMD5 != null && libMD5.isEmpty())
+                        libMD5 = br.readLine();
+                }
+            }
+        } catch (final IOException ioe) {
+            LOGGER.debug("Failed to get md5 file for {}", libName, ioe);
+            libMD5 = null;
+        }
+
+        return getLibFile(libName, libMD5);
+    }
+
+    static {
+        final List<URL> iss = new ArrayList<>();
         try {
             final Enumeration<URL> systemResources = ClassLoader.getSystemResources("com.jiminger.lib.properties");
             while (systemResources.hasMoreElements())
@@ -59,119 +183,29 @@ public class LibraryLoader {
 
         // All we're going to do here is load the library from a jar file
 
-        if (iss == null || iss.size() == 0) {
+        if (iss.size() == 0) {
             LOGGER.warn("Couldn't find any com.jiminger native libraries.");
         } else {
+            for (final URL propFile : iss) {
+                LOGGER.debug("Loading native library from: {}", propFile);
+                final Properties libProps = new Properties();
 
-            try {
-                final MessageDigest digest = java.security.MessageDigest.getInstance("MD5");
-
-                for (final URL propFile : iss) {
-                    LOGGER.debug("Loading native library from: {}", propFile);
-                    final Properties libProps = new Properties();
-
-                    try (InputStream propFileIs = propFile.openStream()) {
-                        libProps.load(propFileIs);
-                    } catch (final IOException e) {
-                        final String message = "Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:";
-                        LOGGER.error(message, e);
-                        throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
-                    }
-
-                    LOGGER.debug("Properties for {} are: {}", propFile, libProps);
-
-                    final String libName = libProps.getProperty("library");
-                    final String libSuffix = libName.substring(libName.lastIndexOf('.'));
-                    File tmpFile = null;
-                    try (InputStream is = new DigestInputStream(getInputStream(libName), digest);) {
-                        try {
-                            tmpFile = File.createTempFile("com.jiminger", libSuffix);
-                            LOGGER.debug("Creating MD5 of {} using temp file: {}", propFile, tmpFile);
-                        } catch (final IOException e) {
-                            final String message = "Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:";
-                            LOGGER.error(message, e);
-                            throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
-                        }
-
-                        try {
-                            FileUtils.copyInputStreamToFile(is, tmpFile);
-                        } catch (final IOException e) {
-                            final String message = "Couldn't load the com.jiminger native library. Couldn't copy the library out of the jar:";
-                            LOGGER.error(message, e);
-                            throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
-                        }
-                    } catch (final IOException ioe) {
-                        final String message = "Couldn't load the library identified as the com.jiminger native library (" + libName + "):";
-                        LOGGER.error(message, ioe);
-                        throw new UnsatisfiedLinkError(message + ioe.getLocalizedMessage());
-                    }
-
-                    final String md5 = StringUtils.bytesToHex(digest.digest());
-                    LOGGER.debug("MD5 of {} is: {}", propFile, md5);
-
-                    final File tmpDir = tmpFile.getParentFile();
-                    final String fname = "com.jiminger." + libName + "." + md5 + libSuffix;
-
-                    final File libFile = new File(tmpDir, fname);
-                    LOGGER.debug("Copying dynamic lib from {} to {}", propFile, libFile);
-                    if (libFile.exists()) {
-                        LOGGER.debug("dynamic lib file {} already exists.", libFile);
-
-                        boolean theSame = false;
-
-                        // make sure it has the same md5.
-                        if (libFile.length() == tmpFile.length()) {
-                            // check the md5
-                            final long numBytes = libFile.length();
-                            final MessageDigest checkDigest = java.security.MessageDigest.getInstance("MD5");
-                            try (final InputStream is = new DigestInputStream(new BufferedInputStream(new FileInputStream(libFile)), checkDigest)) {
-                                for (long i = 0; i < numBytes; i++)
-                                    if (is.read() == -1)
-                                        throw new EOFException();
-                            } catch (final IOException ioe) {
-                                LOGGER.warn("Existing lib file read failed. Attempting to simply overwrite it.");
-                            }
-
-                            final String libMd5 = StringUtils.bytesToHex(checkDigest.digest());
-
-                            if (libMd5.equals(md5))
-                                theSame = true;
-                        }
-
-                        if (theSame) {
-                            if (!tmpFile.delete())
-                                LOGGER.warn("Couldn't delete temporary file:" + tmpFile.getAbsolutePath());
-                        } else {
-                            // attempt to overwrite.
-                            if (!libFile.delete()) {
-                                final String message = "Couldn't delete the existing library file but it's not correct.";
-                                LOGGER.error(message);
-                                throw new UnsatisfiedLinkError(message);
-                            }
-
-                            if (!tmpFile.renameTo(libFile)) {
-                                final String message = "Failed to rename the library file from \"" + tmpFile.getAbsolutePath() + "\" to \""
-                                        + libFile.getAbsolutePath() + "\".";
-                                LOGGER.error(message);
-                                throw new UnsatisfiedLinkError(message);
-                            }
-                        }
-                    } else {
-                        LOGGER.debug("renaming dynamic lib file {} to ().", tmpFile, libFile);
-                        if (!tmpFile.renameTo(libFile)) {
-                            final String message = "Failed to rename the library file from \"" + tmpFile.getAbsolutePath() + "\" to \""
-                                    + libFile.getAbsolutePath() + "\".";
-                            LOGGER.error(message);
-                            throw new UnsatisfiedLinkError(message);
-                        }
-                    }
-                    LOGGER.debug("Loading \"{}\" as \"{}\"", libName, libFile.getAbsolutePath());
-                    System.load(libFile.getAbsolutePath());
+                try (InputStream propFileIs = propFile.openStream()) {
+                    libProps.load(propFileIs);
+                } catch (final IOException e) {
+                    final String message = "Couldn't load the com.jiminger native library. Couldn't load the properties out of the jar:";
+                    LOGGER.error(message, e);
+                    throw new UnsatisfiedLinkError(message + e.getLocalizedMessage());
                 }
-            } catch (final NoSuchAlgorithmException nsa) {
-                final String message = "Missing MD5 algorithm.";
-                LOGGER.error(message);
-                throw new UnsatisfiedLinkError(message);
+
+                LOGGER.debug("Properties for {} are: {}", propFile, libProps);
+
+                final String libName = libProps.getProperty("library");
+
+                final File libFile = getLibFile(libName);
+
+                LOGGER.debug("Loading \"{}\" as \"{}\"", libName, libFile.getAbsolutePath());
+                System.load(libFile.getAbsolutePath());
             }
         }
     }

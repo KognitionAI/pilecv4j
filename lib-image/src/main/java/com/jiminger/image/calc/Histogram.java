@@ -10,8 +10,7 @@ public class Histogram {
     public final int[][] histograms;
 
     private Histogram(final CvRaster raster) {
-        final int channels = raster.channels;
-        histograms = new int[channels][CvRaster.numChannelElementValues(raster)];
+        histograms = new int[raster.channels][CvRaster.numChannelElementValues(raster)];
     }
 
     public static PixelAggregate<Object, Histogram> makeAggregate(final CvRaster raster) {

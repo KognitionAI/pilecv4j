@@ -13,14 +13,15 @@
         <include>*.pdb</include>
         <include>*.so</include>
         <include>*.dylib</include>
-      </includes> 
-    </fileSet>
-    <fileSet>
-      <directory>${platform}</directory>
-      <outputDirectory>/</outputDirectory>
-      <includes> 
-        <include>com.jiminger.lib.properties</include>
+        <include>*.MD5</include>
       </includes> 
     </fileSet>
   </fileSets>
+  <files>
+    <file>
+      <source>${platform}/com.jiminger.lib.properties</source>
+      <outputDirectory>/</outputDirectory>
+      <filtered>true</filtered>
+    </file>
+  </files>
 </assembly>
