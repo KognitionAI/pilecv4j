@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Properties;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -63,7 +64,7 @@ public class LibraryLoader {
             LOGGER.warn("Couldn't find any com.jiminger native libraries.");
         } else {
             for (final URL propFile : iss) {
-                LOGGER.debug("Loading native library from: {}", propFile);
+                LOGGER.debug("Loading native libraries from: {}", propFile);
                 final Properties libProps = new Properties();
 
                 try (InputStream propFileIs = propFile.openStream()) {
@@ -76,12 +77,23 @@ public class LibraryLoader {
 
                 LOGGER.debug("Properties for {} are: {}", propFile, libProps);
 
-                final String libName = libProps.getProperty("library");
+                final List<String> libs = libProps.entrySet().stream()
+                        .filter(e -> {
+                            final String k = ((String) e.getKey());
+                            return k.startsWith("library.") || k.equals("library");
+                        })
+                        .map(e -> (String) e.getValue())
+                        .collect(Collectors.toList());
 
-                final File libFile = getLibFile(libName);
+                if (libs.size() == 0)
+                    LOGGER.error("There are no library entries in the property file {} with contents {}", propFile, libProps);
 
-                LOGGER.debug("Loading \"{}\" as \"{}\"", libName, libFile.getAbsolutePath());
-                System.load(libFile.getAbsolutePath());
+                for (final String libName : libs) {
+                    final File libFile = getLibFile(libName);
+
+                    LOGGER.debug("Loading \"{}\" as \"{}\"", libName, libFile.getAbsolutePath());
+                    System.load(libFile.getAbsolutePath());
+                }
             }
         }
     }

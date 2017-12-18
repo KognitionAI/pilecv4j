@@ -43,7 +43,7 @@ public interface Model {
         //
         // Since theta means to rotate the entire model by that angle
         // (counter clockwise around the center) then, instead, we
-        // can simply rotate the point around the center of the sprocket
+        // can simply rotate the point around the center of the model
         // in the other direction (clockwise) before measuring the
         // distance - that is, we will simply negate theta
         final double ang = -theta;

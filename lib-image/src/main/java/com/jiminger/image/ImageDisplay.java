@@ -5,6 +5,10 @@ import static org.opencv.core.CvType.CV_16U;
 import static org.opencv.core.CvType.CV_8S;
 import static org.opencv.core.CvType.CV_8U;
 
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Image;
@@ -26,127 +30,240 @@ import org.opencv.core.Mat;
 
 import com.jiminger.util.LibraryLoader;
 
-public class ImageDisplay {
+public class ImageDisplay implements AutoCloseable {
     static {
         LibraryLoader.init();
     }
 
-    public static void main(final String[] args) throws Exception {
-        final Display display = new Display();
-        final Shell shell = new Shell(display);
-        shell.setLayout(new FillLayout());
-        Image originalImage = null;
-        final FileDialog dialog = new FileDialog(shell, SWT.OPEN);
-        dialog.setText("Open an image file or cancel");
-        final String string = dialog.open();
+    private final AtomicReference<Image> currentImageRef = new AtomicReference<Image>(null);
+    private Display display;
+    private Shell shell;
+    private Canvas canvas;
+    private final CountDownLatch eventLoopDoneLatch = new CountDownLatch(1);
+    private final AtomicBoolean done = new AtomicBoolean(false);
+    private Thread eventThread = null;
 
-        Mat iioimage = null;
-        if (string != null) {
-            iioimage = ImageFile.readMatFromFile(string);
-            originalImage = new Image(display, convertToSWT(iioimage));
+    private static interface AcNoThrow extends AutoCloseable {
+        @Override
+        public void close();
+    }
+
+    private static class Disposable<T> implements AcNoThrow {
+        private final T it;
+        private final AcNoThrow ac;
+
+        public Disposable(final T it, final AcNoThrow ac) {
+            this.it = it;
+            this.ac = ac;
         }
-        if (originalImage == null) {
-            final int width = 150, height = 200;
-            originalImage = new Image(display, width, height);
-            final GC gc = new GC(originalImage);
-            gc.fillRectangle(0, 0, width, height);
-            gc.drawLine(0, 0, width, height);
-            gc.drawLine(0, height, width, 0);
-            gc.drawText("Default Image", 10, 10);
-            gc.dispose();
+
+        public T get() {
+            return it;
         }
-        final Image image = originalImage;
-        final Point origin = new Point(0, 0);
-        final Canvas canvas = new Canvas(shell, SWT.NO_BACKGROUND |
-                SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL);
-        // final WritableRaster raster = iioimage.getRaster();
-        // canvas.addMouseListener(new MouseListener() {
-        // @Override
-        // public void mouseUp(final MouseEvent e) {}
-        //
-        // @Override
-        // public void mouseDown(final MouseEvent e) {
-        // final Object pixelArray = raster.getDataElements(e.x, e.y, (Object) null);
-        //
-        // System.out.println("(" + e.x + ", " + e.y + ")" + Arrays.toString((byte[]) pixelArray));
-        // }
-        //
-        // @Override
-        // public void mouseDoubleClick(final MouseEvent e) {}
-        // });
-        final ScrollBar hBar = canvas.getHorizontalBar();
-        hBar.addListener(SWT.Selection, new Listener() {
-            @Override
-            public void handleEvent(final Event e) {
-                final int hSelection = hBar.getSelection();
-                final int destX = -hSelection - origin.x;
-                final Rectangle rect = image.getBounds();
-                canvas.scroll(destX, 0, 0, 0, rect.width, rect.height, false);
-                origin.x = -hSelection;
-            }
-        });
-        final ScrollBar vBar = canvas.getVerticalBar();
-        vBar.addListener(SWT.Selection, new Listener() {
-            @Override
-            public void handleEvent(final Event e) {
-                final int vSelection = vBar.getSelection();
-                final int destY = -vSelection - origin.y;
-                final Rectangle rect = image.getBounds();
-                canvas.scroll(0, destY, 0, 0, rect.width, rect.height, false);
-                origin.y = -vSelection;
-            }
-        });
-        canvas.addListener(SWT.Resize, new Listener() {
-            @Override
-            public void handleEvent(final Event e) {
-                final Rectangle rect = image.getBounds();
-                final Rectangle client = canvas.getClientArea();
-                hBar.setMaximum(rect.width);
-                vBar.setMaximum(rect.height);
-                hBar.setThumb(Math.min(rect.width, client.width));
-                vBar.setThumb(Math.min(rect.height, client.height));
-                final int hPage = rect.width - client.width;
-                final int vPage = rect.height - client.height;
-                int hSelection = hBar.getSelection();
-                int vSelection = vBar.getSelection();
-                if (hSelection >= hPage) {
-                    if (hPage <= 0)
-                        hSelection = 0;
-                    origin.x = -hSelection;
+
+        @Override
+        public void close() {
+            ac.close();
+        }
+    }
+
+    private static Disposable<GC> disposable(final GC obj) {
+        return new Disposable<GC>(obj, () -> obj.dispose());
+    }
+
+    public ImageDisplay() {
+        this(null);
+    }
+
+    public ImageDisplay(final Mat mat) {
+        setup(mat);
+    }
+
+    private ImageDisplay(final boolean dontInitMe) {
+        shell = new Shell(display);
+        shell.setLayout(new FillLayout());
+    }
+
+    private void setup(final Mat mat) {
+        final CountDownLatch latch = new CountDownLatch(1);
+        eventThread = new Thread(() -> {
+            try {
+                display = new Display();
+                shell = new Shell(display);
+                shell.setLayout(new FillLayout());
+
+                Image currentImage = null;
+
+                if (mat != null) {
+                    currentImage = new Image(display, convertToSWT(mat));
                 }
-                if (vSelection >= vPage) {
-                    if (vPage <= 0)
-                        vSelection = 0;
-                    origin.y = -vSelection;
+
+                if (currentImage == null) {
+                    final int width = 150, height = 200;
+                    currentImage = new Image(display, width, height);
+                    try (Disposable<GC> disposeable = disposable(new GC(currentImage))) {
+                        final GC gc = disposeable.get();
+                        gc.fillRectangle(0, 0, width, height);
+                        gc.drawLine(0, 0, width, height);
+                        gc.drawLine(0, height, width, 0);
+                        gc.drawText("Default Image", 10, 10);
+                    }
                 }
+
+                final Point origin = new Point(0, 0);
+                canvas = new Canvas(shell, SWT.NO_BACKGROUND |
+                        SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL);
+
+                final ScrollBar hBar = canvas.getHorizontalBar();
+                hBar.addListener(SWT.Selection, new Listener() {
+                    @Override
+                    public void handleEvent(final Event e) {
+                        final Image currentImage = currentImageRef.get();
+                        if (currentImage != null) {
+                            final int hSelection = hBar.getSelection();
+                            final int destX = -hSelection - origin.x;
+                            final Rectangle rect = currentImage.getBounds();
+                            canvas.scroll(destX, 0, 0, 0, rect.width, rect.height, false);
+                            origin.x = -hSelection;
+                        }
+                    }
+                });
+                final ScrollBar vBar = canvas.getVerticalBar();
+                vBar.addListener(SWT.Selection, new Listener() {
+                    @Override
+                    public void handleEvent(final Event e) {
+                        final Image currentImage = currentImageRef.get();
+                        if (currentImage != null) {
+                            final int vSelection = vBar.getSelection();
+                            final int destY = -vSelection - origin.y;
+                            final Rectangle rect = currentImage.getBounds();
+                            canvas.scroll(0, destY, 0, 0, rect.width, rect.height, false);
+                            origin.y = -vSelection;
+                        }
+                    }
+                });
+                canvas.addListener(SWT.Resize, new Listener() {
+                    @Override
+                    public void handleEvent(final Event e) {
+                        final Image currentImage = currentImageRef.get();
+                        if (currentImage != null) {
+                            final Rectangle rect = currentImage.getBounds();
+                            final Rectangle client = canvas.getClientArea();
+                            hBar.setMaximum(rect.width);
+                            vBar.setMaximum(rect.height);
+                            hBar.setThumb(Math.min(rect.width, client.width));
+                            vBar.setThumb(Math.min(rect.height, client.height));
+                            final int hPage = rect.width - client.width;
+                            final int vPage = rect.height - client.height;
+                            int hSelection = hBar.getSelection();
+                            int vSelection = vBar.getSelection();
+                            if (hSelection >= hPage) {
+                                if (hPage <= 0)
+                                    hSelection = 0;
+                                origin.x = -hSelection;
+                            }
+                            if (vSelection >= vPage) {
+                                if (vPage <= 0)
+                                    vSelection = 0;
+                                origin.y = -vSelection;
+                            }
+                            canvas.redraw();
+                        }
+                    }
+                });
+                canvas.addListener(SWT.Paint, new Listener() {
+                    @Override
+                    public void handleEvent(final Event e) {
+                        final Image currentImage = currentImageRef.get();
+                        if (currentImage != null) {
+
+                            final GC gc = e.gc;
+                            gc.drawImage(currentImage, origin.x, origin.y);
+                            final Rectangle rect = currentImage.getBounds();
+                            final Rectangle client = canvas.getClientArea();
+                            final int marginWidth = client.width - rect.width;
+                            if (marginWidth > 0) {
+                                gc.fillRectangle(rect.width, 0, marginWidth, client.height);
+                            }
+                            final int marginHeight = client.height - rect.height;
+                            if (marginHeight > 0) {
+                                gc.fillRectangle(0, rect.height, client.width, marginHeight);
+                            }
+                        }
+                    }
+                });
+                shell.open();
+                latch.countDown();
+                while (!shell.isDisposed() && !done.get()) {
+                    if (!display.readAndDispatch())
+                        display.sleep();
+                }
+            } finally {
+                if (!shell.isDisposed()) {
+                    final Image prev = currentImageRef.getAndSet(null);
+                    prev.dispose();
+                    canvas.dispose();
+                    shell.dispose();
+                    display.dispose();
+                }
+                eventLoopDoneLatch.countDown();
+            }
+        }, "SWT Event Loop");
+        eventThread.start();
+        try {
+            latch.await();
+        } catch (final InterruptedException ie) {
+
+        }
+    }
+
+    public void update(final Mat image) {
+        final ImageData next = convertToSWT(image);
+        Display.getDefault().syncExec(() -> {
+            final Image prev = currentImageRef.getAndSet(new Image(display, next));
+            if (prev != null)
+                prev.dispose();
+            if (canvas != null)
                 canvas.redraw();
-            }
         });
-        canvas.addListener(SWT.Paint, new Listener() {
-            @Override
-            public void handleEvent(final Event e) {
-                final GC gc = e.gc;
-                gc.drawImage(image, origin.x, origin.y);
-                final Rectangle rect = image.getBounds();
-                final Rectangle client = canvas.getClientArea();
-                final int marginWidth = client.width - rect.width;
-                if (marginWidth > 0) {
-                    gc.fillRectangle(rect.width, 0, marginWidth, client.height);
+    }
+
+    @Override
+    public void close() {
+        if (!done.get()) {
+            done.set(true);
+            Display.getDefault().syncExec(() -> {
+                if (Thread.currentThread() == eventThread) {
+                    if (canvas != null) {
+                        canvas.dispose();
+                        final Image img = currentImageRef.getAndSet(null);
+                        if (img != null)
+                            img.dispose();
+                        display.dispose();
+                    }
                 }
-                final int marginHeight = client.height - rect.height;
-                if (marginHeight > 0) {
-                    gc.fillRectangle(0, rect.height, client.width, marginHeight);
-                }
-            }
-        });
-        // shell.setSize (200, 150);
-        shell.open();
-        while (!shell.isDisposed()) {
-            if (!display.readAndDispatch())
-                display.sleep();
+            });
         }
-        originalImage.dispose();
-        display.dispose();
+    }
+
+    public void waitUntilClosed() throws InterruptedException {
+        eventLoopDoneLatch.await();
+    }
+
+    public static void main(final String[] args) throws Exception {
+        try (final ImageDisplay id = new ImageDisplay(true);) {
+            final FileDialog dialog = new FileDialog(id.shell, SWT.OPEN);
+            dialog.setText("Open an image file or cancel");
+            final String string = dialog.open();
+
+            if (string != null) {
+                final Mat iioimage = ImageFile.readMatFromFile(string);
+                id.setup(iioimage);
+            } else
+                id.setup(null);
+
+            id.waitUntilClosed();
+        }
     }
 
     @FunctionalInterface

@@ -17,7 +17,6 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 package com.jiminger.image.houghspace.internal;
 
 import org.opencv.core.CvType;
@@ -35,107 +34,118 @@ import com.jiminger.image.houghspace.Model;
  * in the original image.</p>
  */
 public class Mask {
-   public static byte EDGE= (byte)-1;
-   public static byte NOEDGE= (byte)0;
-   
-   public final int mwidth;
-   public final int mheight;
-   public final int maskcr;
-   public final int maskcc;
-   public final byte [] mask;
+    public static byte EDGE = (byte) -1;
+    public static byte NOEDGE = (byte) 0;
 
+    public final int mwidth;
+    public final int mheight;
 
-   /**
+    /**
+     * Mask center, row
+     */
+    public final int maskcr;
+
+    /**
+     * Mask center, column
+     */
+    public final int maskcc;
+
+    /**
+     * monochrome image of the mask
+     */
+    public final byte[] mask;
+
+    /**
     * Instantiate a mask of the given dimensions assuming 
     *  that the reference point is the center of the mask.
     */
-   private Mask(int mwidth, int mheight) {
-      // mwidth and mheight need to be odd 
-      //  so that the center falls exactly
-      //  on a pixel.
-      mwidth += (((mwidth & 0x01) == 0) ? 1 : 0);
-      mheight += (((mheight & 0x01) == 0) ? 1 : 0);
+    private Mask(int mwidth, int mheight) {
+        // mwidth and mheight need to be odd
+        // so that the center falls exactly
+        // on a pixel.
+        mwidth += (((mwidth & 0x01) == 0) ? 1 : 0);
+        mheight += (((mheight & 0x01) == 0) ? 1 : 0);
 
-      this.mwidth = mwidth;
-      this.mheight = mheight;
+        this.mwidth = mwidth;
+        this.mheight = mheight;
 
-      this.mask = new byte[mwidth * mheight];
+        this.mask = new byte[mwidth * mheight];
 
-      this.maskcr = (this.mheight + 1)/2 - 1;
-      this.maskcc = (this.mwidth + 1)/2 - 1;
-   }
+        this.maskcr = (this.mheight + 1) / 2 - 1;
+        this.maskcc = (this.mwidth + 1) / 2 - 1;
+    }
 
-   /**
+    /**
     * Generate an OpenCV Mat image that contains a view of the mask.
     */
-   public Mat getMaskImage() {
-	   Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
-	   m.put(0, 0, mask);
-	   return m;
-   }
+    public Mat getMaskImage() {
+        final Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
+        m.put(0, 0, mask);
+        return m;
+    }
 
-   /**
+    /**
     * Set the value of the mask at a location to 
     *  the given value. The value should be either
     *  EDGE or NOEDGE. Entries in the mask are 
     * accessed by row and column (not x,y).
     */
-   private void set(int r, int c, byte v) {
-      mask[ (r * mwidth) + c ] = v;
-   }
+    private void set(final int r, final int c, final byte v) {
+        mask[(r * mwidth) + c] = v;
+    }
 
-   public static Mask generateMask(Model m, double quantFactor, double scaleModel) {
-	  double w = m.featureWidth() * scaleModel;
-      double h = m.featureHeight() * scaleModel;
-      Mask mask = new Mask((int)((w/quantFactor) + 1.5),(int)((h/quantFactor) + 1.5));
+    public static Mask generateMask(final Model m, final double quantFactor, final double scaleModel) {
+        final double w = m.featureWidth() * scaleModel;
+        final double h = m.featureHeight() * scaleModel;
 
-      // now set the mask by sweeping the center
-      double x0 = (double)mask.maskcc; // x0,y0 is the
-      double y0 = (double)mask.maskcr; //  origin of 
-                                       //  the mask
+        // mask is 1 pixel wider than w and higher than h
+        // round(w/quant + 1) = (int)((w/quant) + 1.5)
+        final Mask mask = new Mask((int) ((w / quantFactor) + 1.5), (int) ((h / quantFactor) + 1.5));
 
-      for (int r = 0; r < mask.mheight; r++)
-      {
-         for (int c = 0; c < mask.mwidth; c++)
-         {
-            // is the point r,c a possible 
-            //  center if and edge appears at the
-        	//  center of the mast?
+        // now set the mask by sweeping the center
+        final double x0 = mask.maskcc; // x0,y0 is the
+        final double y0 = mask.maskcr; // origin of
+                                       // the mask
 
-            // to figure this out, translate
-            //  r,c to the center.
-            // but first, find out what r,c is
-            //  in the coordinate system of the
-            //  mask with the origin centered.
-            double y1 = (double)(mask.mheight - r - 1) - y0;
-            double x1 = ((double)c) - x0;
+        for (int r = 0; r < mask.mheight; r++) {
+            for (int c = 0; c < mask.mwidth; c++) {
+                // is the point r,c a possible model
+                // center if an edge appears at the
+                // center of the mask?
 
-            // now, if x1,y1 is the center
-            //  of the sprocket hole, will
-            //  the origin be on the sprocket?
-            // That means we need to check 
-            //  -x1,-y1 since that is where
-            //  the origin will be pushed to
-            //  upon translating x1,y1 to the
-            //  origin.
-            double dist = m.distance(-(x1 * quantFactor),-(y1 * quantFactor),0.0,1.0);
+                // to figure this out, translate
+                // r,c to the center.
+                // but first, find out what r,c is
+                // in the coordinate system of the
+                // mask with the origin centered.
+                final double y1 = mask.mheight - r - 1 - y0;
+                final double x1 = (c) - x0;
 
-            // if we are within a 1/2 pixel of the 
-            //  theoretical sprocket then we're on it.
-            if (dist <= quantFactor/2.0)
-               mask.set(r,c,EDGE);
-            else
-               mask.set(r,c,NOEDGE);
-         }
-      }
+                // now, if x1,y1 is the center
+                // of the sprocket hole, will
+                // the origin be on the sprocket?
+                // That means we need to check
+                // -x1,-y1 since that is where
+                // the origin will be pushed to
+                // upon translating x1,y1 to the
+                // origin.
+                final double dist = m.distance(-(x1 * quantFactor), -(y1 * quantFactor), 0.0, 1.0);
 
-      return mask;
-   }
+                // if we are within a 1/2 pixel of the
+                // theoretical sprocket then we're on it.
+                if (dist <= quantFactor / 2.0)
+                    mask.set(r, c, EDGE);
+                else
+                    mask.set(r, c, NOEDGE);
+            }
+        }
 
-   public static void setEdgePixVals(byte edgePixVal, byte noedgePixVal) {
-      EDGE=edgePixVal;
-      NOEDGE=noedgePixVal;
-   }
+        return mask;
+    }
+
+    public static void setEdgePixVals(final byte edgePixVal, final byte noedgePixVal) {
+        EDGE = edgePixVal;
+        NOEDGE = noedgePixVal;
+    }
 
 }
-
