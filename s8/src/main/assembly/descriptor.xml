@@ -1,4 +1,5 @@
 <assembly>
+  <id>single</id>
   <formats>
     <format>zip</format>
   </formats>
