@@ -42,6 +42,7 @@ public class ImageDisplay implements AutoCloseable {
     private final CountDownLatch eventLoopDoneLatch = new CountDownLatch(1);
     private final AtomicBoolean done = new AtomicBoolean(false);
     private Thread eventThread = null;
+    private final CountDownLatch started = new CountDownLatch(1);
 
     private static interface AcNoThrow extends AutoCloseable {
         @Override
@@ -79,6 +80,10 @@ public class ImageDisplay implements AutoCloseable {
         setup(mat);
     }
 
+    public void waitForPaint() throws InterruptedException {
+        started.await();
+    }
+
     private ImageDisplay(final boolean dontInitMe) {
         shell = new Shell(display);
         shell.setLayout(new FillLayout());
@@ -86,6 +91,7 @@ public class ImageDisplay implements AutoCloseable {
 
     private void setup(final Mat mat) {
         final CountDownLatch latch = new CountDownLatch(1);
+
         eventThread = new Thread(() -> {
             try {
                 display = new Display();
@@ -110,9 +116,11 @@ public class ImageDisplay implements AutoCloseable {
                     }
                 }
 
+                shell.setBounds(currentImage.getBounds());
+                currentImageRef.set(currentImage);
+
                 final Point origin = new Point(0, 0);
-                canvas = new Canvas(shell, SWT.NO_BACKGROUND |
-                        SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL);
+                canvas = new Canvas(shell, SWT.NO_BACKGROUND | SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL);
 
                 final ScrollBar hBar = canvas.getHorizontalBar();
                 hBar.addListener(SWT.Selection, new Listener() {
@@ -176,7 +184,6 @@ public class ImageDisplay implements AutoCloseable {
                     public void handleEvent(final Event e) {
                         final Image currentImage = currentImageRef.get();
                         if (currentImage != null) {
-
                             final GC gc = e.gc;
                             gc.drawImage(currentImage, origin.x, origin.y);
                             final Rectangle rect = currentImage.getBounds();
@@ -190,6 +197,7 @@ public class ImageDisplay implements AutoCloseable {
                                 gc.fillRectangle(0, rect.height, client.width, marginHeight);
                             }
                         }
+                        started.countDown();
                     }
                 });
                 shell.open();
