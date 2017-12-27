@@ -25,7 +25,7 @@
     <module>lib-util</module>
     <module>lib-nr</module>
     <module>lib-image</module>
-    <module>native</module>
+<!--    <module>native</module> -->
     <module>s8</module>
     <module>test-jiminger</module>
   </modules>
@@ -37,6 +37,10 @@
     <!-- This property is looked up using 'grep' from the script convert.sh -->
     <opencv.version>3.3.1</opencv.version>
     <slf4j.version>1.7.16</slf4j.version>
+
+    <!-- generator and platform.options are set in the profile -->
+    <cmake.generator>${generator}</cmake.generator>
+    <cmake.options>${platform.option}</cmake.options>
   </properties>
 
   <profiles>
@@ -52,8 +56,7 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86</swtartifact>
         <platform>linux-x86_32</platform>
         <generator>Unix Makefiles</generator>
-        <cmake.generator>${generator}</cmake.generator>
-        <cmake.options></cmake.options>
+        <platform.option></platform.option>
       </properties>
     </profile>
     <profile>
@@ -68,8 +71,7 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
-        <cmake.generator>${generator}</cmake.generator>
-        <cmake.options></cmake.options>
+        <platform.option></platform.option>
       </properties>
     </profile>
     <profile>
@@ -83,9 +85,8 @@
       <properties>
         <platform>windows-x86_64</platform>
         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
+        <platform.option>-Ax64</platform.option>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
-        <cmake.generator>${generator}</cmake.generator>
-        <cmake.options>-Ax64</cmake.options>
       </properties>
     </profile>
     <profile>
@@ -101,8 +102,7 @@
         <platform>windows-x86_32</platform>
         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
-        <cmake.generator>${generator}</cmake.generator>
-        <cmake.options>-Ax64</cmake.options>
+        <platform.option></platform.option>
       </properties>
     </profile>
   </profiles>
@@ -152,19 +152,24 @@
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>2.0.1</version>
+        <groupId>net.dempsy</groupId>
+        <artifactId>dempsy-utils</artifactId>
+        <version>2.2.0-SNAPSHOT</version>
       </dependency>
       <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
-        <version>4.4</version>
+        <version>4.12</version>
       </dependency>
       <dependency>
         <groupId>${swtgroup}</groupId>
         <artifactId>${swtartifact}</artifactId>
         <version>4.6</version>
+      </dependency>
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>2.6</version>
       </dependency>
       
       <!-- Testing -->

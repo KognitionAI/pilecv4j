@@ -19,11 +19,11 @@
 
 package com.jiminger.nr;
 
-import com.jiminger.util.LibraryLoader;
+import net.dempsy.util.library.NativeLibraryLoader;
 
 public class Minimizer {
     static {
-        LibraryLoader.init();
+        NativeLibraryLoader.init();
     }
 
     private final Func f;

@@ -17,7 +17,7 @@ float dbrent(float ax, float bx, float cx, float (*f)(float),
 {
    int iter,ok1,ok2; /*Will be used as .ags for whether proposed*/
                      /*steps are acceptable or not. */
-   float a,b,d,d1,d2,du,dv,dw,dx,e=0.0;
+   float a,b,d=0.0,d1,d2,du,dv,dw,dx,e=0.0;
    float fu,fv,fw,fx,olde,tol1,tol2,u,u1,u2,v,w,x,xm;
    /*Comments following will point out only di.erences from the routine brent. Read that
      routine .rst.*/

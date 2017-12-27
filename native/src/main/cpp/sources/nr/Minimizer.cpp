@@ -155,7 +155,6 @@ float bridgefunc(float v[])
    if (exceptionHappens)
       return 0.0f;
 
-   jboolean isCopy;
    jsize len = end - start + 1;
    jdouble* tmp = new jdouble[len];
    for (int i = start; i <= end; i++)

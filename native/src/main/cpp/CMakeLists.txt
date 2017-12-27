@@ -39,10 +39,10 @@ add_library(utilities.jiminger.com
                sources/houghspace/Transform.cpp
                sources/mjpeg/jpegtoavi.cpp
                sources/nr/Minimizer.cpp
-               sources/nr/brent.c
-               sources/nr/dbrent.c
-               sources/nr/mnbrak.c
-               sources/nr/nrutil.c
-               sources/nr/powell.c)
+               sources/nr/brent.cpp
+               sources/nr/dbrent.cpp
+               sources/nr/mnbrak.cpp
+               sources/nr/nrutil.cpp
+               sources/nr/powell.cpp)
 
 target_link_libraries(utilities.jiminger.com ${JNI_LIBRARIES})

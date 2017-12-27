@@ -17,7 +17,6 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 package com.jiminger.image.mjpeg;
 
 import java.io.File;
@@ -31,112 +30,107 @@ import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import com.jiminger.util.CommandLineParser;
-import com.jiminger.util.LibraryLoader;
 
-public class MJPEGWriter
-{
-   static {  LibraryLoader.init(); }
+import net.dempsy.util.library.NativeLibraryLoader;
 
-   static public String parentDir = null;
-   static public String avifile = "out.avi";
-   public static int avifps = 16;
+public class MJPEGWriter {
+    static {
+        NativeLibraryLoader.init();
+    }
 
-   public static void main(String [] args)
-   {
-      if (!commandLine(args))
-         System.exit(-1);
+    static public String parentDir = null;
+    static public String avifile = "out.avi";
+    public static int avifps = 16;
 
-      // assume args are file names
-      initializeMJPEG(avifile);
-      boolean working = true;
-      File pdir = new File(parentDir);
-      if (!pdir.isDirectory())
-      {
-         System.out.println("\"" + parentDir + "\" is not a directory.");
-         usage();
-      }
+    public static void main(final String[] args) {
+        if (!commandLine(args))
+            System.exit(-1);
 
-      File[] files = pdir.listFiles(
-         new FileFilter()
-         {
-            public boolean accept(File f) 
-            { 
-               String fp = f.getAbsolutePath();
-               return f.isFile() && (fp.endsWith(".jpeg") || fp.endsWith(".JPEG") || 
-                                     fp.endsWith("jpg") || fp.endsWith("JPG"));
+        // assume args are file names
+        initializeMJPEG(avifile);
+        boolean working = true;
+        final File pdir = new File(parentDir);
+        if (!pdir.isDirectory()) {
+            System.out.println("\"" + parentDir + "\" is not a directory.");
+            usage();
+        }
+
+        final File[] files = pdir.listFiles(
+                new FileFilter() {
+                    @Override
+                    public boolean accept(final File f) {
+                        final String fp = f.getAbsolutePath();
+                        return f.isFile() && (fp.endsWith(".jpeg") || fp.endsWith(".JPEG") ||
+                                fp.endsWith("jpg") || fp.endsWith("JPG"));
+                    }
+                });
+
+        final List<File> fileList = Arrays.asList(files);
+        Collections.sort(fileList, new Comparator<File>() {
+            @Override
+            public int compare(final File o1, final File o2) {
+                return o1.getName().compareTo(o2.getName());
             }
-         }
-         );
-      
-      List<File> fileList = Arrays.asList(files);
-      Collections.sort(fileList, new Comparator<File>() {
-         @Override
-         public int compare(File o1, File o2)
-         {
-            return o1.getName().compareTo(o2.getName());
-         }
-      });
+        });
 
-      
-      for (File f : fileList)
-         working = appendFile(f.getAbsolutePath());
+        for (final File f : fileList)
+            working = appendFile(f.getAbsolutePath());
 
-      if (working)
-         close(avifps);
-      else
-         System.out.println("Failed to create AVI - Who knows why!");
+        if (working)
+            close(avifps);
+        else
+            System.out.println("Failed to create AVI - Who knows why!");
 
-      cleanUp();
-   }
+        cleanUp();
+    }
 
-   private static void usage() {
-      System.out.println("usage: java [javaargs] com.jiminger.mjpeg.MJPEGWriter -pdir parentDir [-avifile out.avi] [-avifps 16]");
-   }
+    private static void usage() {
+        System.out.println("usage: java [javaargs] com.jiminger.mjpeg.MJPEGWriter -pdir parentDir [-avifile out.avi] [-avifps 16]");
+    }
 
-   public static boolean commandLine(String [] args) {
-      CommandLineParser cl = new CommandLineParser(args);
-      // see if we are asking for help
-      if (cl.getProperty("help") != null || 
-          cl.getProperty("-help") != null) {
-         usage();
-         return false;
-      }
+    public static boolean commandLine(final String[] args) {
+        final CommandLineParser cl = new CommandLineParser(args);
+        // see if we are asking for help
+        if (cl.getProperty("help") != null ||
+                cl.getProperty("-help") != null) {
+            usage();
+            return false;
+        }
 
-      parentDir = cl.getProperty("pdir");
-      if (parentDir == null)
-      {
-         usage();
-         return false;
-      }
+        parentDir = cl.getProperty("pdir");
+        if (parentDir == null) {
+            usage();
+            return false;
+        }
 
-      String tmps = cl.getProperty("avifile");
-      if (tmps != null)
-         avifile = tmps;
+        String tmps = cl.getProperty("avifile");
+        if (tmps != null)
+            avifile = tmps;
 
-      tmps = cl.getProperty("avifps");
-      if (tmps != null)
-         avifps = Integer.parseInt(tmps);
+        tmps = cl.getProperty("avifps");
+        if (tmps != null)
+            avifps = Integer.parseInt(tmps);
 
-      return true;
-   }
+        return true;
+    }
 
-   static public native boolean initializeMJPEG(String filename);
+    static public native boolean initializeMJPEG(String filename);
 
-   static private int width = -1;
-   static private int height = -1;
+    static private int width = -1;
+    static private int height = -1;
 
-   static public boolean appendFile(String filename) {
-      if (height == -1) {
-          Mat origImage = Imgcodecs.imread(filename);
-          width = origImage.cols();
-          height = origImage.rows();
-      }
-      return doappendFile(filename,width,height);
-   }
+    static public boolean appendFile(final String filename) {
+        if (height == -1) {
+            final Mat origImage = Imgcodecs.imread(filename);
+            width = origImage.cols();
+            height = origImage.rows();
+        }
+        return doappendFile(filename, width, height);
+    }
 
-   static private native boolean doappendFile(String filename, int width, int height);
+    static private native boolean doappendFile(String filename, int width, int height);
 
-   static public native boolean close(int fps);
+    static public native boolean close(int fps);
 
-   static public native void cleanUp();
+    static public native void cleanUp();
 }

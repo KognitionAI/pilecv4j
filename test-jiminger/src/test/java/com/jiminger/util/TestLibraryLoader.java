@@ -2,11 +2,11 @@ package com.jiminger.util;
 
 import org.junit.Test;
 
-import com.jiminger.util.LibraryLoader;
+import net.dempsy.util.library.NativeLibraryLoader;
 
 public class TestLibraryLoader {
     @Test
     public void testLibraryLoading() throws Exception {
-        LibraryLoader.init();
+        NativeLibraryLoader.init();
     }
 }

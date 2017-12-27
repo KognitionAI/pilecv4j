@@ -10,11 +10,11 @@
   <name>s8 application library</name>
   <dependencyManagement>
     <dependencies>
-      <dependency>
-	<groupId>com.github.jai-imageio</groupId>
-	<artifactId>jai-imageio-core</artifactId>
-	<version>1.3.1</version>
-      </dependency>
+        <dependency>
+            <groupId>com.github.jai-imageio</groupId>
+            <artifactId>jai-imageio-core</artifactId>
+            <version>1.3.1</version>
+        </dependency>
     </dependencies>
   </dependencyManagement>
   <dependencies>
@@ -53,6 +53,10 @@
       <artifactId>native-lib</artifactId>
       <classifier>${platform}</classifier>
       <scope>runtime</scope>
+    </dependency>
+    <dependency>
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
     </dependency>
   </dependencies>
 

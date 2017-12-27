@@ -19,7 +19,7 @@
   </fileSets>
   <files>
     <file>
-      <source>${platform}/com.jiminger.lib.properties</source>
+      <source>${platform}/net.dempsy.lib.properties</source>
       <outputDirectory>/</outputDirectory>
       <filtered>true</filtered>
     </file>

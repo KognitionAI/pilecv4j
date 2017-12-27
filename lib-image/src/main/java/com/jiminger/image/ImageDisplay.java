@@ -28,11 +28,11 @@ import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import com.jiminger.util.LibraryLoader;
+import net.dempsy.util.library.NativeLibraryLoader;
 
 public class ImageDisplay implements AutoCloseable {
     static {
-        LibraryLoader.init();
+        NativeLibraryLoader.init();
     }
 
     private final AtomicReference<Image> currentImageRef = new AtomicReference<Image>(null);

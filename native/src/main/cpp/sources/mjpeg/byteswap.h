@@ -1,3 +1,5 @@
+#include <cstdint>
+
 #ifndef _BYTESWAP_H_
 #define _BYTESWAP_H_
 
@@ -13,7 +15,7 @@
 #ifdef UNIX
 #include <endian.h>
 #else
-# ifdef _WINDOWS
+# if (defined _WINDOWS || defined __MINGW32__ || defined __MINGW64__)
    /* Pm windows we're going to assum little endian on
       an iX86 arch*/
 #  define __BYTE_ORDER __LITTLE_ENDIAN
@@ -34,13 +36,13 @@
 # error "Aiee: BYTE_ORDER not defined\n";
 #endif
 
-#define SWAP2(x) (((x>>8) & 0x00ff) |\
-                  ((x<<8) & 0xff00))
+inline uint16_t SWAP2(uint16_t x) {
+	return  (((x>>8) & 0x00ff) | ((x<<8) & 0xff00));
+}
 
-#define SWAP4(x) (((x>>24) & 0x000000ff) |\
-                  ((x>>8)  & 0x0000ff00) |\
-                  ((x<<8)  & 0x00ff0000) |\
-                  ((x<<24) & 0xff000000))
+inline uint32_t SWAP4(uint32_t x) {
+	return (((x>>24) & 0x000000ffL) | ((x>>8)  & 0x0000ff00L) | ((x<<8)  & 0x00ff0000L) | ((x<<24) & 0xff000000L));
+}
 
 #if BYTE_ORDER==BIG_ENDIAN
 # define LILEND2(a) SWAP2((a))

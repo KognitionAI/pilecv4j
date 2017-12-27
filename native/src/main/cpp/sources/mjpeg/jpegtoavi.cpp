@@ -90,7 +90,7 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_initializeMJPEG
   DWORD width=1;
   DWORD height=1;
 //  const off64_t MAX_RIFF_SZ=2147483648; /* 2 Gb limit */
-  DWORD riff_sz;
+  DWORD riff_sz = 0;
   DWORD fps = 1;
 
   const char * filename = env->GetStringUTFChars(jfilename,NULL);
@@ -213,7 +213,7 @@ static jboolean writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
   hdrl.avih.width=LILEND4(width);
   hdrl.avih.height=LILEND4(height);
   hdrl.strl.strh.scale=LILEND4(per_usec);
-  hdrl.strl.strh.rate=LILEND4(1000000);
+  hdrl.strl.strh.rate=LILEND4(1000000L);
   hdrl.strl.strh.length=LILEND4(frames);
   hdrl.strl.strf.width=LILEND4(width);
   hdrl.strl.strf.height=LILEND4(height);
@@ -234,12 +234,11 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
    off_t mfsz,remnant;
    char buff[512];
    long nbr,nbw;
-   size_t tmp_size_t;
 
    if (ofd == NULL)
       return JNI_FALSE;
 
-   if (height == -1)
+   if (height == (DWORD)-1)
    {
       height = jheight;
       width = jwidth;
@@ -258,7 +257,7 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
    DWORD cursz = file_sz(filename);
    jpg_sz_64 += (cursz + ((4-(cursz%4))%4));
 
-   if (cursz == -1)
+   if (cursz == (DWORD)-1)
    {
       env->ReleaseStringUTFChars(jfilename,filename);
       return JNI_FALSE;
@@ -297,7 +296,7 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
       return JNI_FALSE;
    }
    fwrite(buff,nbr,1,ofd);
-   tmp_size_t = fread(buff,1,4,fd);
+   fread(buff,1,4,fd);
    fwrite("AVI1",4,1,ofd);
    nbw=10;
 

@@ -46,13 +46,13 @@ import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jiminger.util.LibraryLoader;
+import net.dempsy.util.library.NativeLibraryLoader;
 
 public class ImageFile {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
 
     static {
-        LibraryLoader.init();
+        NativeLibraryLoader.init();
     }
 
     public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {
@@ -73,7 +73,7 @@ public class ImageFile {
         LOGGER.trace("Read {} from {}", ret, filename);
         return ret;
     }
-    
+
     public static Mat readImageFileAsMat(final String filename) throws IOException {
         final File f = new File(filename);
         if (!f.exists())
@@ -81,7 +81,7 @@ public class ImageFile {
         final Mat ret = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
         if (ret == null) {
             LOGGER.info("Failed to read '{}' using OpenCV", filename);
-            BufferedImage bi = ImageIO.read(f);
+            final BufferedImage bi = ImageIO.read(f);
             if (bi == null)
                 throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
         } else {
