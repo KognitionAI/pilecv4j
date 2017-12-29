@@ -8,6 +8,7 @@ include(UseJava)
 set(CMAKE_JAVA_COMPILE_FLAGS "-source" "1.8" "-target" "1.8")
 
 set (_stubDir "${CMAKE_CURRENT_BINARY_DIR}")
+set (CMAKE_CXX_STANDARD 11)
 
 if(UNIX)
   add_definitions(-DUNIX)
