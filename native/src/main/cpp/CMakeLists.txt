@@ -18,10 +18,11 @@ endif()
 add_custom_command(
     OUTPUT com_jiminger_image_houghspace_Transform.h
            com_jiminger_image_mjpeg_MJPEGWriter.h
+           com_jiminger_image_CvRasterNative.h
     COMMAND ${Java_JAVAH_EXECUTABLE} -verbose
         -classpath ../lib/lib-image-$ENV{PROJECT_VERSION}.jar
         -d ${_stubDir}
-        -jni com.jiminger.image.houghspace.Transform com.jiminger.image.mjpeg.MJPEGWriter
+        -jni com.jiminger.image.houghspace.Transform com.jiminger.image.mjpeg.MJPEGWriter com.jiminger.image.CvRasterNative
     )
 
 add_custom_command(

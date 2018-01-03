@@ -100,7 +100,7 @@ public class ImageDisplay implements AutoCloseable {
 
                 Image currentImage = null;
 
-                if (mat != null) {
+                if (mat != null && mat.width() > 0 && mat.height() > 0) {
                     currentImage = new Image(display, convertToSWT(mat));
                 }
 
@@ -209,10 +209,14 @@ public class ImageDisplay implements AutoCloseable {
             } finally {
                 if (!shell.isDisposed()) {
                     final Image prev = currentImageRef.getAndSet(null);
-                    prev.dispose();
-                    canvas.dispose();
-                    shell.dispose();
-                    display.dispose();
+                    if (prev != null)
+                        prev.dispose();
+                    if (canvas != null)
+                        canvas.dispose();
+                    if (shell != null)
+                        shell.dispose();
+                    if (display != null)
+                        display.dispose();
                 }
                 eventLoopDoneLatch.countDown();
             }
@@ -291,7 +295,7 @@ public class ImageDisplay implements AutoCloseable {
         final int width = in.width();
         final int height = in.height();
         if (inChannels == 1) { // assume gray
-            final CvRaster raster = CvRaster.create(in);
+            final CvRaster raster = CvRaster.manage(in);
             switch (cvDepth) {
 
                 case CV_8U:

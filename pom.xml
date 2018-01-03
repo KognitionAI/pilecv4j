@@ -31,7 +31,7 @@
   </modules>
 
   <properties>
-    <downloadBinaries>true</downloadBinaries>
+    <!-- <downloadBinaries>true</downloadBinaries> -->
     <build.type>debug</build.type>
     <swtgroup>org.eclipse.swt</swtgroup>
     <!-- This property is looked up using 'grep' from the script convert.sh -->
@@ -118,6 +118,11 @@
         <classifier>withlib</classifier>
         <version>${opencv.version}</version>
       </dependency>
+    <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>lib-image-native</artifactId>
+        <version>${opencv.version}</version>
+    </dependency>
 
       <!-- Internal to the product -->
       <dependency>

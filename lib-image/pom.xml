@@ -17,6 +17,10 @@
     </dependency>
     <dependency>
       <groupId>com.jiminger</groupId>
+      <artifactId>lib-image-native</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
     </dependency>
     <dependency> <!-- needed for image work but no numerical recipies -->

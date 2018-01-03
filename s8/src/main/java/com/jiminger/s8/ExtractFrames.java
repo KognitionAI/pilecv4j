@@ -297,8 +297,8 @@ public class ExtractFrames {
         }
 
         // innefficent but whatever....
-        final CvRaster dxr = CvRaster.create(dx);
-        final CvRaster dyr = CvRaster.create(dy);
+        final CvRaster dxr = CvRaster.manage(dx);
+        final CvRaster dyr = CvRaster.manage(dy);
         final CvRaster dirs = CvRaster.create(dxr.rows, dxr.cols, CvType.CV_8UC1); // a byte raster to hold the dirs
         final byte[] dirsa = (byte[]) dirs.data;
         final short[] dxa = (short[]) dxr.data;
@@ -342,8 +342,8 @@ public class ExtractFrames {
         print("edge", edgeImage);
         // --------------------------------------
 
-        final CvRaster edgeRaster = CvRaster.create(edgeImage);
-        final CvRaster gradientDirRaster = CvRaster.create(gradientDirImage);
+        final CvRaster edgeRaster = CvRaster.manage(edgeImage);
+        final CvRaster gradientDirRaster = CvRaster.manage(gradientDirImage);
 
         // ------------------------------------------------------------
         // Now load up the edges of the image. This will set the values
@@ -767,7 +767,7 @@ public class ExtractFrames {
     }
 
     public static Mat linearContrast(final Mat src, final double lowerpct, final double upperpct) {
-        final CvRaster raster = CvRaster.create(src);
+        final CvRaster raster = CvRaster.manage(src);
 
         System.out.print("|");
         final Hist minmax = raster.reduce(new Hist(), histogram(raster));

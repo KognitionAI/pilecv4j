@@ -428,7 +428,7 @@ public class CorrelateFrames
       CvRaster[] frameImage = new CvRaster[fs.numFrames];
       for (int i = 0; i < fs.numFrames; i++) {
          if (filenames[i] != null)
-            frameImage[i] = CvRaster.create(Imgcodecs.imread(filenames[i]));
+            frameImage[i] = CvRaster.manage(Imgcodecs.imread(filenames[i]));
          else
             frameImage[i] = null;
       }
@@ -449,7 +449,7 @@ public class CorrelateFrames
          }
       }
 
-      return CvRaster.create(Imgcodecs.imread(filename));
+      return CvRaster.manage(Imgcodecs.imread(filename));
    }
 
    static private boolean commandLine(String[] args)

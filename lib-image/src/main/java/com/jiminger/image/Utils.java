@@ -36,6 +36,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
+import com.jiminger.image.CvRaster.BytePixelSetter;
 import com.jiminger.image.geometry.PerpendicularLine;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.SimplePoint;
@@ -50,8 +51,7 @@ public class Utils {
     }
 
     public static BufferedImage mat2Img(final Mat in) {
-        final CvRaster raster = CvRaster.create(in);
-        final Object data = raster.data;
+        final Object data = CvRaster.copyToPrimitiveArray(in);
         int type;
 
         final int inChannels = in.channels();
@@ -93,52 +93,57 @@ public class Utils {
 
         out = new BufferedImage(in.cols, in.rows, BufferedImage.TYPE_BYTE_INDEXED, colorModel);
 
-        out.getRaster().setDataElements(0, 0, in.cols, in.rows, in.data);
+        out.getRaster().setDataElements(0, 0, in.cols, in.rows, CvRaster.copyToPrimitiveArray(in));
         return out;
     }
 
-    private static CvRaster argbDataBufferByteToCvRaster(final DataBufferByte bb, final int h, final int w, final int[] lookup) {
-        final boolean hasAlpha = lookup[0] != -1;
-        final CvRaster raster = CvRaster.create(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+    private static CvRaster argbDataBufferByteToCvRaster(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
+        final Mat mat = new Mat(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
+        final CvRaster raster = CvRaster.manage(mat);
         final byte[] inpixels = bb.getData();
-        final byte[] outpixels = (byte[]) raster.data;
-        final int numElements = h * w;
-        final int skip = hasAlpha ? 4 : 3;
-        final int alpha = lookup[0];
-        final int blue = lookup[3];
-        final int red = lookup[1];
-        final int green = lookup[2];
-        for (int pos = 0, el = 0; el < numElements; pos += skip, el++) {
-            // BGR, and maybe A
-            outpixels[pos] = inpixels[pos + blue];
-            outpixels[pos + 1] = inpixels[pos + green];
-            outpixels[pos + 2] = inpixels[pos + red];
-            if (hasAlpha)
-                outpixels[pos + 3] = inpixels[pos + alpha];
+        if (lookup == null) // indicates a pixel compatible format
+            mat.put(0, 0, inpixels);
+        else {
+            final boolean hasAlpha = lookup[0] != -1;
+            final int alpha = lookup[0];
+            final int blue = lookup[3];
+            final int red = lookup[1];
+            final int green = lookup[2];
+            final byte[] outpixel = new byte[skip]; // pixel length
+            final int colsXchannels = raster.colsXchannels;
+            raster.apply((BytePixelSetter) (r, c) -> {
+                final int pos = (r * colsXchannels) + (c * skip);
+                outpixel[0] = inpixels[pos + blue];
+                outpixel[1] = inpixels[pos + green];
+                outpixel[2] = inpixels[pos + red];
+                if (hasAlpha)
+                    outpixel[3] = inpixels[pos + alpha];
+                return outpixel;
+            });
         }
         return raster;
     }
 
     private static CvRaster argbDataBufferByteToCvRaster(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
         final boolean hasAlpha = mask[0] != 0x0;
-        final CvRaster raster = CvRaster.create(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+        final Mat mat = new Mat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+        final CvRaster raster = CvRaster.manage(mat);
         final int[] inpixels = bi.getData();
-        final byte[] outpixels = (byte[]) raster.data;
-        final int numElements = h * w;
-        final int skip = hasAlpha ? 4 : 3;
         final int blue = 3;
         final int red = 1;
         final int green = 2;
         final int alpha = 0;
-        for (int pos = 0, el = 0; el < numElements; pos += skip, el++) {
-            final int pixel = inpixels[el];
-            // BGR, and maybe A
-            outpixels[pos] = (byte) ((pixel & mask[blue]) >>> shift[blue]);
-            outpixels[pos + 1] = (byte) ((pixel & mask[green]) >>> shift[green]);
-            outpixels[pos + 2] = (byte) ((pixel & mask[red]) >>> shift[red]);
+        final byte[] outpixel = new byte[hasAlpha ? 4 : 3]; // pixel length
+        final int cols = raster.cols;
+        raster.apply((BytePixelSetter) (r, c) -> {
+            final int pixel = inpixels[(r * cols) + c];
+            outpixel[0] = (byte) ((pixel & mask[blue]) >>> shift[blue]);
+            outpixel[1] = (byte) ((pixel & mask[green]) >>> shift[green]);
+            outpixel[2] = (byte) ((pixel & mask[red]) >>> shift[red]);
             if (hasAlpha)
-                outpixels[pos + 3] = (byte) ((pixel & mask[alpha]) >>> shift[alpha]);
-        }
+                outpixel[3] = (byte) ((pixel & mask[alpha]) >>> shift[alpha]);
+            return outpixel;
+        });
         return raster;
     }
 
@@ -182,7 +187,7 @@ public class Utils {
                         break;
                 }
                 final CvRaster raster = argbDataBufferByteToCvRaster(bb, h, w, masks, shift);
-                return raster.toMat();
+                return raster.mat;
             }
             case TYPE_3BYTE_BGR:
             case TYPE_4BYTE_ABGR:
@@ -193,25 +198,33 @@ public class Utils {
                             + " but instead has a " + dataBuffer.getClass().getSimpleName());
                 final DataBufferByte bb = (DataBufferByte) dataBuffer;
                 int[] lookup = null;
+                int skip = -1;
                 switch (type) {
                     case TYPE_INT_RGB:
                         lookup = new int[] { -1, 0, 1, 2 };
+                        skip = 4;
                         break;
                     case TYPE_3BYTE_BGR:
+                        skip = 3;
+                        lookup = null; // straight copy since it already matches.
+                        break;
                     case TYPE_INT_BGR:
+                        skip = 4;
                         lookup = new int[] { -1, 2, 1, 0 };
                         break;
                     case TYPE_INT_ARGB:
                     case TYPE_INT_ARGB_PRE:
                         lookup = new int[] { 0, 1, 2, 3 };
+                        skip = 4;
                         break;
                     case TYPE_4BYTE_ABGR:
                     case TYPE_4BYTE_ABGR_PRE:
                         lookup = new int[] { 0, 3, 2, 1 };
+                        skip = 4;
                         break;
                 }
-                final CvRaster raster = argbDataBufferByteToCvRaster(bb, h, w, lookup);
-                return raster.toMat();
+                final CvRaster raster = argbDataBufferByteToCvRaster(bb, h, w, lookup, skip);
+                return raster.mat;
             }
             case TYPE_BYTE_GRAY: {
                 final DataBuffer dataBuffer = crappyImage.getRaster().getDataBuffer();

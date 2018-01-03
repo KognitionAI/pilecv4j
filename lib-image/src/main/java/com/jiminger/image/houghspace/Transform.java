@@ -70,11 +70,11 @@ public class Transform {
 
     public HoughSpace transform(final CvRaster raster, final CvRaster gradientRaster, final int houghThreshold,
             int rowstart, int rowend, int colstart, int colend) {
-        final byte[] image = (byte[]) raster.data;
+        // final byte[] image = (byte[]) raster.data;
         final int height = raster.rows;
         final int width = raster.cols;
 
-        final byte[] gradientDirImage = gradientRaster == null ? null : (byte[]) gradientRaster.data;
+        // final byte[] gradientDirImage = gradientRaster == null ? null : (byte[]) gradientRaster.data;
 
         // the size of the hough space should be quantFactor smaller
         final int htheight = (int) ((height) / quantFactor) + 1;
