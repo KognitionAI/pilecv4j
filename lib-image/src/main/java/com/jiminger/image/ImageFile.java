@@ -46,13 +46,11 @@ import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
 public class ImageFile {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
 
     static {
-        NativeLibraryLoader.init();
+        // NativeLibraryLoader.init();
     }
 
     public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {
@@ -69,24 +67,6 @@ public class ImageFile {
             if (filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                 Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
             ret = Utils.mat2Img(mat);
-        }
-        LOGGER.trace("Read {} from {}", ret, filename);
-        return ret;
-    }
-
-    public static Mat readImageFileAsMat(final String filename) throws IOException {
-        final File f = new File(filename);
-        if (!f.exists())
-            throw new FileNotFoundException(filename);
-        final Mat ret = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
-        if (ret == null) {
-            LOGGER.info("Failed to read '{}' using OpenCV", filename);
-            final BufferedImage bi = ImageIO.read(f);
-            if (bi == null)
-                throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
-        } else {
-            if (filename.endsWith(".jp2") && CvType.channels(ret.channels()) > 1)
-                Imgproc.cvtColor(ret, ret, Imgproc.COLOR_RGB2BGR);
         }
         LOGGER.trace("Read {} from {}", ret, filename);
         return ret;

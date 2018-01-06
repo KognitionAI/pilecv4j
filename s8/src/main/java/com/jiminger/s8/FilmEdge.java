@@ -255,8 +255,8 @@ public class FilmEdge {
         final short requiredGradDir = // looking for upward pointing gradient
                 (short) (1.0 + (requiredGradDirDeg * (256.0 / 360.0)));
 
-        final byte[] image = (byte[]) edgeImage.data;
-        final byte[] gradient = (byte[]) gradientRaster.data;
+        final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
+        final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
         final int height = edgeImage.rows;
         final int width = edgeImage.cols;
@@ -293,8 +293,8 @@ public class FilmEdge {
         final short requiredGradDir = // looking for upward pointing gradient
                 (short) (1.0 + (requiredGradDirDeg * (256.0 / 360.0)));
 
-        final byte[] image = (byte[]) edgeImage.data;
-        final byte[] gradient = (byte[]) gradientRaster.data;
+        final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
+        final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
         final int height = edgeImage.rows;
         final int width = edgeImage.cols;
@@ -331,8 +331,8 @@ public class FilmEdge {
         final short requiredGradDir = // looking for upward pointing gradient
                 (short) (1.0 + (requiredGradDirDeg * (256.0 / 360.0)));
 
-        final byte[] image = (byte[]) edgeImage.data;
-        final byte[] gradient = (byte[]) gradientRaster.data;
+        final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
+        final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
         final int height = edgeImage.rows;
         final int width = edgeImage.cols;
@@ -372,8 +372,8 @@ public class FilmEdge {
         final short requiredGradDir = // looking for upward pointing gradient
                 (short) (1.0 + (requiredGradDirDeg * (256.0 / 360.0)));
 
-        final byte[] image = (byte[]) edgeImage.data;
-        final byte[] gradient = (byte[]) gradientRaster.data;
+        final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
+        final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
         final int height = edgeImage.rows;
         final int width = edgeImage.cols;

@@ -230,8 +230,8 @@ public class ImageDisplay implements AutoCloseable {
     }
 
     public void update(final Mat image) {
-        final ImageData next = convertToSWT(image);
         Display.getDefault().syncExec(() -> {
+            final ImageData next = convertToSWT(image);
             final Image prev = currentImageRef.getAndSet(new Image(display, next));
             if (prev != null)
                 prev.dispose();

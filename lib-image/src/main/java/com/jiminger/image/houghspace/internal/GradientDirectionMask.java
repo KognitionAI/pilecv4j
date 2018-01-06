@@ -20,15 +20,13 @@
 package com.jiminger.image.houghspace.internal;
 
 import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.CvRaster.BytePixelSetter;
 import com.jiminger.image.houghspace.Model;
 
 /**
- * A mask underpinned by an array of shorts that's used to hold a raster of 
- * gradient direction indications.
+ * A mask underpinned by an array of shorts that's used to hold a raster of gradient direction indications.
  */
 public class GradientDirectionMask {
     public int mwidth;
@@ -38,9 +36,8 @@ public class GradientDirectionMask {
     public byte[] mask;
 
     /**
-    * Instantiate a mask of the given dimensions assuming 
-    *  that the reference point is the center of the mask.
-    */
+     * Instantiate a mask of the given dimensions assuming that the reference point is the center of the mask.
+     */
     public GradientDirectionMask(int mwidth, int mheight) {
         // mwidth and mheight need to be odd
         // so that the center falls exactly
@@ -58,10 +55,10 @@ public class GradientDirectionMask {
     }
 
     /**
-    * Generate a byte image that contains a view of the mask.
-    */
-    public Mat getMaskImage() {
-        final CvRaster raster = CvRaster.create(mheight, mwidth, CvType.CV_8UC1);
+     * Generate a byte image that contains a view of the mask.
+     */
+    public CvRaster getMaskRaster() {
+        final CvRaster raster = CvRaster.createManaged(mheight, mwidth, CvType.CV_8UC1);
         final byte[] pixel = new byte[1];
         raster.apply((BytePixelSetter) (row, col) -> {
             final short gradDeg = get(row, col);
@@ -71,7 +68,7 @@ public class GradientDirectionMask {
             pixel[0] = (byte) (gradByte & 0xff);
             return pixel;
         });
-        return raster.toMat();
+        return raster;
     }
 
     public static GradientDirectionMask generateGradientMask(final Model m, final double w, final double h, final double quantFactor) {
@@ -113,21 +110,15 @@ public class GradientDirectionMask {
     }
 
     /**
-    * Set the value of the mask at a location to 
-    *  the given value. The value should be either
-    *  EDGE or NOEDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
+     * Set the value of the mask at a location to the given value. The value should be either EDGE or NOEDGE. Entries in the mask are accessed by row and column (not x,y).
+     */
     private void set(final int r, final int c, final byte v) {
         mask[(r * mwidth) + c] = v;
     }
 
     /**
-    * Get the value of the mask at a location 
-    *  The return value should be either
-    *  EDGE or NOEDGE. Entries in the mask are 
-    * accessed by row and column (not x,y).
-    */
+     * Get the value of the mask at a location The return value should be either EDGE or NOEDGE. Entries in the mask are accessed by row and column (not x,y).
+     */
     private short get(final int r, final int c) {
         return mask[(r * mwidth) + c];
     }

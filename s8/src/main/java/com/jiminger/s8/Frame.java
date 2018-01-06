@@ -94,9 +94,8 @@ public class Frame {
 
         outOfBounds = false;
 
-        final CvRaster srcraster = CvRaster.create(image.height(), image.width(), image.type());
-        srcraster.loadFrom(image);
-        final CvRaster dstraster = CvRaster.create(frameHeightPix, frameWidthPix, srcraster.type);
+        final CvRaster srcraster = CvRaster.manage(image);
+        final CvRaster dstraster = CvRaster.createManaged(frameHeightPix, frameWidthPix, srcraster.type);
 
         final int srcwidth = srcraster.cols;
         final int srcheight = srcraster.rows;
@@ -128,7 +127,7 @@ public class Frame {
 
         frameCut = true;
 
-        return dstraster.toMat();
+        return dstraster.mat;
     }
 
     public void addProperties(final String section, final Properties prop) {

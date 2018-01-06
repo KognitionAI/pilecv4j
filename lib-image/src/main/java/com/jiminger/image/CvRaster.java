@@ -1,10 +1,13 @@
 package com.jiminger.image;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.Function;
 
 import org.opencv.core.CvType;
@@ -12,12 +15,19 @@ import org.opencv.core.Mat;
 
 /**
  * <p>
- * This class is an easier (perhaps) and more efficient interface to an OpenCV Mat. To use it you as CvRaster to "manage" a {@code Mat}. Using the {@code Mat} through the CvRaster will then operate directly on
- * the image data in the {@code Mat} in a "zero copy" form with a few notable exceptions. When the CvRaster is closed, the underlying mat will be "released."
+ * This class is an easier (perhaps) and more efficient interface to an OpenCV Mat.
+ * Than the one available through the Java wrapper.</p>
+ * 
+ * <p><b>NOTE: This class only works when {@code Mat.isContinuous()} is {@code true}</b></p>
+ * 
+ * <p>To use it you as {@code CvRaster} to "manage" a {@code Mat}. Using the {@code Mat} through
+ * the {@code CvRaster} will then operate directly on the image data in the {@code Mat} in a
+ * "zero copy" form. When the {@code CvRaster} is closed, the underlying {@code Mat} will be
+ * "released" if the {@code CvRaster} is managing the {@code Mat}.
  * </p>
  * 
  * <p>
- * To obtain a CvRaster you use the {@link CvRaster#manage(Mat)} as follows.
+ * To obtain a {@code CvRaster} you use the {@link CvRaster#manage(Mat)} as follows.
  * </p>
  * 
  * <pre>
@@ -27,19 +37,24 @@ import org.opencv.core.Mat;
  * } // raster closed and Mat released
  * </code>
  * </pre>
+ * 
+ * <p>If the {@code Mat} will outlive the {@code CvRaster} then you can use the {@link CvRaster#unmanaged(Mat)} 
+ * method to obtain the CvRaster. In this case you need to ensure that the {@code Mat} is not released
+ * prior to the last use of the {@code CvRaster} which should be to {@code close} it.</p>
  */
 public abstract class CvRaster implements AutoCloseable {
-    // public final Object data;
+
     public final int type;
     public final int channels;
     public final int rows;
     public final int cols;
     public final int elemSize;
+    public final Mat mat;
     protected final int colsXchannels;
-    protected final ByteBuffer bb;
-    private final Mat mat;
+    private final boolean managed;
+    private final ByteBuffer underlying;
 
-    private CvRaster(final Mat m, final ByteBuffer bb) {
+    private CvRaster(final Mat m, final boolean managed, final ByteBuffer underlying) {
         this.rows = m.rows();
         this.cols = m.cols();
         this.type = m.type();
@@ -47,18 +62,116 @@ public abstract class CvRaster implements AutoCloseable {
         this.elemSize = CvType.ELEM_SIZE(type);
         this.colsXchannels = cols * channels;
         this.mat = m;
-        this.bb = bb;
+        this.managed = managed;
+        this.underlying = underlying;
     }
 
+    /**
+     * This call should be made to hand management of the Mat over to the {@link CvRaster}. 
+     * When the CvRaster is closed, it will release the {@code Mat}. If you want to keep 
+     * the {@code Mat} beyond the life of the {@link CvRaster} then consider using 
+     * {@link CvRaster#unmanaged(Mat)}.
+     */
     public static CvRaster manage(final Mat mat) {
-        return makeInstance(mat, getData(mat));
+        return manage(mat, null);
     }
 
-    public static CvRaster copyFrom(final Mat mat) {
-        return makeInstance(mat, copyToPrimitiveArray(mat));
+    /**
+     * <p>This call should be made to hand management of the Mat over to the {@link CvRaster}. 
+     * When the CvRaster is closed, it will release the {@code Mat}. If you want to keep 
+     * the {@code Mat} beyond the life of the {@link CvRaster} then consider using 
+     * {@link CvRaster#unmanaged(Mat)}.</p>
+     * 
+     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * will be added to so that then it closes, this {@link CvRaster} will also be closed
+     * {@code release}-ing the underlying {@code Mat}.
+     */
+    public static CvRaster manage(final Mat mat, final Closer closer) {
+        final CvRaster ret = makeInstance(mat, getData(mat), true);
+        if (closer != null)
+            closer.rastersToClose.add(ret);
+        return ret;
     }
 
-    private static CvRaster makeInstance(final Mat mat, final ByteBuffer bb) {
+    /**
+     * This call can be used to wrap a CvRaster around a {@code Mat} without the {@link CvRaster}
+     * taking over ownership of the {@code Mat}. It will be incumbent on the caller to make
+     * sure the {@code Mat} is not {@code released} prior to the CvRaster being closed.
+     */
+    public static CvRaster unmanaged(final Mat mat) {
+        return unmanaged(mat, null);
+    }
+
+    /**
+     * This call can be used to wrap a CvRaster around a {@code Mat} without the {@link CvRaster}
+     * taking over ownership of the {@code Mat}. It will be incumbent on the caller to make
+     * sure the {@code Mat} is not {@code released} prior to the CvRaster being closed.
+     * 
+     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
+     */
+    public static CvRaster unmanaged(final Mat mat, final Closer closer) {
+        final CvRaster ret = makeInstance(mat, getData(mat), false);
+        if (closer != null)
+            closer.rastersToClose.add(ret);
+        return ret;
+    }
+
+    /**
+     * You can use this method to create a {@link CvRaster} along with it's managed Mat.
+     * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
+     * 
+     * @see CvRaster#manage(Mat)
+     */
+    public static CvRaster createManaged(final int rows, final int cols, final int type) {
+        return createManaged(rows, cols, type, null);
+    }
+
+    /**
+     * You can use this method to create a {@link CvRaster} along with it's managed Mat.
+     * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
+     * 
+     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
+     * 
+     * @see CvRaster#manage(Mat, Closer)
+     */
+    public static CvRaster createManaged(final int rows, final int cols, final int type, final Closer closer) {
+        final Mat mat = Mat.zeros(rows, cols, type);
+        return manage(mat, closer);
+    }
+
+    /**
+     * <p>You can use this method to create a {@link CvRaster} along with an unmanaged {@code Mat}.
+     * It's equivalent to {@code CvRaster.unmanaged(Mat.zeros(rows, cols, type)); }</p>
+     * 
+     * <p><b>Note: You are responsible for freeing the Mat on the {@link CvRaster} after the
+     * {@link CvRaster} has been closed</b></p>
+     * 
+     * @see CvRaster#unmanaged(Mat)
+     */
+    public static CvRaster createUnmanaged(final int rows, final int cols, final int type) {
+        return createUnmanaged(rows, cols, type, null);
+    }
+
+    /**
+     * <p>You can use this method to create a {@link CvRaster} along with an unmanaged {@code Mat}.
+     * It's equivalent to {@code CvRaster.unmanaged(Mat.zeros(rows, cols, type)); }</p>
+     * 
+     * <p><b>Note: You are responsible for freeing the Mat on the {@link CvRaster} after the
+     * {@link CvRaster} has been closed</b></p>
+     * 
+     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
+     * 
+     * @see CvRaster#unmanaged(Mat, Closer)
+     */
+    public static CvRaster createUnmanaged(final int rows, final int cols, final int type, final Closer closer) {
+        final Mat mat = Mat.zeros(rows, cols, type);
+        return unmanaged(mat, closer);
+    }
+
+    private static CvRaster makeInstance(final Mat mat, final ByteBuffer bb, final boolean managed) {
         bb.clear();
         final int type = mat.type();
         final int depth = CvType.depth(type);
@@ -66,27 +179,25 @@ public abstract class CvRaster implements AutoCloseable {
         switch (depth) {
             case CvType.CV_8S:
             case CvType.CV_8U:
-                return new CvRaster(mat, bb) {
+                return new CvRaster(mat, managed, bb) {
+                    final byte[] zeroPixel = new byte[channels];
 
                     @Override
                     public void zero(final int row, final int col) {
-                        final byte[] zeroPixel = new byte[channels]; // zeroed already
-                        apply((BytePixelSetter) (r, c) -> zeroPixel);
+                        set(row, col, zeroPixel);
                     }
 
                     @Override
-                    public Object get(final int row, final int col) {
+                    public Object get(final int pos) {
                         final byte[] ret = new byte[channels];
-                        final int pos = (row * colsXchannels) + (col * channels);
                         bb.position(pos);
                         bb.get(ret);
                         return ret;
                     }
 
                     @Override
-                    public void set(final int row, final int col, final Object pixel) {
+                    public void set(final int pos, final Object pixel) {
                         final byte[] p = (byte[]) pixel;
-                        final int pos = (row * colsXchannels) + (col * channels);
                         bb.position(pos);
                         bb.put(p);
                     }
@@ -103,31 +214,41 @@ public abstract class CvRaster implements AutoCloseable {
                         }
                     }
 
+                    @Override
+                    public <T> void apply(final FlatPixelSetter<T> ps) {
+                        final FlatBytePixelSetter bps = (FlatBytePixelSetter) ps;
+                        final int numElements = (rows * cols * channels);
+
+                        for (int pos = 0; pos < numElements; pos += channels) {
+                            bb.position(pos);
+                            bb.put(bps.pixel(pos));
+                        }
+                    }
+
                 };
             case CvType.CV_16U:
             case CvType.CV_16S:
-                return new CvRaster(mat, bb) {
+                return new CvRaster(mat, managed, bb) {
                     final ShortBuffer sb = bb.asShortBuffer();
+
+                    final short[] zeroPixel = new short[channels]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
-                        final short[] zeroPixel = new short[channels]; // zeroed already
-                        apply((ShortPixelSetter) (r, c) -> zeroPixel);
+                        set(row, col, zeroPixel);
                     }
 
                     @Override
-                    public Object get(final int row, final int col) {
+                    public Object get(final int pos) {
                         final short[] ret = new short[channels];
-                        final int pos = (row * colsXchannels) + (col * channels);
                         sb.position(pos);
                         sb.get(ret);
                         return ret;
                     }
 
                     @Override
-                    public void set(final int row, final int col, final Object pixel) {
+                    public void set(final int pos, final Object pixel) {
                         final short[] p = (short[]) pixel;
-                        final int pos = (row * colsXchannels) + (col * channels);
                         sb.position(pos);
                         sb.put(p);
                     }
@@ -143,30 +264,39 @@ public abstract class CvRaster implements AutoCloseable {
                             }
                         }
                     }
+
+                    @Override
+                    public <T> void apply(final FlatPixelSetter<T> ps) {
+                        final FlatShortPixelSetter bps = (FlatShortPixelSetter) ps;
+                        final int numElements = (rows * cols * channels);
+
+                        for (int pos = 0; pos < numElements; pos += channels) {
+                            sb.position(pos);
+                            sb.put(bps.pixel(pos));
+                        }
+                    }
                 };
             case CvType.CV_32S:
-                return new CvRaster(mat, bb) {
+                return new CvRaster(mat, managed, bb) {
                     final IntBuffer ib = bb.asIntBuffer();
+                    final int[] zeroPixel = new int[channels]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
-                        final int[] zeroPixel = new int[channels]; // zeroed already
-                        apply((IntPixelSetter) (r, c) -> zeroPixel);
+                        set(row, col, zeroPixel);
                     }
 
                     @Override
-                    public Object get(final int row, final int col) {
+                    public Object get(final int pos) {
                         final int[] ret = new int[channels];
-                        final int pos = (row * colsXchannels) + (col * channels);
                         ib.position(pos);
                         ib.get(ret);
                         return ret;
                     }
 
                     @Override
-                    public void set(final int row, final int col, final Object pixel) {
+                    public void set(final int pos, final Object pixel) {
                         final int[] p = (int[]) pixel;
-                        final int pos = (row * colsXchannels) + (col * channels);
                         ib.position(pos);
                         ib.put(p);
                     }
@@ -182,30 +312,39 @@ public abstract class CvRaster implements AutoCloseable {
                             }
                         }
                     }
+
+                    @Override
+                    public <T> void apply(final FlatPixelSetter<T> ps) {
+                        final FlatIntPixelSetter bps = (FlatIntPixelSetter) ps;
+                        final int numElements = (rows * cols * channels);
+
+                        for (int pos = 0; pos < numElements; pos += channels) {
+                            ib.position(pos);
+                            ib.put(bps.pixel(pos));
+                        }
+                    }
                 };
             case CvType.CV_32F:
-                return new CvRaster(mat, bb) {
+                return new CvRaster(mat, managed, bb) {
                     final FloatBuffer fb = bb.asFloatBuffer();
+                    final float[] zeroPixel = new float[channels]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
-                        final float[] zeroPixel = new float[channels]; // zeroed already
-                        apply((FloatPixelSetter) (r, c) -> zeroPixel);
+                        set(row, col, zeroPixel);
                     }
 
                     @Override
-                    public Object get(final int row, final int col) {
+                    public Object get(final int pos) {
                         final float[] ret = new float[channels];
-                        final int pos = (row * colsXchannels) + (col * channels);
                         fb.position(pos);
                         fb.get(ret);
                         return ret;
                     }
 
                     @Override
-                    public void set(final int row, final int col, final Object pixel) {
+                    public void set(final int pos, final Object pixel) {
                         final float[] p = (float[]) pixel;
-                        final int pos = (row * colsXchannels) + (col * channels);
                         fb.position(pos);
                         fb.put(p);
                     }
@@ -221,30 +360,39 @@ public abstract class CvRaster implements AutoCloseable {
                             }
                         }
                     }
+
+                    @Override
+                    public <T> void apply(final FlatPixelSetter<T> ps) {
+                        final FlatFloatPixelSetter bps = (FlatFloatPixelSetter) ps;
+                        final int numElements = (rows * cols * channels);
+
+                        for (int pos = 0; pos < numElements; pos += channels) {
+                            fb.position(pos);
+                            fb.put(bps.pixel(pos));
+                        }
+                    }
                 };
             case CvType.CV_64F:
-                return new CvRaster(mat, bb) {
+                return new CvRaster(mat, true, bb) {
                     final DoubleBuffer db = bb.asDoubleBuffer();
+                    final double[] zeroPixel = new double[channels]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
-                        final double[] zeroPixel = new double[channels]; // zeroed already
-                        apply((DoublePixelSetter) (r, c) -> zeroPixel);
+                        set(row, col, zeroPixel);
                     }
 
                     @Override
-                    public Object get(final int row, final int col) {
+                    public Object get(final int pos) {
                         final double[] ret = new double[channels];
-                        final int pos = (row * colsXchannels) + (col * channels);
                         db.position(pos);
                         db.get(ret);
                         return ret;
                     }
 
                     @Override
-                    public void set(final int row, final int col, final Object pixel) {
+                    public void set(final int pos, final Object pixel) {
                         final double[] p = (double[]) pixel;
-                        final int pos = (row * colsXchannels) + (col * channels);
                         db.position(pos);
                         db.put(p);
                     }
@@ -260,17 +408,47 @@ public abstract class CvRaster implements AutoCloseable {
                             }
                         }
                     }
+
+                    @Override
+                    public <T> void apply(final FlatPixelSetter<T> ps) {
+                        final FlatDoublePixelSetter bps = (FlatDoublePixelSetter) ps;
+                        final int numElements = (rows * cols * channels);
+
+                        for (int pos = 0; pos < numElements; pos += channels) {
+                            db.position(pos);
+                            db.put(bps.pixel(pos));
+                        }
+                    }
                 };
             default:
                 throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
         }
     }
 
+    /**
+     * zero out the pixel at the position (row, col)
+     */
     public abstract void zero(int row, int col);
 
-    public abstract Object get(int row, int col);
+    /**
+     * get the pixel at the flattened position {@code pos}. The type will
+     * depend on the underlying CvType.
+     */
+    public abstract Object get(int pos); // flat get
 
-    public abstract void set(int row, int col, Object pixel);
+    public abstract void set(int pos, Object pixel);
+
+    public abstract <T> void apply(final PixelSetter<T> pixelSetter);
+
+    public abstract <T> void apply(final FlatPixelSetter<T> pixelSetter);
+
+    public Object get(final int row, final int col) {
+        return get((row * colsXchannels) + (col * channels));
+    }
+
+    public void set(final int row, final int col, final Object pixel) {
+        set((row * colsXchannels) + (col * channels), pixel);
+    }
 
     public <U> U reduce(final U identity, final PixelAggregate<Object, U> seqOp) {
         U prev = identity;
@@ -282,19 +460,78 @@ public abstract class CvRaster implements AutoCloseable {
         return prev;
     }
 
-    public <T> void apply(final PixelSetter<T> pixelSetter) {
-        throw new UnsupportedOperationException();
+    public int getNumBytes() {
+        return rows * cols * elemSize;
+    }
+
+    public long getNativeAddressOfData() {
+        return CvRasterNative._getDataAddress(mat.nativeObj);
+    }
+
+    public ByteBuffer dataAsByteBuffer() {
+        return underlying;
+    }
+
+    public void show() {
+        CvRasterNative.showImage(mat.nativeObj);
     }
 
     @Override
     public void close() {
-        if (mat != null && bb.isDirect()) // if the bb is not direct then we're no managing the mat
+        if (mat != null && managed)
             mat.release();
     }
 
-    public static ByteBuffer copyToIndirectByteBuffer(final Mat m) {
-        final byte[] data = new byte[m.rows() * m.cols() * CvType.ELEM_SIZE(m.type())];
-        DoubleBuffer.w
+    @Override
+    public int hashCode() {
+        final int prime = 31;
+        int result = 1;
+        result = prime * result + channels;
+        result = prime * result + cols;
+        result = prime * result + colsXchannels;
+        result = prime * result + elemSize;
+        result = prime * result + (managed ? 1231 : 1237);
+        result = prime * result + rows;
+        result = prime * result + type;
+        return result;
+    }
+
+    @Override
+    public boolean equals(final Object obj) {
+        if (this == obj)
+            return true;
+        if (obj == null)
+            return false;
+        if (getClass() != obj.getClass())
+            return false;
+        final CvRaster other = (CvRaster) obj;
+        if (channels != other.channels)
+            return false;
+        if (cols != other.cols)
+            return false;
+        if (colsXchannels != other.colsXchannels)
+            return false;
+        if (elemSize != other.elemSize)
+            return false;
+        if (managed != other.managed)
+            return false;
+        if (mat == null) {
+            if (other.mat != null)
+                return false;
+        }
+        if (rows != other.rows)
+            return false;
+        if (type != other.type)
+            return false;
+        if (!pixelsIdentical(mat, other.mat))
+            return false;
+        return true;
+    }
+
+    public static boolean pixelsIdentical(final Mat m1, final Mat m2) {
+        final ByteBuffer bb1 = CvRasterNative._getData(m1.nativeObj);
+        final ByteBuffer bb2 = CvRasterNative._getData(m2.nativeObj);
+        return bb1.compareTo(bb2) == 0;
     }
 
     public static <T> T copyToPrimitiveArray(final CvRaster m) {
@@ -451,6 +688,9 @@ public abstract class CvRaster implements AutoCloseable {
         public T apply(Object pixel);
     }
 
+    // ==================================================================
+    // PixelSetter interfaces
+    // ==================================================================
     @FunctionalInterface
     public static interface PixelSetter<T> {
         public T pixel(int row, int col);
@@ -470,6 +710,41 @@ public abstract class CvRaster implements AutoCloseable {
 
     @FunctionalInterface
     public static interface DoublePixelSetter extends PixelSetter<double[]> {}
+    // ==================================================================
+
+    // ==================================================================
+    // FlatPixelSetter interfaces
+    // ==================================================================
+    @FunctionalInterface
+    public static interface FlatPixelSetter<T> {
+        public T pixel(int position);
+    }
+
+    @FunctionalInterface
+    public static interface FlatBytePixelSetter extends FlatPixelSetter<byte[]> {}
+
+    @FunctionalInterface
+    public static interface FlatShortPixelSetter extends FlatPixelSetter<short[]> {}
+
+    @FunctionalInterface
+    public static interface FlatIntPixelSetter extends FlatPixelSetter<int[]> {}
+
+    @FunctionalInterface
+    public static interface FlatFloatPixelSetter extends FlatPixelSetter<float[]> {}
+
+    @FunctionalInterface
+    public static interface FlatDoublePixelSetter extends FlatPixelSetter<double[]> {}
+    // ==================================================================
+
+    public static class Closer implements AutoCloseable {
+        private final List<CvRaster> rastersToClose = new ArrayList<>();
+
+        @Override
+        public void close() {
+            rastersToClose.stream().forEach(r -> r.close());
+        }
+
+    }
 
     @FunctionalInterface
     public static interface PixelAggregate<P, R> {
@@ -477,6 +752,9 @@ public abstract class CvRaster implements AutoCloseable {
     }
 
     private static ByteBuffer getData(final Mat mat) {
-        return CvRasterNative._getData(mat.nativeObj);
+        final ByteBuffer ret = CvRasterNative._getData(mat.nativeObj);
+        if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
+            ret.order(ByteOrder.LITTLE_ENDIAN);
+        return ret;
     }
 }

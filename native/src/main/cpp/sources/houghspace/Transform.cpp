@@ -54,7 +54,7 @@ int maskcheck(unsigned char * mask, jint maskw, jint maskh, int r, int c, int is
 
 JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransformNative
 (JNIEnv * env, jobject /*thethis*/, 
- jbyteArray imageA, jint width, jint /*height*/, jbyteArray gradientDirImageA,
+ jlong imageA, jint width, jint /*height*/, jlong gradientDirImageA,
  jbyteArray maskA, jint maskw, jint maskh, jint maskcr, jint maskcc,
  jbyteArray gradientDirMaskA, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
  jdouble gradientDirSlopDeg, jdouble quantFactor, jshortArray retA, jint hswidth, jint hsheight,
@@ -71,10 +71,8 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
   short gradientDirSlopBytePM = (short)((1.0 + gradientDirSlopDeg * (256.0/360.0))/2.0);
 
   jboolean isCopy;
-  jbyte* image = 
-    (jbyte*)(env->GetPrimitiveArrayCritical(imageA, &isCopy));
-  jbyte* gradientDirImage = 
-    (jbyte*)(env->GetPrimitiveArrayCritical(gradientDirImageA, &isCopy));
+  jbyte* image = (jbyte*)imageA;
+  jbyte* gradientDirImage = (jbyte*)gradientDirImageA; // can be null
   jbyte* mask = 
     (jbyte*)(env->GetPrimitiveArrayCritical(maskA, &isCopy));
   jbyte* gradientDirMask = 
@@ -209,8 +207,6 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
 
   env->ReleasePrimitiveArrayCritical(gradientDirMaskA,gradientDirMask,0);
   env->ReleasePrimitiveArrayCritical(maskA,mask,0);
-  env->ReleasePrimitiveArrayCritical(gradientDirImageA,gradientDirImage,0);
-  env->ReleasePrimitiveArrayCritical(imageA,image,0);
   env->ReleasePrimitiveArrayCritical(retA,ret,0);
 }
 

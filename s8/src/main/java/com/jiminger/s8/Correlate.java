@@ -18,113 +18,107 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-
 import com.jiminger.image.CvRaster;
 
-public class Correlate
-{
-   public static double [] correlation(CvRaster X, CvRaster Y)
-      throws CorrelateException {
-      if (X.rows != Y.rows || X.cols != Y.cols)
-         throw new CorrelateException("images don't have the same dimmentions");
-      
-      if (X.channels != Y.channels)
-          throw new CorrelateException("images don't have the same number of bands");
+public class Correlate {
+    public static double[] correlation(final CvRaster Xraster, final CvRaster Yraster)
+            throws CorrelateException {
+        if (Xraster.rows != Yraster.rows || Xraster.cols != Yraster.cols)
+            throw new CorrelateException("images don't have the same dimmentions");
 
-      int width = X.cols;
-      int height = X.rows;
-      int wh = width * height;
+        if (Xraster.channels != Yraster.channels)
+            throw new CorrelateException("images don't have the same number of bands");
 
-      int dim = X.channels;
-      double [] ret = new double [dim];
+        final int width = Xraster.cols;
+        final int height = Xraster.rows;
+        final int wh = width * height;
 
-      // find the means
-      double Xbar;
-      double Ybar;
+        final int dim = Xraster.channels;
+        final double[] ret = new double[dim];
 
-      byte [] bandx = (byte[])X.data;
-      byte [] bandy = (byte[])Y.data;
+        // find the means
+        double Xbar;
+        double Ybar;
 
-      for (int b = 0; b < dim; b++) {
-         Xbar = 0.0;
-         Ybar = 0.0;
+        final byte[] bandx = CvRaster.copyToPrimitiveArray(Xraster);
+        final byte[] bandy = CvRaster.copyToPrimitiveArray(Yraster);
 
-         int pos = b;
-         for(int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-               Xbar += (double)(bandx[pos] & 0xff);
-               Ybar += (double)(bandy[pos] & 0xff);
-               pos += dim;
+        for (int b = 0; b < dim; b++) {
+            Xbar = 0.0;
+            Ybar = 0.0;
+
+            int pos = b;
+            for (int row = 0; row < height; row++) {
+                for (int col = 0; col < width; col++) {
+                    Xbar += bandx[pos] & 0xff;
+                    Ybar += bandy[pos] & 0xff;
+                    pos += dim;
+                }
             }
-         }
 
-         Xbar /= (double)wh;
-         Ybar /= (double)wh;
+            Xbar /= wh;
+            Ybar /= wh;
 
-         // now Xbar and Ybar are set appropriately.
+            // now Xbar and Ybar are set appropriately.
 
-         // since this is a normalized correlation we will
-         //  calculate the denominator now
-         double XmXbar;
-         double YmYbar;
-         double varx = 0.0;
-         double vary = 0.0;
+            // since this is a normalized correlation we will
+            // calculate the denominator now
+            double XmXbar;
+            double YmYbar;
+            double varx = 0.0;
+            double vary = 0.0;
 
-         pos = b;
-         for(int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-               XmXbar = (double)(bandx[pos] & 0xff) - Xbar;
-               YmYbar = (double)(bandy[pos] & 0xff) - Ybar;
+            pos = b;
+            for (int row = 0; row < height; row++) {
+                for (int col = 0; col < width; col++) {
+                    XmXbar = (bandx[pos] & 0xff) - Xbar;
+                    YmYbar = (bandy[pos] & 0xff) - Ybar;
 
-               // calculate the mag sq
-               varx += (XmXbar * XmXbar);
-               vary += (YmYbar * YmYbar);
-               
-               pos += dim;
+                    // calculate the mag sq
+                    varx += (XmXbar * XmXbar);
+                    vary += (YmYbar * YmYbar);
+
+                    pos += dim;
+                }
             }
-         }
 
-         double denom = Math.sqrt(varx * vary);
-         double numerator = 0.0;
-         
-         pos = b;
-         for(int row = 0; row < height; row++) {
-            for (int col = 0; col < width; col++) {
-               XmXbar = (double)(bandx[pos] & 0xff) - Xbar;
-               YmYbar = (double)(bandy[pos] & 0xff) - Ybar;
+            final double denom = Math.sqrt(varx * vary);
+            double numerator = 0.0;
 
-               numerator += XmXbar * YmYbar;
-               pos += dim;
+            pos = b;
+            for (int row = 0; row < height; row++) {
+                for (int col = 0; col < width; col++) {
+                    XmXbar = (bandx[pos] & 0xff) - Xbar;
+                    YmYbar = (bandy[pos] & 0xff) - Ybar;
+
+                    numerator += XmXbar * YmYbar;
+                    pos += dim;
+                }
             }
-         }
 
-         ret[b] = numerator/denom;
-      }
+            ret[b] = numerator / denom;
+        }
 
-      return ret;
-   }
+        return ret;
+    }
 
-   public static class CorrelateException extends Exception
-   {
-      /**
-     * 
-     */
-    private static final long serialVersionUID = -2120461761070300410L;
+    public static class CorrelateException extends Exception {
+        /**
+        * 
+        */
+        private static final long serialVersionUID = -2120461761070300410L;
 
-    public CorrelateException(String message)
-      {
-         super(message);
-      }
-   }
+        public CorrelateException(final String message) {
+            super(message);
+        }
+    }
 
-   public static String printDoubleArray(double [] ar)
-   {
-      String ret = "[";
-      for (int i = 0; i < ar.length - 1; i++)
-         ret += Double.toString(ar[i]) + ", ";
-      ret += Double.toString(ar[ar.length - 1]) + "]";
+    public static String printDoubleArray(final double[] ar) {
+        String ret = "[";
+        for (int i = 0; i < ar.length - 1; i++)
+            ret += Double.toString(ar[i]) + ", ";
+        ret += Double.toString(ar[ar.length - 1]) + "]";
 
-      return ret;
-   }
+        return ret;
+    }
 }
-

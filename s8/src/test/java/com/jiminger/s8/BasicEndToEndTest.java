@@ -27,10 +27,10 @@ public class BasicEndToEndTest {
     @Test
     public void testExtractFrames() throws Exception {
         // copy the testfile into the temporary folder.
-        try (InputStream is = new BufferedInputStream(BasicEndToEndTest.class.getClassLoader().getResourceAsStream(testFileName));) {
+        try (InputStream is = new BufferedInputStream(getClass().getClassLoader().getResourceAsStream(testFileName));) {
 
             // copy the file into the temp folder
-            final File rootDir = outputDir.newFolder();
+            final File rootDir = new File("/tmp"); // outputDir.newFolder();
             final String testFile = new File(rootDir, testFileName).getAbsolutePath();
 
             try (OutputStream os = new BufferedOutputStream(new FileOutputStream(testFile))) {

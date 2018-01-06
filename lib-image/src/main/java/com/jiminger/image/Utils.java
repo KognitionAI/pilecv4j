@@ -28,8 +28,6 @@ import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferInt;
 import java.awt.image.DataBufferUShort;
 import java.awt.image.IndexColorModel;
-import java.awt.image.Raster;
-import java.awt.image.WritableRaster;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -97,7 +95,7 @@ public class Utils {
         return out;
     }
 
-    private static CvRaster argbDataBufferByteToCvRaster(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
+    private static Mat argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
         final Mat mat = new Mat(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
         final CvRaster raster = CvRaster.manage(mat);
         final byte[] inpixels = bb.getData();
@@ -121,10 +119,10 @@ public class Utils {
                 return outpixel;
             });
         }
-        return raster;
+        return mat;
     }
 
-    private static CvRaster argbDataBufferByteToCvRaster(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
+    private static Mat argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
         final boolean hasAlpha = mask[0] != 0x0;
         final Mat mat = new Mat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
         final CvRaster raster = CvRaster.manage(mat);
@@ -144,7 +142,7 @@ public class Utils {
                 outpixel[3] = (byte) ((pixel & mask[alpha]) >>> shift[alpha]);
             return outpixel;
         });
-        return raster;
+        return mat;
     }
 
     public static Mat img2Mat(final BufferedImage crappyImage) {
@@ -186,8 +184,7 @@ public class Utils {
                         shift = new int[] { 24, 0, 8, 16 };
                         break;
                 }
-                final CvRaster raster = argbDataBufferByteToCvRaster(bb, h, w, masks, shift);
-                return raster.mat;
+                return argbDataBufferByteToMat(bb, h, w, masks, shift);
             }
             case TYPE_3BYTE_BGR:
             case TYPE_4BYTE_ABGR:
@@ -223,8 +220,7 @@ public class Utils {
                         skip = 4;
                         break;
                 }
-                final CvRaster raster = argbDataBufferByteToCvRaster(bb, h, w, lookup, skip);
-                return raster.mat;
+                return argbDataBufferByteToMat(bb, h, w, lookup, skip);
             }
             case TYPE_BYTE_GRAY: {
                 final DataBuffer dataBuffer = crappyImage.getRaster().getDataBuffer();
@@ -466,19 +462,6 @@ public class Utils {
         Imgproc.line(ti, new org.opencv.core.Point(c1 + translatec, r1 + translater),
                 new org.opencv.core.Point(c2 + translatec, r2 + translater),
                 new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
-    }
-
-    public static BufferedImage dbgImage = null;
-
-    public static Graphics2D wrap(final CvRaster cvraster) {
-        if (cvraster.channels != 1 && CvType.depth(cvraster.type) != CvType.CV_8U)
-            throw new IllegalArgumentException("can only get Graphics2D for an 8-bit CvRaster with 1 channel. Was passed " + cvraster);
-        final DataBufferByte db = new DataBufferByte((byte[]) cvraster.data, cvraster.rows * cvraster.cols);
-        final WritableRaster raster = Raster.createInterleavedRaster(db, cvraster.cols, cvraster.rows, cvraster.cols, 1, new int[] { 0 },
-                new java.awt.Point(0, 0));
-        final BufferedImage bi = new BufferedImage(Utils.grayColorModel, raster, false, null);
-        dbgImage = bi;
-        return bi.createGraphics();
     }
 
 }

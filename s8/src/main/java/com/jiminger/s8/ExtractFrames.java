@@ -21,7 +21,6 @@ package com.jiminger.s8;
 import static com.jiminger.image.Utils.print;
 
 import java.awt.Color;
-import java.awt.Graphics2D;
 import java.awt.image.IndexColorModel;
 import java.io.File;
 import java.io.IOException;
@@ -239,7 +238,7 @@ public class ExtractFrames {
 
         final String propertyFileName = outDir + File.separator + "frames.properties";
 
-        final Mat origImage = ImageFile.readImageFileAsMat(sourceFileName);
+        final Mat origImage = ImageFile.readMatFromFile(sourceFileName);
         if (writeDebugImages)
             ImageFile.writeImageFile(origImage, outDir + File.separator + "orig.tif");
 
@@ -296,402 +295,405 @@ public class ExtractFrames {
             ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
         }
 
-        // innefficent but whatever....
-        final CvRaster dxr = CvRaster.manage(dx);
-        final CvRaster dyr = CvRaster.manage(dy);
-        final CvRaster dirs = CvRaster.create(dxr.rows, dxr.cols, CvType.CV_8UC1); // a byte raster to hold the dirs
-        final byte[] dirsa = (byte[]) dirs.data;
-        final short[] dxa = (short[]) dxr.data;
-        final short[] dya = (short[]) dyr.data;
+        try (CvRaster.Closer closer = new CvRaster.Closer()) {
 
-        final int numPixelsInGradient = dxr.rows * dxr.cols;
-        for (int pos = 0; pos < numPixelsInGradient; pos++) {
+            final CvRaster dxr = CvRaster.manage(dx, closer);
+            final CvRaster dyr = CvRaster.manage(dy, closer);
+            final int numPixelsInGradient = dxr.rows * dxr.cols;
+            final byte[] dirsa = new byte[numPixelsInGradient];
 
-            // calculate the angle
-            final double dxv = dxa[pos];
-            final double dyv = 0.0 - dya[pos]; // flip y axis.
-            dirsa[pos] = angle_byte(dxv, dyv);
-        }
+            final short[] tmpdx = new short[numPixelsInGradient];
+            dxr.mat.get(0, 0, tmpdx);
 
-        final Mat gradientDirImage = dirs.toMat();
-        gradientDirImage.put(0, 0, dirsa);
-        if (writeDebugImages) {
-            ImageFile.writeImageFile(gradientDirImage, outDir + File.separator + "gradDir.bmp");
-            // ImageFile.writeImageFile(gradMag.toMat(), outDir + File.separator + "gradMag.tif");
-        }
-        System.out.println("done.");
-        print("dx", dx);
-        print("dy", dy);
+            for (int pos = 0; pos < numPixelsInGradient; pos++) {
+                // calculate the angle
+                final double dxv = ((short[]) dxr.get(pos))[0];
+                final double dyv = 0.0 - ((short[]) dyr.get(pos))[0]; // flip y axis.
+                dirsa[pos] = angle_byte(dxv, dyv);
+            }
 
-        System.out.print("canny ... ");
-        final Mat edgeImage = new Mat();
+            final CvRaster dirs = CvRaster.createManaged(dxr.rows, dxr.cols, CvType.CV_8UC1, closer); // a byte raster to hold the dirs
+            final Mat gradientDirImage = dirs.mat;
+            gradientDirImage.put(0, 0, dirsa);
+            if (writeDebugImages) {
+                ImageFile.writeImageFile(gradientDirImage, outDir + File.separator + "gradDir.bmp");
+                // ImageFile.writeImageFile(gradMag.toMat(), outDir + File.separator + "gradMag.tif");
+            }
+            System.out.println("done.");
+            print("dx", dx);
+            print("dy", dy);
 
-        if (kernelSize >= 5)
-            thigh *= 4.0;
-        if (kernelSize == 7)
-            thigh *= 4.0;
-        final double tlow = (tlowpct / 100.0) * thigh;
+            System.out.print("canny ... ");
+            final Mat edgeImage = new Mat();
 
-        System.out.println("High threshold for Canny hysteresis is " + thigh);
-        System.out.println("Low threshold for Canny hysteresis is " + tlow);
-        Imgproc.Canny(dx, dy, edgeImage, tlow, thigh, true);
+            if (kernelSize >= 5)
+                thigh *= 4.0;
+            if (kernelSize == 7)
+                thigh *= 4.0;
+            final double tlow = (tlowpct / 100.0) * thigh;
 
-        System.out.println("done.");
-        if (writeDebugImages)
-            ImageFile.writeImageFile(edgeImage, outDir + File.separator + "edge.bmp");
-        print("edge", edgeImage);
-        // --------------------------------------
+            System.out.println("High threshold for Canny hysteresis is " + thigh);
+            System.out.println("Low threshold for Canny hysteresis is " + tlow);
+            Imgproc.Canny(dx, dy, edgeImage, tlow, thigh, true);
 
-        final CvRaster edgeRaster = CvRaster.manage(edgeImage);
-        final CvRaster gradientDirRaster = CvRaster.manage(gradientDirImage);
+            System.out.println("done.");
+            if (writeDebugImages)
+                ImageFile.writeImageFile(edgeImage, outDir + File.separator + "edge.bmp");
+            print("edge", edgeImage);
+            // --------------------------------------
 
-        // ------------------------------------------------------------
-        // Now load up the edges of the image. This will set the values
-        // of sprocketEdge and farEdge to the appropriate value
-        // ------------------------------------------------------------
-        timer.start();
-        System.out.print("finding the edges of the film ... ");
-        final FilmEdge[] filmedges = FilmEdge.getEdges(filmLayout, edgeRaster, EDGE, gradientDirRaster, true);
-        final FilmEdge sprocketEdge = reverseImage ? filmedges[0] : filmedges[1];
-        final FilmEdge farEdge = reverseImage ? filmedges[1] : filmedges[0];
-        System.out.println("done (" + timer.stop() + ")");
-        System.out.println("film edges:" + sprocketEdge + " " + farEdge);
-        // ------------------------------------------------------------
+            final CvRaster edgeRaster = CvRaster.manage(edgeImage, closer);
+            final CvRaster gradientDirRaster = CvRaster.manage(gradientDirImage, closer);
 
-        // ------------------------------------------------------------
-        // Do the hough transform of the model. First figure out the
-        // range of pixels to do the transform over. This will
-        // be a certain distance from the edge of the image where
-        // the sprockets are.
-        // ------------------------------------------------------------
-        timer.start();
-        System.out.print("preparing hough transform ... ");
-        final double sprocketHoleWidthPixels = FilmSpec.inPixels(filmType, FilmSpec.widthIndex, resolutiondpi);
-        final double edgeToSprocketCenterPixels = FilmSpec.inPixels(filmType, FilmSpec.edgeToEdgeIndex, resolutiondpi)
-                + (sprocketHoleWidthPixels / 2.0);
-        final double quantFactor = resolutiondpi * 7.0 / 3200.0;
-
-        double furthestPixelToLookFor = edgeToSprocketCenterPixels + (sprocketHoleWidthPixels / 2.0) + (2.0 * quantFactor);
-        double closestPixelToLookFor = edgeToSprocketCenterPixels - ((sprocketHoleWidthPixels / 2.0) + (2.0 * quantFactor));
-
-        int rowstart = 0;
-        int rowend = origImageHeight - 1;
-        int colstart = 0;
-        int colend = origImageWidth - 1;
-        switch (sprocketLayout) {
-            case FilmSpec.alongRight:
-                colstart = sprocketEdge.mostLeft().x - ((int) (furthestPixelToLookFor + 1.0));
-                colend = sprocketEdge.mostRight().x - ((int) (closestPixelToLookFor + 1.0));
-                break;
-            case FilmSpec.alongLeft:
-                colstart = ((int) (closestPixelToLookFor + 1.0)) + sprocketEdge.mostLeft().x;
-                colend = ((int) (furthestPixelToLookFor + 1.0)) + sprocketEdge.mostRight().x;
-                break;
-            case FilmSpec.alongTop:
-                rowstart = ((int) (closestPixelToLookFor + 1.0)) + sprocketEdge.mostTop().y;
-                rowend = ((int) (furthestPixelToLookFor + 1.0)) + sprocketEdge.mostBottom().y;
-                break;
-            case FilmSpec.alongBottom:
-                rowstart = sprocketEdge.mostTop().y - ((int) (furthestPixelToLookFor + 1.0));
-                rowend = sprocketEdge.mostBottom().y - ((int) (closestPixelToLookFor + 1.0));
-                break;
-        }
-
-        // Create the sprocket hole model and the Transform for the model.
-        // in order to locate the clusters in the transform space
-        final SprocketHoleModel sm = new SprocketHoleModel(resolutiondpi, filmType, filmLayout);
-        final Transform transform = new Transform(sm, quantFactor, 1.0, 10.0);
-
-        // // write out the mask and the gradient mask
-        // // for debugging purposes
-        // if (writeDebugImages)
-        // ImageFile.writeImageFile(transform.mask.getMaskImage(), outDir + File.separator + "tmpmask.bmp");
-        if (writeDebugImages)
-            ImageFile.writeImageFile(transform.gradDirMask.getMaskImage(), outDir + File.separator + "tmpgradmask.bmp");
-
-        // Execute the hough transform on the edge image
-        System.out.print("executing hough transform (" + rowstart + "->" +
-                rowend + "," + colstart + "->" + colend + ")" + "... ");
-        final Transform.HoughSpace houghSpace = transform.transform(edgeRaster, gradientDirRaster, houghThreshold,
-                rowstart, rowend, colstart, colend);
-        if (writeDebugImages)
-            ImageFile.writeImageFile(transform.getTransformImage(houghSpace), outDir + File.separator + "tmpht.bmp");
-        System.out.println("done (" + timer.stop() + ")");
-        // ------------------------------------------------------------
-
-        timer.start();
-        System.out.print("writing transform information to debug image ... ");
-        final CvRaster sprocketInfoTiledImage = CvRaster.create(origImageHeight, origImageWidth, CvType.CV_8UC1);
-
-        // // This commented out code if for me to look at the resulting edges.
-        // PolarLineFit.drawPolarLine(sprocketEdge.r,sprocketEdge.c,sprocketInfoTiledImage,Color.cyan);
-        // PolarLineFit.drawPolarLine(farEdge.r,farEdge.c,sprocketInfoTiledImage,Color.cyan);
-        // JAI.create("filestore",sprocketInfoTiledImage,"tmpsprockets.bmp", "BMP", null);
-        // System.exit(0);
-
-        System.out.println("done (" + timer.stop() + ")");
-
-        timer.start();
-        System.out.print("calculating inverse hough transform ...");
-        final List<Transform.HoughSpaceEntry> hse = transform.inverseTransform(houghSpace, sprocketInfoTiledImage, GOVERLAY, ROVERLAY,
-                writeDebugImages ? (outDir + File.separator + "bi.bmp") : null);
-        System.out.println("done (" + timer.stop() + ")");
-
-        // ------------------------------------------------------------
-        // locate the clusters in the transform and prune off
-        // clusters that cant be appropriate based on known information
-        // about the image.
-        // ------------------------------------------------------------
-        timer.start();
-        System.out.print("clustering the transform results ... ");
-        final java.util.List<Transform.Cluster> clusters = transform.cluster(hse, clusterFactor);
-        System.out.println("done (" + timer.stop() + ")");
-
-        // eliminate clusters that fall outside of the edges
-        timer.start();
-        System.out.print("eliminating clusters outside edges ... ");
-
-        furthestPixelToLookFor = edgeToSprocketCenterPixels + (sprocketHoleWidthPixels / 2.0);
-        closestPixelToLookFor = edgeToSprocketCenterPixels - (sprocketHoleWidthPixels / 2.0);
-
-        for (int i = clusters.size() - 1; i >= 0; i--) {
-            final Transform.Cluster cluster = clusters.get(i);
-            final double distToFarEdge = PerpendicularLineCoordFit.perpendicularDistance(cluster, farEdge.edge);
-            final Point p = Utils.closest(cluster, sprocketEdge.edge);
-            final double distBetweenEdgesAtCluster = PerpendicularLineCoordFit.perpendicularDistance(p, farEdge.edge);
-            final double distToCloseEdge = PerpendicularLineCoordFit.distance(cluster, p);
-
-            if (distToFarEdge >= distBetweenEdgesAtCluster ||
-                    distToCloseEdge < closestPixelToLookFor ||
-                    distToCloseEdge > furthestPixelToLookFor)
-                clusters.remove(i);
-        }
-        System.out.println("done (" + timer.stop() + ")");
-
-        timer.start();
-        System.out.print("pruning clusters too far out of line ... ");
-        // now find the best line which passes through the clusters
-        // as a polar - determine what side of center the line
-        // falls on in order to see if the image is correct
-        // or not.
-        double[] result = null;
-        final double maxDistanceFromLine = (resolutiondpi) / 64.0; // this gives 50 at 3200 dpi
-
-        for (boolean done = false; !done;) {
-            final PerpendicularLineCoordFit sprocketErrFunc = new PerpendicularLineCoordFit(clusters, true);
-            final Minimizer m = new Minimizer(sprocketErrFunc);
-            /* double sumSqErr = */ m.minimize(startingPowell);
-            result = m.getFinalPostion();
-
-            final double furthestDist = PerpendicularLineCoordFit.perpendicularDistance(sprocketErrFunc.worst,
-                    PerpendicularLineCoordFit.interpretFinalPosition(result));
-
-            // this prunes off clusters way out of line
-            if (furthestDist > maxDistanceFromLine)
-                clusters.remove(sprocketErrFunc.worst);
-            else
-                done = true;
-        }
-
-        Transform.drawClusters(clusters, sprocketInfoTiledImage, BOVERLAY);
-        System.out.println("done (" + timer.stop() + ")");
-        // ------------------------------------------------------------
-
-        // ------------------------------------------------------------
-        // Minimize the error in the sprocket location, scale, and
-        // rotation and trim clusters without a minimal remaining
-        // number left.
-        // ------------------------------------------------------------
-        timer.start();
-        System.out.print("finding the best fit for the sprocket holes ... ");
-        final List<Transform.Fit> sprockets = new ArrayList<Transform.Fit>();
-        final List<java.awt.Point> prunnedEdges = new ArrayList<java.awt.Point>();
-        final List<Transform.Cluster> removedClusters = new ArrayList<Transform.Cluster>();
-
-        // the minimal number of pixels should at least be
-        // the number in a long edge of a sprocket hole.
-        final double sprocketWidthPix = FilmSpec.inPixels(filmType, FilmSpec.widthIndex, resolutiondpi);
-        final double sprocketHeightPix = FilmSpec.inPixels(filmType, FilmSpec.heightIndex, resolutiondpi);
-        final int minNumPixels = (int) ((sprocketWidthPix > sprocketHeightPix ? sprocketWidthPix : sprocketHeightPix) + 0.5);
-        for (int i = clusters.size() - 1; i >= 0; i--) {
-            prunnedEdges.clear();
-            final Transform.Cluster cluster = clusters.get(i);
-            final Transform.Fit fit = transform.bestFit(cluster, sprocketInfoTiledImage, ROVERLAY, GOVERLAY, prunnedEdges);
-            sprockets.add(fit);
-
-            if (fit.edgeVals.size() < minNumPixels)
-                removedClusters.add(clusters.remove(i));
-        }
-        System.out.println("done (" + timer.stop() + ")" + removedClusters);
-        // ------------------------------------------------------------
-
-        // ------------------------------------------------------------
-        if (allowInterframeGeometry) {
+            // ------------------------------------------------------------
+            // Now load up the edges of the image. This will set the values
+            // of sprocketEdge and farEdge to the appropriate value
+            // ------------------------------------------------------------
             timer.start();
-            System.out.print("Using interframe geometry to validate clusters ... ");
+            System.out.print("finding the edges of the film ... ");
+            final FilmEdge[] filmedges = FilmEdge.getEdges(filmLayout, edgeRaster, EDGE, gradientDirRaster, true);
+            final FilmEdge sprocketEdge = reverseImage ? filmedges[0] : filmedges[1];
+            final FilmEdge farEdge = reverseImage ? filmedges[1] : filmedges[0];
+            System.out.println("done (" + timer.stop() + ")");
+            System.out.println("film edges:" + sprocketEdge + " " + farEdge);
+            // ------------------------------------------------------------
 
-            // -------------------------------------------
-            // First I need to put the Fits in rank order
-            // The rank that seems to work the best needs
-            // to take into account the std deviation as
-            // well as the number of edge pixels that contribute
-            // to the Fit. In this case we sort the list from
-            // lowest stdDev to highest and assign a rank to the
-            // list order. Then sort from highest to lowest contributors
-            // and add that list order to the rank. Those with the highest
-            // rank are considered more likely to be real holes and the
-            // interframeFilter assumes that the first one on the list
-            // is guaranteed to be a hole.
-            // -------------------------------------------
-            Collections.sort(sprockets, Transform.Fit.stdDeviationOrder);
-            final int numSprockets = sprockets.size();
-            List<WeightedFit> wfits = new ArrayList<>(Arrays.asList(
-                    IntStream.range(0, numSprockets).mapToObj(i -> new WeightedFit(sprockets.get(i), numSprockets - i)).toArray(WeightedFit[]::new)));
+            // ------------------------------------------------------------
+            // Do the hough transform of the model. First figure out the
+            // range of pixels to do the transform over. This will
+            // be a certain distance from the edge of the image where
+            // the sprockets are.
+            // ------------------------------------------------------------
+            timer.start();
+            System.out.print("preparing hough transform ... ");
+            final double sprocketHoleWidthPixels = FilmSpec.inPixels(filmType, FilmSpec.widthIndex, resolutiondpi);
+            final double edgeToSprocketCenterPixels = FilmSpec.inPixels(filmType, FilmSpec.edgeToEdgeIndex, resolutiondpi)
+                    + (sprocketHoleWidthPixels / 2.0);
+            final double quantFactor = resolutiondpi * 7.0 / 3200.0;
 
-            Collections.sort(wfits, (o1, o2) -> Transform.Fit.edgeCountOrder.compare(o1.fit, o2.fit));
-            for (int i = 0; i < wfits.size(); i++)
-                wfits.get(i).rank += numSprockets - i;
+            double furthestPixelToLookFor = edgeToSprocketCenterPixels + (sprocketHoleWidthPixels / 2.0) + (2.0 * quantFactor);
+            double closestPixelToLookFor = edgeToSprocketCenterPixels - ((sprocketHoleWidthPixels / 2.0) + (2.0 * quantFactor));
 
-            final List<WeightedFit> verifiedSprockets = new ArrayList<>();
-            final int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
-            if (!FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, wfits, verifiedSprockets)) {
-                // in the odd case where this fails, assume it's due to the fact that
-                // the first point in the list was actually not a real sprocket hole
-                for (boolean done = false; !done && wfits.size() > 0;) {
-                    wfits.remove(0);
-                    verifiedSprockets.clear();
-                    // try again
-                    done = FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, wfits, verifiedSprockets);
+            int rowstart = 0;
+            int rowend = origImageHeight - 1;
+            int colstart = 0;
+            int colend = origImageWidth - 1;
+            switch (sprocketLayout) {
+                case FilmSpec.alongRight:
+                    colstart = sprocketEdge.mostLeft().x - ((int) (furthestPixelToLookFor + 1.0));
+                    colend = sprocketEdge.mostRight().x - ((int) (closestPixelToLookFor + 1.0));
+                    break;
+                case FilmSpec.alongLeft:
+                    colstart = ((int) (closestPixelToLookFor + 1.0)) + sprocketEdge.mostLeft().x;
+                    colend = ((int) (furthestPixelToLookFor + 1.0)) + sprocketEdge.mostRight().x;
+                    break;
+                case FilmSpec.alongTop:
+                    rowstart = ((int) (closestPixelToLookFor + 1.0)) + sprocketEdge.mostTop().y;
+                    rowend = ((int) (furthestPixelToLookFor + 1.0)) + sprocketEdge.mostBottom().y;
+                    break;
+                case FilmSpec.alongBottom:
+                    rowstart = sprocketEdge.mostTop().y - ((int) (furthestPixelToLookFor + 1.0));
+                    rowend = sprocketEdge.mostBottom().y - ((int) (closestPixelToLookFor + 1.0));
+                    break;
+            }
 
-                    if (done)
-                        wfits = verifiedSprockets;
-                }
-            } else
-                wfits = verifiedSprockets;
+            // Create the sprocket hole model and the Transform for the model.
+            // in order to locate the clusters in the transform space
+            final SprocketHoleModel sm = new SprocketHoleModel(resolutiondpi, filmType, filmLayout);
+            final Transform transform = new Transform(sm, quantFactor, 1.0, 10.0);
 
-            // now rebuild the sprockets list
-            sprockets.clear();
-            sprockets.addAll(wfits.stream().map(w -> w.fit).collect(Collectors.toList()));
+            // // write out the mask and the gradient mask
+            // // for debugging purposes
+            // if (writeDebugImages)
+            // ImageFile.writeImageFile(transform.mask.getMaskImage(), outDir + File.separator + "tmpmask.bmp");
+            if (writeDebugImages)
+                ImageFile.writeImageFile(transform.gradDirMask.getMaskRaster().mat, outDir + File.separator + "tmpgradmask.bmp");
+
+            // Execute the hough transform on the edge image
+            System.out.print("executing hough transform (" + rowstart + "->" +
+                    rowend + "," + colstart + "->" + colend + ")" + "... ");
+            final Transform.HoughSpace houghSpace = transform.transform(edgeRaster, gradientDirRaster, houghThreshold,
+                    rowstart, rowend, colstart, colend);
+            if (writeDebugImages)
+                ImageFile.writeImageFile(transform.getTransformRaster(houghSpace).mat, outDir + File.separator + "tmpht.bmp");
+            System.out.println("done (" + timer.stop() + ")");
+            // ------------------------------------------------------------
+
+            timer.start();
+            System.out.print("writing transform information to debug image ... ");
+            final CvRaster sprocketInfoTiledImage = CvRaster.createManaged(origImageHeight, origImageWidth, CvType.CV_8UC1, closer);
+
+            // // This commented out code if for me to look at the resulting edges.
+            // PolarLineFit.drawPolarLine(sprocketEdge.r,sprocketEdge.c,sprocketInfoTiledImage,Color.cyan);
+            // PolarLineFit.drawPolarLine(farEdge.r,farEdge.c,sprocketInfoTiledImage,Color.cyan);
+            // JAI.create("filestore",sprocketInfoTiledImage,"tmpsprockets.bmp", "BMP", null);
+            // System.exit(0);
 
             System.out.println("done (" + timer.stop() + ")");
+
+            timer.start();
+            System.out.print("calculating inverse hough transform ...");
+            final List<Transform.HoughSpaceEntry> hse = transform.inverseTransform(houghSpace, sprocketInfoTiledImage, GOVERLAY, ROVERLAY,
+                    writeDebugImages ? (outDir + File.separator + "bi.bmp") : null);
+            System.out.println("done (" + timer.stop() + ")");
+
+            // ------------------------------------------------------------
+            // locate the clusters in the transform and prune off
+            // clusters that cant be appropriate based on known information
+            // about the image.
+            // ------------------------------------------------------------
+            timer.start();
+            System.out.print("clustering the transform results ... ");
+            final java.util.List<Transform.Cluster> clusters = transform.cluster(hse, clusterFactor);
+            System.out.println("done (" + timer.stop() + ")");
+
+            // eliminate clusters that fall outside of the edges
+            timer.start();
+            System.out.print("eliminating clusters outside edges ... ");
+
+            furthestPixelToLookFor = edgeToSprocketCenterPixels + (sprocketHoleWidthPixels / 2.0);
+            closestPixelToLookFor = edgeToSprocketCenterPixels - (sprocketHoleWidthPixels / 2.0);
+
+            for (int i = clusters.size() - 1; i >= 0; i--) {
+                final Transform.Cluster cluster = clusters.get(i);
+                final double distToFarEdge = PerpendicularLineCoordFit.perpendicularDistance(cluster, farEdge.edge);
+                final Point p = Utils.closest(cluster, sprocketEdge.edge);
+                final double distBetweenEdgesAtCluster = PerpendicularLineCoordFit.perpendicularDistance(p, farEdge.edge);
+                final double distToCloseEdge = PerpendicularLineCoordFit.distance(cluster, p);
+
+                if (distToFarEdge >= distBetweenEdgesAtCluster ||
+                        distToCloseEdge < closestPixelToLookFor ||
+                        distToCloseEdge > furthestPixelToLookFor)
+                    clusters.remove(i);
+            }
+            System.out.println("done (" + timer.stop() + ")");
+
+            timer.start();
+            System.out.print("pruning clusters too far out of line ... ");
+            // now find the best line which passes through the clusters
+            // as a polar - determine what side of center the line
+            // falls on in order to see if the image is correct
+            // or not.
+            double[] result = null;
+            final double maxDistanceFromLine = (resolutiondpi) / 64.0; // this gives 50 at 3200 dpi
+
+            for (boolean done = false; !done;) {
+                final PerpendicularLineCoordFit sprocketErrFunc = new PerpendicularLineCoordFit(clusters, true);
+                final Minimizer m = new Minimizer(sprocketErrFunc);
+                /* double sumSqErr = */ m.minimize(startingPowell);
+                result = m.getFinalPostion();
+
+                final double furthestDist = PerpendicularLineCoordFit.perpendicularDistance(sprocketErrFunc.worst,
+                        PerpendicularLineCoordFit.interpretFinalPosition(result));
+
+                // this prunes off clusters way out of line
+                if (furthestDist > maxDistanceFromLine)
+                    clusters.remove(sprocketErrFunc.worst);
+                else
+                    done = true;
+            }
+
+            Transform.drawClusters(clusters, sprocketInfoTiledImage, BOVERLAY);
+            System.out.println("done (" + timer.stop() + ")");
+            // ------------------------------------------------------------
+
+            // ------------------------------------------------------------
+            // Minimize the error in the sprocket location, scale, and
+            // rotation and trim clusters without a minimal remaining
+            // number left.
+            // ------------------------------------------------------------
+            timer.start();
+            System.out.print("finding the best fit for the sprocket holes ... ");
+            final List<Transform.Fit> sprockets = new ArrayList<Transform.Fit>();
+            final List<java.awt.Point> prunnedEdges = new ArrayList<java.awt.Point>();
+            final List<Transform.Cluster> removedClusters = new ArrayList<Transform.Cluster>();
+
+            // the minimal number of pixels should at least be
+            // the number in a long edge of a sprocket hole.
+            final double sprocketWidthPix = FilmSpec.inPixels(filmType, FilmSpec.widthIndex, resolutiondpi);
+            final double sprocketHeightPix = FilmSpec.inPixels(filmType, FilmSpec.heightIndex, resolutiondpi);
+            final int minNumPixels = (int) ((sprocketWidthPix > sprocketHeightPix ? sprocketWidthPix : sprocketHeightPix) + 0.5);
+            for (int i = clusters.size() - 1; i >= 0; i--) {
+                prunnedEdges.clear();
+                final Transform.Cluster cluster = clusters.get(i);
+                final Transform.Fit fit = transform.bestFit(cluster, sprocketInfoTiledImage, ROVERLAY, GOVERLAY, prunnedEdges);
+                sprockets.add(fit);
+
+                if (fit.edgeVals.size() < minNumPixels)
+                    removedClusters.add(clusters.remove(i));
+            }
+            System.out.println("done (" + timer.stop() + ")" + removedClusters);
+            // ------------------------------------------------------------
+
+            // ------------------------------------------------------------
+            if (allowInterframeGeometry) {
+                timer.start();
+                System.out.print("Using interframe geometry to validate clusters ... ");
+
+                // -------------------------------------------
+                // First I need to put the Fits in rank order
+                // The rank that seems to work the best needs
+                // to take into account the std deviation as
+                // well as the number of edge pixels that contribute
+                // to the Fit. In this case we sort the list from
+                // lowest stdDev to highest and assign a rank to the
+                // list order. Then sort from highest to lowest contributors
+                // and add that list order to the rank. Those with the highest
+                // rank are considered more likely to be real holes and the
+                // interframeFilter assumes that the first one on the list
+                // is guaranteed to be a hole.
+                // -------------------------------------------
+                Collections.sort(sprockets, Transform.Fit.stdDeviationOrder);
+                final int numSprockets = sprockets.size();
+                List<WeightedFit> wfits = new ArrayList<>(Arrays.asList(
+                        IntStream.range(0, numSprockets).mapToObj(i -> new WeightedFit(sprockets.get(i), numSprockets - i))
+                                .toArray(WeightedFit[]::new)));
+
+                Collections.sort(wfits, (o1, o2) -> Transform.Fit.edgeCountOrder.compare(o1.fit, o2.fit));
+                for (int i = 0; i < wfits.size(); i++)
+                    wfits.get(i).rank += numSprockets - i;
+
+                final List<WeightedFit> verifiedSprockets = new ArrayList<>();
+                final int imgLength = FilmSpec.isVertical(filmLayout) ? origImageHeight : origImageWidth;
+                if (!FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, wfits, verifiedSprockets)) {
+                    // in the odd case where this fails, assume it's due to the fact that
+                    // the first point in the list was actually not a real sprocket hole
+                    for (boolean done = false; !done && wfits.size() > 0;) {
+                        wfits.remove(0);
+                        verifiedSprockets.clear();
+                        // try again
+                        done = FilmSpec.interframeFilter(filmType, filmLayout, resolutiondpi, imgLength, wfits, verifiedSprockets);
+
+                        if (done)
+                            wfits = verifiedSprockets;
+                    }
+                } else
+                    wfits = verifiedSprockets;
+
+                // now rebuild the sprockets list
+                sprockets.clear();
+                sprockets.addAll(wfits.stream().map(w -> w.fit).collect(Collectors.toList()));
+
+                System.out.println("done (" + timer.stop() + ")");
+            }
+
+            // ------------------------------------------------------------
+            // This is where I used to do the minimization. Now,
+            // I only want to trim the sprocket by the remaining
+            // clusters.
+            // ------------------------------------------------------------
+
+            // Put the fits in sprocket hole order
+            Collections.sort(sprockets, new FilmSpec.SprocketHoleOrder(filmLayout));
+            Transform.drawFits(sprockets, sprocketInfoTiledImage, YOVERLAY);
+            // ------------------------------------------------------------
+
+            // use the film edge and calculate the resolution average
+            final double resolutionsum = 0.0;
+
+            timer.start();
+            System.out.print("finding and writing output images ");
+
+            // For 8mm it takes two successive sprocket holes to make one
+            // frame. For super-8 it takes only one.
+            final int numFrames = filmType == FilmSpec.eightMMFilmType ? sprockets.size() - 1 : sprockets.size();
+
+            // final Graphics2D g = Utils.wrap(sprocketInfoTiledImage);
+            final Color cyan = new Color(COVERLAY, COVERLAY, COVERLAY);
+            for (int i = 0; i < numFrames; i++) {
+                final Transform.Fit fit = sprockets.get(i);
+
+                // if we are dealing with 8mm then we need to take successive
+                // sprocket holes and find the centroid of the two fits
+                // to find the center of the frame
+                Transform.Fit frameReference = fit;
+                if (filmType == FilmSpec.eightMMFilmType) {
+                    final Transform.Fit fit2 = sprockets.get(i + 1);
+                    frameReference = new Transform.Fit(
+                            (fit.cr + fit2.cr) / 2.0, (fit.cc + fit2.cc) / 2.0, fit.scale, fit.rotation,
+                            null, 0.0, null);
+                }
+
+                FilmEdge sprocketEdgePiece = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
+                if (sprocketEdgePiece == null)
+                    sprocketEdgePiece = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
+                FilmEdge farEdgePiece = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
+                if (farEdgePiece == null)
+                    farEdgePiece = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
+
+                if (sprocketEdgePiece != null) {
+                    sprocketEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
+                    sprocketEdgePiece.writePruned(sprocketInfoTiledImage, ROVERLAY);
+
+                    // for debug purposes draw a circle around the point along the sprocketEdgePiece
+                    // that is closest to the sprocket. This line is the axis of the frame and
+                    // passes through the center.
+                    Utils.drawCircle(Utils.closest(frameReference, sprocketEdgePiece.edge), sprocketInfoTiledImage.mat, cyan);
+                }
+                if (farEdgePiece != null) {
+                    farEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
+                    farEdgePiece.writePruned(sprocketInfoTiledImage, ROVERLAY);
+
+                    // for debug purposes draw a circle around the point along the far edge
+                    // that is closest to the sprocket. This line is the axis of the frame and
+                    // passes through the center.
+                    final Point closest = Utils.closest(frameReference, farEdgePiece.edge);
+                    Utils.drawCircle(closest, sprocketInfoTiledImage.mat, cyan);
+                    Utils.drawLine(frameReference, closest, sprocketInfoTiledImage.mat, cyan);
+                }
+
+                // figure out what the distance between the two edges are
+                //
+                // the distance between two parallel lines in polar coords ought
+                // to be the differences between their radius'
+                // since they are not perfectly parallel (which is a real problem with crappy
+                // scanners) we will measure the distance from the sprocket hole to each edge
+                // and add them.
+                // double calcedEdgeResDPI = -1.0;
+                // if (sprocketEdgePiece != null && farEdgePiece != null) {
+                // double distPix = PolarLineFit.perpendicularDistance(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r) +
+                // PolarLineFit.perpendicularDistance(frameReference,farEdgePiece.c, farEdgePiece.r);
+                //
+                // calcedEdgeResDPI = (distPix * FilmSpec.mmPerInch) / FilmSpec.filmAttribute(filmType,FilmSpec.filmWidthIndex);
+                // }
+
+                final Frame frame = new Frame(frameReference/* (Transform.Fit)sprockets.get(i) */,
+                        sprocketEdgePiece, farEdgePiece, /* filmLayout, */filmType, resolutiondpi);
+
+                final String frameNumStr = (i < 10) ? ("0" + i) : Integer.toString(i);
+
+                System.out.print(".");
+                final Mat frameTiledImageMat = frame.cutFrame(
+                        origImage, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, i, frameOversizeMult,
+                        rescale, correctrotation);
+
+                if (frameTiledImageMat != null) {
+                    // frameTiledImageMat = linearContrast(frameTiledImageMat, 0, 0.3);
+                    ImageFile.writeImageFile(frameTiledImageMat, outDir + File.separator + "f" + frameNumStr + ".tif");
+                    // final Mat tmp1 = convertToGray(frameTiledImageMat);
+                    // final Mat tmp2 = new Mat();
+                    // Imgproc.equalizeHist(tmp1, tmp2);
+                    // ImageFile.writeImageFile(tmp2, outDir + File.separator + "f" + frameNumStr + ".tif");
+                }
+
+                frame.addProperties("frames." + Integer.toString(i), prop);
+            }
+
+            prop.setProperty("frames.numberofframes", Integer.toString(numFrames));
+
+            System.out.println(" done (" + timer.stop() + ")");
+
+            if (writeDebugImages)
+                ImageFile.writeImageFile(Utils.mat2Img(sprocketInfoTiledImage, getOverlayCM()), outDir + File.separator + "tmpsprockets.bmp");
+
+            final double calculatedResolution = (resolutionsum / sprockets.size());
+            System.out.println("calculated resolution based on distance between edges is an average of:" +
+                    calculatedResolution);
+
+            PropertiesUtils.saveProps(prop, propertyFileName, "frame properties for source image " + sourceFileName);
+
+            System.out.println("total time for entire process is " + totalTime.stop());
         }
-
-        // ------------------------------------------------------------
-        // This is where I used to do the minimization. Now,
-        // I only want to trim the sprocket by the remaining
-        // clusters.
-        // ------------------------------------------------------------
-
-        // Put the fits in sprocket hole order
-        Collections.sort(sprockets, new FilmSpec.SprocketHoleOrder(filmLayout));
-        Transform.drawFits(sprockets, sprocketInfoTiledImage, YOVERLAY);
-        // ------------------------------------------------------------
-
-        // use the film edge and calculate the resolution average
-        final double resolutionsum = 0.0;
-
-        timer.start();
-        System.out.print("finding and writing output images ");
-
-        // For 8mm it takes two successive sprocket holes to make one
-        // frame. For super-8 it takes only one.
-        final int numFrames = filmType == FilmSpec.eightMMFilmType ? sprockets.size() - 1 : sprockets.size();
-
-        final Graphics2D g = Utils.wrap(sprocketInfoTiledImage);
-        final Color cyan = new Color(COVERLAY, COVERLAY, COVERLAY);
-        for (int i = 0; i < numFrames; i++) {
-            final Transform.Fit fit = sprockets.get(i);
-
-            // if we are dealing with 8mm then we need to take successive
-            // sprocket holes and find the centroid of the two fits
-            // to find the center of the frame
-            Transform.Fit frameReference = fit;
-            if (filmType == FilmSpec.eightMMFilmType) {
-                final Transform.Fit fit2 = sprockets.get(i + 1);
-                frameReference = new Transform.Fit(
-                        (fit.cr + fit2.cr) / 2.0, (fit.cc + fit2.cc) / 2.0, fit.scale, fit.rotation,
-                        null, 0.0, null);
-            }
-
-            FilmEdge sprocketEdgePiece = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
-            if (sprocketEdgePiece == null)
-                sprocketEdgePiece = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
-            FilmEdge farEdgePiece = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
-            if (farEdgePiece == null)
-                farEdgePiece = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
-
-            if (sprocketEdgePiece != null) {
-                sprocketEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
-                sprocketEdgePiece.writePruned(sprocketInfoTiledImage, ROVERLAY);
-
-                // for debug purposes draw a circle around the point along the sprocketEdgePiece
-                // that is closest to the sprocket. This line is the axis of the frame and
-                // passes through the center.
-                Utils.drawCircle(Utils.closest(frameReference, sprocketEdgePiece.edge), g, cyan);
-            }
-            if (farEdgePiece != null) {
-                farEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
-                farEdgePiece.writePruned(sprocketInfoTiledImage, ROVERLAY);
-
-                // for debug purposes draw a circle around the point along the far edge
-                // that is closest to the sprocket. This line is the axis of the frame and
-                // passes through the center.
-                final Point closest = Utils.closest(frameReference, farEdgePiece.edge);
-                Utils.drawCircle(closest, g, cyan);
-                Utils.drawLine(frameReference, closest, g, cyan);
-            }
-
-            // figure out what the distance between the two edges are
-            //
-            // the distance between two parallel lines in polar coords ought
-            // to be the differences between their radius'
-            // since they are not perfectly parallel (which is a real problem with crappy
-            // scanners) we will measure the distance from the sprocket hole to each edge
-            // and add them.
-            // double calcedEdgeResDPI = -1.0;
-            // if (sprocketEdgePiece != null && farEdgePiece != null) {
-            // double distPix = PolarLineFit.perpendicularDistance(frameReference,sprocketEdgePiece.c, sprocketEdgePiece.r) +
-            // PolarLineFit.perpendicularDistance(frameReference,farEdgePiece.c, farEdgePiece.r);
-            //
-            // calcedEdgeResDPI = (distPix * FilmSpec.mmPerInch) / FilmSpec.filmAttribute(filmType,FilmSpec.filmWidthIndex);
-            // }
-
-            final Frame frame = new Frame(frameReference/* (Transform.Fit)sprockets.get(i) */,
-                    sprocketEdgePiece, farEdgePiece, /* filmLayout, */filmType, resolutiondpi);
-
-            final String frameNumStr = (i < 10) ? ("0" + i) : Integer.toString(i);
-
-            System.out.print(".");
-            final Mat frameTiledImageMat = frame.cutFrame(
-                    origImage, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, i, frameOversizeMult,
-                    rescale, correctrotation);
-
-            if (frameTiledImageMat != null) {
-                // frameTiledImageMat = linearContrast(frameTiledImageMat, 0, 0.3);
-                ImageFile.writeImageFile(frameTiledImageMat, outDir + File.separator + "f" + frameNumStr + ".tif");
-                // final Mat tmp1 = convertToGray(frameTiledImageMat);
-                // final Mat tmp2 = new Mat();
-                // Imgproc.equalizeHist(tmp1, tmp2);
-                // ImageFile.writeImageFile(tmp2, outDir + File.separator + "f" + frameNumStr + ".tif");
-            }
-
-            frame.addProperties("frames." + Integer.toString(i), prop);
-        }
-
-        prop.setProperty("frames.numberofframes", Integer.toString(numFrames));
-
-        System.out.println(" done (" + timer.stop() + ")");
-
-        if (writeDebugImages)
-            ImageFile.writeImageFile(Utils.mat2Img(sprocketInfoTiledImage, getOverlayCM()), outDir + File.separator + "tmpsprockets.bmp");
-
-        final double calculatedResolution = (resolutionsum / sprockets.size());
-        System.out.println("calculated resolution based on distance between edges is an average of:" +
-                calculatedResolution);
-
-        PropertiesUtils.saveProps(prop, propertyFileName, "frame properties for source image " + sourceFileName);
-
-        System.out.println("total time for entire process is " + totalTime.stop());
     }
 
     private static class Hist {
@@ -700,7 +702,7 @@ public class ExtractFrames {
         public int min = Integer.MAX_VALUE;
     }
 
-    private static Mat applyCdf(final int[] cdf, final CvRaster src) {
+    private static CvRaster applyCdf(final int[] cdf, final CvRaster src) {
         final int maxPixVal = cdf.length - 1; // should be either 0xff or 0xffff
         if (maxPixVal != 0xff && maxPixVal != 0xffff)
             throw new RuntimeException();
@@ -711,44 +713,45 @@ public class ExtractFrames {
         for (int idx = 0; idx < scale.length; idx++)
             scale[idx] = cdf[idx] * factor;
 
-        final CvRaster tmp = CvRaster.create(src.rows, src.cols, CvType.CV_32SC3);
+        try (final CvRaster tmp = CvRaster.createManaged(src.rows, src.cols, CvType.CV_32SC3);) {
 
-        final PixelToInts p2i = CvRaster.pixelToIntsConverter(src);
+            final PixelToInts p2i = CvRaster.pixelToIntsConverter(src);
 
-        int maxChannel = 0;
-        for (int r = 0; r < src.rows; r++) {
-            for (int c = 0; c < src.cols; c++) {
-                final int[] sbgr = p2i.apply(src.get(r, c));
-                double intensity = (sbgr[0] & maxPixVal);
-                for (int idx = 1; idx < sbgr.length; idx++)
-                    intensity += sbgr[idx] & maxPixVal;
-                intensity /= 3.0;
-                final double boost = scale[(int) Math.round(intensity)] / intensity;
-                final int[] newpix = new int[3];
-                for (int idx = 0; idx < 3; idx++) {
-                    final int cv = (int) Math.round((sbgr[idx] & maxPixVal) * boost);
-                    if (maxChannel < cv)
-                        maxChannel = cv;
-                    newpix[idx] = cv;
+            int maxChannel = 0;
+            for (int r = 0; r < src.rows; r++) {
+                for (int c = 0; c < src.cols; c++) {
+                    final int[] sbgr = p2i.apply(src.get(r, c));
+                    double intensity = (sbgr[0] & maxPixVal);
+                    for (int idx = 1; idx < sbgr.length; idx++)
+                        intensity += sbgr[idx] & maxPixVal;
+                    intensity /= 3.0;
+                    final double boost = scale[(int) Math.round(intensity)] / intensity;
+                    final int[] newpix = new int[3];
+                    for (int idx = 0; idx < 3; idx++) {
+                        final int cv = (int) Math.round((sbgr[idx] & maxPixVal) * boost);
+                        if (maxChannel < cv)
+                            maxChannel = cv;
+                        newpix[idx] = cv;
+                    }
+                    tmp.set(r, c, newpix);
                 }
-                tmp.set(r, c, newpix);
             }
-        }
 
-        // now rescale so maxChannel is 0xffff.
-        final double rescale = maxPixValD / maxChannel;
-        final IntsToPixel toPix = CvRaster.intsToPixelConverter(src);
-        for (int r = 0; r < tmp.rows; r++) {
-            for (int c = 0; c < tmp.cols; c++) {
-                final int[] bgr = (int[]) tmp.get(r, c);
-                final int[] sbgr = new int[3];
-                for (int i = 0; i < 3; i++)
-                    sbgr[i] = (int) Math.round(bgr[i] * rescale);
-                src.set(r, c, toPix.apply(sbgr));
+            // now rescale so maxChannel is 0xffff.
+            final double rescale = maxPixValD / maxChannel;
+            final IntsToPixel toPix = CvRaster.intsToPixelConverter(src);
+            for (int r = 0; r < tmp.rows; r++) {
+                for (int c = 0; c < tmp.cols; c++) {
+                    final int[] bgr = (int[]) tmp.get(r, c);
+                    final int[] sbgr = new int[3];
+                    for (int i = 0; i < 3; i++)
+                        sbgr[i] = (int) Math.round(bgr[i] * rescale);
+                    src.set(r, c, toPix.apply(sbgr));
+                }
             }
-        }
 
-        return src.toMat();
+            return src;
+        }
     }
 
     public static PixelAggregate<Object, Hist> histogram(final CvRaster raster) {
@@ -766,9 +769,7 @@ public class ExtractFrames {
         };
     }
 
-    public static Mat linearContrast(final Mat src, final double lowerpct, final double upperpct) {
-        final CvRaster raster = CvRaster.manage(src);
-
+    public static CvRaster linearContrast(final CvRaster raster, final double lowerpct, final double upperpct) {
         System.out.print("|");
         final Hist minmax = raster.reduce(new Hist(), histogram(raster));
 

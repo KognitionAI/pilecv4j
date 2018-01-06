@@ -23,6 +23,16 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.tensorflow</groupId>
+      <artifactId>tensorflow</artifactId>
+    </dependency>
+
+    <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+    </dependency>
+
     <dependency> <!-- needed for image work but no numerical recipies -->
       <groupId>com.jiminger</groupId>
       <artifactId>opencv-lib-jar</artifactId>

@@ -20,9 +20,6 @@
 package com.jiminger.image.houghspace;
 
 import java.awt.Color;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,10 +29,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 
 import com.jiminger.image.CvRaster;
-import com.jiminger.image.ImageFile;
+import com.jiminger.image.CvRaster.FlatBytePixelSetter;
 import com.jiminger.image.Utils;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.WeightedPoint;
@@ -70,11 +66,10 @@ public class Transform {
 
     public HoughSpace transform(final CvRaster raster, final CvRaster gradientRaster, final int houghThreshold,
             int rowstart, int rowend, int colstart, int colend) {
-        // final byte[] image = (byte[]) raster.data;
         final int height = raster.rows;
         final int width = raster.cols;
 
-        // final byte[] gradientDirImage = gradientRaster == null ? null : (byte[]) gradientRaster.data;
+        final long gradientDirImage = gradientRaster == null ? 0 : gradientRaster.getNativeAddressOfData();
 
         // the size of the hough space should be quantFactor smaller
         final int htheight = (int) ((height) / quantFactor) + 1;
@@ -93,7 +88,7 @@ public class Transform {
         if (colend >= width)
             colend = width - 1;
 
-        houghTransformNative(image, width, height, gradientDirImage,
+        houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
                 mask.mask, mask.mwidth, mask.mheight, mask.maskcr, mask.maskcc,
                 gradDirMask.mask, gradDirMask.mwidth, gradDirMask.mheight, gradDirMask.maskcr, gradDirMask.maskcc,
                 gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, hsem, houghThreshold,
@@ -104,7 +99,7 @@ public class Transform {
         return new HoughSpace(ret, htwidth, htheight, quantFactor, hsem.entries);
     }
 
-    native public void houghTransformNative(byte[] image, int width, int height, byte[] gradientDirImage,
+    native public void houghTransformNative(long image, int width, int height, long gradientDirImage,
             byte[] mask, int maskw, int maskh, int maskcr, int maskcc,
             byte[] gradDirMask, int gdmaskw, int gdmaskh, int gdmaskcr, int gdmaskcc,
             double gradientDirSlopDeg, double quantFactor,
@@ -119,8 +114,6 @@ public class Transform {
         final List<HoughSpaceEntry> sortedSet = new LinkedList<HoughSpaceEntry>();
 
         sortedSet.addAll(houghSpace.backMapEntries);
-        final Graphics2D g = Utils.wrap(ti);
-        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_OFF);
 
         Collections.sort(sortedSet, new HoughSpaceEntry.HSEComparator());
         final Color peakCircleColor = new Color(peakCircleColorValue, peakCircleColorValue, peakCircleColorValue);
@@ -133,30 +126,30 @@ public class Transform {
                 final int eir = e.ir;
                 final int eic = e.ic;
 
-                Utils.drawCircle(eir, eic, g, peakCircleColor);
+                Utils.drawCircle(eir, eic, ti.mat, peakCircleColor);
 
                 for (final java.awt.Point p : e.contributingImagePoints)
                     ti.set(p.y, p.x, overlayPixel);
             }
         }
 
-        if (outputFileName != null) {
-            try {
-                ImageFile.writeImageFile(Utils.dbgImage, outputFileName);
-            } catch (final IOException ioe) {
-                ioe.printStackTrace();
-            }
-        }
+        // if (outputFileName != null) {
+        // try {
+        // ImageFile.writeImageFile(Utils.dbgImage, outputFileName);
+        // } catch (final IOException ioe) {
+        // ioe.printStackTrace();
+        // }
+        // }
 
         return sortedSet;
     }
 
-    public Mat getTransformImage(final HoughSpace houghSpace0) {
+    public CvRaster getTransformRaster(final HoughSpace houghSpace0) {
         final short[] houghSpace = houghSpace0.houghSpace;
         final int width = houghSpace0.hswidth;
         final int height = houghSpace0.hsheight;
 
-        final CvRaster gradRaster = CvRaster.create(height, width, CvType.CV_8UC1);
+        final CvRaster gradRaster = CvRaster.createManaged(height, width, CvType.CV_8UC1);
 
         int max = 0;
         for (int i = 0; i < houghSpace.length; i++) {
@@ -165,18 +158,19 @@ public class Transform {
                 max = count;
         }
 
-        final byte[] dest = (byte[]) gradRaster.data;
-        for (int i = 0; i < houghSpace.length; i++) {
-            int intVal = (int) (((double) (houghSpace[i]) / (double) max) * 255.0);
+        final byte[] pixel = new byte[1];
+        final double finalMax = max;
+        gradRaster.apply((FlatBytePixelSetter) pos -> {
+            int intVal = (int) (((houghSpace[pos]) / finalMax) * 255.0);
             if (intVal < 0)
                 intVal = 0;
             else if (intVal > 255)
                 intVal = 255;
+            pixel[0] = (byte) intVal;
+            return pixel;
+        });
 
-            dest[i] = (byte) intVal;
-        }
-
-        return gradRaster.toMat();
+        return gradRaster;
     }
 
     public List<Cluster> cluster(final List<HoughSpaceEntry> houghEntries, final double percentModelCoverage) {
@@ -291,17 +285,15 @@ public class Transform {
     }
 
     public static void drawClusters(final List<Cluster> clusters, final CvRaster ti, final byte color) {
-        final Graphics2D g = Utils.wrap(ti);
-        g.setColor(new Color(color, color, color));
+        final Color colorC = new Color(color, color, color);
         for (final Cluster c : clusters)
-            drawCircle(g, c.imageRow(), c.imageCol());
+            Utils.drawCircle(c.imageRow(), c.imageCol(), ti.mat, colorC);
     }
 
     public static void drawFits(final List<Transform.Fit> fits, final CvRaster ti, final byte color) {
-        final Graphics2D g = Utils.wrap(ti);
-        g.setColor(new Color(color, color, color));
+        final Color colorC = new Color(color, color, color);
         for (final Fit c : fits)
-            drawCircle(g, (int) Math.round(c.cr), (int) Math.round(c.cc));
+            Utils.drawCircle((int) Math.round(c.cr), (int) Math.round(c.cc), ti.mat, colorC);
     }
 
     public static class HoughSpaceEntryManager {
@@ -325,11 +317,6 @@ public class Transform {
 
             e.addContribution(imrow, imcol);
         }
-    }
-
-    public static void drawCircle(final Graphics2D g, final int r, final int c) {
-        final int radius = 10;
-        g.drawOval(c - radius, r - radius, 2 * radius, 2 * radius);
     }
 
     public static class HoughSpaceEntry {
