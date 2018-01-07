@@ -472,9 +472,9 @@ public abstract class CvRaster implements AutoCloseable {
         return underlying;
     }
 
-    public void show() {
-        CvRasterNative.showImage(mat.nativeObj);
-    }
+//    public void show() {
+//        CvRasterNative.showImage(mat.nativeObj);
+//    }
 
     @Override
     public void close() {
