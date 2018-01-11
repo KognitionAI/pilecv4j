@@ -13,6 +13,8 @@ import java.util.function.Function;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
+import net.dempsy.util.library.NativeLibraryLoader;
+
 /**
  * <p>
  * This class is an easier (perhaps) and more efficient interface to an OpenCV Mat.
@@ -43,6 +45,25 @@ import org.opencv.core.Mat;
  * prior to the last use of the {@code CvRaster} which should be to {@code close} it.</p>
  */
 public abstract class CvRaster implements AutoCloseable {
+
+    /**
+     * If you're going to use OpenCv classes before using CvRaster then
+     * you need to bootstrap the initializing of OpenCv (which boils down
+     * to loading the native libraries). This can be done by calling
+     * this method.
+     */
+    public static void initOpenCv() {} // causes the classloader to initialize the static block and load the native libs
+
+    static void init() {
+        NativeLibraryLoader.loader()
+                .library("opencv_java340")
+                .library("lib-image-native.jiminger.com")
+                .load();
+    }
+
+    static {
+        init();
+    }
 
     public final int type;
     public final int channels;
@@ -472,9 +493,9 @@ public abstract class CvRaster implements AutoCloseable {
         return underlying;
     }
 
-//    public void show() {
-//        CvRasterNative.showImage(mat.nativeObj);
-//    }
+    // public void show() {
+    // CvRasterNative.showImage(mat.nativeObj);
+    // }
 
     @Override
     public void close() {

@@ -5,8 +5,9 @@ import org.junit.Test;
 import net.dempsy.util.library.NativeLibraryLoader;
 
 public class TestLibraryLoader {
+
     @Test
     public void testLibraryLoading() throws Exception {
-        NativeLibraryLoader.init();
+        NativeLibraryLoader.loader().library("utilities.jiminger.com").load();
     }
 }

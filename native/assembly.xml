@@ -17,11 +17,4 @@
       </includes> 
     </fileSet>
   </fileSets>
-  <files>
-    <file>
-      <source>${platform}/net.dempsy.lib.properties</source>
-      <outputDirectory>/</outputDirectory>
-      <filtered>true</filtered>
-    </file>
-  </files>
 </assembly>

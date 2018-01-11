@@ -53,8 +53,6 @@ import com.jiminger.nr.MinimizerException;
 import com.jiminger.util.CommandLineParser;
 import com.jiminger.util.PropertiesUtils;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
 /*******************************************************************
  * Because I had to look this up 8000 times I decided to document it.
  *
@@ -158,8 +156,6 @@ public class ExtractFrames {
         cvrtScaleDenom[CvType.CV_16S] = (0x7fff);
         cvrtScaleDenom[CvType.CV_8U] = (0xff);
         cvrtScaleDenom[CvType.CV_8S] = (0x7f);
-
-        NativeLibraryLoader.init();
     }
 
     public static Mat convertToGray(final Mat src) {

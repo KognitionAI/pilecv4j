@@ -22,8 +22,14 @@ package com.jiminger.nr;
 import net.dempsy.util.library.NativeLibraryLoader;
 
 public class Minimizer {
+    public static void init() {
+        NativeLibraryLoader.loader()
+                .library("utilities.jiminger.com")
+                .load();
+    }
+
     static {
-        NativeLibraryLoader.init();
+        init();
     }
 
     private final Func f;

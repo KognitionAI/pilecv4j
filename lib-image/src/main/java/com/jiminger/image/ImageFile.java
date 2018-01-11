@@ -50,7 +50,7 @@ public class ImageFile {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
 
     static {
-        // NativeLibraryLoader.init();
+        CvRaster.init();
     }
 
     public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {

@@ -4,12 +4,7 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
 public class TestMinimizer {
-    static {
-        NativeLibraryLoader.init();
-    }
 
     static class MyMinFinc implements Minimizer.Func {
 

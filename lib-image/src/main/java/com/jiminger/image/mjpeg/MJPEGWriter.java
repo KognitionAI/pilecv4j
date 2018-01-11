@@ -31,13 +31,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 
 import com.jiminger.util.CommandLineParser;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
 public class MJPEGWriter {
-    static {
-        NativeLibraryLoader.init();
-    }
-
     static public String parentDir = null;
     static public String avifile = "out.avi";
     public static int avifps = 16;

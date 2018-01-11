@@ -12,27 +12,21 @@ import org.opencv.core.CvType;
 
 import com.jiminger.image.CvRaster.BytePixelSetter;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
 public class CvRasterTest {
 
     @Rule
     public TemporaryFolder tempDir = new TemporaryFolder();
 
-    static {
-    	NativeLibraryLoader.init();
-    }
-
-//    @Test
-//    public void test() throws Exception {
-//        final String expectedFileLocation = new File(
-//                getClass().getClassLoader().getResource("test-images/expected-8bit-grey.darkToLight.bmp").getFile())
-//                        .getPath();
-//        final Mat mat = ImageFile.readMatFromFile(expectedFileLocation);
-//        final CvRaster underTest = CvRaster.manage(mat);
-//        underTest.show();
-//        Thread.sleep(20000);
-//    }
+    // @Test
+    // public void test() throws Exception {
+    // final String expectedFileLocation = new File(
+    // getClass().getClassLoader().getResource("test-images/expected-8bit-grey.darkToLight.bmp").getFile())
+    // .getPath();
+    // final Mat mat = ImageFile.readMatFromFile(expectedFileLocation);
+    // final CvRaster underTest = CvRaster.manage(mat);
+    // underTest.show();
+    // Thread.sleep(20000);
+    // }
 
     @Test
     public void testSimpleCreate() throws Exception {

@@ -28,12 +28,7 @@ import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
 public class ImageDisplay implements AutoCloseable {
-    static {
-        NativeLibraryLoader.init();
-    }
 
     private final AtomicReference<Image> currentImageRef = new AtomicReference<Image>(null);
     private Display display;
