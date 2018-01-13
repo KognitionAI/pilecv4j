@@ -56,6 +56,7 @@ public abstract class CvRaster implements AutoCloseable {
 
     static void init() {
         NativeLibraryLoader.loader()
+                .optional("opencv_ffmpeg340_64")
                 .library("opencv_java340")
                 .library("lib-image-native.jiminger.com")
                 .load();
