@@ -24,6 +24,7 @@ import java.util.Properties;
 import org.opencv.core.Mat;
 
 import com.jiminger.image.CvRaster;
+import com.jiminger.image.CvRaster.Closer;
 import com.jiminger.image.Utils;
 import com.jiminger.image.geometry.PerpendicularLineCoordFit;
 import com.jiminger.image.houghspace.Transform;
@@ -94,40 +95,42 @@ public class Frame {
 
         outOfBounds = false;
 
-        final CvRaster srcraster = CvRaster.manage(image);
-        final CvRaster dstraster = CvRaster.createManaged(frameHeightPix, frameWidthPix, srcraster.type);
+        try (Closer closer = new Closer()) {
+            final CvRaster srcraster = CvRaster.manageCopy(image, closer);
+            final CvRaster dstraster = CvRaster.createManaged(frameHeightPix, frameWidthPix, srcraster.type, closer);
 
-        final int srcwidth = srcraster.cols;
-        final int srcheight = srcraster.rows;
+            final int srcwidth = srcraster.cols;
+            final int srcheight = srcraster.rows;
 
-        final int dstwidth = dstraster.cols;
-        final int dstheight = dstraster.rows;
+            final int dstwidth = dstraster.cols;
+            final int dstheight = dstraster.rows;
 
-        for (int dstRow = 0; dstRow < dstheight; dstRow++) {
-            for (int dstCol = 0; dstCol < dstwidth; dstCol++) {
-                final Point srclocation = map(dstRow, dstCol, frameWidthPix, frameHeightPix, reverseImage);
+            for (int dstRow = 0; dstRow < dstheight; dstRow++) {
+                for (int dstCol = 0; dstCol < dstwidth; dstCol++) {
+                    final Point srclocation = map(dstRow, dstCol, frameWidthPix, frameHeightPix, reverseImage);
 
-                if (leftmostCol > srclocation.x)
-                    leftmostCol = srclocation.x;
-                if (rightmostCol < srclocation.x)
-                    rightmostCol = srclocation.x;
-                if (topmostRow > srclocation.y)
-                    topmostRow = srclocation.y;
-                if (bottommostRow < srclocation.y)
-                    bottommostRow = srclocation.y;
+                    if (leftmostCol > srclocation.x)
+                        leftmostCol = srclocation.x;
+                    if (rightmostCol < srclocation.x)
+                        rightmostCol = srclocation.x;
+                    if (topmostRow > srclocation.y)
+                        topmostRow = srclocation.y;
+                    if (bottommostRow < srclocation.y)
+                        bottommostRow = srclocation.y;
 
-                if (srclocation.y < 0 || srclocation.y >= srcheight ||
-                        srclocation.x < 0 || srclocation.x >= srcwidth) {
-                    dstraster.zero(dstRow, dstCol);
-                    outOfBounds = true;
-                } else
-                    dstraster.set(dstRow, dstCol, srcraster.get(srclocation.y, srclocation.x));
+                    if (srclocation.y < 0 || srclocation.y >= srcheight ||
+                            srclocation.x < 0 || srclocation.x >= srcwidth) {
+                        dstraster.zero(dstRow, dstCol);
+                        outOfBounds = true;
+                    } else
+                        dstraster.set(dstRow, dstCol, srcraster.get(srclocation.y, srclocation.x));
+                }
             }
+
+            frameCut = true;
+
+            return dstraster.decoupled();
         }
-
-        frameCut = true;
-
-        return dstraster.mat;
     }
 
     public void addProperties(final String section, final Properties prop) {

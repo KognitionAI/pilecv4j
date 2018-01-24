@@ -26,7 +26,6 @@ import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.ScrollBar;
 import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 
 public class ImageDisplay implements AutoCloseable {
 
@@ -71,7 +70,7 @@ public class ImageDisplay implements AutoCloseable {
         this(null);
     }
 
-    public ImageDisplay(final Mat mat) {
+    public ImageDisplay(final CvRaster mat) {
         setup(mat);
     }
 
@@ -84,7 +83,7 @@ public class ImageDisplay implements AutoCloseable {
         shell.setLayout(new FillLayout());
     }
 
-    private void setup(final Mat mat) {
+    private void setup(final CvRaster mat) {
         final CountDownLatch latch = new CountDownLatch(1);
 
         eventThread = new Thread(() -> {
@@ -95,7 +94,7 @@ public class ImageDisplay implements AutoCloseable {
 
                 Image currentImage = null;
 
-                if (mat != null && mat.width() > 0 && mat.height() > 0) {
+                if (mat != null && mat.cols > 0 && mat.rows > 0) {
                     currentImage = new Image(display, convertToSWT(mat));
                 }
 
@@ -202,18 +201,20 @@ public class ImageDisplay implements AutoCloseable {
                         display.sleep();
                 }
             } finally {
-                if (!shell.isDisposed()) {
-                    final Image prev = currentImageRef.getAndSet(null);
-                    if (prev != null)
-                        prev.dispose();
-                    if (canvas != null)
-                        canvas.dispose();
-                    if (shell != null)
-                        shell.dispose();
-                    if (display != null)
-                        display.dispose();
+                if (shell != null) {
+                    if (!shell.isDisposed()) {
+                        final Image prev = currentImageRef.getAndSet(null);
+                        if (prev != null)
+                            prev.dispose();
+                        if (canvas != null)
+                            canvas.dispose();
+                        if (shell != null)
+                            shell.dispose();
+                        if (display != null)
+                            display.dispose();
+                    }
+                    eventLoopDoneLatch.countDown();
                 }
-                eventLoopDoneLatch.countDown();
             }
         }, "SWT Event Loop");
         eventThread.start();
@@ -224,7 +225,7 @@ public class ImageDisplay implements AutoCloseable {
         }
     }
 
-    public void update(final Mat image) {
+    public synchronized void update(final CvRaster image) {
         Display.getDefault().syncExec(() -> {
             final ImageData next = convertToSWT(image);
             final Image prev = currentImageRef.getAndSet(new Image(display, next));
@@ -264,7 +265,7 @@ public class ImageDisplay implements AutoCloseable {
             final String string = dialog.open();
 
             if (string != null) {
-                final Mat iioimage = ImageFile.readMatFromFile(string);
+                final CvRaster iioimage = ImageFile.readMatFromFile(string);
                 id.setup(iioimage);
             } else
                 id.setup(null);
@@ -278,30 +279,29 @@ public class ImageDisplay implements AutoCloseable {
         int get(int row, int col);
     }
 
-    static ImageData convertToSWT(final Mat in) {
+    static ImageData convertToSWT(final CvRaster in) {
         PaletteData pd;
         final int depth;
         PixGet getter = null;
-        final int inChannels = in.channels();
+        final int inChannels = in.channels;
         final byte[] tbbuf = new byte[1];
         final short[] tsbuf = new short[1];
-        final int cvDepth = CvType.depth(in.type());
+        final int cvDepth = CvType.depth(in.type);
 
-        final int width = in.width();
-        final int height = in.height();
+        final int width = in.cols;
+        final int height = in.rows;
         if (inChannels == 1) { // assume gray
-            final CvRaster raster = CvRaster.manage(in);
             switch (cvDepth) {
 
                 case CV_8U:
                     getter = (r, c) -> {
-                        in.get(r, c, tbbuf);
+                        in.mat.get(r, c, tbbuf);
                         return Byte.toUnsignedInt(tbbuf[0]);
                     };
                 case CV_8S: {
                     if (cvDepth == CV_8S)
                         getter = (r, c) -> {
-                            in.get(r, c, tbbuf);
+                            in.mat.get(r, c, tbbuf);
                             return (int) tbbuf[0];
                         };
                     final RGB[] rgb = new RGB[256];
@@ -313,12 +313,12 @@ public class ImageDisplay implements AutoCloseable {
                 }
                 case CV_16U:
                     getter = (r, c) -> {
-                        return Short.toUnsignedInt(((short[]) raster.get(r, c))[0]);
+                        return Short.toUnsignedInt(((short[]) in.get(r, c))[0]);
                     };
                 case CV_16S: {
                     if (cvDepth == CV_16S)
                         getter = (r, c) -> {
-                            in.get(r, c, tsbuf);
+                            in.mat.get(r, c, tsbuf);
                             return (int) tsbuf[0];
                         };
                     pd = new PaletteData(255, 255, 255);
@@ -327,9 +327,9 @@ public class ImageDisplay implements AutoCloseable {
                 }
                 default:
                     throw new IllegalArgumentException(
-                            "Cannot convert a Mat with a type of " + CvType.typeToString(in.type()) + " to a BufferedImage");
+                            "Cannot convert a Mat with a type of " + CvType.typeToString(in.type) + " to a BufferedImage");
             }
-            final ImageData id = new ImageData(in.width(), in.height(), depth, pd);
+            final ImageData id = new ImageData(in.cols, in.rows, depth, pd);
             for (int row = 0; row < height; row++)
                 for (int col = 0; col < width; col++)
                     id.setPixel(col, row, getter.get(row, col));
@@ -341,7 +341,7 @@ public class ImageDisplay implements AutoCloseable {
             final byte[] pixel = new byte[3];
             for (int row = 0; row < height; row++) {
                 for (int col = 0; col < width; col++) {
-                    in.get(row, col, pixel);
+                    in.mat.get(row, col, pixel);
                     final int pix = Byte.toUnsignedInt(pixel[0]) | 0xff00 & (Byte.toUnsignedInt(pixel[1]) << 8)
                             | 0xff0000 & (Byte.toUnsignedInt(pixel[2]) << 16);
                     id.setPixel(col, row, pix);

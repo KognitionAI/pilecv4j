@@ -234,67 +234,66 @@ public class ExtractFrames {
 
         final String propertyFileName = outDir + File.separator + "frames.properties";
 
-        final Mat origImage = ImageFile.readMatFromFile(sourceFileName);
-        if (writeDebugImages)
-            ImageFile.writeImageFile(origImage, outDir + File.separator + "orig.tif");
-
-        print("origImage", origImage);
-        final int origImageHeight = origImage.height();
-        final int origImageWidth = origImage.width();
-
-        final com.jiminger.util.Timer timer = new com.jiminger.util.Timer();
-
-        // ------------------------------------------------------------
-        // This does a conversion to grayscale
-        // ------------------------------------------------------------
-        // Create a grayscale color model.
-        timer.start();
-        final Mat grayImage = convertToGray(origImage);
-        System.out.println("Gray is " + CvType.typeToString(grayImage.type()));
-        if (writeDebugImages)
-            ImageFile.writeImageFile(grayImage, outDir + File.separator + "gray.bmp");
-        print("grayImage", grayImage);
-
-        System.out.println("done (" + timer.stop() + ")");
-        // ------------------------------------------------------------
-
-        // ------------------------------------------------------------
-        // This does a canny edge detection and puts the gradient
-        // direction image in the GradientDirectionImageHolder
-        // object (if one is supplied).
-        // ------------------------------------------------------------
-        timer.start();
-        System.out.print("performing canny edge detection ... ");
-
-        System.out.print("blurring ... ");
-        // preblur 3,3 for 3200.
-        int kernelSize = (int) Math.ceil(((double) resolutiondpi * 3) / 3200);
-        if ((kernelSize & 0x01) == 0)
-            kernelSize += 1;
-        if (kernelSize > 7)
-            kernelSize = 7;
-        Imgproc.GaussianBlur(grayImage, grayImage, new Size(kernelSize + 2, kernelSize + 2), 0.0);
-        if (writeDebugImages)
-            ImageFile.writeImageFile(grayImage, outDir + File.separator + "blur.bmp");
-
-        // --------------------------------------
-        // Make the gradient images
-        // --------------------------------------
-        System.out.println("Performing Sobel deriv calculation");
-        System.out.print("Making gradient image ... ");
-        final Mat dx = new Mat();
-        final Mat dy = new Mat();
-        Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-        Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-        if (writeDebugImages) {
-            ImageFile.writeImageFile(dx, outDir + File.separator + "dx.tiff");
-            ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
-        }
-
         try (CvRaster.Closer closer = new CvRaster.Closer()) {
+            final CvRaster origImage = ImageFile.readMatFromFile(sourceFileName, closer);
+            if (writeDebugImages)
+                ImageFile.writeImageFile(origImage, outDir + File.separator + "orig.tif");
 
-            final CvRaster dxr = CvRaster.manage(dx, closer);
-            final CvRaster dyr = CvRaster.manage(dy, closer);
+            print("origImage", origImage.mat);
+            final int origImageHeight = origImage.rows;
+            final int origImageWidth = origImage.cols;
+
+            final com.jiminger.util.Timer timer = new com.jiminger.util.Timer();
+
+            // ------------------------------------------------------------
+            // This does a conversion to grayscale
+            // ------------------------------------------------------------
+            // Create a grayscale color model.
+            timer.start();
+            final Mat grayImage = closer.add(convertToGray(origImage.mat));
+            System.out.println("Gray is " + CvType.typeToString(grayImage.type()));
+            if (writeDebugImages)
+                ImageFile.writeImageFile(grayImage, outDir + File.separator + "gray.bmp");
+            print("grayImage", grayImage);
+
+            System.out.println("done (" + timer.stop() + ")");
+            // ------------------------------------------------------------
+
+            // ------------------------------------------------------------
+            // This does a canny edge detection and puts the gradient
+            // direction image in the GradientDirectionImageHolder
+            // object (if one is supplied).
+            // ------------------------------------------------------------
+            timer.start();
+            System.out.print("performing canny edge detection ... ");
+
+            System.out.print("blurring ... ");
+            // preblur 3,3 for 3200.
+            int kernelSize = (int) Math.ceil(((double) resolutiondpi * 3) / 3200);
+            if ((kernelSize & 0x01) == 0)
+                kernelSize += 1;
+            if (kernelSize > 7)
+                kernelSize = 7;
+            Imgproc.GaussianBlur(grayImage, grayImage, new Size(kernelSize + 2, kernelSize + 2), 0.0);
+            if (writeDebugImages)
+                ImageFile.writeImageFile(grayImage, outDir + File.separator + "blur.bmp");
+
+            // --------------------------------------
+            // Make the gradient images
+            // --------------------------------------
+            System.out.println("Performing Sobel deriv calculation");
+            System.out.print("Making gradient image ... ");
+            final Mat dx = closer.add(new Mat());
+            final Mat dy = closer.add(new Mat());
+            Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+            Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+            if (writeDebugImages) {
+                ImageFile.writeImageFile(dx, outDir + File.separator + "dx.tiff");
+                ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
+            }
+
+            final CvRaster dxr = CvRaster.manageCopy(dx, closer);
+            final CvRaster dyr = CvRaster.manageCopy(dy, closer);
             final int numPixelsInGradient = dxr.rows * dxr.cols;
             final byte[] dirsa = new byte[numPixelsInGradient];
 
@@ -338,8 +337,8 @@ public class ExtractFrames {
             print("edge", edgeImage);
             // --------------------------------------
 
-            final CvRaster edgeRaster = CvRaster.manage(edgeImage, closer);
-            final CvRaster gradientDirRaster = CvRaster.manage(gradientDirImage, closer);
+            final CvRaster edgeRaster = CvRaster.manageCopy(edgeImage, closer);
+            final CvRaster gradientDirRaster = CvRaster.manageCopy(gradientDirImage, closer);
 
             // ------------------------------------------------------------
             // Now load up the edges of the image. This will set the values
@@ -660,7 +659,7 @@ public class ExtractFrames {
 
                 System.out.print(".");
                 final Mat frameTiledImageMat = frame.cutFrame(
-                        origImage, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, i, frameOversizeMult,
+                        origImage.mat, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, i, frameOversizeMult,
                         rescale, correctrotation);
 
                 if (frameTiledImageMat != null) {

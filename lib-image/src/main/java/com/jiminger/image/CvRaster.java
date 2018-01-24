@@ -1,12 +1,14 @@
 package com.jiminger.image;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
-import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Function;
 
@@ -44,7 +46,7 @@ import net.dempsy.util.library.NativeLibraryLoader;
  * method to obtain the CvRaster. In this case you need to ensure that the {@code Mat} is not released
  * prior to the last use of the {@code CvRaster} which should be to {@code close} it.</p>
  */
-public abstract class CvRaster implements AutoCloseable {
+public abstract class CvRaster implements NoThrowAutoClosable {
 
     /**
      * If you're going to use OpenCv classes before using CvRaster then
@@ -52,7 +54,8 @@ public abstract class CvRaster implements AutoCloseable {
      * to loading the native libraries). This can be done by calling
      * this method.
      */
-    public static void initOpenCv() {} // causes the classloader to initialize the static block and load the native libs
+    // causes the classloader to initialize the static block and load the native libs
+    public static void initOpenCv() {}
 
     static void init() {
         NativeLibraryLoader.loader()
@@ -73,10 +76,9 @@ public abstract class CvRaster implements AutoCloseable {
     public final int elemSize;
     public final Mat mat;
     protected final int colsXchannels;
-    private final boolean managed;
     private final ByteBuffer underlying;
 
-    private CvRaster(final Mat m, final boolean managed, final ByteBuffer underlying) {
+    private CvRaster(final Mat m, final ByteBuffer underlying) {
         this.rows = m.rows();
         this.cols = m.cols();
         this.type = m.type();
@@ -84,7 +86,6 @@ public abstract class CvRaster implements AutoCloseable {
         this.elemSize = CvType.ELEM_SIZE(type);
         this.colsXchannels = cols * channels;
         this.mat = m;
-        this.managed = managed;
         this.underlying = underlying;
     }
 
@@ -94,8 +95,8 @@ public abstract class CvRaster implements AutoCloseable {
      * the {@code Mat} beyond the life of the {@link CvRaster} then consider using 
      * {@link CvRaster#unmanaged(Mat)}.
      */
-    public static CvRaster manage(final Mat mat) {
-        return manage(mat, null);
+    public static CvRaster manageCopy(final Mat mat) {
+        return manageCopy(mat, null);
     }
 
     /**
@@ -104,38 +105,14 @@ public abstract class CvRaster implements AutoCloseable {
      * the {@code Mat} beyond the life of the {@link CvRaster} then consider using 
      * {@link CvRaster#unmanaged(Mat)}.</p>
      * 
-     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * <p>The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
      * will be added to so that then it closes, this {@link CvRaster} will also be closed
      * {@code release}-ing the underlying {@code Mat}.
      */
-    public static CvRaster manage(final Mat mat, final Closer closer) {
-        final CvRaster ret = makeInstance(mat, getData(mat), true);
+    public static CvRaster manageCopy(final Mat mat, final Closer closer) {
+        final CvRaster ret = makeInstance(new MatCopy(mat), getData(mat));
         if (closer != null)
-            closer.rastersToClose.add(ret);
-        return ret;
-    }
-
-    /**
-     * This call can be used to wrap a CvRaster around a {@code Mat} without the {@link CvRaster}
-     * taking over ownership of the {@code Mat}. It will be incumbent on the caller to make
-     * sure the {@code Mat} is not {@code released} prior to the CvRaster being closed.
-     */
-    public static CvRaster unmanaged(final Mat mat) {
-        return unmanaged(mat, null);
-    }
-
-    /**
-     * This call can be used to wrap a CvRaster around a {@code Mat} without the {@link CvRaster}
-     * taking over ownership of the {@code Mat}. It will be incumbent on the caller to make
-     * sure the {@code Mat} is not {@code released} prior to the CvRaster being closed.
-     * 
-     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
-     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
-     */
-    public static CvRaster unmanaged(final Mat mat, final Closer closer) {
-        final CvRaster ret = makeInstance(mat, getData(mat), false);
-        if (closer != null)
-            closer.rastersToClose.add(ret);
+            closer.rastersToClose.add(0, ret);
         return ret;
     }
 
@@ -153,47 +130,17 @@ public abstract class CvRaster implements AutoCloseable {
      * You can use this method to create a {@link CvRaster} along with it's managed Mat.
      * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
      * 
-     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * <p>The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
      * will be added to so that then it closes, this {@link CvRaster} will also be closed.
      * 
-     * @see CvRaster#manage(Mat, Closer)
+     * @see CvRaster#manage(Mat, com.jiminger.image.CvRaster.Closer)
      */
     public static CvRaster createManaged(final int rows, final int cols, final int type, final Closer closer) {
         final Mat mat = Mat.zeros(rows, cols, type);
-        return manage(mat, closer);
+        return manageCopy(mat, closer);
     }
 
-    /**
-     * <p>You can use this method to create a {@link CvRaster} along with an unmanaged {@code Mat}.
-     * It's equivalent to {@code CvRaster.unmanaged(Mat.zeros(rows, cols, type)); }</p>
-     * 
-     * <p><b>Note: You are responsible for freeing the Mat on the {@link CvRaster} after the
-     * {@link CvRaster} has been closed</b></p>
-     * 
-     * @see CvRaster#unmanaged(Mat)
-     */
-    public static CvRaster createUnmanaged(final int rows, final int cols, final int type) {
-        return createUnmanaged(rows, cols, type, null);
-    }
-
-    /**
-     * <p>You can use this method to create a {@link CvRaster} along with an unmanaged {@code Mat}.
-     * It's equivalent to {@code CvRaster.unmanaged(Mat.zeros(rows, cols, type)); }</p>
-     * 
-     * <p><b>Note: You are responsible for freeing the Mat on the {@link CvRaster} after the
-     * {@link CvRaster} has been closed</b></p>
-     * 
-     * <p>The {@link Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
-     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
-     * 
-     * @see CvRaster#unmanaged(Mat, Closer)
-     */
-    public static CvRaster createUnmanaged(final int rows, final int cols, final int type, final Closer closer) {
-        final Mat mat = Mat.zeros(rows, cols, type);
-        return unmanaged(mat, closer);
-    }
-
-    private static CvRaster makeInstance(final Mat mat, final ByteBuffer bb, final boolean managed) {
+    private static CvRaster makeInstance(final MatCopy mat, final ByteBuffer bb) {
         bb.clear();
         final int type = mat.type();
         final int depth = CvType.depth(type);
@@ -201,7 +148,7 @@ public abstract class CvRaster implements AutoCloseable {
         switch (depth) {
             case CvType.CV_8S:
             case CvType.CV_8U:
-                return new CvRaster(mat, managed, bb) {
+                return new CvRaster(mat, bb) {
                     final byte[] zeroPixel = new byte[channels];
 
                     @Override
@@ -250,7 +197,7 @@ public abstract class CvRaster implements AutoCloseable {
                 };
             case CvType.CV_16U:
             case CvType.CV_16S:
-                return new CvRaster(mat, managed, bb) {
+                return new CvRaster(mat, bb) {
                     final ShortBuffer sb = bb.asShortBuffer();
 
                     final short[] zeroPixel = new short[channels]; // zeroed already
@@ -299,7 +246,7 @@ public abstract class CvRaster implements AutoCloseable {
                     }
                 };
             case CvType.CV_32S:
-                return new CvRaster(mat, managed, bb) {
+                return new CvRaster(mat, bb) {
                     final IntBuffer ib = bb.asIntBuffer();
                     final int[] zeroPixel = new int[channels]; // zeroed already
 
@@ -347,7 +294,7 @@ public abstract class CvRaster implements AutoCloseable {
                     }
                 };
             case CvType.CV_32F:
-                return new CvRaster(mat, managed, bb) {
+                return new CvRaster(mat, bb) {
                     final FloatBuffer fb = bb.asFloatBuffer();
                     final float[] zeroPixel = new float[channels]; // zeroed already
 
@@ -395,7 +342,7 @@ public abstract class CvRaster implements AutoCloseable {
                     }
                 };
             case CvType.CV_64F:
-                return new CvRaster(mat, true, bb) {
+                return new CvRaster(mat, bb) {
                     final DoubleBuffer db = bb.asDoubleBuffer();
                     final double[] zeroPixel = new double[channels]; // zeroed already
 
@@ -494,14 +441,18 @@ public abstract class CvRaster implements AutoCloseable {
         return underlying;
     }
 
+    public Mat decoupled() {
+        return new Mat(CvRasterNative._copy(mat.nativeObj));
+    }
+
     // public void show() {
     // CvRasterNative.showImage(mat.nativeObj);
     // }
 
     @Override
     public void close() {
-        if (mat != null && managed)
-            mat.release();
+        if (mat != null)
+            ((MatCopy) mat).close();
     }
 
     @Override
@@ -512,7 +463,6 @@ public abstract class CvRaster implements AutoCloseable {
         result = prime * result + cols;
         result = prime * result + colsXchannels;
         result = prime * result + elemSize;
-        result = prime * result + (managed ? 1231 : 1237);
         result = prime * result + rows;
         result = prime * result + type;
         return result;
@@ -535,22 +485,23 @@ public abstract class CvRaster implements AutoCloseable {
             return false;
         if (elemSize != other.elemSize)
             return false;
-        if (managed != other.managed)
-            return false;
         if (mat == null) {
             if (other.mat != null)
                 return false;
-        }
+        } else if (other.mat == null)
+            return false;
         if (rows != other.rows)
             return false;
         if (type != other.type)
             return false;
-        if (!pixelsIdentical(mat, other.mat))
+        if (mat != other.mat && !pixelsIdentical(mat, other.mat))
             return false;
         return true;
     }
 
     public static boolean pixelsIdentical(final Mat m1, final Mat m2) {
+        if (m1.nativeObj == m2.nativeObj)
+            return true;
         final ByteBuffer bb1 = CvRasterNative._getData(m1.nativeObj);
         final ByteBuffer bb2 = CvRasterNative._getData(m2.nativeObj);
         return bb1.compareTo(bb2) == 0;
@@ -759,13 +710,18 @@ public abstract class CvRaster implements AutoCloseable {
     // ==================================================================
 
     public static class Closer implements AutoCloseable {
-        private final List<CvRaster> rastersToClose = new ArrayList<>();
+        private final List<NoThrowAutoClosable> rastersToClose = new LinkedList<>();
+
+        public Mat add(final Mat mat) {
+            if (mat != null)
+                rastersToClose.add(0, () -> mat.release());
+            return mat;
+        }
 
         @Override
         public void close() {
             rastersToClose.stream().forEach(r -> r.close());
         }
-
     }
 
     @FunctionalInterface
@@ -779,4 +735,38 @@ public abstract class CvRaster implements AutoCloseable {
             ret.order(ByteOrder.LITTLE_ENDIAN);
         return ret;
     }
+
+    private static class MatCopy extends org.opencv.core.Mat implements AutoCloseable {
+        private final Method nDelete;
+
+        public MatCopy(final Mat mat) {
+            super(CvRasterNative._copy(mat.nativeObj));
+
+            try {
+                nDelete = org.opencv.core.Mat.class.getDeclaredMethod("n_delete", long.class);
+                nDelete.setAccessible(true);
+            } catch (NoSuchMethodException | SecurityException e) {
+                throw new RuntimeException(
+                        "Got an exception trying to access Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
+                        e);
+            }
+        }
+
+        // Prevent finalize from being called
+        @Override
+        protected void finalize() throws Throwable {}
+
+        @Override
+        public void close() {
+            try {
+                nDelete.invoke(this, super.nativeObj);
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                throw new RuntimeException(
+                        "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
+                        e);
+            }
+        }
+
+    }
+
 }

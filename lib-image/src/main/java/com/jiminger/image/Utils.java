@@ -95,9 +95,9 @@ public class Utils {
         return out;
     }
 
-    private static Mat argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
-        final Mat mat = new Mat(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
-        final CvRaster raster = CvRaster.manage(mat);
+    private static CvRaster argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
+        final CvRaster raster = CvRaster.createManaged(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
+        final Mat mat = raster.mat;
         final byte[] inpixels = bb.getData();
         if (lookup == null) // indicates a pixel compatible format
             mat.put(0, 0, inpixels);
@@ -119,13 +119,12 @@ public class Utils {
                 return outpixel;
             });
         }
-        return mat;
+        return raster;
     }
 
-    private static Mat argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
+    private static CvRaster argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
         final boolean hasAlpha = mask[0] != 0x0;
-        final Mat mat = new Mat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
-        final CvRaster raster = CvRaster.manage(mat);
+        final CvRaster raster = CvRaster.createManaged(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
         final int[] inpixels = bi.getData();
         final int blue = 3;
         final int red = 1;
@@ -142,10 +141,10 @@ public class Utils {
                 outpixel[3] = (byte) ((pixel & mask[alpha]) >>> shift[alpha]);
             return outpixel;
         });
-        return mat;
+        return raster;
     }
 
-    public static Mat img2Mat(final BufferedImage crappyImage) {
+    public static CvRaster img2CvRaster(final BufferedImage crappyImage) {
         final int w = crappyImage.getWidth();
         final int h = crappyImage.getHeight();
 
@@ -229,8 +228,8 @@ public class Utils {
                             + dataBuffer.getClass().getSimpleName());
                 final DataBufferByte bb = (DataBufferByte) dataBuffer;
                 final byte[] srcdata = bb.getData();
-                final Mat ret = new Mat(h, w, CvType.CV_8UC1);
-                ret.put(0, 0, srcdata);
+                final CvRaster ret = CvRaster.createManaged(h, w, CvType.CV_8UC1);
+                ret.mat.put(0, 0, srcdata);
                 return ret;
             }
             case TYPE_USHORT_GRAY: {
@@ -240,8 +239,8 @@ public class Utils {
                             + dataBuffer.getClass().getSimpleName());
                 final DataBufferUShort bb = (DataBufferUShort) dataBuffer;
                 final short[] srcdata = bb.getData();
-                final Mat ret = new Mat(h, w, CvType.CV_16UC1);
-                ret.put(0, 0, srcdata);
+                final CvRaster ret = CvRaster.createManaged(h, w, CvType.CV_16UC1);
+                ret.mat.put(0, 0, srcdata);
                 return ret;
             }
             case TYPE_USHORT_565_RGB: // 16 bit total with 5 bit r, 6 bit g, 5 bit blue

@@ -1,7 +1,11 @@
 package com.jiminger.image;
 
+import java.lang.reflect.Array;
+import java.util.stream.LongStream;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.tensorflow.Graph;
 import org.tensorflow.Tensor;
 import org.tensorflow.types.UInt8;
 
@@ -54,6 +58,43 @@ public class TensorUtils {
         // }
     }
 
+    public static Graph inflate(final byte[] graphBytes) {
+        final Graph graph = new Graph();
+        graph.importGraphDef(graphBytes);
+        return graph;
+    }
+
     // private static native long createNativeTensorFromAddress(int type, long[] shape, long size, long buffer);
+
+    private static <T, AT> Object toNativeArray(final Tensor<T> tensor, final Class<AT> componentType) {
+        final int[] dimentions = LongStream.of(tensor.shape())
+                .mapToInt(l -> (int) l)
+                .toArray();
+
+        final Object results = Array.newInstance(componentType, dimentions);
+
+        tensor.copyTo(results);
+
+        return results;
+    }
+
+    public static float getScalar(final Tensor<Float> tensor) {
+        // expect a 1 dim array with 1 value.
+        final float[] result = new float[1];
+        tensor.copyTo(result);
+        return result[0];
+    }
+
+    public static float[] getVector(final Tensor<Float> tensor) {
+        // expect a 1 dim array with 1 value.
+        final float[][] result = new float[1][(int) tensor.shape()[1]];
+        tensor.copyTo(result);
+        return result[0];
+    }
+
+    public static float[][] getMatrix(final Tensor<Float> tensor) {
+        final float[][][] matrix = (float[][][]) toNativeArray(tensor, float.class);
+        return matrix[0];
+    }
 
 }

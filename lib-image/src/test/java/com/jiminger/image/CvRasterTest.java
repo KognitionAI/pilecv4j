@@ -37,7 +37,7 @@ public class CvRasterTest {
         try (final CvRaster raster = CvRaster.createManaged(256, 256, CvType.CV_8UC1)) {
             raster.apply((BytePixelSetter) (r, c) -> new byte[] { (byte) (((r + c) >> 1) & 0xff) });
 
-            final CvRaster expected = CvRaster.manage(ImageFile.readMatFromFile(expectedFileLocation));
+            final CvRaster expected = ImageFile.readMatFromFile(expectedFileLocation);
             assertEquals(expected, raster);
         }
     }
@@ -55,7 +55,7 @@ public class CvRasterTest {
                 return new byte[] { (byte) (((r + c) >> 1) & 0xff) };
             });
 
-            final CvRaster expected = CvRaster.manage(ImageFile.readMatFromFile(expectedFileLocation));
+            final CvRaster expected = ImageFile.readMatFromFile(expectedFileLocation);
             assertNotEquals(expected, raster);
 
             // correct the pixel
