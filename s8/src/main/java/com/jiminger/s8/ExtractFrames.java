@@ -160,7 +160,7 @@ public class ExtractFrames {
         cvrtScaleDenom[CvType.CV_8S] = (0x7f);
     }
 
-    public static CvMat convertToGray(final Mat src) {
+    public static CvMat convertToGray(final CvMat src) {
         final CvMat workingImage = new CvMat();
         if (src.depth() != CvType.CV_8U) {
             System.out.print("converting image to 8-bit grayscale ... ");

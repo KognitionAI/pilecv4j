@@ -788,13 +788,7 @@ public abstract class CvRaster implements AutoCloseable {
     public static class Closer implements AutoCloseable {
         private final List<AutoCloseable> rastersToClose = new LinkedList<>();
 
-        public CvMat add(final CvMat mat) {
-            if (mat != null)
-                rastersToClose.add(0, mat);
-            return mat;
-        }
-
-        public CvRaster add(final CvRaster mat) {
+        public <T extends AutoCloseable> T add(final T mat) {
             if (mat != null)
                 rastersToClose.add(0, mat);
             return mat;
