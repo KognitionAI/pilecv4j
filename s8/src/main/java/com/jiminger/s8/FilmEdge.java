@@ -258,8 +258,8 @@ public class FilmEdge {
         final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
         final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
-        final int height = edgeImage.rows;
-        final int width = edgeImage.cols;
+        final int height = edgeImage.rows();
+        final int width = edgeImage.cols();
         final List<Point> ret = new ArrayList<Point>();
 
         for (int c = 0; c < width; c++) {
@@ -296,8 +296,8 @@ public class FilmEdge {
         final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
         final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
-        final int height = edgeImage.rows;
-        final int width = edgeImage.cols;
+        final int height = edgeImage.rows();
+        final int width = edgeImage.cols();
         final List<Point> ret = new ArrayList<Point>();
 
         for (int c = 0; c < width; c++) {
@@ -334,8 +334,8 @@ public class FilmEdge {
         final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
         final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
-        final int height = edgeImage.rows;
-        final int width = edgeImage.cols;
+        final int height = edgeImage.rows();
+        final int width = edgeImage.cols();
         final List<Point> ret = new ArrayList<Point>();
 
         // for (int i = 0; i < height; i++)
@@ -375,8 +375,8 @@ public class FilmEdge {
         final byte[] image = (byte[]) CvRaster.copyToPrimitiveArray(edgeImage);
         final byte[] gradient = (byte[]) CvRaster.copyToPrimitiveArray(gradientRaster);
 
-        final int height = edgeImage.rows;
-        final int width = edgeImage.cols;
+        final int height = edgeImage.rows();
+        final int width = edgeImage.cols();
         final List<Point> ret = new ArrayList<Point>();
 
         // for (int i = 0; i < height; i++)

@@ -40,7 +40,6 @@ import javax.imageio.stream.ImageOutputStream;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
@@ -67,7 +66,6 @@ public class ImageFile {
                 final Mat mat = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
                 if (mat == null)
                     throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec available in either ImageIO or OpenCv");
-                closer.add(mat);
                 if (filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                     Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
                 ret = Utils.mat2Img(mat);
@@ -95,7 +93,6 @@ public class ImageFile {
                 LOGGER.debug("Failed to read '" + filename + "' using OpenCV");
                 ret = Utils.img2CvRaster(ImageIO.read(f));
             } else {
-                cx.add(mat);
                 if (filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                     Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
                 ret = CvRaster.manageCopy(mat, closer);
@@ -126,7 +123,8 @@ public class ImageFile {
     public static void writeImageFile(final CvRaster ri, final String filename) throws IOException {
         if (!doWrite(ri, filename)) {
             LOGGER.debug("Failed to write '" + filename + "' using OpenCV");
-            if (!doWrite(Utils.mat2Img(ri.mat), filename))
+            final BufferedImage bi = ri.matOp(m -> Utils.mat2Img(m));
+            if (!doWrite(bi, filename))
                 throw new IllegalArgumentException("Failed to write");
         }
     }
@@ -166,7 +164,7 @@ public class ImageFile {
 
     private static boolean doWrite(final CvRaster ri, final String filename) throws IOException {
         LOGGER.trace("Writing image {} to {}", ri, filename);
-        return Imgcodecs.imwrite(filename, ri.mat);
+        return ri.matOp(m -> (Boolean) Imgcodecs.imwrite(filename, m));
     }
 
     private static double scale(final int width, final int height, final ImageDestinationDefinition dest) {
@@ -216,46 +214,46 @@ public class ImageFile {
         writeImageFile(bi, dest.outfile);
     }
 
-    public static void transcode(final CvRaster bi, final ImageDestinationDefinition dest) throws IOException {
-        if (infile != null && infile.equalsIgnoreCase(dest.outfile))
-            throw new IOException("Can't overwrite original file durring transcode (" + infile + ").");
-
-        if (dest.maxw != -1 || dest.maxh != -1 || dest.maxe != -1) {
-            final int width = bi.cols;
-            final int height = bi.rows;
-
-            double scale = -1.0;
-            if (dest.maxh != -1) {
-                if (height > dest.maxh)
-                    // see what we need to scale to make the height the same.
-                    scale = ((double) dest.maxh) / ((double) height);
-            }
-
-            if (dest.maxw != -1) {
-                final int adjwidth = (scale >= 0.0) ? (int) Math.round(scale * width) : width;
-                if (adjwidth > dest.maxw) {
-                    scale = ((double) dest.maxw) / ((double) adjwidth);
-                }
-            }
-
-            if (dest.maxe != -1) {
-                final int adjedge = width > height ? (scale >= 0.0 ? (int) Math.round(scale * width) : width)
-                        : (scale >= 0.0 ? (int) Math.round(scale * height) : height);
-                if (adjedge > dest.maxe) {
-                    scale = ((double) (dest.maxe)) / ((double) adjedge);
-                }
-            }
-
-            if (scale >= 0.0) {
-                final int newwidth = (int) Math.round(scale * (width));
-                final int newheight = (int) Math.round(scale * (height));
-
-                Imgproc.resize(bi.mat, bi.mat, new Size(newwidth, newheight), 0, 0, Imgproc.INTER_LINEAR);
-            }
-        }
-
-        writeImageFile(bi, dest.outfile);
-    }
+    // public static void transcode(final CvRaster bi, final ImageDestinationDefinition dest) throws IOException {
+    // if (infile != null && infile.equalsIgnoreCase(dest.outfile))
+    // throw new IOException("Can't overwrite original file durring transcode (" + infile + ").");
+    //
+    // if (dest.maxw != -1 || dest.maxh != -1 || dest.maxe != -1) {
+    // final int width = bi.cols;
+    // final int height = bi.rows;
+    //
+    // double scale = -1.0;
+    // if (dest.maxh != -1) {
+    // if (height > dest.maxh)
+    // // see what we need to scale to make the height the same.
+    // scale = ((double) dest.maxh) / ((double) height);
+    // }
+    //
+    // if (dest.maxw != -1) {
+    // final int adjwidth = (scale >= 0.0) ? (int) Math.round(scale * width) : width;
+    // if (adjwidth > dest.maxw) {
+    // scale = ((double) dest.maxw) / ((double) adjwidth);
+    // }
+    // }
+    //
+    // if (dest.maxe != -1) {
+    // final int adjedge = width > height ? (scale >= 0.0 ? (int) Math.round(scale * width) : width)
+    // : (scale >= 0.0 ? (int) Math.round(scale * height) : height);
+    // if (adjedge > dest.maxe) {
+    // scale = ((double) (dest.maxe)) / ((double) adjedge);
+    // }
+    // }
+    //
+    // if (scale >= 0.0) {
+    // final int newwidth = (int) Math.round(scale * (width));
+    // final int newheight = (int) Math.round(scale * (height));
+    //
+    // Imgproc.resize(bi.mat, bi.mat, new Size(newwidth, newheight), 0, 0, Imgproc.INTER_LINEAR);
+    // }
+    // }
+    //
+    // writeImageFile(bi, dest.outfile);
+    // }
 
     public static class ImageDestinationDefinition {
         public String outfile = null;

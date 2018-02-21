@@ -1,7 +1,5 @@
 package com.jiminger.image;
 
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
@@ -10,6 +8,7 @@ import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.opencv.core.CvType;
@@ -46,7 +45,7 @@ import net.dempsy.util.library.NativeLibraryLoader;
  * method to obtain the CvRaster. In this case you need to ensure that the {@code Mat} is not released
  * prior to the last use of the {@code CvRaster} which should be to {@code close} it.</p>
  */
-public abstract class CvRaster implements NoThrowAutoClosable {
+public abstract class CvRaster implements AutoCloseable {
 
     /**
      * If you're going to use OpenCv classes before using CvRaster then
@@ -69,22 +68,31 @@ public abstract class CvRaster implements NoThrowAutoClosable {
         init();
     }
 
-    public final int type;
-    public final int channels;
-    public final int rows;
-    public final int cols;
-    public final int elemSize;
-    public final Mat mat;
-    protected final int colsXchannels;
-    private final ByteBuffer underlying;
+    public int type() {
+        return mat.type();
+    }
 
-    private CvRaster(final Mat m, final ByteBuffer underlying) {
-        this.rows = m.rows();
-        this.cols = m.cols();
-        this.type = m.type();
-        this.channels = CvType.channels(type);
-        this.elemSize = CvType.ELEM_SIZE(type);
-        this.colsXchannels = cols * channels;
+    public int channels() {
+        return CvType.channels(type());
+    }
+
+    public int rows() {
+        return mat.rows();
+    }
+
+    public int cols() {
+        return mat.cols();
+    }
+
+    public int elemSize() {
+        return CvType.ELEM_SIZE(type());
+    }
+
+    private final ByteBuffer underlying;
+    private boolean decoupled = false;
+    private final CvMat mat;
+
+    private CvRaster(final CvMat m, final ByteBuffer underlying) {
         this.mat = m;
         this.underlying = underlying;
     }
@@ -100,6 +108,13 @@ public abstract class CvRaster implements NoThrowAutoClosable {
     }
 
     /**
+     * convert/wrap a CvMat into a CvRaster
+     */
+    public static CvRaster toRaster(final CvMat mat) {
+        return toRaster(mat, null);
+    }
+
+    /**
      * <p>This call should be made to hand management of the Mat over to the {@link CvRaster}. 
      * When the CvRaster is closed, it will release the {@code Mat}. If you want to keep 
      * the {@code Mat} beyond the life of the {@link CvRaster} then consider using 
@@ -110,9 +125,23 @@ public abstract class CvRaster implements NoThrowAutoClosable {
      * {@code release}-ing the underlying {@code Mat}.
      */
     public static CvRaster manageCopy(final Mat mat, final Closer closer) {
-        final CvRaster ret = makeInstance(new MatCopy(mat), getData(mat));
+        final CvRaster ret = makeInstance(new CvMat(CvRasterNative._copy(mat.nativeObj)), getData(mat));
         if (closer != null)
-            closer.rastersToClose.add(0, ret);
+            closer.add(ret);
+        return ret;
+    }
+
+    /**
+     * convert/wrap a CvMat into a CvRaster
+     * 
+     * <p>The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * will be added to so that then it closes, this {@link CvRaster} will also be closed
+     * {@code release}-ing the underlying {@code Mat}.
+     */
+    public static CvRaster toRaster(final CvMat mat, final Closer closer) {
+        final CvRaster ret = makeInstance(mat, getData(mat));
+        if (closer != null)
+            closer.add(ret);
         return ret;
     }
 
@@ -136,11 +165,11 @@ public abstract class CvRaster implements NoThrowAutoClosable {
      * @see CvRaster#manage(Mat, com.jiminger.image.CvRaster.Closer)
      */
     public static CvRaster createManaged(final int rows, final int cols, final int type, final Closer closer) {
-        final Mat mat = Mat.zeros(rows, cols, type);
-        return manageCopy(mat, closer);
+        final CvMat mat = CvMat.zeros(rows, cols, type);
+        return toRaster(mat, closer);
     }
 
-    private static CvRaster makeInstance(final MatCopy mat, final ByteBuffer bb) {
+    private static CvRaster makeInstance(final CvMat mat, final ByteBuffer bb) {
         bb.clear();
         final int type = mat.type();
         final int depth = CvType.depth(type);
@@ -149,7 +178,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_8S:
             case CvType.CV_8U:
                 return new CvRaster(mat, bb) {
-                    final byte[] zeroPixel = new byte[channels];
+                    final byte[] zeroPixel = new byte[channels()];
 
                     @Override
                     public void zero(final int row, final int col) {
@@ -158,7 +187,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
                     @Override
                     public Object get(final int pos) {
-                        final byte[] ret = new byte[channels];
+                        final byte[] ret = new byte[channels()];
                         bb.position(pos);
                         bb.get(ret);
                         return ret;
@@ -174,6 +203,10 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final PixelSetter<T> ps) {
                         final BytePixelSetter bps = (BytePixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
+                        final int colsXchannels = cols * channels;
                         for (int row = 0; row < rows; row++) {
                             final int rowOffset = row * colsXchannels;
                             for (int col = 0; col < cols; col++) {
@@ -185,6 +218,10 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
                     @Override
                     public <T> void apply(final FlatPixelSetter<T> ps) {
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
+
                         final FlatBytePixelSetter bps = (FlatBytePixelSetter) ps;
                         final int numElements = (rows * cols * channels);
 
@@ -200,7 +237,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                 return new CvRaster(mat, bb) {
                     final ShortBuffer sb = bb.asShortBuffer();
 
-                    final short[] zeroPixel = new short[channels]; // zeroed already
+                    final short[] zeroPixel = new short[channels()]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
@@ -209,7 +246,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
                     @Override
                     public Object get(final int pos) {
-                        final short[] ret = new short[channels];
+                        final short[] ret = new short[channels()];
                         sb.position(pos);
                         sb.get(ret);
                         return ret;
@@ -225,6 +262,10 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final PixelSetter<T> ps) {
                         final ShortPixelSetter bps = (ShortPixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
+                        final int colsXchannels = cols * channels;
                         for (int row = 0; row < rows; row++) {
                             final int rowOffset = row * colsXchannels;
                             for (int col = 0; col < cols; col++) {
@@ -237,6 +278,9 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final FlatPixelSetter<T> ps) {
                         final FlatShortPixelSetter bps = (FlatShortPixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
                         final int numElements = (rows * cols * channels);
 
                         for (int pos = 0; pos < numElements; pos += channels) {
@@ -248,7 +292,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_32S:
                 return new CvRaster(mat, bb) {
                     final IntBuffer ib = bb.asIntBuffer();
-                    final int[] zeroPixel = new int[channels]; // zeroed already
+                    final int[] zeroPixel = new int[channels()]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
@@ -257,7 +301,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
                     @Override
                     public Object get(final int pos) {
-                        final int[] ret = new int[channels];
+                        final int[] ret = new int[channels()];
                         ib.position(pos);
                         ib.get(ret);
                         return ret;
@@ -273,6 +317,10 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final PixelSetter<T> ps) {
                         final IntPixelSetter bps = (IntPixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
+                        final int colsXchannels = cols * channels;
                         for (int row = 0; row < rows; row++) {
                             final int rowOffset = row * colsXchannels;
                             for (int col = 0; col < cols; col++) {
@@ -285,6 +333,9 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final FlatPixelSetter<T> ps) {
                         final FlatIntPixelSetter bps = (FlatIntPixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
                         final int numElements = (rows * cols * channels);
 
                         for (int pos = 0; pos < numElements; pos += channels) {
@@ -296,7 +347,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_32F:
                 return new CvRaster(mat, bb) {
                     final FloatBuffer fb = bb.asFloatBuffer();
-                    final float[] zeroPixel = new float[channels]; // zeroed already
+                    final float[] zeroPixel = new float[channels()]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
@@ -305,7 +356,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
                     @Override
                     public Object get(final int pos) {
-                        final float[] ret = new float[channels];
+                        final float[] ret = new float[channels()];
                         fb.position(pos);
                         fb.get(ret);
                         return ret;
@@ -321,6 +372,10 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final PixelSetter<T> ps) {
                         final FloatPixelSetter bps = (FloatPixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
+                        final int colsXchannels = cols * channels;
                         for (int row = 0; row < rows; row++) {
                             final int rowOffset = row * colsXchannels;
                             for (int col = 0; col < cols; col++) {
@@ -333,6 +388,9 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final FlatPixelSetter<T> ps) {
                         final FlatFloatPixelSetter bps = (FlatFloatPixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
                         final int numElements = (rows * cols * channels);
 
                         for (int pos = 0; pos < numElements; pos += channels) {
@@ -344,7 +402,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_64F:
                 return new CvRaster(mat, bb) {
                     final DoubleBuffer db = bb.asDoubleBuffer();
-                    final double[] zeroPixel = new double[channels]; // zeroed already
+                    final double[] zeroPixel = new double[channels()]; // zeroed already
 
                     @Override
                     public void zero(final int row, final int col) {
@@ -353,7 +411,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
                     @Override
                     public Object get(final int pos) {
-                        final double[] ret = new double[channels];
+                        final double[] ret = new double[channels()];
                         db.position(pos);
                         db.get(ret);
                         return ret;
@@ -369,6 +427,10 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final PixelSetter<T> ps) {
                         final DoublePixelSetter bps = (DoublePixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
+                        final int colsXchannels = cols * channels;
                         for (int row = 0; row < rows; row++) {
                             final int rowOffset = row * colsXchannels;
                             for (int col = 0; col < cols; col++) {
@@ -381,6 +443,9 @@ public abstract class CvRaster implements NoThrowAutoClosable {
                     @Override
                     public <T> void apply(final FlatPixelSetter<T> ps) {
                         final FlatDoublePixelSetter bps = (FlatDoublePixelSetter) ps;
+                        final int rows = rows();
+                        final int cols = cols();
+                        final int channels = channels();
                         final int numElements = (rows * cols * channels);
 
                         for (int pos = 0; pos < numElements; pos += channels) {
@@ -412,15 +477,19 @@ public abstract class CvRaster implements NoThrowAutoClosable {
     public abstract <T> void apply(final FlatPixelSetter<T> pixelSetter);
 
     public Object get(final int row, final int col) {
-        return get((row * colsXchannels) + (col * channels));
+        final int channels = channels();
+        return get((row * cols() * channels) + (col * channels));
     }
 
     public void set(final int row, final int col, final Object pixel) {
-        set((row * colsXchannels) + (col * channels), pixel);
+        final int channels = channels();
+        set((row * cols() * channels) + (col * channels), pixel);
     }
 
     public <U> U reduce(final U identity, final PixelAggregate<Object, U> seqOp) {
         U prev = identity;
+        final int rows = rows();
+        final int cols = cols();
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
                 prev = seqOp.apply(prev, get(r, c), r, c);
@@ -430,7 +499,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
     }
 
     public int getNumBytes() {
-        return rows * cols * elemSize;
+        return rows() * cols() * elemSize();
     }
 
     public long getNativeAddressOfData() {
@@ -441,8 +510,17 @@ public abstract class CvRaster implements NoThrowAutoClosable {
         return underlying;
     }
 
-    public Mat decoupled() {
-        return new Mat(CvRasterNative._copy(mat.nativeObj));
+    public <R> R matOp(final Function<CvMat, R> op) {
+        return op.apply(mat);
+    }
+
+    public void matAp(final Consumer<CvMat> op) {
+        op.accept(mat);
+    }
+
+    public CvMat decoupled() {
+        decoupled = true;
+        return mat;
     }
 
     // public void show() {
@@ -451,20 +529,20 @@ public abstract class CvRaster implements NoThrowAutoClosable {
 
     @Override
     public void close() {
-        if (mat != null)
-            ((MatCopy) mat).close();
+        if (mat != null && !decoupled)
+            mat.close();
+        decoupled = true;
     }
 
     @Override
     public int hashCode() {
         final int prime = 31;
         int result = 1;
-        result = prime * result + channels;
-        result = prime * result + cols;
-        result = prime * result + colsXchannels;
-        result = prime * result + elemSize;
-        result = prime * result + rows;
-        result = prime * result + type;
+        result = prime * result + channels();
+        result = prime * result + cols();
+        result = prime * result + elemSize();
+        result = prime * result + rows();
+        result = prime * result + type();
         return result;
     }
 
@@ -477,22 +555,20 @@ public abstract class CvRaster implements NoThrowAutoClosable {
         if (getClass() != obj.getClass())
             return false;
         final CvRaster other = (CvRaster) obj;
-        if (channels != other.channels)
+        if (channels() != other.channels())
             return false;
-        if (cols != other.cols)
+        if (cols() != other.cols())
             return false;
-        if (colsXchannels != other.colsXchannels)
-            return false;
-        if (elemSize != other.elemSize)
+        if (elemSize() != other.elemSize())
             return false;
         if (mat == null) {
             if (other.mat != null)
                 return false;
         } else if (other.mat == null)
             return false;
-        if (rows != other.rows)
+        if (rows() != other.rows())
             return false;
-        if (type != other.type)
+        if (type() != other.type())
             return false;
         if (mat != other.mat && !pixelsIdentical(mat, other.mat))
             return false;
@@ -571,7 +647,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
     public static interface IntsToPixel extends Function<int[], Object> {}
 
     public static PutChannelValueFromInt channelValuePutter(final CvRaster raster) {
-        switch (CvType.depth(raster.type)) {
+        switch (CvType.depth(raster.type())) {
             case CvType.CV_8S:
                 return (p, ch, chv) -> ((byte[]) p)[ch] = (byte) ((chv > Byte.MAX_VALUE) ? Byte.MAX_VALUE : chv);
             case CvType.CV_8U:
@@ -583,12 +659,12 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_32S:
                 return (p, ch, chv) -> ((int[]) p)[ch] = chv;
             default:
-                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
         }
     }
 
     public static GetChannelValueAsInt channelValueFetcher(final CvRaster raster) {
-        switch (CvType.depth(raster.type)) {
+        switch (CvType.depth(raster.type())) {
             case CvType.CV_8S:
                 return (p, ch) -> (int) ((byte[]) p)[ch];
             case CvType.CV_8U:
@@ -600,13 +676,13 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_32S:
                 return (p, ch) -> ((int[]) p)[ch];
             default:
-                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
         }
     }
 
     public static PixelToInts pixelToIntsConverter(final CvRaster raster) {
         final GetChannelValueAsInt fetcher = channelValueFetcher(raster);
-        final int numChannels = raster.channels;
+        final int numChannels = raster.channels();
         final int[] ret = new int[numChannels];
         return (p -> {
             for (int i = 0; i < numChannels; i++)
@@ -616,7 +692,7 @@ public abstract class CvRaster implements NoThrowAutoClosable {
     }
 
     public static int numChannelElementValues(final CvRaster raster) {
-        switch (CvType.depth(raster.type)) {
+        switch (CvType.depth(raster.type())) {
             case CvType.CV_8S:
             case CvType.CV_8U:
                 return 256;
@@ -624,13 +700,13 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_16U:
                 return 65536;
             default:
-                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
         }
     }
 
     public static Object makePixel(final CvRaster raster) {
-        final int channels = raster.channels;
-        switch (CvType.depth(raster.type)) {
+        final int channels = raster.channels();
+        switch (CvType.depth(raster.type())) {
             case CvType.CV_8S:
             case CvType.CV_8U:
                 return new byte[channels];
@@ -640,14 +716,14 @@ public abstract class CvRaster implements NoThrowAutoClosable {
             case CvType.CV_32S:
                 return new int[channels];
             default:
-                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type));
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
 
         }
     }
 
     public static IntsToPixel intsToPixelConverter(final CvRaster raster) {
         final PutChannelValueFromInt putter = channelValuePutter(raster);
-        final int numChannels = raster.channels;
+        final int numChannels = raster.channels();
         final Object pixel = makePixel(raster);
         return ints -> {
             for (int i = 0; i < numChannels; i++)
@@ -710,17 +786,30 @@ public abstract class CvRaster implements NoThrowAutoClosable {
     // ==================================================================
 
     public static class Closer implements AutoCloseable {
-        private final List<NoThrowAutoClosable> rastersToClose = new LinkedList<>();
+        private final List<AutoCloseable> rastersToClose = new LinkedList<>();
 
-        public Mat add(final Mat mat) {
+        public CvMat add(final CvMat mat) {
             if (mat != null)
-                rastersToClose.add(0, () -> mat.release());
+                rastersToClose.add(0, mat);
+            return mat;
+        }
+
+        public CvRaster add(final CvRaster mat) {
+            if (mat != null)
+                rastersToClose.add(0, mat);
             return mat;
         }
 
         @Override
         public void close() {
-            rastersToClose.stream().forEach(r -> r.close());
+            rastersToClose.stream().forEach(
+                    r -> {
+                        try {
+                            r.close();
+                        } catch (final Exception e) {
+                            // impossible
+                        }
+                    });
         }
     }
 
@@ -734,39 +823,6 @@ public abstract class CvRaster implements NoThrowAutoClosable {
         if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
             ret.order(ByteOrder.LITTLE_ENDIAN);
         return ret;
-    }
-
-    private static class MatCopy extends org.opencv.core.Mat implements AutoCloseable {
-        private final Method nDelete;
-
-        public MatCopy(final Mat mat) {
-            super(CvRasterNative._copy(mat.nativeObj));
-
-            try {
-                nDelete = org.opencv.core.Mat.class.getDeclaredMethod("n_delete", long.class);
-                nDelete.setAccessible(true);
-            } catch (NoSuchMethodException | SecurityException e) {
-                throw new RuntimeException(
-                        "Got an exception trying to access Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
-                        e);
-            }
-        }
-
-        // Prevent finalize from being called
-        @Override
-        protected void finalize() throws Throwable {}
-
-        @Override
-        public void close() {
-            try {
-                nDelete.invoke(this, super.nativeObj);
-            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                throw new RuntimeException(
-                        "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
-                        e);
-            }
-        }
-
     }
 
 }

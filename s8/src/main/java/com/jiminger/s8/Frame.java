@@ -21,8 +21,7 @@ package com.jiminger.s8;
 import java.awt.Point;
 import java.util.Properties;
 
-import org.opencv.core.Mat;
-
+import com.jiminger.image.CvMat;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.CvRaster.Closer;
 import com.jiminger.image.Utils;
@@ -71,11 +70,12 @@ public class Frame {
         this.worstEdgeStdDevToConsider = (worstEdgeStdDevAllowedAt3200Dpi * resolutiondpi) / 3200.0;
     }
 
-    public Mat cutFrame(final Mat image, final double resdpi,
+    public CvMat cutFrame(final CvRaster srcraster, final double resdpi,
             final int frameWidthPix, final int frameHeightPix,
             final boolean reverseImage, final int frameNum,
             final double scaleMult, final boolean rescale,
             final boolean correctrotation) {
+
         noCut = false;
         if (farEdge == null || farEdge.stdDev > worstEdgeStdDevToConsider) {
             System.out.println("WARNING: far film edge for frame " + frameNum + " has a stdDev of " +
@@ -96,14 +96,13 @@ public class Frame {
         outOfBounds = false;
 
         try (Closer closer = new Closer()) {
-            final CvRaster srcraster = CvRaster.manageCopy(image, closer);
-            final CvRaster dstraster = CvRaster.createManaged(frameHeightPix, frameWidthPix, srcraster.type, closer);
+            final CvRaster dstraster = CvRaster.createManaged(frameHeightPix, frameWidthPix, srcraster.type(), closer);
 
-            final int srcwidth = srcraster.cols;
-            final int srcheight = srcraster.rows;
+            final int srcwidth = srcraster.cols();
+            final int srcheight = srcraster.rows();
 
-            final int dstwidth = dstraster.cols;
-            final int dstheight = dstraster.rows;
+            final int dstwidth = dstraster.cols();
+            final int dstheight = dstraster.rows();
 
             for (int dstRow = 0; dstRow < dstheight; dstRow++) {
                 for (int dstCol = 0; dstCol < dstwidth; dstCol++) {

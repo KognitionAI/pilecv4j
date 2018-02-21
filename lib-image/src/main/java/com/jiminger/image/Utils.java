@@ -86,21 +86,20 @@ public class Utils {
     public static BufferedImage mat2Img(final CvRaster in, final IndexColorModel colorModel) {
         BufferedImage out;
 
-        if (in.channels != 1 || CvType.depth(in.type) != CvType.CV_8U)
+        if (in.channels() != 1 || CvType.depth(in.type()) != CvType.CV_8U)
             throw new IllegalArgumentException("Cannot convert a Mat to a BufferedImage with a colorMap if the Mat has more than one channel);");
 
-        out = new BufferedImage(in.cols, in.rows, BufferedImage.TYPE_BYTE_INDEXED, colorModel);
+        out = new BufferedImage(in.cols(), in.rows(), BufferedImage.TYPE_BYTE_INDEXED, colorModel);
 
-        out.getRaster().setDataElements(0, 0, in.cols, in.rows, CvRaster.copyToPrimitiveArray(in));
+        out.getRaster().setDataElements(0, 0, in.cols(), in.rows(), CvRaster.copyToPrimitiveArray(in));
         return out;
     }
 
     private static CvRaster argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
         final CvRaster raster = CvRaster.createManaged(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
-        final Mat mat = raster.mat;
         final byte[] inpixels = bb.getData();
         if (lookup == null) // indicates a pixel compatible format
-            mat.put(0, 0, inpixels);
+            raster.matAp(m -> m.put(0, 0, inpixels));
         else {
             final boolean hasAlpha = lookup[0] != -1;
             final int alpha = lookup[0];
@@ -108,7 +107,7 @@ public class Utils {
             final int red = lookup[1];
             final int green = lookup[2];
             final byte[] outpixel = new byte[skip]; // pixel length
-            final int colsXchannels = raster.colsXchannels;
+            final int colsXchannels = raster.cols() * raster.channels();
             raster.apply((BytePixelSetter) (r, c) -> {
                 final int pos = (r * colsXchannels) + (c * skip);
                 outpixel[0] = inpixels[pos + blue];
@@ -131,7 +130,7 @@ public class Utils {
         final int green = 2;
         final int alpha = 0;
         final byte[] outpixel = new byte[hasAlpha ? 4 : 3]; // pixel length
-        final int cols = raster.cols;
+        final int cols = raster.cols();
         raster.apply((BytePixelSetter) (r, c) -> {
             final int pixel = inpixels[(r * cols) + c];
             outpixel[0] = (byte) ((pixel & mask[blue]) >>> shift[blue]);
@@ -229,7 +228,7 @@ public class Utils {
                 final DataBufferByte bb = (DataBufferByte) dataBuffer;
                 final byte[] srcdata = bb.getData();
                 final CvRaster ret = CvRaster.createManaged(h, w, CvType.CV_8UC1);
-                ret.mat.put(0, 0, srcdata);
+                ret.matAp(m -> m.put(0, 0, srcdata));
                 return ret;
             }
             case TYPE_USHORT_GRAY: {
@@ -240,7 +239,7 @@ public class Utils {
                 final DataBufferUShort bb = (DataBufferUShort) dataBuffer;
                 final short[] srcdata = bb.getData();
                 final CvRaster ret = CvRaster.createManaged(h, w, CvType.CV_16UC1);
-                ret.mat.put(0, 0, srcdata);
+                ret.matAp(m -> m.put(0, 0, srcdata));
                 return ret;
             }
             case TYPE_USHORT_565_RGB: // 16 bit total with 5 bit r, 6 bit g, 5 bit blue

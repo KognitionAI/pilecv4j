@@ -23,17 +23,18 @@ import com.jiminger.image.CvRaster;
 public class Correlate {
     public static double[] correlation(final CvRaster Xraster, final CvRaster Yraster)
             throws CorrelateException {
-        if (Xraster.rows != Yraster.rows || Xraster.cols != Yraster.cols)
+        final int width = Xraster.cols();
+        final int height = Xraster.rows();
+        final int dim = Xraster.channels();
+
+        if (height != Yraster.rows() || width != Yraster.cols())
             throw new CorrelateException("images don't have the same dimmentions");
 
-        if (Xraster.channels != Yraster.channels)
+        if (dim != Yraster.channels())
             throw new CorrelateException("images don't have the same number of bands");
 
-        final int width = Xraster.cols;
-        final int height = Xraster.rows;
         final int wh = width * height;
 
-        final int dim = Xraster.channels;
         final double[] ret = new double[dim];
 
         // find the means

@@ -19,6 +19,7 @@ package com.jiminger.s8;
 ****************************************************************************/
 
 import static com.jiminger.image.Utils.print;
+import static net.dempsy.util.Functional.uncheck;
 
 import java.awt.Color;
 import java.awt.image.IndexColorModel;
@@ -38,6 +39,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import com.jiminger.image.CvMat;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.CvRaster.IntsToPixel;
 import com.jiminger.image.CvRaster.PixelAggregate;
@@ -158,8 +160,8 @@ public class ExtractFrames {
         cvrtScaleDenom[CvType.CV_8S] = (0x7f);
     }
 
-    public static Mat convertToGray(final Mat src) {
-        final Mat workingImage = new Mat();
+    public static CvMat convertToGray(final Mat src) {
+        final CvMat workingImage = new CvMat();
         if (src.depth() != CvType.CV_8U) {
             System.out.print("converting image to 8-bit grayscale ... ");
             src.convertTo(workingImage, CvType.CV_8U, 255.0 / cvrtScaleDenom[src.depth()]);
@@ -239,9 +241,9 @@ public class ExtractFrames {
             if (writeDebugImages)
                 ImageFile.writeImageFile(origImage, outDir + File.separator + "orig.tif");
 
-            print("origImage", origImage.mat);
-            final int origImageHeight = origImage.rows;
-            final int origImageWidth = origImage.cols;
+            origImage.matAp(m -> print("origImage", m));
+            final int origImageHeight = origImage.rows();
+            final int origImageWidth = origImage.cols();
 
             final com.jiminger.util.Timer timer = new com.jiminger.util.Timer();
 
@@ -250,7 +252,7 @@ public class ExtractFrames {
             // ------------------------------------------------------------
             // Create a grayscale color model.
             timer.start();
-            final Mat grayImage = closer.add(convertToGray(origImage.mat));
+            final CvMat grayImage = closer.add(origImage.matOp(m -> convertToGray(m)));
             System.out.println("Gray is " + CvType.typeToString(grayImage.type()));
             if (writeDebugImages)
                 ImageFile.writeImageFile(grayImage, outDir + File.separator + "gray.bmp");
@@ -283,8 +285,8 @@ public class ExtractFrames {
             // --------------------------------------
             System.out.println("Performing Sobel deriv calculation");
             System.out.print("Making gradient image ... ");
-            final Mat dx = closer.add(new Mat());
-            final Mat dy = closer.add(new Mat());
+            final CvMat dx = closer.add(new CvMat());
+            final CvMat dy = closer.add(new CvMat());
             Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
             Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
             if (writeDebugImages) {
@@ -292,13 +294,13 @@ public class ExtractFrames {
                 ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
             }
 
-            final CvRaster dxr = CvRaster.manageCopy(dx, closer);
-            final CvRaster dyr = CvRaster.manageCopy(dy, closer);
-            final int numPixelsInGradient = dxr.rows * dxr.cols;
+            final CvRaster dxr = CvRaster.toRaster(dx, closer);
+            final CvRaster dyr = CvRaster.toRaster(dy, closer);
+            final int numPixelsInGradient = dxr.rows() * dxr.cols();
             final byte[] dirsa = new byte[numPixelsInGradient];
 
             final short[] tmpdx = new short[numPixelsInGradient];
-            dxr.mat.get(0, 0, tmpdx);
+            dxr.matAp(m -> m.get(0, 0, tmpdx));
 
             for (int pos = 0; pos < numPixelsInGradient; pos++) {
                 // calculate the angle
@@ -307,8 +309,8 @@ public class ExtractFrames {
                 dirsa[pos] = angle_byte(dxv, dyv);
             }
 
-            final CvRaster dirs = CvRaster.createManaged(dxr.rows, dxr.cols, CvType.CV_8UC1, closer); // a byte raster to hold the dirs
-            final Mat gradientDirImage = dirs.mat;
+            // a byte raster to hold the dirs
+            final CvMat gradientDirImage = closer.add(CvRaster.createManaged(dxr.rows(), dxr.cols(), CvType.CV_8UC1).decoupled());
             gradientDirImage.put(0, 0, dirsa);
             if (writeDebugImages) {
                 ImageFile.writeImageFile(gradientDirImage, outDir + File.separator + "gradDir.bmp");
@@ -319,7 +321,7 @@ public class ExtractFrames {
             print("dy", dy);
 
             System.out.print("canny ... ");
-            final Mat edgeImage = new Mat();
+            final CvMat edgeImage = new CvMat();
 
             if (kernelSize >= 5)
                 thigh *= 4.0;
@@ -337,8 +339,8 @@ public class ExtractFrames {
             print("edge", edgeImage);
             // --------------------------------------
 
-            final CvRaster edgeRaster = CvRaster.manageCopy(edgeImage, closer);
-            final CvRaster gradientDirRaster = CvRaster.manageCopy(gradientDirImage, closer);
+            final CvRaster edgeRaster = CvRaster.toRaster(edgeImage, closer);
+            final CvRaster gradientDirRaster = CvRaster.toRaster(gradientDirImage, closer);
 
             // ------------------------------------------------------------
             // Now load up the edges of the image. This will set the values
@@ -402,7 +404,8 @@ public class ExtractFrames {
             // if (writeDebugImages)
             // ImageFile.writeImageFile(transform.mask.getMaskImage(), outDir + File.separator + "tmpmask.bmp");
             if (writeDebugImages)
-                ImageFile.writeImageFile(transform.gradDirMask.getMaskRaster().mat, outDir + File.separator + "tmpgradmask.bmp");
+                transform.gradDirMask.getMaskRaster()
+                        .matAp(m -> uncheck(() -> ImageFile.writeImageFile(m, outDir + File.separator + "tmpgradmask.bmp")));
 
             // Execute the hough transform on the edge image
             System.out.print("executing hough transform (" + rowstart + "->" +
@@ -410,7 +413,8 @@ public class ExtractFrames {
             final Transform.HoughSpace houghSpace = transform.transform(edgeRaster, gradientDirRaster, houghThreshold,
                     rowstart, rowend, colstart, colend);
             if (writeDebugImages)
-                ImageFile.writeImageFile(transform.getTransformRaster(houghSpace).mat, outDir + File.separator + "tmpht.bmp");
+                transform.getTransformRaster(houghSpace)
+                        .matAp(m -> uncheck(() -> ImageFile.writeImageFile(m, outDir + File.separator + "tmpht.bmp")));
             System.out.println("done (" + timer.stop() + ")");
             // ------------------------------------------------------------
 
@@ -601,20 +605,24 @@ public class ExtractFrames {
                 // if we are dealing with 8mm then we need to take successive
                 // sprocket holes and find the centroid of the two fits
                 // to find the center of the frame
-                Transform.Fit frameReference = fit;
+                Transform.Fit tfit = fit;
                 if (filmType == FilmSpec.eightMMFilmType) {
                     final Transform.Fit fit2 = sprockets.get(i + 1);
-                    frameReference = new Transform.Fit(
+                    tfit = new Transform.Fit(
                             (fit.cr + fit2.cr) / 2.0, (fit.cc + fit2.cc) / 2.0, fit.scale, fit.rotation,
                             null, 0.0, null);
                 }
+                final Transform.Fit frameReference = tfit;
 
-                FilmEdge sprocketEdgePiece = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
-                if (sprocketEdgePiece == null)
-                    sprocketEdgePiece = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
-                FilmEdge farEdgePiece = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
-                if (farEdgePiece == null)
-                    farEdgePiece = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
+                FilmEdge t_sep = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
+                if (t_sep == null)
+                    t_sep = sprocketEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
+                final FilmEdge sprocketEdgePiece = t_sep;
+
+                FilmEdge t_fep = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, false);
+                if (t_fep == null)
+                    t_fep = farEdge.edgePiece(frameReference.cr, frameReference.cc, frameHeightPix, true);
+                final FilmEdge farEdgePiece = t_fep;
 
                 if (sprocketEdgePiece != null) {
                     sprocketEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
@@ -623,7 +631,7 @@ public class ExtractFrames {
                     // for debug purposes draw a circle around the point along the sprocketEdgePiece
                     // that is closest to the sprocket. This line is the axis of the frame and
                     // passes through the center.
-                    Utils.drawCircle(Utils.closest(frameReference, sprocketEdgePiece.edge), sprocketInfoTiledImage.mat, cyan);
+                    sprocketInfoTiledImage.matAp(m -> Utils.drawCircle(Utils.closest(frameReference, sprocketEdgePiece.edge), m, cyan));
                 }
                 if (farEdgePiece != null) {
                     farEdgePiece.writeEdge(sprocketInfoTiledImage, BOVERLAY);
@@ -633,8 +641,8 @@ public class ExtractFrames {
                     // that is closest to the sprocket. This line is the axis of the frame and
                     // passes through the center.
                     final Point closest = Utils.closest(frameReference, farEdgePiece.edge);
-                    Utils.drawCircle(closest, sprocketInfoTiledImage.mat, cyan);
-                    Utils.drawLine(frameReference, closest, sprocketInfoTiledImage.mat, cyan);
+                    sprocketInfoTiledImage.matAp(m -> Utils.drawCircle(closest, m, cyan));
+                    sprocketInfoTiledImage.matAp(m -> Utils.drawLine(frameReference, closest, m, cyan));
                 }
 
                 // figure out what the distance between the two edges are
@@ -653,13 +661,14 @@ public class ExtractFrames {
                 // }
 
                 final Frame frame = new Frame(frameReference/* (Transform.Fit)sprockets.get(i) */,
-                        sprocketEdgePiece, farEdgePiece, /* filmLayout, */filmType, resolutiondpi);
+                        t_sep, farEdgePiece, /* filmLayout, */filmType, resolutiondpi);
 
                 final String frameNumStr = (i < 10) ? ("0" + i) : Integer.toString(i);
 
                 System.out.print(".");
+                final int frameIndex = i;
                 final Mat frameTiledImageMat = frame.cutFrame(
-                        origImage.mat, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, i, frameOversizeMult,
+                        origImage, resolutiondpi, frameWidthPix, frameHeightPix, reverseImage, frameIndex, frameOversizeMult,
                         rescale, correctrotation);
 
                 if (frameTiledImageMat != null) {
@@ -708,13 +717,15 @@ public class ExtractFrames {
         for (int idx = 0; idx < scale.length; idx++)
             scale[idx] = cdf[idx] * factor;
 
-        try (final CvRaster tmp = CvRaster.createManaged(src.rows, src.cols, CvType.CV_32SC3);) {
+        final int srcrows = src.rows();
+        final int srccols = src.cols();
+        try (final CvRaster tmp = CvRaster.createManaged(srcrows, srccols, CvType.CV_32SC3);) {
 
             final PixelToInts p2i = CvRaster.pixelToIntsConverter(src);
 
             int maxChannel = 0;
-            for (int r = 0; r < src.rows; r++) {
-                for (int c = 0; c < src.cols; c++) {
+            for (int r = 0; r < srcrows; r++) {
+                for (int c = 0; c < srccols; c++) {
                     final int[] sbgr = p2i.apply(src.get(r, c));
                     double intensity = (sbgr[0] & maxPixVal);
                     for (int idx = 1; idx < sbgr.length; idx++)
@@ -735,8 +746,10 @@ public class ExtractFrames {
             // now rescale so maxChannel is 0xffff.
             final double rescale = maxPixValD / maxChannel;
             final IntsToPixel toPix = CvRaster.intsToPixelConverter(src);
-            for (int r = 0; r < tmp.rows; r++) {
-                for (int c = 0; c < tmp.cols; c++) {
+            final int tmprows = tmp.rows();
+            final int tmpcols = tmp.cols();
+            for (int r = 0; r < tmprows; r++) {
+                for (int c = 0; c < tmpcols; c++) {
                     final int[] bgr = (int[]) tmp.get(r, c);
                     final int[] sbgr = new int[3];
                     for (int i = 0; i < 3; i++)
@@ -751,7 +764,7 @@ public class ExtractFrames {
 
     public static PixelAggregate<Object, Hist> histogram(final CvRaster raster) {
         final CvRaster.GetChannelValueAsInt channelValFetcher = CvRaster.channelValueFetcher(raster);
-        final int numChannels = raster.channels;
+        final int numChannels = raster.channels();
         return (h, pixel, row, col) -> {
             for (int i = 0; i < numChannels; i++) {
                 final int el = channelValFetcher.get(pixel, i);

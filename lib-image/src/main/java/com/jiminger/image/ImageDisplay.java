@@ -94,7 +94,7 @@ public class ImageDisplay implements AutoCloseable {
 
                 Image currentImage = null;
 
-                if (mat != null && mat.cols > 0 && mat.rows > 0) {
+                if (mat != null && mat.cols() > 0 && mat.rows() > 0) {
                     currentImage = new Image(display, convertToSWT(mat));
                 }
 
@@ -283,25 +283,25 @@ public class ImageDisplay implements AutoCloseable {
         PaletteData pd;
         final int depth;
         PixGet getter = null;
-        final int inChannels = in.channels;
+        final int inChannels = in.channels();
         final byte[] tbbuf = new byte[1];
         final short[] tsbuf = new short[1];
-        final int cvDepth = CvType.depth(in.type);
+        final int cvDepth = CvType.depth(in.type());
 
-        final int width = in.cols;
-        final int height = in.rows;
+        final int width = in.cols();
+        final int height = in.rows();
         if (inChannels == 1) { // assume gray
             switch (cvDepth) {
 
                 case CV_8U:
                     getter = (r, c) -> {
-                        in.mat.get(r, c, tbbuf);
+                        in.matAp(m -> m.get(r, c, tbbuf));
                         return Byte.toUnsignedInt(tbbuf[0]);
                     };
                 case CV_8S: {
                     if (cvDepth == CV_8S)
                         getter = (r, c) -> {
-                            in.mat.get(r, c, tbbuf);
+                            in.matAp(m -> m.get(r, c, tbbuf));
                             return (int) tbbuf[0];
                         };
                     final RGB[] rgb = new RGB[256];
@@ -318,7 +318,7 @@ public class ImageDisplay implements AutoCloseable {
                 case CV_16S: {
                     if (cvDepth == CV_16S)
                         getter = (r, c) -> {
-                            in.mat.get(r, c, tsbuf);
+                            in.matAp(m -> m.get(r, c, tsbuf));
                             return (int) tsbuf[0];
                         };
                     pd = new PaletteData(255, 255, 255);
@@ -327,9 +327,9 @@ public class ImageDisplay implements AutoCloseable {
                 }
                 default:
                     throw new IllegalArgumentException(
-                            "Cannot convert a Mat with a type of " + CvType.typeToString(in.type) + " to a BufferedImage");
+                            "Cannot convert a Mat with a type of " + CvType.typeToString(in.type()) + " to a BufferedImage");
             }
-            final ImageData id = new ImageData(in.cols, in.rows, depth, pd);
+            final ImageData id = new ImageData(in.cols(), in.rows(), depth, pd);
             for (int row = 0; row < height; row++)
                 for (int col = 0; col < width; col++)
                     id.setPixel(col, row, getter.get(row, col));
@@ -340,8 +340,10 @@ public class ImageDisplay implements AutoCloseable {
             final ImageData id = new ImageData(width, height, 24, new PaletteData(0xFF0000, 0x00FF00, 0x0000FF));
             final byte[] pixel = new byte[3];
             for (int row = 0; row < height; row++) {
+                final int rr = row;
                 for (int col = 0; col < width; col++) {
-                    in.mat.get(row, col, pixel);
+                    final int cc = col;
+                    in.matAp(m -> m.get(rr, cc, pixel));
                     final int pix = Byte.toUnsignedInt(pixel[0]) | 0xff00 & (Byte.toUnsignedInt(pixel[1]) << 8)
                             | 0xff0000 & (Byte.toUnsignedInt(pixel[2]) << 16);
                     id.setPixel(col, row, pix);

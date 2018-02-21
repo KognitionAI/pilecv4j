@@ -59,15 +59,15 @@ public class Transform {
      * This method assumes raster is an edge detected image. If gradient raster is supplied then it will be used to greatly improve the results.
      */
     public HoughSpace transform(final CvRaster raster, final CvRaster gradientRaster, final int houghThreshold) {
-        final int height = raster.rows;
-        final int width = raster.cols;
+        final int height = raster.rows();
+        final int width = raster.cols();
         return transform(raster, gradientRaster, houghThreshold, 0, height - 1, 0, width - 1);
     }
 
     public HoughSpace transform(final CvRaster raster, final CvRaster gradientRaster, final int houghThreshold,
             int rowstart, int rowend, int colstart, int colend) {
-        final int height = raster.rows;
-        final int width = raster.cols;
+        final int height = raster.rows();
+        final int width = raster.cols();
 
         final long gradientDirImage = gradientRaster == null ? 0 : gradientRaster.getNativeAddressOfData();
 
@@ -126,7 +126,7 @@ public class Transform {
                 final int eir = e.ir;
                 final int eic = e.ic;
 
-                Utils.drawCircle(eir, eic, ti.mat, peakCircleColor);
+                ti.matAp(m -> Utils.drawCircle(eir, eic, m, peakCircleColor));
 
                 for (final java.awt.Point p : e.contributingImagePoints)
                     ti.set(p.y, p.x, overlayPixel);
@@ -287,13 +287,13 @@ public class Transform {
     public static void drawClusters(final List<Cluster> clusters, final CvRaster ti, final byte color) {
         final Color colorC = new Color(color, color, color);
         for (final Cluster c : clusters)
-            Utils.drawCircle(c.imageRow(), c.imageCol(), ti.mat, colorC);
+            ti.matAp(m -> Utils.drawCircle(c.imageRow(), c.imageCol(), m, colorC));
     }
 
     public static void drawFits(final List<Transform.Fit> fits, final CvRaster ti, final byte color) {
         final Color colorC = new Color(color, color, color);
         for (final Fit c : fits)
-            Utils.drawCircle((int) Math.round(c.cr), (int) Math.round(c.cc), ti.mat, colorC);
+            ti.matAp(m -> Utils.drawCircle((int) Math.round(c.cr), (int) Math.round(c.cc), m, colorC));
     }
 
     public static class HoughSpaceEntryManager {
