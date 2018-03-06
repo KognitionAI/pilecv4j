@@ -19,16 +19,5 @@
       <groupId>org.slf4j</groupId>
       <artifactId>jul-to-slf4j</artifactId>
     </dependency>
-    <!-- explicitly add a standard logging framework, as Flink does not have
-         a hard dependency on one specific framework by default -->
-    <dependency>
-      <groupId>com.jiminger</groupId>
-      <artifactId>lib-image</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>com.jiminger</groupId>
-      <artifactId>opencv-lib-jar</artifactId>
-      <classifier>withlib</classifier>
-    </dependency>
   </dependencies>
 </project>
