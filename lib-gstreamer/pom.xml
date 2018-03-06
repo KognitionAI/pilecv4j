@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.jiminger</groupId>
+    <artifactId>utilities</artifactId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>lib-gstreamer</artifactId>
+  <name>lib-gstreamer (${project.version})</name>
+  <description></description>
+  <dependencies>
+    <dependency>
+      <groupId>org.freedesktop.gstreamer</groupId>
+      <artifactId>gst1-java-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>jul-to-slf4j</artifactId>
+    </dependency>
+    <!-- explicitly add a standard logging framework, as Flink does not have
+         a hard dependency on one specific framework by default -->
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>lib-image</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>opencv-lib-jar</artifactId>
+      <classifier>withlib</classifier>
+    </dependency>
+  </dependencies>
+</project>

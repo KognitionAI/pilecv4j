@@ -25,6 +25,7 @@
     <module>lib-util</module>
     <module>lib-nr</module>
     <module>lib-image</module>
+    <module>lib-gstreamer</module>
     <module>native</module>
     <module>s8</module>
     <module>test-jiminger</module>
@@ -151,6 +152,16 @@
            should all be ${project.version} -->
 
       <!-- Third party library versions -->
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jul-to-slf4j</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.freedesktop.gstreamer</groupId>
+        <artifactId>gst1-java-core</artifactId>
+        <version>0.9.2</version>
+      </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>

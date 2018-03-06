@@ -88,7 +88,7 @@ public abstract class CvRaster implements AutoCloseable {
         return CvType.ELEM_SIZE(type());
     }
 
-    private final ByteBuffer underlying;
+    public final ByteBuffer underlying;
     private boolean decoupled = false;
     private final CvMat mat;
 
