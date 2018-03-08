@@ -1,4 +1,4 @@
-package com.jiminger.gstreamer;
+package com.jiminger.gstreamer.util;
 
 import java.io.PrintStream;
 import java.util.List;
@@ -34,17 +34,25 @@ public class GstUtils {
         java.util.logging.Logger.getLogger(logger).setLevel(level);
     }
 
-    public static final Bus.EOS endOnEOS = (object) -> {
-        if (LOGGER.isDebugEnabled())
-            LOGGER.debug("end-of-stream: " + object);
-        Gst.quit();
-    };
+    public static final Bus.EOS endOnEOS(final Bin bin) {
+        final Bus.EOS ret = (object) -> {
+            if (LOGGER.isDebugEnabled())
+                LOGGER.debug("end-of-stream: " + object);
+            bin.stop();
+            Gst.quit();
+        };
+        return ret;
+    }
 
-    public static final Bus.ERROR endOnError = (object, code, msg) -> {
-        if (LOGGER.isDebugEnabled())
-            LOGGER.debug("error:" + object + " code:" + code + " " + msg);
-        Gst.quit();
-    };
+    public static final Bus.ERROR endOnError(final Bin bin) {
+        final Bus.ERROR ret = (object, code, msg) -> {
+            if (LOGGER.isDebugEnabled())
+                LOGGER.debug("error:" + object + " code:" + code + " " + msg);
+            bin.stop();
+            Gst.quit();
+        };
+        return ret;
+    }
 
     public static final Bus.STATE_CHANGED printStateChange = (final GstObject source, final State old, final State current,
             final State pending) -> {
@@ -53,8 +61,8 @@ public class GstUtils {
 
     public static void instrument(final Pipeline pipe) {
         final Bus bus = pipe.getBus();
-        bus.connect(endOnEOS);
-        bus.connect(endOnError);
+        bus.connect(endOnEOS(pipe));
+        bus.connect(endOnError(pipe));
         if (LOGGER.isDebugEnabled())
             bus.connect(printStateChange);
     }

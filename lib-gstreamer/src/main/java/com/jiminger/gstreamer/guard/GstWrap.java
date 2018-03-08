@@ -1,4 +1,4 @@
-package com.jiminger.gstreamer;
+package com.jiminger.gstreamer.guard;
 
 import org.freedesktop.gstreamer.MiniObject;
 

@@ -1,9 +1,11 @@
 package com.jiminger.gstreamer;
 
-import static com.jiminger.gstreamer.GstUtils.dispose;
+import static com.jiminger.gstreamer.util.GstUtils.dispose;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Buffer;
@@ -18,6 +20,10 @@ import org.freedesktop.gstreamer.elements.AppSrc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.jiminger.gstreamer.guard.BufferWrap;
+import com.jiminger.gstreamer.guard.GstWrap;
+import com.jiminger.gstreamer.util.NewSample;
+
 public class Breakout {
     private static final Logger LOGGER = LoggerFactory.getLogger(Breakout.class);
 
@@ -26,8 +32,7 @@ public class Breakout {
     private ProcessFrame frameProcessor = null;
     private final AtomicBoolean needsData = new AtomicBoolean(false);
     private OutputMode mode = OutputMode.BLOCKING;
-
-    AppSink.NEW_SAMPLE testCallback;
+    private boolean preroll = true;
 
     public enum OutputMode {
         BLOCKING,
@@ -94,6 +99,11 @@ public class Breakout {
         return this;
     }
 
+    public Breakout preroll(final boolean preroll) {
+        this.preroll = preroll;
+        return this;
+    }
+
     public static class SlowFrameProcessor implements ProcessFrame {
         final Thread thread;
         final AtomicReference<Sample> to = new AtomicReference<>(null);
@@ -144,19 +154,52 @@ public class Breakout {
                 }
             }
         }
+    }
 
+    private final ProcessFrame passthroughFrameProcessor = s -> {
+        try (GstWrap<Sample> sample = new GstWrap<>(s); BufferWrap buf = new BufferWrap(sample.obj.getBuffer())) {
+            final ByteBuffer bb = buf.map(false);
+            try (final BufferWrap ret = new BufferWrap(new Buffer(bb.remaining()));) {
+                LOGGER.trace("breakout got frame {}", (int) bb.get(0));
+                final ByteBuffer bb2 = ret.map(true);
+                bb2.put(bb);
+                return ret.disown();
+            }
+        }
+    };
+
+    private Function<NewSample, FlowReturn> blocking(final ProcessFrame processor) {
+        return elem -> {
+            LOGGER.trace("New blocking {} from {}", (elem.preroll ? "preroll" : "sample"), elem.elem.getName());
+            final Sample sample = elem.pull();
+            final Buffer b = processor.processFrame(sample);
+            if (b != null)
+                output.pushBuffer(b);
+            return FlowReturn.OK;
+        };
+    }
+
+    private Function<NewSample, FlowReturn> managed(final ProcessFrame processor) {
+        return new ManagedAppSinkListener(needsData, processor);
     }
 
     public Bin build() {
+        Function<NewSample, FlowReturn> mainCallback = null;
+        Function<NewSample, FlowReturn> prerollCallback = null;
+
         input.set("emit-signals", true);
 
         switch (mode) {
             case BLOCKING:
-                testCallback = new BlockingAppSinkListener(frameProcessor, output);
+                mainCallback = blocking(frameProcessor);
+                if (!preroll)
+                    prerollCallback = blocking(passthroughFrameProcessor);
                 output.set("emit-signals", false);
                 break;
             case MANAGED:
-                testCallback = new ManagedAppSinkListener(frameProcessor, output, needsData);
+                mainCallback = managed(frameProcessor);
+                if (!preroll)
+                    prerollCallback = managed(passthroughFrameProcessor);
                 output.set("emit-signals", true);
                 output.connect((AppSrc.NEED_DATA) (elem, size) -> {
                     LOGGER.trace("{} needs {} bytes of data", elem.getName(), size);
@@ -169,112 +212,66 @@ public class Breakout {
                 break;
         }
 
-        final CapsTransfer ct = new CapsTransfer((AppSinkListener) testCallback, output, input);
-        input.connect((AppSink.NEW_PREROLL) ct);
-        input.connect((AppSink.NEW_SAMPLE) ct);
+        final CapsTransfer ct = new CapsTransfer(prerollCallback == null ? mainCallback : prerollCallback);
+        input.connect(ct);
+        input.connect(NewSample.sampler(mainCallback));
         return new BinBuilder()
                 .add(input)
                 .add(output)
                 .buildBin();
     }
 
-    private static class CapsTransfer implements AppSink.NEW_SAMPLE, AppSink.NEW_PREROLL {
-        final AppSinkListener successor;
-        final AppSrc output;
-        final AppSink input;
+    private class CapsTransfer implements AppSink.NEW_PREROLL, Function<NewSample, FlowReturn> {
+        final Function<NewSample, FlowReturn> successor;
 
-        private CapsTransfer(final AppSinkListener successor, final AppSrc output, final AppSink input) {
+        private CapsTransfer(final Function<NewSample, FlowReturn> successor) {
             this.successor = successor;
-            this.output = output;
-            this.input = input;
         }
 
         @Override
-        public FlowReturn newSample(final AppSink elem) {
-            return doIt(elem, false);
-        }
-
-        @Override
-        public FlowReturn newPreroll(final AppSink elem) {
-            return doIt(elem, true);
-        }
-
-        private FlowReturn doIt(final AppSink elem, final boolean preroll) {
+        public FlowReturn apply(final NewSample elem) {
+            LOGGER.trace("Caps transfer during {} on {}", (elem.preroll ? "preroll" : "sample"), elem.elem.getName());
             final Pad sinkPad = input.getSinkPads().get(0);
             final Caps caps = sinkPad.getNegotiatedCaps();
             output.setCaps(caps);
-            input.disconnect((AppSink.NEW_PREROLL) this);
-            input.disconnect((AppSink.NEW_SAMPLE) this);
-            input.connect((AppSink.NEW_PREROLL) successor);
-            input.connect((AppSink.NEW_SAMPLE) successor);
-            successor.doIt(elem, preroll);
-            return FlowReturn.OK;
-        }
-    }
-
-    private static abstract class AppSinkListener implements AppSink.NEW_SAMPLE, AppSink.NEW_PREROLL {
-        protected final ProcessFrame process;
-        protected final AppSrc output;
-
-        protected AppSinkListener(final ProcessFrame process, final AppSrc output) {
-            this.process = process == null ? s -> {
-                return s.getBuffer();
-            }
-                    : process;
-            this.output = output;
-        }
-
-        @Override
-        public FlowReturn newSample(final AppSink elem) {
-            return doIt(elem, false);
+            // input.disconnect(this);
+            // input.disconnect((AppSink.NEW_SAMPLE) this);
+            // input.connect(NewSample.preroller(successor));
+            // input.connect(NewSample.sampler(successor));
+            return successor.apply(elem);
         }
 
         @Override
         public FlowReturn newPreroll(final AppSink elem) {
-            return doIt(elem, true);
-        }
-
-        public abstract FlowReturn doIt(final AppSink elem, final boolean preroll);
-    }
-
-    private static class BlockingAppSinkListener extends AppSinkListener {
-        private BlockingAppSinkListener(final ProcessFrame process, final AppSrc output) {
-            super(process, output);
-        }
-
-        @Override
-        public FlowReturn doIt(final AppSink elem, final boolean preroll) {
-            final Sample sample = preroll ? elem.pullPreroll() : elem.pullSample();
-            final Buffer b = process.processFrame(sample);
-            if (b != null)
-                output.pushBuffer(b);
-            return FlowReturn.OK;
+            return apply(new NewSample(elem, true));
         }
     }
 
-    private static class ManagedAppSinkListener extends AppSinkListener {
+    private class ManagedAppSinkListener implements Function<NewSample, FlowReturn> {
         private final AtomicBoolean needsData;
+        private final ProcessFrame processor;
         boolean blockedAck = false;
 
-        private ManagedAppSinkListener(final ProcessFrame process, final AppSrc output, final AtomicBoolean needsData) {
-            super(process, output);
+        private ManagedAppSinkListener(final AtomicBoolean needsData, final ProcessFrame processor) {
             this.needsData = needsData;
+            this.processor = processor;
         }
 
         @Override
-        public FlowReturn doIt(final AppSink elem, final boolean preroll) {
-            final Sample sample = preroll ? elem.pullPreroll() : elem.pullSample();
-            final Buffer b = process.processFrame(sample);
+        public FlowReturn apply(final NewSample elem) {
+            LOGGER.trace("New managed {} from {}", (elem.preroll ? "preroll" : "sample"), elem.elem.getName());
+            final Sample sample = elem.pull();
+            final Buffer b = processor.processFrame(sample);
             if (b != null) {
                 while (!needsData.get()) {
                     if (!blockedAck) {
                         blockedAck = true;
-                        LOGGER.trace("{} is blocked waiting for a NEED_DATA", elem.getName());
+                        LOGGER.trace("{} is blocked waiting for a NEED_DATA", elem.elem.getName());
                     }
                     Thread.yield();
                 }
                 if (blockedAck)
-                    LOGGER.trace("{} is no longer blocked.", elem.getName());
+                    LOGGER.trace("{} is no longer blocked.", elem.elem.getName());
                 blockedAck = false;
                 output.pushBuffer(b);
             }

@@ -12,7 +12,6 @@ import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.GhostPad;
 import org.freedesktop.gstreamer.Pad;
 import org.freedesktop.gstreamer.Pipeline;
-import org.freedesktop.gstreamer.Structure;
 
 /**
  *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder patter.
@@ -136,11 +135,11 @@ public class Branch {
         addAllTo(bin);
         linkAll(bin);
         List<Pad> pads = first.getSinkPads();
-        if (pads.size() > 0)
-            bin.addPad(new GhostPad("sink", pads.get(0)));
+        for (final Pad pad : pads)
+            bin.addPad(new GhostPad("GstSink:" + pad.getName(), pad));
         pads = last.getSrcPads();
-        if (pads.size() > 0)
-            bin.addPad(new GhostPad("src", pads.get(0)));
+        for (final Pad pad : pads)
+            bin.addPad(new GhostPad("GstSrc:" + pad.getName(), pad));
         return bin;
     }
 
@@ -181,15 +180,16 @@ public class Branch {
             if (pad.isLinked())
                 return;
 
-            final Caps caps = pad.getCaps();
-            if (caps.size() > 0) {
-                final Structure struct = caps.getStructure(0);
-                final String capName = struct.getName();
-                if ("video/x-raw".equalsIgnoreCase(capName))
-                    pad.link(next.getSinkPads().get(0));
-                else if ("video".equalsIgnoreCase(struct.getString("media")))
-                    pad.link(next.getSinkPads().get(0));
-            }
+            pad.link(next.getSinkPads().get(0));
+            // final Caps caps = pad.getCaps();
+            // if (caps.size() > 0) {
+            // final Structure struct = caps.getStructure(0);
+            // final String capName = struct.getName();
+            // if ("video/x-raw".equalsIgnoreCase(capName))
+            // pad.link(next.getSinkPads().get(0));
+            // else if ("video".equalsIgnoreCase(struct.getString("media")))
+            // pad.link(next.getSinkPads().get(0));
+            // }
         };
     }
 }

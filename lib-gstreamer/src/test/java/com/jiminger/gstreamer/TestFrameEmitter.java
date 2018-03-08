@@ -1,49 +1,44 @@
 package com.jiminger.gstreamer;
 
-import static com.jiminger.gstreamer.util.GstUtils.instrument;
 import static net.dempsy.utils.test.ConditionPoll.poll;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.net.URI;
 
 import org.freedesktop.gstreamer.Pipeline;
-import org.freedesktop.gstreamer.elements.URIDecodeBin;
-import org.freedesktop.gstreamer.event.EOSEvent;
 import org.junit.Test;
 
 import com.jiminger.gstreamer.guard.ElementWrap;
 import com.jiminger.gstreamer.guard.GstMain;
 import com.jiminger.gstreamer.util.FrameCatcher;
+import com.jiminger.gstreamer.util.FrameEmitter;
 
-public class TestBuilders {
+public class TestFrameEmitter {
     final static URI STREAM = new File(
             TestBuilders.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile()).toURI();
+    // public static final String STREAM = "file:///home/jim/Videos/Dave Smith Libertas (2017).mp4";
 
     @Test
-    public void testSimplePipeline() throws Exception {
-        try (final GstMain m = new GstMain(TestBuilders.class);) {
+    public void testFrameEmitterToCather() throws Exception {
+        try (final GstMain m = new GstMain(TestFrameEmitter.class);) {
+            final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
             final FrameCatcher fc = new FrameCatcher("framecatcher");
             try (ElementWrap<Pipeline> ew = new ElementWrap<>(new BinBuilder()
-                    .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
-                    .make("videoscale")
+                    .add(fe.element)
                     .make("videoconvert")
-                    .caps("video/x-raw,width=640,height=480")
+                    .caps("video/x-raw")
                     .add(fc.sink)
                     .buildPipeline());) {
                 final Pipeline pipe = ew.element;
-                instrument(pipe);
                 pipe.play();
-                Thread.sleep(1000);
-                pipe.sendEvent(new EOSEvent());
+                assertTrue(poll(o -> fe.isDone()));
                 pipe.stop();
                 assertTrue(poll(o -> !pipe.isPlaying()));
+                Thread.sleep(500);
+                assertEquals(30, fc.frames.size());
             }
-
-            // one seconds worth of frames should be more than 25 and less than 35 (actually, should be 29)
-            final int numFrames = fc.frames.size();
-            assertTrue(25 < numFrames);
-            assertTrue(35 > numFrames);
         }
     }
 }
