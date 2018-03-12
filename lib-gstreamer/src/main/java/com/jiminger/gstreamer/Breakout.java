@@ -2,7 +2,6 @@ package com.jiminger.gstreamer;
 
 import static com.jiminger.gstreamer.util.GstUtils.dispose;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -32,7 +31,6 @@ public class Breakout {
     private ProcessFrame frameProcessor = null;
     private final AtomicBoolean needsData = new AtomicBoolean(false);
     private OutputMode mode = OutputMode.BLOCKING;
-    private boolean preroll = true;
 
     public enum OutputMode {
         BLOCKING,
@@ -99,11 +97,6 @@ public class Breakout {
         return this;
     }
 
-    public Breakout preroll(final boolean preroll) {
-        this.preroll = preroll;
-        return this;
-    }
-
     public static class SlowFrameProcessor implements ProcessFrame {
         final Thread thread;
         final AtomicReference<Sample> to = new AtomicReference<>(null);
@@ -140,15 +133,15 @@ public class Breakout {
 
                 final Buffer cur = current.get();
                 if (cur == null) {
-                    if (!fromSlow) {
+                    if (!fromSlow && LOGGER.isDebugEnabled()) {
                         fromSlow = true;
-                        LOGGER.debug("Switch to slow source.");
+                        LOGGER.debug("Playing unprocessed stream");
                     }
                     return sample.getBuffer().copy();
                 } else {
-                    if (fromSlow) {
+                    if (fromSlow && LOGGER.isDebugEnabled()) {
                         fromSlow = false;
-                        LOGGER.debug("Switch from slow source.");
+                        LOGGER.debug("Playing processed stream");
                     }
                     return cur.copy();
                 }
@@ -156,17 +149,17 @@ public class Breakout {
         }
     }
 
-    private final ProcessFrame passthroughFrameProcessor = s -> {
-        try (GstWrap<Sample> sample = new GstWrap<>(s); BufferWrap buf = new BufferWrap(sample.obj.getBuffer())) {
-            final ByteBuffer bb = buf.map(false);
-            try (final BufferWrap ret = new BufferWrap(new Buffer(bb.remaining()));) {
-                LOGGER.trace("breakout got frame {}", (int) bb.get(0));
-                final ByteBuffer bb2 = ret.map(true);
-                bb2.put(bb);
-                return ret.disown();
-            }
-        }
-    };
+    // private final ProcessFrame passthroughFrameProcessor = s -> {
+    // try (GstWrap<Sample> sample = new GstWrap<>(s); BufferWrap buf = new BufferWrap(sample.obj.getBuffer())) {
+    // final ByteBuffer bb = buf.map(false);
+    // try (final BufferWrap ret = new BufferWrap(new Buffer(bb.remaining()));) {
+    // LOGGER.trace("breakout got frame {}", (int) bb.get(0));
+    // final ByteBuffer bb2 = ret.map(true);
+    // bb2.put(bb);
+    // return ret.disown();
+    // }
+    // }
+    // };
 
     private Function<NewSample, FlowReturn> blocking(final ProcessFrame processor) {
         return elem -> {
@@ -185,21 +178,18 @@ public class Breakout {
 
     public Bin build() {
         Function<NewSample, FlowReturn> mainCallback = null;
-        Function<NewSample, FlowReturn> prerollCallback = null;
+        final Function<NewSample, FlowReturn> prerollCallback = null;
 
         input.set("emit-signals", true);
 
         switch (mode) {
             case BLOCKING:
                 mainCallback = blocking(frameProcessor);
-                if (!preroll)
-                    prerollCallback = blocking(passthroughFrameProcessor);
                 output.set("emit-signals", false);
+                output.set("block", true);
                 break;
             case MANAGED:
                 mainCallback = managed(frameProcessor);
-                if (!preroll)
-                    prerollCallback = managed(passthroughFrameProcessor);
                 output.set("emit-signals", true);
                 output.connect((AppSrc.NEED_DATA) (elem, size) -> {
                     LOGGER.trace("{} needs {} bytes of data", elem.getName(), size);
@@ -238,7 +228,9 @@ public class Breakout {
             // input.disconnect((AppSink.NEW_SAMPLE) this);
             // input.connect(NewSample.preroller(successor));
             // input.connect(NewSample.sampler(successor));
-            return successor.apply(elem);
+            final FlowReturn ret = successor.apply(elem);
+            // LOGGER.trace("Caps transfer PREROLL returning {}", ret);
+            return ret;
         }
 
         @Override

@@ -56,7 +56,6 @@ public class TestBreakoutPassthrough {
                             })
                             .live(true)
                             .outputMode(OutputMode.MANAGED)
-                            .preroll(false)
                             .setTimestamp(true)
                             .format(Format.TIME)
                             .type(AppSrc.Type.STREAM)

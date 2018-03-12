@@ -102,7 +102,7 @@ public class Branch {
     /**
      * Set a property on the most recently added element.
      */
-    public Branch with(final String name, final String value) {
+    public Branch with(final String name, final Object value) {
         currentElement.set(name, value);
         return this;
     }

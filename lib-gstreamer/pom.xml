@@ -29,5 +29,16 @@
         <artifactId>slf4j-log4j12</artifactId>
         <scope>test</scope>
       </dependency>
+      <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>lib-image</artifactId>
+        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>opencv-lib-jar</artifactId>
+        <classifier>withlib</classifier>
+        <scope>test</scope>
+      </dependency>
   </dependencies>
 </project>
