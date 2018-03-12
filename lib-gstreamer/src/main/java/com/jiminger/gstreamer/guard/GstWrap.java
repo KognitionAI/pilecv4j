@@ -17,7 +17,11 @@ public class GstWrap<T extends MiniObject> implements AutoCloseable {
 
     @Override
     public void close() {
-        if (!disowned && obj != null)
-            obj.dispose();
+        if (obj != null) {
+            if (!disowned)
+                obj.dispose();
+            else
+                obj.disown();
+        }
     }
 }

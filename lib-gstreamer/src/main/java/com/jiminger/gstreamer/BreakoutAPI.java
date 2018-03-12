@@ -1,7 +1,7 @@
 package com.jiminger.gstreamer;
 
+import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Caps;
-import org.freedesktop.gstreamer.Sample;
 import org.freedesktop.gstreamer.lowlevel.GstAPI;
 import org.freedesktop.gstreamer.lowlevel.GstNative;
 import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
@@ -16,5 +16,12 @@ public interface BreakoutAPI extends Library {
     boolean gst_breakout_set_caps(BreakoutFilter appsrc, Caps incaps, Caps outcaps);
 
     @CallerOwnsReturn
-    Sample gst_breakout_pull_sample(BreakoutFilter appsink);
+    Buffer gst_breakout_current_frame_buffer(BreakoutFilter breakout);
+
+    @CallerOwnsReturn
+    Caps gst_breakout_current_frame_caps(BreakoutFilter breakout);
+
+    int gst_breakout_current_frame_width(BreakoutFilter breakout);
+
+    int gst_breakout_current_frame_height(BreakoutFilter breakout);
 }

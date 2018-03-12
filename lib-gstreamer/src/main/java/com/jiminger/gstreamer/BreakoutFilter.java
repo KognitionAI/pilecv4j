@@ -2,10 +2,12 @@ package com.jiminger.gstreamer;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Gst;
-import org.freedesktop.gstreamer.Sample;
 import org.freedesktop.gstreamer.elements.BaseTransform;
 import org.freedesktop.gstreamer.lowlevel.GstAPI.GstCallback;
+
+import com.jiminger.gstreamer.guard.BufferWrap;
 
 public class BreakoutFilter extends BaseTransform {
     public static final String GST_NAME = "breakout";
@@ -32,14 +34,23 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public static interface NEW_SAMPLE {
-        /**
-         * @param elem
-         */
         public void new_sample(BreakoutFilter elem);
     }
 
-    public Sample pullSample() {
-        return gst().gst_breakout_pull_sample(this);
+    public BufferWrap getCurrentBuffer() {
+        return new BufferWrap(gst().gst_breakout_current_frame_buffer(this), false);
+    }
+
+    public Caps getCurrentCaps() {
+        return gst().gst_breakout_current_frame_caps(this);
+    }
+
+    public int getCurrentFrameWidth() {
+        return gst().gst_breakout_current_frame_width(this);
+    }
+
+    public int getCurrentFrameHeight() {
+        return gst().gst_breakout_current_frame_height(this);
     }
 
     public void connect(final NEW_SAMPLE listener) {

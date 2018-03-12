@@ -8,7 +8,12 @@ public class BufferWrap extends GstWrap<Buffer> {
     private boolean mapped = false;
 
     public BufferWrap(final Buffer buffer) {
+        this(buffer, true);
+    }
+
+    public BufferWrap(final Buffer buffer, final boolean iown) {
         super(buffer);
+        disown();
     }
 
     public ByteBuffer map(final boolean writeable) {
