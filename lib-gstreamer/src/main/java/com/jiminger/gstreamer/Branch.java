@@ -82,8 +82,15 @@ public class Branch {
      * Add a caps filter statement. Also see {@link CapsBuilder}.
      */
     public Branch caps(final String caps) {
+        return caps(new Caps(caps));
+    }
+
+    /**
+     * Add a caps filter statement. Also see {@link CapsBuilder}.
+     */
+    public Branch caps(final Caps caps) {
         final Element ret = ElementFactory.make("capsfilter", nextName("capsfilter"));
-        ret.setCaps(new Caps(caps));
+        ret.setCaps(caps);
         return add(ret);
     }
 

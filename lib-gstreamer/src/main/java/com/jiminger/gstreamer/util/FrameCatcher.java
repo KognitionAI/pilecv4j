@@ -10,14 +10,18 @@ import org.freedesktop.gstreamer.FlowReturn;
 import org.freedesktop.gstreamer.Sample;
 import org.freedesktop.gstreamer.Structure;
 import org.freedesktop.gstreamer.elements.AppSink;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.jiminger.gstreamer.CapsBuilder;
 import com.jiminger.gstreamer.guard.BufferWrap;
 import com.jiminger.gstreamer.guard.GstWrap;
 
 public class FrameCatcher {
+    private static Logger LOGGER = LoggerFactory.getLogger(FrameCatcher.class);
     public final AppSink sink;
     public final List<Frame> frames = new LinkedList<>();
+    private boolean handledPreroll = false;
 
     public static class Frame {
         public final byte[] data;
@@ -41,7 +45,16 @@ public class FrameCatcher {
                 final ByteBuffer bb = buffer.map(false);
                 final byte[] frameData = new byte[bb.remaining()];
                 bb.get(frameData);
-                frames.add(new Frame(frameData, w, h));
+
+                if (!elem.preroll || handledPreroll)
+                    frames.add(new Frame(frameData, w, h));
+
+                if (elem.preroll) {
+                    if (FrameEmitter.HACK_FRAME)
+                        LOGGER.trace("byte0 (" + frameData[0] + ")");
+                    handledPreroll = true;
+                } else if (FrameEmitter.HACK_FRAME)
+                    LOGGER.trace("byte0 " + frameData[0]);
             }
         }
         return FlowReturn.OK;
@@ -54,7 +67,7 @@ public class FrameCatcher {
                 .build());
         sink.set("emit-signals", true);
 
-        // sink.connect(NewSample.preroller(handler));
+        sink.connect(NewSample.preroller(handler));
         sink.connect(NewSample.sampler(handler));
     }
 

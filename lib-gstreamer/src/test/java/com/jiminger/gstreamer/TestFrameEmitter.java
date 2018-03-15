@@ -18,10 +18,10 @@ import com.jiminger.gstreamer.util.FrameEmitter;
 public class TestFrameEmitter {
     final static URI STREAM = new File(
             TestBuilders.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile()).toURI();
-    // public static final String STREAM = "file:///home/jim/Videos/Dave Smith Libertas (2017).mp4";
 
     @Test
     public void testFrameEmitterToCather() throws Exception {
+        System.out.println(System.getenv());
         try (final GstMain m = new GstMain(TestFrameEmitter.class);) {
             final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
             final FrameCatcher fc = new FrameCatcher("framecatcher");

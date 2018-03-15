@@ -1,11 +1,19 @@
 package com.jiminger.gstreamer.guard;
 
+import static org.freedesktop.gstreamer.lowlevel.GstBufferAPI.GSTBUFFER_API;
+
 import java.nio.ByteBuffer;
 
 import org.freedesktop.gstreamer.Buffer;
+import org.freedesktop.gstreamer.lowlevel.GstBufferAPI;
+import org.freedesktop.gstreamer.lowlevel.GstBufferAPI.MapInfoStruct;
+
+import com.jiminger.image.CvRaster;
+import com.sun.jna.Pointer;
 
 public class BufferWrap extends GstWrap<Buffer> {
     private boolean mapped = false;
+    private MapInfoStruct mapInfo = null;
 
     public BufferWrap(final Buffer buffer) {
         this(buffer, true);
@@ -23,10 +31,31 @@ public class BufferWrap extends GstWrap<Buffer> {
         return ret;
     }
 
+    public CvRaster mapToRaster(final int rows, final int cols, final int type, final boolean writeable) {
+        mapInfo = new MapInfoStruct();
+        final boolean ok = GSTBUFFER_API.gst_buffer_map(obj, mapInfo,
+                writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
+        if (ok && mapInfo.data != null) {
+            return CvRaster.createManaged(rows, cols, type, Pointer.nativeValue(mapInfo.data));
+        }
+        return null;
+    }
+
+    public BufferWrap unmap() {
+        if (mapped) {
+            obj.unmap();
+            mapped = false;
+        }
+        if (mapInfo != null) {
+            GSTBUFFER_API.gst_buffer_unmap(obj, mapInfo);
+            mapInfo = null;
+        }
+        return this;
+    }
+
     @Override
     public void close() {
-        if (mapped)
-            obj.unmap();
+        unmap();
         super.close();
     }
 }

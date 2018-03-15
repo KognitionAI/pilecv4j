@@ -3,9 +3,12 @@ package com.jiminger.gstreamer.guard;
 import org.freedesktop.gstreamer.Gst;
 
 public class GstMain implements AutoCloseable {
+    private static boolean inited = false;
 
     public GstMain() {
-        Gst.init();
+        if (!inited)
+            Gst.init();
+        inited = true;
     }
 
     public GstMain(final Class<?> testClass) {
@@ -17,12 +20,14 @@ public class GstMain implements AutoCloseable {
     }
 
     public GstMain(final String appName, final String[] args) {
-        Gst.init(appName, args);
+        if (!inited)
+            Gst.init(appName, args);
+        inited = true;
     }
 
     @Override
     public void close() {
-        Gst.deinit();
+        // Gst.deinit();
     }
 
 }

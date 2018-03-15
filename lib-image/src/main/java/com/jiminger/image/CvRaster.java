@@ -169,6 +169,15 @@ public abstract class CvRaster implements AutoCloseable {
         return toRaster(mat, closer);
     }
 
+    public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer) {
+        return createManaged(rows, cols, type, pointer, null);
+    }
+
+    public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
+        final CvMat mat = new CvMat(CvRasterNative._makeMatFromRawDataReference(rows, cols, type, pointer));
+        return toRaster(mat, closer);
+    }
+
     private static CvRaster makeInstance(final CvMat mat, final ByteBuffer bb) {
         bb.clear();
         final int type = mat.type();
