@@ -12,5 +12,8 @@ public class ElementWrap<T extends Element> implements AutoCloseable {
     @Override
     public void close() {
         this.element.stop();
+        while (this.element.isPlaying())
+            Thread.yield();
+        this.element.dispose();
     }
 }

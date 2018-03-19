@@ -33,8 +33,8 @@ public interface BreakoutAPI extends Library {
     void gst_breakout_current_frame_details(BreakoutFilter breakout, _FrameDetails details);
 
     public static class _FrameDetails extends com.sun.jna.Structure {
-        public Pointer caps;
         public Pointer buffer;
+        public Pointer caps;
         public int width;
         public int height;
 
@@ -53,6 +53,8 @@ public interface BreakoutAPI extends Library {
                     _FrameDetails.class.getField("width").getName(),
                     _FrameDetails.class.getField("height").getName());
         } catch (NoSuchFieldException | SecurityException e) {
+            // This will only happen if the structure changes and should cause systemic
+            // test failures pointing to that fact.
             throw new RuntimeException(e);
         }
     }

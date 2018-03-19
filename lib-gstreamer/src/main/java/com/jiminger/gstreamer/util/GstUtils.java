@@ -9,13 +9,14 @@ import org.freedesktop.gstreamer.Bus;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.GstObject;
-import org.freedesktop.gstreamer.MiniObject;
 import org.freedesktop.gstreamer.Pad;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
+
+import com.jiminger.gstreamer.guard.ElementWrap;
 
 public class GstUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(GstUtils.class);
@@ -44,12 +45,13 @@ public class GstUtils {
         return ret;
     }
 
-    public static final Bus.ERROR endOnError(final Bin bin) {
+    public static final Bus.ERROR endOnError(final Bin bin, final Bus.ERROR errCb) {
         final Bus.ERROR ret = (object, code, msg) -> {
-            if (LOGGER.isDebugEnabled())
-                LOGGER.debug("error:" + object + " code:" + code + " " + msg);
+            LOGGER.error("error:" + object + " code:" + code + " " + msg);
             bin.stop();
             Gst.quit();
+            if (errCb != null)
+                errCb.errorMessage(object, code, msg);
         };
         return ret;
     }
@@ -59,17 +61,24 @@ public class GstUtils {
         LOGGER.debug("State of " + source + " changed from " + old + " to " + current + " with " + pending + " pending.");
     };
 
-    public static void instrument(final Pipeline pipe) {
+    public static void instrument(final Pipeline pipe, final Bus.ERROR errCb) {
         final Bus bus = pipe.getBus();
         bus.connect(endOnEOS(pipe));
-        bus.connect(endOnError(pipe));
+        bus.connect(endOnError(pipe, errCb));
         if (LOGGER.isDebugEnabled())
             bus.connect(printStateChange);
     }
 
-    public static void dispose(final MiniObject obj) {
-        if (obj != null)
-            obj.dispose();
+    public static void instrument(final Pipeline pipe) {
+        instrument(pipe, null);
+    }
+
+    public static void instrument(final ElementWrap<Pipeline> pipe, final Bus.ERROR errCb) {
+        instrument(pipe.element, errCb);
+    }
+
+    public static void instrument(final ElementWrap<Pipeline> pipe) {
+        instrument(pipe, null);
     }
 
     private static final String indent = "    ";
@@ -85,15 +94,26 @@ public class GstUtils {
         printDetails(pipe, System.out);
     }
 
+    public static void printDetails(final Bin pipe, final PrintStream out) {
+        printDetails(pipe, out, 0);
+    }
+
     public static void printDetails(final Element e) {
-        printDetails(e, System.out, 0);
+        printDetails(e, System.out);
     }
 
     public static void printDetails(final Element e, final PrintStream out) {
         printDetails(e, out, 0);
     }
 
-    public static void printDetails(final Element e, final PrintStream out, final int depth) {
+    private static void printDetails(final Bin pipe, final PrintStream out, final int depth) {
+        final List<Element> elements = pipe.getElements();
+        final int numEl = elements.size();
+        for (int i = numEl - 1; i >= 0; i--)
+            printDetails(elements.get(i), out, depth);
+    }
+
+    private static void printDetails(final Element e, final PrintStream out, final int depth) {
         String tmp = "";
         for (int i = 0; i < depth; i++)
             tmp += indent + indent;
@@ -114,16 +134,5 @@ public class GstUtils {
             out.println(prefix + indent + indent + "=======================================================");
         }
 
-    }
-
-    public static void printDetails(final Bin pipe, final PrintStream out) {
-        printDetails(pipe, out, 0);
-    }
-
-    public static void printDetails(final Bin pipe, final PrintStream out, final int depth) {
-        final List<Element> elements = pipe.getElements();
-        final int numEl = elements.size();
-        for (int i = numEl - 1; i >= 0; i--)
-            printDetails(elements.get(i), out, depth);
     }
 }

@@ -12,12 +12,16 @@ import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.GhostPad;
 import org.freedesktop.gstreamer.Pad;
 import org.freedesktop.gstreamer.Pipeline;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder patter.
  *  It encapsulates many of the boilerplate manipulations including naming, adding and linking elements.
  */
 public class Branch {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Branch.class);
+
     private final List<List<Element>> elements = new ArrayList<>();
     private List<Element> currentList = new ArrayList<>();
     private Element currentElement;
@@ -122,16 +126,6 @@ public class Branch {
     }
 
     /**
-     * Convert the current builder to a {@link Pipeline}
-     */
-    public Pipeline buildPipeline() {
-        final Pipeline ret = new Pipeline();
-        addAllTo(ret);
-        linkAll(ret);
-        return ret;
-    }
-
-    /**
      * Convert the current builder to a {@link Bin}. This will also manage
      * the GhostPads. Currently it assumes there's a single src pad and
      * a single sink pad at the ends of the chain of elements that have been
@@ -176,7 +170,19 @@ public class Branch {
         }
     }
 
-    private final AtomicInteger sequence = new AtomicInteger(0);
+    void disposeAll() {
+        for (int i = elements.size() - 1; i >= 0; i--) {
+            final List<Element> cur = elements.get(i);
+            for (int j = cur.size() - 1; j >= 0; j--) {
+                final Element ce = cur.get(j);
+                if (LOGGER.isDebugEnabled())
+                    LOGGER.debug("disposing {} with a ref count of {}", ce, ce.getRefCount());
+                ce.dispose();
+            }
+        }
+    }
+
+    protected final AtomicInteger sequence = new AtomicInteger(0);
 
     private String nextName(final String basename) {
         return prefix + basename + sequence.getAndIncrement();
@@ -186,7 +192,6 @@ public class Branch {
         return (Element.PAD_ADDED) (element, pad) -> {
             if (pad.isLinked())
                 return;
-
             pad.link(next.getSinkPads().get(0));
             // final Caps caps = pad.getCaps();
             // if (caps.size() > 0) {

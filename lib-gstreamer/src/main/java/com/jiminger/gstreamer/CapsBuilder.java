@@ -7,8 +7,6 @@ import org.freedesktop.gstreamer.Caps;
 public class CapsBuilder {
     private StringBuilder sb = null;
 
-    public CapsBuilder() {}
-
     public CapsBuilder(final String init) {
         add(init);
     }

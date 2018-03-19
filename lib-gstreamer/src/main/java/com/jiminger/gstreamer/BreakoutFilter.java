@@ -1,7 +1,5 @@
 package com.jiminger.gstreamer;
 
-import static org.freedesktop.gstreamer.lowlevel.GstBufferAPI.GSTBUFFER_API;
-
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -14,16 +12,13 @@ import org.freedesktop.gstreamer.FlowReturn;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.elements.BaseTransform;
 import org.freedesktop.gstreamer.lowlevel.GstAPI.GstCallback;
-import org.freedesktop.gstreamer.lowlevel.GstBufferAPI;
-import org.freedesktop.gstreamer.lowlevel.GstBufferAPI.MapInfoStruct;
 import org.opencv.core.CvType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jiminger.gstreamer.BreakoutAPI._FrameDetails;
 import com.jiminger.gstreamer.guard.BufferWrap;
+import com.jiminger.gstreamer.guard.GstMain;
 import com.jiminger.image.CvRaster;
-import com.sun.jna.Pointer;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
@@ -32,6 +27,8 @@ public class BreakoutFilter extends BaseTransform {
     public static final String GTYPE_NAME = "GstBreakout";
 
     private static final AtomicBoolean inited = new AtomicBoolean(false);
+
+    private SlowFilterSlippage slowFilterSlippage = null;
 
     public static void init() {
         if (!inited.getAndSet(true))
@@ -54,19 +51,10 @@ public class BreakoutFilter extends BaseTransform {
         this(makeRawElement(GST_NAME, name));
     }
 
-    public BreakoutFilter setCaps(final Caps incaps, final Caps outcaps) {
-        gst().gst_breakout_set_caps(this, incaps, outcaps);
-        return this;
-    }
-
     @Override
     public void setCaps(final Caps caps) {
         throw new UnsupportedOperationException(
                 "gstreamer element \"" + GST_NAME + "\" doesn't support the \"caps\" property. Please use a caps filter.");
-    }
-
-    public static interface SlowSampleHandler {
-        public void accept(Buffer buffer, Caps caps);
     }
 
     private static final AtomicReference<CvRaster> storedBuffer = new AtomicReference<>();
@@ -89,55 +77,55 @@ public class BreakoutFilter extends BaseTransform {
         }
     }
 
-    public static class BufferAndCaps extends CapsInfo {
-        public final Buffer buffer;
-        private boolean mapped = false;
-        private MapInfoStruct mapInfo = null;
-
-        private BufferAndCaps(final Buffer frameData, final Caps caps, final int w, final int h) {
-            super(caps, w, h);
-            this.buffer = frameData;
-        }
-
-        public ByteBuffer map(final boolean writeable) {
-            if (mapped)
-                throw new IllegalStateException("You can't map the same BufferAndCaps twice.");
-            mapped = true;
-            final ByteBuffer ret = buffer.map(writeable);
-            ret.rewind();
-            return ret;
-        }
-
-        public CvRaster mapToRaster(final int type, final boolean writeable) {
-            mapInfo = new MapInfoStruct();
-            final boolean ok = GSTBUFFER_API.gst_buffer_map(buffer, mapInfo,
-                    writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
-            if (ok && mapInfo.data != null) {
-                return CvRaster.createManaged(height, width, type, Pointer.nativeValue(mapInfo.data));
-            }
-            return null;
-        }
-
-        public BufferAndCaps unmap() {
-            if (mapped) {
-                buffer.unmap();
-                mapped = false;
-            }
-            if (mapInfo != null) {
-                GSTBUFFER_API.gst_buffer_unmap(buffer, mapInfo);
-                mapInfo = null;
-            }
-            return this;
-        }
-
-        @Override
-        public void close() {
-            unmap();
-            if (buffer != null)
-                buffer.dispose();
-            super.close();
-        }
-    }
+    // public static class BufferAndCaps extends CapsInfo {
+    // public final Buffer buffer;
+    // private boolean mapped = false;
+    // private MapInfoStruct mapInfo = null;
+    //
+    // private BufferAndCaps(final Buffer frameData, final Caps caps, final int w, final int h) {
+    // super(caps, w, h);
+    // this.buffer = frameData;
+    // }
+    //
+    // public ByteBuffer map(final boolean writeable) {
+    // if (mapped)
+    // throw new IllegalStateException("You can't map the same BufferAndCaps twice.");
+    // mapped = true;
+    // final ByteBuffer ret = buffer.map(writeable);
+    // ret.rewind();
+    // return ret;
+    // }
+    //
+    // public CvRaster mapToRaster(final int type, final boolean writeable) {
+    // mapInfo = new MapInfoStruct();
+    // final boolean ok = GSTBUFFER_API.gst_buffer_map(buffer, mapInfo,
+    // writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
+    // if (ok && mapInfo.data != null) {
+    // return CvRaster.createManaged(height, width, type, Pointer.nativeValue(mapInfo.data));
+    // }
+    // return null;
+    // }
+    //
+    // public BufferAndCaps unmap() {
+    // if (mapped) {
+    // buffer.unmap();
+    // mapped = false;
+    // }
+    // if (mapInfo != null) {
+    // GSTBUFFER_API.gst_buffer_unmap(buffer, mapInfo);
+    // mapInfo = null;
+    // }
+    // return this;
+    // }
+    //
+    // @Override
+    // public void close() {
+    // unmap();
+    // if (buffer != null)
+    // buffer.dispose();
+    // super.close();
+    // }
+    // }
 
     public static class CvRasterAndCaps extends CapsInfo {
         public final CvRaster raster;
@@ -175,6 +163,7 @@ public class BreakoutFilter extends BaseTransform {
         public void close() {
             if (raster != null && !rasterDisowned)
                 raster.close();
+            super.close();
         }
 
         private CvRaster disownRaster() {
@@ -195,7 +184,9 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public BreakoutFilter connectSlowFilter(final Consumer<CvRasterAndCaps> filter) {
-        return connect(new SlowFilterSlippage(filter));
+        final BreakoutFilter ret = connect(slowFilterSlippage = new SlowFilterSlippage(filter));
+        GstMain.register(() -> slowFilterSlippage.stop());
+        return ret;
     }
 
     private static class SlowFilterSlippage implements NEW_SAMPLE {
@@ -214,7 +205,7 @@ public class BreakoutFilter extends BaseTransform {
                         Thread.yield();
                         frame = to.getAndSet(null);
                     }
-                    if (frame != null) {
+                    if (frame != null && !stop.get()) {
                         processor.accept(frame);
                         dispose(result.getAndSet(frame));
                     } // otherwise we're stopped.
@@ -320,10 +311,10 @@ public class BreakoutFilter extends BaseTransform {
         return gst().gst_breakout_current_frame_height(this);
     }
 
-    public BufferAndCaps getCurrentBufferAndCaps() {
-        final _FrameDetails fd = new _FrameDetails();
-        BreakoutFilter.gst().gst_breakout_current_frame_details(this, fd);
-        return new BufferAndCaps(new Buffer(initializer(fd.buffer)), new Caps(initializer(fd.caps)), fd.width, fd.height);
-    }
+    // public BufferAndCaps getCurrentBufferAndCaps() {
+    // final _FrameDetails fd = new _FrameDetails();
+    // BreakoutFilter.gst().gst_breakout_current_frame_details(this, fd);
+    // return new BufferAndCaps(new Buffer(initializer(fd.buffer)), new Caps(initializer(fd.caps)), fd.width, fd.height);
+    // }
     // =================================================
 }

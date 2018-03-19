@@ -3,17 +3,23 @@ package com.jiminger.gstreamer;
 import java.util.List;
 
 import org.freedesktop.gstreamer.Bin;
+import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.Pad;
 import org.freedesktop.gstreamer.PadDirection;
 import org.freedesktop.gstreamer.Pipeline;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import com.jiminger.gstreamer.guard.ElementWrap;
 
 /**
  *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder patter.
  *  It encapsulates many of the boilerplate manipulations including naming, adding and linking elements.
  */
 public class BinBuilder {
+    private static final Logger LOGGER = LoggerFactory.getLogger(BinBuilder.class);
     final Branch current = new Branch();
 
     /**
@@ -68,6 +74,14 @@ public class BinBuilder {
     }
 
     /**
+     * Add a caps filter statement. Also see {@link CapsBuilder}.
+     */
+    public BinBuilder caps(final Caps caps) {
+        current.caps(caps);
+        return this;
+    }
+
+    /**
      * Add an element that has static pads. 
      */
     public BinBuilder add(final Element e) {
@@ -91,11 +105,27 @@ public class BinBuilder {
     /**
      * Convert the current builder to a {@link Pipeline}
      */
-    public Pipeline buildPipeline() {
+    public ElementWrap<Pipeline> buildPipeline() {
         final Pipeline pipe = new Pipeline();
         current.addAllTo(pipe);
         build(pipe, current, 0);
-        return pipe;
+        return new ElementWrap<Pipeline>(pipe) {
+
+            @Override
+            public void close() {
+                LOGGER.debug("disposing " + element + " with a ref count of " + element.getRefCount());
+                element.dispose();
+                disposeAll(current);
+            }
+        };
+    }
+
+    private static void disposeAll(final Branch cur) {
+        final List<Branch> branches = cur.sinks;
+        for (int b = branches.size() - 1; b >= 0; b--) {
+            disposeAll(branches.get(b));
+        }
+        cur.disposeAll();
     }
 
     private static int build(final Bin pipe, final Branch current, int teeNum) {

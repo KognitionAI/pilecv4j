@@ -17,9 +17,9 @@ import com.jiminger.gstreamer.CapsBuilder;
 import com.jiminger.gstreamer.guard.BufferWrap;
 import com.jiminger.gstreamer.guard.GstWrap;
 
-public class FrameCatcher {
+public class FrameCatcher implements AutoCloseable {
     private static Logger LOGGER = LoggerFactory.getLogger(FrameCatcher.class);
-    public final AppSink sink;
+    private AppSink sink;
     public final List<Frame> frames = new LinkedList<>();
     private boolean handledPreroll = false;
 
@@ -69,6 +69,20 @@ public class FrameCatcher {
 
         sink.connect(NewSample.preroller(handler));
         sink.connect(NewSample.sampler(handler));
+    }
+
+    public AppSink disown() {
+        final AppSink ret = sink;
+        sink = null;
+        return ret;
+    }
+
+    @Override
+    public void close() {
+        if (sink != null) {
+            sink.dispose();
+            disown();
+        }
     }
 
 }

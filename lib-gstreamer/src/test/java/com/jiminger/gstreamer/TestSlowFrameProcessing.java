@@ -1,13 +1,14 @@
 package com.jiminger.gstreamer;
 
+import static net.dempsy.util.Functional.uncheck;
 import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.net.URI;
+import java.util.concurrent.atomic.AtomicLong;
 
-import org.freedesktop.gstreamer.FlowReturn;
 import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -19,42 +20,32 @@ import com.jiminger.gstreamer.guard.GstMain;
 import com.jiminger.gstreamer.util.FrameCatcher;
 import com.jiminger.gstreamer.util.FrameEmitter;
 
-public class TestBreakoutPassthrough {
+public class TestSlowFrameProcessing {
     static {
         GstMain.testMode();
     }
 
-    private final static Logger LOGGER = LoggerFactory.getLogger(TestBreakoutPassthrough.class);
+    private final static Logger LOGGER = LoggerFactory.getLogger(TestSlowFrameProcessing.class);
     final static URI STREAM = new File(
             TestFrameCatcherUnusedCleansUp.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile()).toURI();
 
     @Test
-    public void testBreakoutWithPassthrough() throws Exception {
-        try (final GstMain m = new GstMain(TestBreakoutPassthrough.class);
-                final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
+    public void testSlowFrameProcessing() throws Exception {
+        final AtomicLong slowFramesProcessed = new AtomicLong(0);
+        try (final GstMain m = new GstMain(TestSlowFrameProcessing.class);
+                final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 60);
                 final FrameCatcher fc = new FrameCatcher("framecatcher");
 
                 final ElementWrap<Pipeline> ew = new BinBuilder()
                         .add(fe.disown())
                         .make("videoconvert")
                         .caps("video/x-raw")
-                        .add(new BreakoutFilter("filter")
-                                .connect((final CvRasterAndCaps bac) -> {
-                                    if (FrameEmitter.HACK_FRAME)
-                                        LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
-                                    return FlowReturn.OK;
-                                }))
                         .add(new BreakoutFilter("filter1")
-                                .connect((final CvRasterAndCaps bac) -> {
+                                .connectSlowFilter((final CvRasterAndCaps bac) -> {
                                     if (FrameEmitter.HACK_FRAME)
                                         LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
-                                    return FlowReturn.OK;
-                                }))
-                        .add(new BreakoutFilter("filter2")
-                                .connect((final CvRasterAndCaps bac) -> {
-                                    if (FrameEmitter.HACK_FRAME)
-                                        LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
-                                    return FlowReturn.OK;
+                                    uncheck(() -> Thread.sleep(100)); // ~10 frame/second
+                                    slowFramesProcessed.incrementAndGet();
                                 }))
                         .add(fc.disown())
                         .buildPipeline();) {
@@ -63,11 +54,12 @@ public class TestBreakoutPassthrough {
             // instrument(pipe);
             pipe.play();
             assertTrue(poll(o -> fe.isDone()));
-            Thread.sleep(100);
             pipe.stop();
             assertTrue(poll(o -> !pipe.isPlaying()));
-
-            assertEquals(30, fc.frames.size());
+            assertEquals(60, fc.frames.size());
+            // the slowFramesProcessed should be less than 1/2 of the processed frames
+            assertTrue(30 > slowFramesProcessed.get());
         }
     }
+
 }

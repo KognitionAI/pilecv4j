@@ -17,11 +17,11 @@ import com.jiminger.gstreamer.CapsBuilder;
 /**
  * This class can be used to source a fixed number of frames for testing purposes.
  */
-public class FrameEmitter {
+public class FrameEmitter implements AutoCloseable {
     public static boolean HACK_FRAME = true;
     private final static Logger LOGGER = LoggerFactory.getLogger(FrameEmitter.class);
     private static AtomicInteger sequence = new AtomicInteger(0);
-    public final Bin element;
+    private Bin element;
     public final int numFrames;
 
     private int curFrames = 0;
@@ -61,6 +61,18 @@ public class FrameEmitter {
 
     public boolean isDone() {
         return (curFrames >= numFrames);
+    }
+
+    public Bin disown() {
+        final Bin ret = element;
+        element = null;
+        return ret;
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (element != null)
+            element.dispose();
     }
 
 }
