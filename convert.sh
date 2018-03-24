@@ -1,13 +1,19 @@
 #!/bin/bash
 
-. ./os.sh
+##################################################
+# preamble
+set -e
+cd "$(dirname "$0")"
+SCRIPTDIR="$(pwd -P)"
+. $SCRIPTDIR/env.sh
+##################################################
+
+. $SCRIPTDIR/os.sh
 
 usage() {
     echo "USAGE: $0 -s source-dir -d dest-dir -se src-extention -de desti-extention"
     exit 1
 }
-
-. ./env.sh
 
 OPENCV_VERSION=`grep '<opencv.version>' pom.xml  | head -1 | sed -e 's/^.*<opencv.version>//g' | sed -e 's/<\/opencv.version>.*$//g'`
 

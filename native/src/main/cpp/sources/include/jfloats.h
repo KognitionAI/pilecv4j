@@ -17,18 +17,31 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-package com.jiminger.nr;
+#ifndef _JFloat__
+#define _JFloat__
 
-public class MinimizerException extends RuntimeException {
-    private static final long serialVersionUID = 2687515753273397453L;
+#if defined(FLOAT_4BYTE)
+typedef float float32_t;
+#elif defined(DOUBLE_4BYTE)
+typedef double float32_t;
+#elif defined(LONG_DOUBLE_4BYTE)
+typedef long double float32_t;
+#else
+#error "Unable to deterine which type is a 32 bit float"
+#endif
 
-    public MinimizerException() {}
+#if defined(FLOAT_8BYTE)
+typedef float float64_t;
+#elif defined(DOUBLE_8BYTE)
+typedef double float64_t;
+#elif defined(LONG_DOUBLE_8BYTE)
+typedef long double float64_t;
+#else
+#error "Unable to deterine which type is a 64 bit float"
+#endif
 
-    public MinimizerException(final String msg) {
-        super(msg);
-    }
+#endif
 
-    public MinimizerException(final String msg, final Throwable th) {
-        super(msg, th);
-    }
-}
+
+
+

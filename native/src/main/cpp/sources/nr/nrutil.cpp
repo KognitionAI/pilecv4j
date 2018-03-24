@@ -15,27 +15,38 @@ void nrerror2(const char error_text[])
    /* Numerical Recipes standard error handler */
 {
   errorText = (char*)(malloc(sizeof(char) * (strlen(error_text) + 1)));
-   strcpy(errorText,error_text);
-   errorHappens = 1;
+  strcpy(errorText,error_text);
+  errorHappens = 1;
 }
+  
 int nrIsError()
 {
    int errorHappened = errorHappens;
    errorHappens = 0;
    return errorHappened;
 }
+  
 char* nrGetErrorMessage()
 {
-   return errorText;
+  char* ret = errorText;
+  errorText = NULL;
+  return ret;
 }
 
 void nrerror(const char error_text[])
    /* Numerical Recipes standard error handler */
 {
+  /*
+   * The original implementation used to exit. We're going to
+   * jumper this to the newer call and HOPE that the routine
+   * eventually exits correctly.
+   *
    fprintf(stderr,"Numerical Recipes run-time error...\n");
    fprintf(stderr,"%s\n",error_text);
    fprintf(stderr,"...now exiting to system...\n");
    exit(1);
+   */
+  nrerror2(error_text);
 }
 float *vector(long nl, long nh)
    /* allocate a float vector with subscript range v[nl..nh] */

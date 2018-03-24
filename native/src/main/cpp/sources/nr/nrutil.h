@@ -50,6 +50,8 @@ void nrerror(const char error_text[]);
 /* My custom added methods for error handling */
 void nrerror2(const char error_text[]);
 int nrIsError();
+// this acts as a MOVE operation on the char* returned.
+//  It's then owned by the called.
 char* nrGetErrorMessage();
 /**********************************************/
 float *vector(long nl, long nh);

@@ -201,6 +201,14 @@
         <version>1.4.0</version>
         <optional>true</optional>
       </dependency>
+    <dependency>
+        <groupId>net.java.dev.jna</groupId>
+        <artifactId>jna</artifactId>
+        <version>4.5.1</version>
+        <optional>true</optional>
+    </dependency>
+      
+      
       <!-- Testing -->
       <dependency>
         <groupId>org.slf4j</groupId>

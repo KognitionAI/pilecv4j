@@ -16,7 +16,7 @@ extern "C" {
  * function value at p, and iter is the number of iterations taken. The routine linmin is used.
  */
 void powell(float p[], float **xi, int n, float ftol, int *iter, float *fret,
-            float (*func)(float []))
+            float (*func)(float*))
 {
    int nrIsError(void);
    void linmin(float p[], float xi[], int n, float *fret,

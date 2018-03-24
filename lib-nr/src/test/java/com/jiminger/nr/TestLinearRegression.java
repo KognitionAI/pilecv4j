@@ -4,10 +4,6 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
-import com.jiminger.nr.LinearRegression;
-import com.jiminger.nr.LinearRegressionWithKnownSlope;
-import com.jiminger.nr.Minimizer;
-
 public class TestLinearRegression {
     public static double[] slopes = { -3.0D, -2.0D, -1.0D, 0.0D, 1.0D, 2.0D, 3.0D };
     public static double[] yintercepts = { -3.0D, -2.0D, -1.0D, 0.0D, 1.0D, 2.0D, 3.0D };

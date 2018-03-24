@@ -16,5 +16,10 @@
       <groupId>net.dempsy</groupId>
       <artifactId>dempsy-utils</artifactId>
     </dependency>
+    <dependency>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
 </project>
