@@ -27,11 +27,16 @@ import java.util.List;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
+import com.jiminger.image.CvRaster;
 import com.jiminger.image.ImageAPI;
 import com.jiminger.util.CommandLineParser;
 
 public class MJPEGWriter {
     private static final ImageAPI API = ImageAPI.API;
+
+    static {
+        CvRaster.initOpenCv();
+    }
 
     static public File pdir = null;
     static public String avifile = "out.avi";
