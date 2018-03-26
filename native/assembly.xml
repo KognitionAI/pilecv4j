@@ -6,7 +6,7 @@
   <includeBaseDirectory>false</includeBaseDirectory>
   <fileSets>
     <fileSet>
-      <directory>target/${platform}-${build.type}/dll-staging</directory>
+      <directory>target/${platform}-${build.type}/build</directory>
       <outputDirectory>/</outputDirectory>
       <includes> 
         <include>*.dll</include>

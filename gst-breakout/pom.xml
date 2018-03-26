@@ -47,8 +47,8 @@
               <goal>generate</goal>
             </goals>
             <configuration>
-              <sourcePath>${project.build.directory}/sources</sourcePath>
-              <targetPath>${project.build.directory}/cmake</targetPath>
+              <sourcePath>${project.build.sourceDirectory}</sourcePath>
+              <targetPath>${project.build.directory}/build</targetPath>
               <generator>${cmake.generator}</generator>
               <classifier>${platform}</classifier>
               <options>${cmake.options}</options>
@@ -66,36 +66,12 @@
               <goal>compile</goal>
             </goals>
             <configuration>
-              <projectDirectory>${project.build.directory}/cmake</projectDirectory>
+              <projectDirectory>${project.build.directory}/build</projectDirectory>
               <classifier>${platform}</classifier>
               <config>${build.type}</config>
             </configuration>
           </execution>
         </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-resources-plugin</artifactId>
-        <version>3.0.2</version>
-        <executions>
-          <execution>
-            <id>copy-sources</id>
-            <phase>generate-sources</phase>
-            <goals>
-              <goal>copy-resources</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>${project.build.directory}/sources</outputDirectory>
-              <resources>
-                <resource>
-                  <directory>${project.build.sourceDirectory}</directory>
-                </resource>
-              </resources>
-            </configuration>
-          </execution>
-        </executions>
-        <configuration>
-          <encoding>${project.build.sourceEncoding}</encoding>
-        </configuration>
       </plugin>
       <plugin>
         <artifactId>maven-antrun-plugin</artifactId>
@@ -105,24 +81,14 @@
             <phase>process-resources</phase>
             <configuration>
               <tasks>
-                <checksum todir="${project.build.directory}/cmake" format="CHECKSUM">
-                  <fileset dir="${project.build.directory}/cmake">
+                <checksum todir="${project.build.directory}/build" format="CHECKSUM">
+                  <fileset dir="${project.build.directory}/build">
                     <include name="**/*.dll"/>
                     <include name="**/*.pdb"/>
                     <include name="**/*.so"/>
                     <include name="**/*.dylib"/>
                   </fileset>
                 </checksum>
-                <copy todir="${project.build.directory}/dll-staging">
-                  <fileset dir="${project.build.directory}/cmake">
-                    <include name="**/*.dll"/>
-                    <include name="**/*.pdb"/>
-                    <include name="**/*.so"/>
-                    <include name="**/*.dylib"/>
-                    <include name="**/*.MD5"/>
-                  </fileset>
-                  <flattenmapper/>
-                </copy>
               </tasks>
             </configuration>
             <goals>
