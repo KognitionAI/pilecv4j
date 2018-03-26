@@ -27,11 +27,13 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.opencv.core.CvType;
 
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.CvRaster.FlatBytePixelSetter;
+import com.jiminger.image.ImageAPI;
 import com.jiminger.image.Utils;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.WeightedPoint;
@@ -41,6 +43,8 @@ import com.jiminger.nr.Minimizer;
 import com.jiminger.nr.MinimizerException;
 
 public class Transform {
+    private static final ImageAPI API = ImageAPI.API;
+
     public final double quantFactor;
     public final Mask mask;
     public final GradientDirectionMask gradDirMask;
@@ -79,6 +83,17 @@ public class Transform {
 
         final HoughSpaceEntryManager hsem = new HoughSpaceEntryManager(quantFactor);
 
+        final ImageAPI.AddHoughSpaceEntryContributorFunc cb = (final int orow, final int ocol, final int hsr, final int hsc,
+                final int hscount) -> {
+            try {
+                hsem.addHoughSpaceEntryContributor(orow, ocol, hsr, hsc, hscount);
+            } catch (final RuntimeException rte) {
+                rte.printStackTrace(System.err);
+                return false;
+            }
+            return true;
+        };
+
         if (rowstart < 0)
             rowstart = 0;
         if (rowend >= height)
@@ -88,89 +103,15 @@ public class Transform {
         if (colend >= width)
             colend = width - 1;
 
-        houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
+        API.Transform_houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
                 mask.mask, mask.mwidth, mask.mheight, mask.maskcr, mask.maskcc,
                 gradDirMask.mask, gradDirMask.mwidth, gradDirMask.mheight, gradDirMask.maskcr, gradDirMask.maskcc,
-                gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, hsem, houghThreshold,
-                rowstart, rowend, colstart, colend);
+                gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, cb, houghThreshold,
+                rowstart, rowend, colstart, colend, Mask.EDGE);
 
         hsem.entryMap.clear(); // help the gc
 
         return new HoughSpace(ret, htwidth, htheight, quantFactor, hsem.entries);
-    }
-
-    native public void houghTransformNative(long image, int width, int height, long gradientDirImage,
-            byte[] mask, int maskw, int maskh, int maskcr, int maskcc,
-            byte[] gradDirMask, int gdmaskw, int gdmaskh, int gdmaskcr, int gdmaskcc,
-            double gradientDirSlopDeg, double quantFactor,
-            short[] ret, int htwidth, int htheight, HoughSpaceEntryManager hsem,
-            int houghThreshold, int rowstart, int rowend, int colstart, int colend);
-
-    /**
-     * This method does not do much any more. Now it simply writes the inverse transform (that is, the edge pixels identified by the transform) back into the image for debugging purposes.
-     */
-    public List<HoughSpaceEntry> inverseTransform(final HoughSpace houghSpace, final CvRaster ti, final byte overlayPixelValue,
-            final byte peakCircleColorValue, final String outputFileName) {
-        final List<HoughSpaceEntry> sortedSet = new LinkedList<HoughSpaceEntry>();
-
-        sortedSet.addAll(houghSpace.backMapEntries);
-
-        Collections.sort(sortedSet, new HoughSpaceEntry.HSEComparator());
-        final Color peakCircleColor = new Color(peakCircleColorValue, peakCircleColorValue, peakCircleColorValue);
-
-        if (ti != null) {
-            System.out.println("Constructing reverse hough transform image.");
-
-            final byte[] overlayPixel = new byte[] { overlayPixelValue };
-            for (final HoughSpaceEntry e : sortedSet) {
-                final int eir = e.ir;
-                final int eic = e.ic;
-
-                ti.matAp(m -> Utils.drawCircle(eir, eic, m, peakCircleColor));
-
-                for (final java.awt.Point p : e.contributingImagePoints)
-                    ti.set(p.y, p.x, overlayPixel);
-            }
-        }
-
-        // if (outputFileName != null) {
-        // try {
-        // ImageFile.writeImageFile(Utils.dbgImage, outputFileName);
-        // } catch (final IOException ioe) {
-        // ioe.printStackTrace();
-        // }
-        // }
-
-        return sortedSet;
-    }
-
-    public CvRaster getTransformRaster(final HoughSpace houghSpace0) {
-        final short[] houghSpace = houghSpace0.houghSpace;
-        final int width = houghSpace0.hswidth;
-        final int height = houghSpace0.hsheight;
-
-        final CvRaster gradRaster = CvRaster.createManaged(height, width, CvType.CV_8UC1);
-
-        int max = 0;
-        for (int i = 0; i < houghSpace.length; i++) {
-            final int count = houghSpace[i];
-            if (max < count)
-                max = count;
-        }
-
-        final byte[] pixel = new byte[1];
-        final double finalMax = max;
-        gradRaster.apply((FlatBytePixelSetter) pos -> {
-            int intVal = (int) (((houghSpace[pos]) / finalMax) * 255.0);
-            if (intVal < 0)
-                intVal = 0;
-            else if (intVal > 255)
-                intVal = 255;
-            pixel[0] = (byte) intVal;
-            return pixel;
-        });
-
-        return gradRaster;
     }
 
     public List<Cluster> cluster(final List<HoughSpaceEntry> houghEntries, final double percentModelCoverage) {
@@ -200,9 +141,23 @@ public class Transform {
         return ret;
     }
 
+    public List<Fit> bestFit(final List<Cluster> clusters, final CvRaster ti, final byte overlayPixelValueRemovedEdge,
+            final byte overlayPixelValueEdge) {
+        return bestFit(clusters, ti, overlayPixelValueRemovedEdge, overlayPixelValueEdge, null);
+    }
+
+    public List<Fit> bestFit(final List<Cluster> clusters, final CvRaster ti, final byte overlayPixelValueRemovedEdge,
+            final byte overlayPixelValueEdge, final List<java.awt.Point> savedPruned) {
+        return clusters.stream()
+                .map(c -> bestFit(c, ti, overlayPixelValueRemovedEdge, overlayPixelValueEdge, savedPruned))
+                .collect(Collectors.toList());
+    }
+
     /**
-     * This method will take a Cluster and use it to minimize the sum of square error with the error against the model that would fit the actual edge pixels. This is what finds the actual feature from the
-     * cluster. The passed image and overlay values are for bookkeeping only. A null ti means ignore book keeping.
+     * This method will take a Cluster and use it to minimize the sum of square error 
+     * with the error against the model that would fit the actual edge pixels. This is 
+     * what finds the actual feature from the cluster. The passed image and overlay
+     * values are for bookkeeping only. A null ti means ignore book keeping.
      */
     public Fit bestFit(final Cluster cluster, final CvRaster ti, final byte overlayPixelValueRemovedEdge, final byte overlayPixelValueEdge)
             throws MinimizerException {
@@ -210,8 +165,10 @@ public class Transform {
     }
 
     /**
-     * This method will take a Cluster and use it to minimize the sum of square error with the error against the model that would fit the actual edge pixels. This is what finds the actual feature from the
-     * cluster. The passed image and overlay values are for bookkeeping only. A null ti means ignore book keeping.
+     * This method will take a Cluster and use it to minimize the sum of square error with
+     *  the error against the model that would fit the actual edge pixels. This is what 
+     *  finds the actual feature from the cluster. The passed image and overlay values
+     *  are for bookkeeping only. A null ti means ignore book keeping.
      */
     public Fit bestFit(final Cluster cluster, final CvRaster ti, final byte overlayPixelValueRemovedEdge, final byte overlayPixelValueEdge,
             final List<java.awt.Point> savedPruned)
@@ -314,6 +271,7 @@ public class Transform {
                 entryMap.put(hsrc, e);
                 entries.add(e);
             }
+            // System.out.println("HoughSpaceEntry:" + e);
 
             e.addContribution(imrow, imcol);
         }
@@ -383,6 +341,69 @@ public class Transform {
         public int hsheight;
         public double quantFactor;
         public List<HoughSpaceEntry> backMapEntries;
+
+        public CvRaster getTransformRaster() {
+            final int width = hswidth;
+            final int height = hsheight;
+
+            final CvRaster gradRaster = CvRaster.createManaged(height, width, CvType.CV_8UC1);
+
+            int max = 0;
+            for (int i = 0; i < houghSpace.length; i++) {
+                final int count = houghSpace[i];
+                if (max < count)
+                    max = count;
+            }
+
+            final byte[] pixel = new byte[1];
+            final double finalMax = max;
+            gradRaster.apply((FlatBytePixelSetter) pos -> {
+                int intVal = (int) (((houghSpace[pos]) / finalMax) * 255.0);
+                if (intVal < 0)
+                    intVal = 0;
+                else if (intVal > 255)
+                    intVal = 255;
+                pixel[0] = (byte) intVal;
+                return pixel;
+            });
+
+            return gradRaster;
+        }
+
+        public List<HoughSpaceEntry> getSortedEntries() {
+            final List<HoughSpaceEntry> sortedSet = new LinkedList<HoughSpaceEntry>();
+            sortedSet.addAll(backMapEntries);
+            Collections.sort(sortedSet, new HoughSpaceEntry.HSEComparator());
+            return sortedSet;
+        }
+
+        /**
+         * This method does not do much any more. Now it simply writes the inverse transform (that is, 
+         * the edge pixels identified by the transform) back into the image for debugging purposes.
+         */
+        public List<HoughSpaceEntry> inverseTransform(final CvRaster ti, final byte overlayPixelValue,
+                final byte peakCircleColorValue) {
+            final List<HoughSpaceEntry> sortedSet = getSortedEntries();
+            final Color peakCircleColor = new Color(peakCircleColorValue, peakCircleColorValue, peakCircleColorValue);
+
+            if (ti != null) {
+                System.out.println("Constructing reverse hough transform image.");
+
+                final byte[] overlayPixel = new byte[] { overlayPixelValue };
+                for (final HoughSpaceEntry e : sortedSet) {
+                    final int eir = e.ir;
+                    final int eic = e.ic;
+
+                    ti.matAp(m -> Utils.drawCircle(eir, eic, m, peakCircleColor));
+
+                    for (final java.awt.Point p : e.contributingImagePoints)
+                        ti.set(p.y, p.x, overlayPixel);
+                }
+            }
+
+            return sortedSet;
+        }
+
     }
 
     public static class Cluster implements WeightedPoint {
@@ -646,15 +667,6 @@ public class Transform {
         public static final Comparator<Transform.Fit> stdDeviationOrder = (o1, o2) -> o1.stdDev > o2.stdDev ? 1 : ((o1.stdDev == o2.stdDev) ? 0 : -1);
 
         public static final Comparator<Transform.Fit> edgeCountOrder = (o1, o2) -> o2.edgeVals.size() - o1.edgeVals.size();
-    }
-
-    // private static byte byteify(int i)
-    // {
-    // return i > 127 ? (byte)(i - 256) : (byte)i;
-    // }
-
-    private static int intify(final byte b) {
-        return (b < 0) ? (b) + 256 : (int) b;
     }
 
 }

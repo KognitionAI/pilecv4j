@@ -20,6 +20,8 @@
 #define _LARGEFILE_SOURCE
 #define _LARGEFILE64_SOURCE
 
+#include "jpegtoavi.h"
+
 #include <stdio.h>
 #include "avifmt.h"
 #include <string.h>
@@ -40,13 +42,12 @@
 #include "byteswap.h"
 #include <stdlib.h>
 
-#include "com_jiminger_image_mjpeg_MJPEGWriter.h"
 #include <list>
 using namespace std;
 
-static jboolean writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
-                            DWORD width, DWORD height, DWORD riff_sz,
-                            FILE* ofd);
+static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
+                        DWORD width, DWORD height, DWORD riff_sz,
+                        FILE* ofd);
 
 /*
   spc: indicating file sz in bytes, -1 on error
@@ -83,8 +84,7 @@ static DWORD prevoffset;
 static unsigned long tnbw = 0;
 static off64_t jpg_sz_64 = 0;
 
-JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_initializeMJPEG
-  (JNIEnv * env, jclass, jstring jfilename)
+bool mjpeg_initializeMJPEG(const char* filename)
 {
   DWORD frames=1;
   DWORD width=1;
@@ -93,14 +93,12 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_initializeMJPEG
   DWORD riff_sz = 0;
   DWORD fps = 1;
 
-  const char * filename = env->GetStringUTFChars(jfilename,NULL);
   ofd = fopen(filename,"wb");
 
   if (ofd == NULL)
   {
      fprintf(stderr,"Failed to open file %s",filename);
-     env->ReleaseStringUTFChars(jfilename,filename);
-     return JNI_FALSE;
+     return false;
   }
 
   DWORD per_usec=1000000/fps;
@@ -111,13 +109,12 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_initializeMJPEG
 
   fwrite("movi",1,4,ofd);
 
-  env->ReleaseStringUTFChars(jfilename,filename);
-  return JNI_TRUE;
+  return true;
 }
 
-static jboolean writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
-                            DWORD width, DWORD height, DWORD riff_sz,
-                            FILE* ofd)
+static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
+                        DWORD width, DWORD height, DWORD riff_sz,
+                        FILE* ofd)
 {
   struct AVI_list_hdrl hdrl={
     /* header */
@@ -132,7 +129,7 @@ static jboolean writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
     LILEND4(sizeof(struct AVI_avih)),
     {
       LILEND4(per_usec),
-      LILEND4(1000000*(jpg_sz/frames)/per_usec),
+      (DWORD) LILEND4(1000000*(jpg_sz/frames)/per_usec),
       LILEND4(0),
       LILEND4(AVIF_HASINDEX),
       LILEND4(frames),
@@ -224,19 +221,18 @@ static jboolean writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
   /* list movi */
   fwrite("LIST",1,4,ofd);
   print_quartet(jpg_sz+8*frames+4,ofd);
-  return JNI_TRUE;
+  return true;
 }
 
   
-JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
-  (JNIEnv * env, jclass, jstring jfilename, jint jwidth, jint jheight)
+bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
 {
    off_t mfsz,remnant;
    char buff[512];
    long nbr,nbw;
 
    if (ofd == NULL)
-      return JNI_FALSE;
+      return false;
 
    if (height == (DWORD)-1)
    {
@@ -251,16 +247,13 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
       jpg_sz_64 = 0;
    }
 
-   const char * filename = env->GetStringUTFChars(jfilename,NULL);
-
    fwrite("00db",1,4,ofd);
    DWORD cursz = file_sz(filename);
    jpg_sz_64 += (cursz + ((4-(cursz%4))%4));
 
    if (cursz == (DWORD)-1)
    {
-      env->ReleaseStringUTFChars(jfilename,filename);
-      return JNI_FALSE;
+      return false;
    }
    mfsz = cursz; // szarray[f-img0];
 
@@ -285,15 +278,13 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
    if((fd=fopen(filename,"rb")) == 0)
    {
       fprintf(stderr,"couldn't open file!\n");
-      env->ReleaseStringUTFChars(jfilename,filename);
-      return JNI_FALSE;
+      return false;
    }
 
    if((nbr=fread(buff,1,6,fd))!=6)
    {
       fprintf(stderr,"error\n");
-      env->ReleaseStringUTFChars(jfilename,filename);
-      return JNI_FALSE;
+      return false;
    }
    fwrite(buff,nbr,1,ofd);
    fread(buff,1,4,fd);
@@ -313,22 +304,20 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_doappendFile
    tnbw+=nbw;
    fclose(fd);
 
-   env->ReleaseStringUTFChars(jfilename,filename);
    prevsz = cursz;
    prevoffset = curoffset;
    f++;
 
-   return JNI_TRUE;
+   return true;
 }
 
-JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_close
-  (JNIEnv *, jclass, jint jfps)
+bool mjpeg_close(int32_t jfps)
 {
    unsigned int fps = (unsigned int)jfps;
    const off64_t MAX_RIFF_SZ=2147483648UL; /* 2 Gb limit */
 
    if (ofd == NULL)
-      return JNI_FALSE;
+      return false;
 
    unsigned long jpg_sz = (unsigned long)jpg_sz_64;
 
@@ -336,7 +325,7 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_close
    {
       fprintf(stderr,"error writing images (wrote %ld bytes, expected %ld bytes)\n",
               tnbw,jpg_sz);
-      return JNI_FALSE;
+      return false;
    }
 
    // indices
@@ -365,7 +354,7 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_close
    if(riff_sz_64>=MAX_RIFF_SZ)
    {
       fprintf(stderr,"RIFF would exceed 2 Gb limit\n");
-      return JNI_FALSE;
+      return false;
    }
    DWORD riff_sz=(DWORD)riff_sz_64;
 
@@ -375,11 +364,10 @@ JNIEXPORT jboolean JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_close
                ofd);
 
    fflush(ofd);
-   return JNI_TRUE;
+   return true;
 }
 
-JNIEXPORT void JNICALL Java_com_jiminger_mjpeg_MJPEGWriter_cleanUp
-  (JNIEnv *, jclass)
+void mjpeg_cleanUp()
 {
    if (ofd)
    {

@@ -76,14 +76,17 @@ public interface Point {
         // | i j k | | i j k |
         // | x y 0 | | x y 0 |
         // | 0 0 1 | | 0 0 -1 |
-        return flipZ ? new SimplePoint(-y(), x()) : new SimplePoint(y(), -x());
+        //
+        // !flipZ = i(y * 1) - j(x * 1) => x=y*1, y=-x*1 => r=-x*1, c=y*1
+        // flipZ = i(y * -1) - j(x * -1) => x=-y*1, y=x*1 => r=x*1, c=-y*1
+        return flipZ ? new SimplePoint(x(), -y()) : new SimplePoint(-x(), y());
     }
 
     default public byte quantizedDirection() {
         final double rawang = Math.atan2(y(), x());
 
         // angle should be between -Pi and Pi. We want it from 0 -> 2Pi
-        final double ang = rawang < 0.0 ? rawang + Math.PI : rawang;
+        final double ang = rawang < 0.0 ? (2.0 * Math.PI) + rawang : rawang;
         final int bytified = (int) Math.round((ang * 256.0) / twoPi);
         return (bytified >= 256 ? 0 : (byte) (bytified & 0xff));
     }

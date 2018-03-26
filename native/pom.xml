@@ -12,36 +12,29 @@
 
   <artifactId>native-lib</artifactId>
   <packaging>pom</packaging>
-  <name>Native POM</name>
 
+  <!-- Using this library implies you'll need the following, so pull them in transitively -->
   <dependencies>
     <dependency>
-      <groupId>com.jiminger</groupId>
-      <artifactId>lib-image</artifactId>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-utils</artifactId>
+    </dependency>
+    <dependency> <!-- Only used in the NativeLibraryLoader -->
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
     </dependency>
   </dependencies>
-  
+
   <build>
     <directory>${basedir}/target/${platform}-${build.type}</directory>
     <sourceDirectory>src/main/cpp</sourceDirectory>
     <plugins>
       <!-- Copies the dependencies so that javah can find them. -->
       <!--   see the CMakeLists.txt file -->
-      <plugin>
-        <artifactId>maven-dependency-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>copy-dependencies</id>
-            <phase>initialize</phase>
-            <goals>
-              <goal>copy-dependencies</goal>
-            </goals>
-            <configuration>
-              <outputDirectory>${project.build.directory}/lib</outputDirectory>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <groupId>com.googlecode.cmake-maven-project</groupId>
         <artifactId>cmake-maven-plugin</artifactId>

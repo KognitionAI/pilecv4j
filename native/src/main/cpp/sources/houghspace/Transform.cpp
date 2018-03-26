@@ -17,16 +17,24 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
+#include <cstdint>
 #include <stdio.h>
-#include "com_jiminger_image_houghspace_Transform.h"
 #include <list>
+#include "jfloats.h"
+
 using namespace std;
 
-//public short [] houghTransformNative(int width, int height, byte [] image, byte [] gradientDirImage,
-//                                     byte [] mask, byte [] gradientDirImage, double gradientDirSlopDeg);
+typedef int32_t (*AddHoughSpaceEntryContributorFunc)(int32_t orow, int32_t ocol,int32_t hsr, int32_t hsc, int32_t hscount);
 
-static unsigned char EDGE = -1;
-static bool EDGE_set = false;
+extern "C" {
+void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImage,
+ void* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
+ void* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
+ float64_t gradientDirSlopDeg, float64_t quantFactor, int16_t* ret, int32_t hswidth, int32_t hsheight,
+ AddHoughSpaceEntryContributorFunc hsem, int32_t houghThreshold, int32_t rowstart, int32_t rowend, int32_t colstart, int32_t colend,
+ unsigned char EDGE);
+}
+
 
 struct BackMap
 {
@@ -43,46 +51,29 @@ struct BackMap
 typedef BackMap* BackMapPtr;
 
 
-void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint width, jint height,
-           unsigned char* mask, jint maskw, jint maskh, jint maskcr, jint maskcc,
-           unsigned char* gradientDirMask, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
-           short gradientDirByte, short gradientDirSlopBytePM, double quantFactor,
+static void sweep(int32_t orow, int32_t ocol, int32_t row, int32_t col, int16_t* houghSpace, int32_t width, int32_t height,
+           unsigned char* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
+           unsigned char* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
+           short gradientDirByte, short gradientDirSlopBytePM, double quantFactor, unsigned char EDGE,
            int houghThreshold = -1, short* interimHoughSpace = NULL, list<BackMapPtr>** backMapList = NULL);
 
-int maskcheck(unsigned char * mask, jint maskw, jint maskh, int r, int c, int isBackMapping);
+static int maskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, int isBackMapping, unsigned char EDGE);
 
-
-JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransformNative
-(JNIEnv * env, jobject /*thethis*/, 
- jlong imageA, jint width, jint /*height*/, jlong gradientDirImageA,
- jbyteArray maskA, jint maskw, jint maskh, jint maskcr, jint maskcc,
- jbyteArray gradientDirMaskA, jint gdmaskw, jint gdmaskh, jint gdmaskcr, jint gdmaskcc,
- jdouble gradientDirSlopDeg, jdouble quantFactor, jshortArray retA, jint hswidth, jint hsheight,
- jobject hsem, jint houghThreshold, jint rowstart, jint rowend, jint colstart, jint colend)
+void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImageA,
+ void* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
+ void* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
+ float64_t gradientDirSlopDeg, float64_t quantFactor, int16_t* ret, int32_t hswidth, int32_t hsheight,
+ AddHoughSpaceEntryContributorFunc hsem, int32_t houghThreshold, int32_t rowstart, int32_t rowend, int32_t colstart, int32_t colend,
+ unsigned char EDGE)
 {
-  if (! EDGE_set) {
-    jclass maskClass = env->FindClass("com/jiminger/image/houghspace/internal/Mask");
-    jfieldID fid = env->GetStaticFieldID(maskClass, "EDGE", "B");
-    jbyte val = env->GetStaticByteField(maskClass, fid);
-    EDGE = (unsigned char)val;
-    EDGE_set = true;
-  }
-  
   short gradientDirSlopBytePM = (short)((1.0 + gradientDirSlopDeg * (256.0/360.0))/2.0);
 
-  jboolean isCopy;
-  jbyte* image = (jbyte*)imageA;
-  jbyte* gradientDirImage = (jbyte*)gradientDirImageA; // can be null
-  jbyte* mask = 
-    (jbyte*)(env->GetPrimitiveArrayCritical(maskA, &isCopy));
-  jbyte* gradientDirMask = 
-    (jbyte*)(env->GetPrimitiveArrayCritical(gradientDirMaskA, &isCopy));
-  jshort* ret = 
-    (jshort*)(env->GetPrimitiveArrayCritical(retA, &isCopy));
-
-  jint hssize = hswidth * hsheight;
+  int32_t hssize = hswidth * hsheight;
   short * interimht = new short[ hssize ];
   list<BackMapPtr>** backMapListSpace = new list<BackMapPtr>*[ hssize ];
+
+  void* image = (void*) imageA;
+  void* gradientDirImage = (void*) gradientDirImageA;
 
   for ( int i = 0; i < hssize; i++)
   {
@@ -115,7 +106,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
               (unsigned char*)mask,maskw,maskh,maskcr,maskcc,
               (unsigned char*)gradientDirMask,gdmaskw,gdmaskh,gdmaskcr,gdmaskcc,
               (short)(((unsigned char*)gradientDirImage)[pos]),
-              gradientDirSlopBytePM, quantFactor);
+              gradientDirSlopBytePM, quantFactor, EDGE);
       }
     }
   }
@@ -136,18 +127,13 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
               (unsigned char*)mask,maskw, maskh, maskcr, maskcc,
               (unsigned char*)gradientDirMask,gdmaskw,gdmaskh,gdmaskcr,gdmaskcc,
               (short)(((unsigned char*)gradientDirImage)[pos]),
-              gradientDirSlopBytePM,quantFactor,-1,interimht,backMapListSpace);
+              gradientDirSlopBytePM,quantFactor, EDGE,-1,interimht,backMapListSpace);
       }
     }
   }
 
-  jclass gFuncClass;
-  jmethodID gFuncMeth;
-  gFuncClass = env->GetObjectClass(hsem);
-  gFuncMeth = env->GetMethodID(gFuncClass,"addHoughSpaceEntryContributor","(IIIII)V");
-
-  jboolean exceptionHappens = false;
-
+  bool exceptionHappens = false;
+  int bmlistcount = 0;
   for (int hsr = 0; hsr < hsheight && !exceptionHappens; hsr++)
   {
     for (int hsc = 0; hsc < hswidth && !exceptionHappens; hsc++)
@@ -161,9 +147,11 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
         int listcount = bmlist->size();
         int hscount = (int)ret[hsindex];
 
-        if (hscount != listcount)
-          printf(" Problem: hough space entry %d,%d has %d backmapped entries yet %d entrie\n",
+        if (hscount != listcount) {
+          fprintf(stderr, " Problem: hough space entry %d,%d has %d backmapped entries yet %d entrie\n",
                  hsr,hsc,listcount,hscount);
+          fflush(stderr);
+        }
 
         if (listcount >= houghThreshold)
         {
@@ -171,12 +159,7 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
           for (iter = bmlist->begin(); iter != bmlist->end() && !exceptionHappens; iter++)
           {
             BackMap* bm = (*iter);
-            env->CallVoidMethod(hsem,gFuncMeth,(jint)bm->orow,(jint)bm->ocol,(jint)hsr,(jint)hsc,(jint)hscount);
-            if (env->ExceptionOccurred() != NULL)
-            {
-              printf("Exception Happens!\n");
-              exceptionHappens = true;
-            }
+            exceptionHappens = !((*hsem)((int32_t)bm->orow,(int32_t)bm->ocol,(int32_t)hsr,(int32_t)hsc,(int32_t)hscount));
           }
         }
       }
@@ -203,25 +186,20 @@ JNIEXPORT void JNICALL Java_com_jiminger_image_houghspace_Transform_houghTransfo
 
   delete [] backMapListSpace;
   delete [] interimht;
-   
-
-  env->ReleasePrimitiveArrayCritical(gradientDirMaskA,gradientDirMask,0);
-  env->ReleasePrimitiveArrayCritical(maskA,mask,0);
-  env->ReleasePrimitiveArrayCritical(retA,ret,0);
 }
 
-void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint width, jint height,
-           unsigned char* mask, jint maskw, jint maskh, jint maskcr, jint maskcc,
-           unsigned char* gradDirMask, jint /*gdmaskw*/, jint /*gdmaskh*/, jint /*gdmaskcr*/, jint /*gdmaskcc*/,
+static void sweep(int32_t orow, int32_t ocol, int32_t row, int32_t col, int16_t* houghSpace, int32_t width, int32_t height,
+           unsigned char* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
+           unsigned char* gradDirMask, int32_t /*gdmaskw*/, int32_t /*gdmaskh*/, int32_t /*gdmaskcr*/, int32_t /*gdmaskcc*/,
            short gradientDirByte, short gradientDirSlopBytePM,
-           double /*quantFactor*/,int houghThreshold,short* interimHoughSpace, 
+           double /*quantFactor*/, unsigned char EDGE, int houghThreshold,short* interimHoughSpace,
            list<BackMapPtr>** backMapListSpace)
 {
   int maxbincount = -1;
   int maxbinpos = -1;
   int tmpi;
 
-  // the mask is already swept so we need to simply 
+  // the mask is already swept so we need to simply
   //  plop it on the houghSpace centered at r,c
   for (int r = 0; r < maskh; r++)
   {
@@ -233,14 +211,15 @@ void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint wi
         int hsc = (col - maskcc) + c;
         if (hsc >= 0 && hsc < width &&
             maskcheck(mask,maskw,maskh,r,c,       // this mask check checks adjacent pixels also
-                      interimHoughSpace != NULL)) //  and has the side affect of smearing the transform
+                      interimHoughSpace != NULL,  //  and has the side affect of smearing the transform
+                      EDGE))
         {
           short requiredGradDir = gradDirMask[(r * maskw) + c];
-          short diff = requiredGradDir > gradientDirByte ? 
-            (short)(requiredGradDir - gradientDirByte) : 
+          short diff = requiredGradDir > gradientDirByte ?
+            (short)(requiredGradDir - gradientDirByte) :
             (short)(gradientDirByte - requiredGradDir);
 
-          if (gradientDirSlopBytePM >= diff || 
+          if (gradientDirSlopBytePM >= diff ||
               gradientDirSlopBytePM >= ((short)256 - diff))
           {
             if (interimHoughSpace)
@@ -285,16 +264,16 @@ void sweep(jint orow, jint ocol, jint row, jint col, jshort* houghSpace, jint wi
 }
 
 
-inline int smaskcheck(unsigned char * mask, jint maskw, jint maskh, int r, int c)
+static inline int smaskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, unsigned char EDGE)
 {
   return (r >= 0 && r < maskh && c >= 0 && c < maskw) ? (mask[(r * maskw) + c] == EDGE) : 0;
 }
 
-int maskcheck(unsigned char * mask, jint maskw, jint maskh, int r, int c, int isBackMapping)
+static int maskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, int isBackMapping, unsigned char EDGE)
 {
-  return isBackMapping ? 
-    (smaskcheck(mask,maskw,maskh,r,c) || smaskcheck(mask,maskw,maskh,r+1,c) ||
-     smaskcheck(mask,maskw,maskh,r-1,c) || smaskcheck(mask,maskw,maskh,r,c+1) ||
-     smaskcheck(mask,maskw,maskh,r,c-1)) : smaskcheck(mask,maskw,maskh,r,c);
+  return isBackMapping ?
+    (smaskcheck(mask,maskw,maskh,r,c,EDGE) || smaskcheck(mask,maskw,maskh,r+1,c,EDGE) ||
+     smaskcheck(mask,maskw,maskh,r-1,c,EDGE) || smaskcheck(mask,maskw,maskh,r,c+1,EDGE) ||
+     smaskcheck(mask,maskw,maskh,r,c-1,EDGE)) : smaskcheck(mask,maskw,maskh,r,c,EDGE);
 }
 

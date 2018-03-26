@@ -11,6 +11,7 @@ target
 
 #project build directories
 native/linux-amd64-jiminger/bin
+native/build
 
 hs_err_*.log
 

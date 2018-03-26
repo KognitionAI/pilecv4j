@@ -15,17 +15,30 @@
       <groupId>com.jiminger</groupId>
       <artifactId>lib-util</artifactId>
     </dependency>
-    <dependency>
-      <groupId>com.jiminger</groupId>
-      <artifactId>lib-image-native</artifactId>
-    </dependency>
-    <dependency>
+    
+    <dependency> <!-- Used for Transform -->
       <groupId>com.jiminger</groupId>
       <artifactId>lib-nr</artifactId>
+      <optional>true</optional>
     </dependency>
+    
     <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>native-lib</artifactId>
+      <classifier>${platform}</classifier>
+    </dependency>
+    
+    <!-- Third party deps -->
+    <dependency> <!-- Used for TensorUtils -->
       <groupId>org.tensorflow</groupId>
       <artifactId>tensorflow</artifactId>
+      <optional>true</optional>
+    </dependency>
+    
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>native-lib</artifactId>
+      <classifier>${platform}</classifier>
     </dependency>
 
     <dependency>

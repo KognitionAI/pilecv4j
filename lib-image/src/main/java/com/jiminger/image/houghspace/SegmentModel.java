@@ -20,6 +20,9 @@ public class SegmentModel implements Model {
     final private double w;
     final private double h;
 
+    final private double shiftrow;
+    final private double shiftcol;
+
     public SegmentModel(final Collection<LineSegment> segments) {
         if (segments == null || segments.size() == 0)
             throw new IllegalArgumentException();
@@ -51,20 +54,25 @@ public class SegmentModel implements Model {
                 maxY = y;
         }
 
-        // this.minX = minX;
-        // this.minY = minY;
-        // this.maxX = maxX;
-        // this.maxY = maxY;
-
         this.w = maxX - minX;
         this.h = maxY - minY;
+
+        // move minX to -1/2 w
+        final double halfw = this.w / 2.0;
+        this.shiftcol = 0.0 - (minX - halfw);
+
+        final double halfh = this.h / 2.0;
+        this.shiftrow = 0.0 - (minY - halfh);
     }
 
     @Override
     public double distance(final double ox, final double oy, final double scale) {
+        final double x = shiftcol + ox;
+        final double y = shiftrow + oy;
+
         double minDist = Double.POSITIVE_INFINITY;
         for (final LineSegment seg : segments) {
-            final double dist = seg.distance(new SimplePoint(oy, ox));
+            final double dist = seg.distance(new SimplePoint(y, x));
             if (dist < minDist)
                 minDist = dist;
         }
@@ -73,7 +81,9 @@ public class SegmentModel implements Model {
 
     @Override
     public byte gradientDirection(final double ox, final double oy) {
-        return closest(ox, oy, 1.0).gradientDirection;
+        final double x = shiftcol + ox;
+        final double y = shiftrow + oy;
+        return closest(x, y, 1.0).gradientDirection;
     }
 
     @Override

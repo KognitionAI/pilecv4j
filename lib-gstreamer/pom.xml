@@ -11,6 +11,25 @@
   <name>lib-gstreamer (${project.version})</name>
   <description></description>
   <dependencies>
+    <!-- Internal deps -->
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>lib-image</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>gst-breakout</artifactId>
+      <classifier>${platform}</classifier>
+    </dependency>
+  
+    <!-- Sister project -->
+    <dependency>
+      <groupId>com.jiminger</groupId>
+      <artifactId>opencv-lib-jar</artifactId>
+      <classifier>withlib</classifier>
+    </dependency>
+  
+    <!-- 3rd party deps -->
     <dependency>
       <groupId>org.freedesktop.gstreamer</groupId>
       <artifactId>gst1-java-core</artifactId>
@@ -19,37 +38,35 @@
       <groupId>org.slf4j</groupId>
       <artifactId>jul-to-slf4j</artifactId>
     </dependency>
+    
+    <!-- 3rd party test deps -->
     <dependency>
       <groupId>net.dempsy</groupId>
       <artifactId>dempsy-test-utils</artifactId>
       <scope>test</scope>
     </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-log4j12</artifactId>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
-        <groupId>com.jiminger</groupId>
-        <artifactId>lib-image</artifactId>
-      </dependency>
-      <dependency>
-        <groupId>com.jiminger</groupId>
-        <artifactId>opencv-lib-jar</artifactId>
-        <classifier>withlib</classifier>
-      </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency> <!-- Used for TensorUtils -->
+      <groupId>org.tensorflow</groupId>
+      <artifactId>tensorflow</artifactId>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>2.21.0</version>
-                <configuration>
-                    <reuseForks>false</reuseForks>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>2.21.0</version>
+        <configuration>
+          <reuseForks>false</reuseForks>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
 </project>

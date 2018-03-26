@@ -20,19 +20,20 @@
 package com.jiminger.image.mjpeg;
 
 import java.io.File;
-import java.io.FileFilter;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
+import com.jiminger.image.ImageAPI;
 import com.jiminger.util.CommandLineParser;
 
 public class MJPEGWriter {
-    static public String parentDir = null;
+    private static final ImageAPI API = ImageAPI.API;
+
+    static public File pdir = null;
     static public String avifile = "out.avi";
     public static int avifps = 16;
 
@@ -43,29 +44,16 @@ public class MJPEGWriter {
         // assume args are file names
         initializeMJPEG(avifile);
         boolean working = true;
-        final File pdir = new File(parentDir);
-        if (!pdir.isDirectory()) {
-            System.out.println("\"" + parentDir + "\" is not a directory.");
-            usage();
-        }
 
         final File[] files = pdir.listFiles(
-                new FileFilter() {
-                    @Override
-                    public boolean accept(final File f) {
-                        final String fp = f.getAbsolutePath();
-                        return f.isFile() && (fp.endsWith(".jpeg") || fp.endsWith(".JPEG") ||
-                                fp.endsWith("jpg") || fp.endsWith("JPG"));
-                    }
+                f -> {
+                    final String fp = f.getAbsolutePath();
+                    return f.isFile() && (fp.endsWith(".jpeg") || fp.endsWith(".JPEG") ||
+                            fp.endsWith("jpg") || fp.endsWith("JPG"));
                 });
 
         final List<File> fileList = Arrays.asList(files);
-        Collections.sort(fileList, new Comparator<File>() {
-            @Override
-            public int compare(final File o1, final File o2) {
-                return o1.getName().compareTo(o2.getName());
-            }
-        });
+        Collections.sort(fileList, (o1, o2) -> o1.getName().compareTo(o2.getName()));
 
         for (final File f : fileList)
             working = appendFile(f.getAbsolutePath());
@@ -76,6 +64,22 @@ public class MJPEGWriter {
             System.out.println("Failed to create AVI - Who knows why!");
 
         cleanUp();
+    }
+
+    public static boolean initializeMJPEG(final String filename) {
+        return API.mjpeg_initializeMJPEG(filename);
+    }
+
+    public static boolean doappendFile(final String filename, final int width, final int height) {
+        return API.mjpeg_doappendFile(filename, width, height);
+    }
+
+    public static boolean close(final int fps) {
+        return API.mjpeg_close(fps);
+    }
+
+    public static void cleanUp() {
+        API.mjpeg_cleanUp();
     }
 
     private static void usage() {
@@ -91,8 +95,15 @@ public class MJPEGWriter {
             return false;
         }
 
-        parentDir = cl.getProperty("pdir");
+        final String parentDir = cl.getProperty("pdir");
         if (parentDir == null) {
+            usage();
+            return false;
+        }
+
+        pdir = new File(parentDir);
+        if (!pdir.isDirectory()) {
+            System.out.println("\"" + parentDir + "\" is not a directory.");
             usage();
             return false;
         }
@@ -108,8 +119,6 @@ public class MJPEGWriter {
         return true;
     }
 
-    static public native boolean initializeMJPEG(String filename);
-
     static private int width = -1;
     static private int height = -1;
 
@@ -121,10 +130,4 @@ public class MJPEGWriter {
         }
         return doappendFile(filename, width, height);
     }
-
-    static private native boolean doappendFile(String filename, int width, int height);
-
-    static public native boolean close(int fps);
-
-    static public native void cleanUp();
 }

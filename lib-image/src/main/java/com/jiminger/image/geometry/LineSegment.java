@@ -59,7 +59,8 @@ public class LineSegment {
         p2TransMagSq = p2Trans.magnitudeSquared();
         xbiased = Math.abs(p1.x() - p2.x()) > Math.abs(p1.y() - p2.y());
 
-        gradientDirection = p2Trans.crossWithZ(direction == Direction.LEFT).quantizedDirection();
+        final Point zcross = p2Trans.crossWithZ(direction == Direction.LEFT);
+        gradientDirection = zcross.quantizedDirection();
     }
 
     public double distance(final Point x) {
@@ -109,5 +110,10 @@ public class LineSegment {
             }
         }
         return x.distance(closest);
+    }
+
+    @Override
+    public String toString() {
+        return p1.toString() + "=>" + p2.toString();
     }
 }

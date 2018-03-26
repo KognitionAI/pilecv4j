@@ -18,4 +18,9 @@ public class SimplePoint implements Point {
     public double getCol() {
         return c;
     }
+
+    @Override
+    public String toString() {
+        return "(r:" + r + ",c:" + c + ")";
+    }
 }

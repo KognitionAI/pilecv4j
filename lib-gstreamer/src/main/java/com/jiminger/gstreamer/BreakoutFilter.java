@@ -30,9 +30,12 @@ public class BreakoutFilter extends BaseTransform {
 
     private SlowFilterSlippage slowFilterSlippage = null;
 
+    private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
+
     public static void init() {
-        if (!inited.getAndSet(true))
+        if (!inited.getAndSet(true)) {
             Gst.registerClass(BreakoutFilter.class);
+        }
     }
 
     static {
@@ -40,7 +43,7 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public static final BreakoutAPI gst() {
-        return BreakoutAPI.FILTER_API;
+        return FILTER_API;
     }
 
     public BreakoutFilter(final Initializer init) {

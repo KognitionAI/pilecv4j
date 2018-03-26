@@ -51,7 +51,7 @@ public class ImageFile {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
 
     static {
-        CvRaster.init();
+        CvRaster.initOpenCv();
     }
 
     public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {

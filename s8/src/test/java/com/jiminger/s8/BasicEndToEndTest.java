@@ -30,7 +30,8 @@ public class BasicEndToEndTest {
         try (InputStream is = new BufferedInputStream(getClass().getClassLoader().getResourceAsStream(testFileName));) {
 
             // copy the file into the temp folder
-            final File rootDir = new File("/tmp"); // outputDir.newFolder();
+            final File rootDir = new File("/tmp");
+            // final File rootDir = outputDir.newFolder();
             final String testFile = new File(rootDir, testFileName).getAbsolutePath();
 
             try (OutputStream os = new BufferedOutputStream(new FileOutputStream(testFile))) {
@@ -48,7 +49,9 @@ public class BasicEndToEndTest {
             ExtractFrames.main(new String[] { "-f", testFile, "-rev", "-rl", "-di" });
 
             final Properties props = new Properties();
-            props.load(new FileInputStream(new File(propertyFileName)));
+            try (FileInputStream fis = new FileInputStream(new File(propertyFileName))) {
+                props.load(fis);
+            }
 
             assertEquals("16", props.getProperty("frames.numberofframes"));
         }

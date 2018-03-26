@@ -14,7 +14,7 @@ import java.util.function.Function;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import net.dempsy.util.library.NativeLibraryLoader;
+import com.sun.jna.Pointer;
 
 /**
  * <p>
@@ -47,26 +47,16 @@ import net.dempsy.util.library.NativeLibraryLoader;
  */
 public abstract class CvRaster implements AutoCloseable {
 
+    private static final CvRasterAPI API = CvRasterAPI.API;
+
     /**
      * If you're going to use OpenCv classes before using CvRaster then
      * you need to bootstrap the initializing of OpenCv (which boils down
      * to loading the native libraries). This can be done by calling
      * this method.
      */
-    // causes the classloader to initialize the static block and load the native libs
+    // causes the classloader to initialize API and load the native libs
     public static void initOpenCv() {}
-
-    static void init() {
-        NativeLibraryLoader.loader()
-                .optional("opencv_ffmpeg340_64")
-                .library("opencv_java340")
-                .library("lib-image-native.jiminger.com")
-                .load();
-    }
-
-    static {
-        init();
-    }
 
     public int type() {
         return mat.type();
@@ -125,7 +115,7 @@ public abstract class CvRaster implements AutoCloseable {
      * {@code release}-ing the underlying {@code Mat}.
      */
     public static CvRaster manageCopy(final Mat mat, final Closer closer) {
-        final CvRaster ret = makeInstance(new CvMat(CvRasterNative._copy(mat.nativeObj)), getData(mat));
+        final CvRaster ret = makeInstance(new CvMat(API.CvRaster_copy(mat.nativeObj)), getData(mat));
         if (closer != null)
             closer.add(ret);
         return ret;
@@ -165,8 +155,7 @@ public abstract class CvRaster implements AutoCloseable {
      * @see CvRaster#manage(Mat, com.jiminger.image.CvRaster.Closer)
      */
     public static CvRaster createManaged(final int rows, final int cols, final int type, final Closer closer) {
-        final CvMat mat = CvMat.zeros(rows, cols, type);
-        return toRaster(mat, closer);
+        return toRaster(CvMat.zeros(rows, cols, type), closer);
     }
 
     public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer) {
@@ -174,8 +163,10 @@ public abstract class CvRaster implements AutoCloseable {
     }
 
     public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
-        final CvMat mat = new CvMat(CvRasterNative._makeMatFromRawDataReference(rows, cols, type, pointer));
-        return toRaster(mat, closer);
+        final long nativeObj = API.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+        if (nativeObj == 0)
+            throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
+        return toRaster(new CvMat(nativeObj), closer);
     }
 
     private static CvRaster makeInstance(final CvMat mat, final ByteBuffer bb) {
@@ -512,7 +503,9 @@ public abstract class CvRaster implements AutoCloseable {
     }
 
     public long getNativeAddressOfData() {
-        return CvRasterNative._getDataAddress(mat.nativeObj);
+        if (!mat.isContinuous())
+            throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
+        return Pointer.nativeValue(API.CvRaster_getData(mat.nativeObj));
     }
 
     public ByteBuffer dataAsByteBuffer() {
@@ -587,9 +580,18 @@ public abstract class CvRaster implements AutoCloseable {
     public static boolean pixelsIdentical(final Mat m1, final Mat m2) {
         if (m1.nativeObj == m2.nativeObj)
             return true;
-        final ByteBuffer bb1 = CvRasterNative._getData(m1.nativeObj);
-        final ByteBuffer bb2 = CvRasterNative._getData(m2.nativeObj);
+        final ByteBuffer bb1 = _getData(m1);
+        final ByteBuffer bb2 = _getData(m2);
         return bb1.compareTo(bb2) == 0;
+    }
+
+    private static ByteBuffer _getData(final Mat mat) {
+        if (!mat.isContinuous())
+            throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
+        final Pointer dataPtr = API.CvRaster_getData(mat.nativeObj);
+        if (Pointer.nativeValue(dataPtr) == 0)
+            throw new IllegalArgumentException("Cannot access raw data in Mat. It may be uninitialized.");
+        return dataPtr.getByteBuffer(0, mat.elemSize() * mat.total());
     }
 
     public static <T> T copyToPrimitiveArray(final CvRaster m) {
@@ -814,6 +816,10 @@ public abstract class CvRaster implements AutoCloseable {
                         }
                     });
         }
+
+        public void release() {
+            rastersToClose.clear();
+        }
     }
 
     @FunctionalInterface
@@ -822,7 +828,7 @@ public abstract class CvRaster implements AutoCloseable {
     }
 
     private static ByteBuffer getData(final Mat mat) {
-        final ByteBuffer ret = CvRasterNative._getData(mat.nativeObj);
+        final ByteBuffer ret = _getData(mat);
         if (ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
             ret.order(ByteOrder.LITTLE_ENDIAN);
         return ret;

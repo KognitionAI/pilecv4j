@@ -18,11 +18,17 @@ package com.jiminger.s8;
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
+import static com.jiminger.image.Operations.BOVERLAY;
+import static com.jiminger.image.Operations.COVERLAY;
+import static com.jiminger.image.Operations.EDGE;
+import static com.jiminger.image.Operations.GOVERLAY;
+import static com.jiminger.image.Operations.ROVERLAY;
+import static com.jiminger.image.Operations.YOVERLAY;
+import static com.jiminger.image.Operations.getOverlayCM;
 import static com.jiminger.image.Utils.print;
 import static net.dempsy.util.Functional.uncheck;
 
 import java.awt.Color;
-import java.awt.image.IndexColorModel;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,7 +39,6 @@ import java.util.Properties;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
-import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
@@ -45,6 +50,8 @@ import com.jiminger.image.CvRaster.IntsToPixel;
 import com.jiminger.image.CvRaster.PixelAggregate;
 import com.jiminger.image.CvRaster.PixelToInts;
 import com.jiminger.image.ImageFile;
+import com.jiminger.image.Operations;
+import com.jiminger.image.Operations.GradientImages;
 import com.jiminger.image.Utils;
 import com.jiminger.image.geometry.PerpendicularLineCoordFit;
 import com.jiminger.image.geometry.Point;
@@ -58,10 +65,17 @@ import com.jiminger.util.PropertiesUtils;
 /*******************************************************************
  * Because I had to look this up 8000 times I decided to document it.
  *
- * Sprocket image color key. 1) Clusters - blue circles. 2) edges pixels belonging to a feature according to the HT - green 3) Hough transform peaks - red circles 4) edge pixels removed by the sprocket hole
- * model error minimizattion - red 5) (edge pixels remaining from the minimization of (4) are REPAINTED green. 6) Sprocket hole centers discovered after regression of (4) - yellow circles 7) film edges
- * surviving line fit error minimization along a sprocket hole - blue 8) film edges removed as a result of line fit error minimization along a sprocket hole - red 9) frame line from center of sprocket hole to
- * the far edge along with the far edge intersection point and sprocket edge intersection point are all - cyan
+ * Sprocket image color key. 
+ * 1) Clusters - blue circles. 
+ * 2) edges pixels belonging to a feature according to the HT - green 
+ * 3) Hough transform peaks - red circles 
+ * 4) edge pixels removed by the sprocket hole model error minimizattion - red 
+ * 5) (edge pixels remaining from the minimization of (4) are REPAINTED green. 
+ * 6) Sprocket hole centers discovered after regression of (4) - yellow circles 
+ * 7) film edges surviving line fit error minimization along a sprocket hole - blue 
+ * 8) film edges removed as a result of line fit error minimization along a sprocket hole - red 
+ * 9) frame line from center of sprocket hole to the far edge along with the 
+ *    far edge intersection point and sprocket edge intersection point are all - cyan
  * 
  ********************************************************************/
 
@@ -74,16 +88,6 @@ public class ExtractFrames {
     public static int frameWidthPix = -1;
 
     public static double frameOversizeMult = 1.0;
-
-    private static byte EDGE = (byte) -1;
-    private static final byte ROVERLAY = (byte) 100;
-    private static final byte GOVERLAY = (byte) 101;
-    private static final byte BOVERLAY = (byte) 102;
-    private static final byte YOVERLAY = (byte) 103;
-    private static final byte COVERLAY = (byte) 104;
-    private static final byte MOVERLAY = (byte) 105;
-    private static final byte OOVERLAY = (byte) 106;
-    private static final byte GRAYOVERLAY = (byte) 107;
 
     public static long tileCacheSize = defaultTileCacheSize * megaBytes;
     public static String sourceFileName = null;
@@ -104,7 +108,7 @@ public class ExtractFrames {
     public static int filmLayout = -1;
     public static int filmType = FilmSpec.superEightFilmType;
     public static int sprocketLayout;
-    public static boolean writeDebugImages = false;
+    public static boolean writeDebugImages = true;
 
     public static String outputType = "JPEG";
     // public static String outputType = "BMP";
@@ -118,61 +122,6 @@ public class ExtractFrames {
     public static double clusterFactor = 0.2;
 
     public static boolean allowInterframeGeometry = true;
-
-    public static final double _256Ov2Pi = (256.0 / (2.0 * Math.PI));
-
-    public static byte angle_byte(final double x, final double y) {
-        double xu, yu, ang;
-        double ret;
-        int rret;
-
-        xu = Math.abs(x);
-        yu = Math.abs(y);
-
-        if ((xu == 0) && (yu == 0))
-            return (0);
-
-        ang = Math.atan(yu / xu);
-
-        if (x >= 0) {
-            if (y >= 0)
-                ret = ang;
-            else ret = (2.0 * Math.PI - ang);
-        } else {
-            if (y >= 0)
-                ret = (Math.PI - ang);
-            else ret = (Math.PI + ang);
-        }
-
-        rret = (int) (0.5 + (ret * _256Ov2Pi));
-        if (rret >= 256)
-            rret = 0;
-
-        return byteify(rret);
-    }
-
-    public static final double[] cvrtScaleDenom = new double[6];
-
-    static {
-        cvrtScaleDenom[CvType.CV_16U] = (0xffff);
-        cvrtScaleDenom[CvType.CV_16S] = (0x7fff);
-        cvrtScaleDenom[CvType.CV_8U] = (0xff);
-        cvrtScaleDenom[CvType.CV_8S] = (0x7f);
-    }
-
-    public static CvMat convertToGray(final CvMat src) {
-        final CvMat workingImage = new CvMat();
-        if (src.depth() != CvType.CV_8U) {
-            System.out.print("converting image to 8-bit grayscale ... ");
-            src.convertTo(workingImage, CvType.CV_8U, 255.0 / cvrtScaleDenom[src.depth()]);
-            Imgproc.cvtColor(workingImage, workingImage, Imgproc.COLOR_BGR2GRAY);
-            return workingImage;
-        } else {
-            src.copyTo(workingImage);
-            Imgproc.cvtColor(src, workingImage, Imgproc.COLOR_BGR2GRAY);
-            return workingImage;
-        }
-    }
 
     public static class WeightedFit implements WeightedPoint {
         public final Transform.Fit fit;
@@ -236,7 +185,7 @@ public class ExtractFrames {
 
         final String propertyFileName = outDir + File.separator + "frames.properties";
 
-        try (CvRaster.Closer closer = new CvRaster.Closer()) {
+        try (final CvRaster.Closer closer = new CvRaster.Closer()) {
             final CvRaster origImage = ImageFile.readMatFromFile(sourceFileName, closer);
             if (writeDebugImages)
                 ImageFile.writeImageFile(origImage, outDir + File.separator + "orig.tif");
@@ -252,7 +201,7 @@ public class ExtractFrames {
             // ------------------------------------------------------------
             // Create a grayscale color model.
             timer.start();
-            final CvMat grayImage = closer.add(origImage.matOp(m -> convertToGray(m)));
+            final CvMat grayImage = Operations.convertToGray(origImage, closer);
             System.out.println("Gray is " + CvType.typeToString(grayImage.type()));
             if (writeDebugImages)
                 ImageFile.writeImageFile(grayImage, outDir + File.separator + "gray.bmp");
@@ -285,43 +234,26 @@ public class ExtractFrames {
             // --------------------------------------
             System.out.println("Performing Sobel deriv calculation");
             System.out.print("Making gradient image ... ");
-            final CvMat dx = closer.add(new CvMat());
-            final CvMat dy = closer.add(new CvMat());
-            Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-            Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+            final GradientImages gis = Operations.gradient(grayImage, kernelSize, closer);
+            final CvRaster dx = gis.dx;
+            final CvRaster dy = gis.dy;
+            final CvRaster gradientDirRaster = gis.gradientDir;
+
             if (writeDebugImages) {
                 ImageFile.writeImageFile(dx, outDir + File.separator + "dx.tiff");
                 ImageFile.writeImageFile(dy, outDir + File.separator + "dy.tiff");
             }
 
-            final CvRaster dxr = CvRaster.toRaster(dx, closer);
-            final CvRaster dyr = CvRaster.toRaster(dy, closer);
-            final int numPixelsInGradient = dxr.rows() * dxr.cols();
-            final byte[] dirsa = new byte[numPixelsInGradient];
-
-            final short[] tmpdx = new short[numPixelsInGradient];
-            dxr.matAp(m -> m.get(0, 0, tmpdx));
-
-            for (int pos = 0; pos < numPixelsInGradient; pos++) {
-                // calculate the angle
-                final double dxv = ((short[]) dxr.get(pos))[0];
-                final double dyv = 0.0 - ((short[]) dyr.get(pos))[0]; // flip y axis.
-                dirsa[pos] = angle_byte(dxv, dyv);
-            }
-
-            // a byte raster to hold the dirs
-            final CvMat gradientDirImage = closer.add(CvRaster.createManaged(dxr.rows(), dxr.cols(), CvType.CV_8UC1).decoupled());
-            gradientDirImage.put(0, 0, dirsa);
             if (writeDebugImages) {
-                ImageFile.writeImageFile(gradientDirImage, outDir + File.separator + "gradDir.bmp");
+                ImageFile.writeImageFile(gradientDirRaster, outDir + File.separator + "gradDir.bmp");
                 // ImageFile.writeImageFile(gradMag.toMat(), outDir + File.separator + "gradMag.tif");
             }
             System.out.println("done.");
-            print("dx", dx);
-            print("dy", dy);
+            dx.matAp(m -> print("dx", m));
+            dy.matAp(m -> print("dy", m));
+            // --------------------------------------
 
             System.out.print("canny ... ");
-            final CvMat edgeImage = new CvMat();
 
             if (kernelSize >= 5)
                 thigh *= 4.0;
@@ -331,16 +263,14 @@ public class ExtractFrames {
 
             System.out.println("High threshold for Canny hysteresis is " + thigh);
             System.out.println("Low threshold for Canny hysteresis is " + tlow);
-            Imgproc.Canny(dx, dy, edgeImage, tlow, thigh, true);
+
+            final CvRaster edgeRaster = Operations.canny(gis, tlow, thigh, closer);
 
             System.out.println("done.");
             if (writeDebugImages)
-                ImageFile.writeImageFile(edgeImage, outDir + File.separator + "edge.bmp");
-            print("edge", edgeImage);
+                ImageFile.writeImageFile(edgeRaster, outDir + File.separator + "edge.bmp");
+            edgeRaster.matAp(edgeImage -> print("edge", edgeImage));
             // --------------------------------------
-
-            final CvRaster edgeRaster = CvRaster.toRaster(edgeImage, closer);
-            final CvRaster gradientDirRaster = CvRaster.toRaster(gradientDirImage, closer);
 
             // ------------------------------------------------------------
             // Now load up the edges of the image. This will set the values
@@ -413,7 +343,7 @@ public class ExtractFrames {
             final Transform.HoughSpace houghSpace = transform.transform(edgeRaster, gradientDirRaster, houghThreshold,
                     rowstart, rowend, colstart, colend);
             if (writeDebugImages)
-                transform.getTransformRaster(houghSpace)
+                houghSpace.getTransformRaster()
                         .matAp(m -> uncheck(() -> ImageFile.writeImageFile(m, outDir + File.separator + "tmpht.bmp")));
             System.out.println("done (" + timer.stop() + ")");
             // ------------------------------------------------------------
@@ -432,8 +362,7 @@ public class ExtractFrames {
 
             timer.start();
             System.out.print("calculating inverse hough transform ...");
-            final List<Transform.HoughSpaceEntry> hse = transform.inverseTransform(houghSpace, sprocketInfoTiledImage, GOVERLAY, ROVERLAY,
-                    writeDebugImages ? (outDir + File.separator + "bi.bmp") : null);
+            final List<Transform.HoughSpaceEntry> hse = houghSpace.inverseTransform(sprocketInfoTiledImage, GOVERLAY, ROVERLAY);
             System.out.println("done (" + timer.stop() + ")");
 
             // ------------------------------------------------------------
@@ -1033,47 +962,6 @@ public class ExtractFrames {
         System.out.println("  -wm set the reference image and frame into the final frame images as a watermark.");
         System.out.println("  -ot set the output file type (and extention).");
         System.out.println("  -di writes out tmp*.bmp debug images.");
-    }
-
-    static private IndexColorModel getOverlayCM() {
-        final byte[] r = new byte[256];
-        final byte[] g = new byte[256];
-        final byte[] b = new byte[256];
-
-        r[intify(EDGE)] = g[intify(EDGE)] = b[intify(EDGE)] = -1;
-
-        r[intify(ROVERLAY)] = -1;
-        g[intify(GOVERLAY)] = -1;
-        b[intify(BOVERLAY)] = -1;
-
-        r[intify(YOVERLAY)] = -1;
-        g[intify(YOVERLAY)] = -1;
-
-        r[intify(COVERLAY)] = byteify(Color.cyan.getRed());
-        g[intify(COVERLAY)] = byteify(Color.cyan.getGreen());
-        b[intify(COVERLAY)] = byteify(Color.cyan.getBlue());
-
-        r[intify(MOVERLAY)] = byteify(Color.magenta.getRed());
-        g[intify(MOVERLAY)] = byteify(Color.magenta.getGreen());
-        b[intify(MOVERLAY)] = byteify(Color.magenta.getBlue());
-
-        r[intify(OOVERLAY)] = byteify(Color.orange.getRed());
-        g[intify(OOVERLAY)] = byteify(Color.orange.getGreen());
-        b[intify(OOVERLAY)] = byteify(Color.orange.getBlue());
-
-        r[intify(GRAYOVERLAY)] = byteify(Color.gray.getRed());
-        g[intify(GRAYOVERLAY)] = byteify(Color.gray.getGreen());
-        b[intify(GRAYOVERLAY)] = byteify(Color.gray.getBlue());
-
-        return new IndexColorModel(8, 256, r, g, b);
-    }
-
-    private static byte byteify(final int i) {
-        return i > 127 ? (byte) (i - 256) : (byte) i;
-    }
-
-    private static int intify(final byte b) {
-        return (b < 0) ? (b) + 256 : (int) b;
     }
 
 }

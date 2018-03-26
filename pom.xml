@@ -27,8 +27,8 @@
     <module>lib-image</module>
     <module>lib-gstreamer</module>
     <module>native</module>
+    <module>gst-breakout</module>
     <module>s8</module>
-    <module>test-jiminger</module>
   </modules>
 
   <properties>
@@ -115,17 +115,20 @@
        (with the exception of the parent tag) -->
   <dependencyManagement>
     <dependencies>
+      <!-- dempsy-commons bom pom import -->
+      <dependency>
+        <groupId>net.dempsy</groupId>
+        <artifactId>dempsy-commons-bom</artifactId>
+        <version>${dempsy-commons.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       <dependency>
         <groupId>com.jiminger</groupId>
         <artifactId>opencv-lib-jar</artifactId>
         <classifier>withlib</classifier>
         <version>${opencv.version}</version>
       </dependency>
-    <dependency>
-        <groupId>com.jiminger</groupId>
-        <artifactId>lib-image-native</artifactId>
-        <version>${opencv.version}</version>
-    </dependency>
 
       <!-- Internal to the product -->
       <dependency>
@@ -146,6 +149,12 @@
       <dependency>
         <groupId>com.jiminger</groupId>
         <artifactId>native-lib</artifactId>
+        <classifier>${platform}</classifier>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>gst-breakout</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
@@ -170,17 +179,6 @@
         <version>${slf4j.version}</version>
       </dependency>
       <dependency>
-        <groupId>net.dempsy</groupId>
-        <artifactId>dempsy-utils</artifactId>
-        <version>${dempsy-commons.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>net.dempsy</groupId>
-        <artifactId>dempsy-test-utils</artifactId>
-        <version>${dempsy-commons.version}</version>
-        <scope>test</scope>
-      </dependency>
-      <dependency>
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>4.12</version>
@@ -201,12 +199,12 @@
         <version>1.4.0</version>
         <optional>true</optional>
       </dependency>
-    <dependency>
+      <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
         <version>4.5.1</version>
         <optional>true</optional>
-    </dependency>
+      </dependency>
       
       
       <!-- Testing -->

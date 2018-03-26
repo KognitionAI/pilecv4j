@@ -1,0 +1,20 @@
+<assembly>
+  <id>${platform}</id>
+  <formats>
+    <format>jar</format>
+  </formats>
+  <includeBaseDirectory>false</includeBaseDirectory>
+  <fileSets>
+    <fileSet>
+      <directory>target/${platform}-${build.type}/dll-staging</directory>
+      <outputDirectory>/</outputDirectory>
+      <includes> 
+        <include>*.dll</include>
+        <include>*.pdb</include>
+        <include>*.so</include>
+        <include>*.dylib</include>
+        <include>*.MD5</include>
+      </includes> 
+    </fileSet>
+  </fileSets>
+</assembly>

@@ -2,18 +2,42 @@ package com.jiminger.gstreamer;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Caps;
+import org.freedesktop.gstreamer.Registry;
 import org.freedesktop.gstreamer.lowlevel.GstAPI;
 import org.freedesktop.gstreamer.lowlevel.GstNative;
 import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
 
 import com.sun.jna.Library;
+import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
+import net.dempsy.util.library.NativeLibraryLoader;
+
 public interface BreakoutAPI extends Library {
-    static BreakoutAPI FILTER_API = GstNative.load("gstbreakout", BreakoutAPI.class);
+
+    public static final String LIBNAME = "gstbreakout";
+
+    public static final AtomicBoolean inited = new AtomicBoolean(false);
+
+    public static String _init() {
+        if (!inited.getAndSet(true)) {
+            NativeLibraryLoader.loader()
+                    .library(LIBNAME + "-1.0")
+                    .addCallback((dir, libname, oslibname) -> {
+                        NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
+                        Registry.get().scanPath(dir.getAbsolutePath());
+                    })
+                    .load();
+        }
+
+        return LIBNAME;
+    }
+
+    static BreakoutAPI FILTER_API = GstNative.load(_init(), BreakoutAPI.class);
     static int GST_PADDING = GstAPI.GST_PADDING;
     static int GST_PADDING_LARGE = GstAPI.GST_PADDING_LARGE;
 
