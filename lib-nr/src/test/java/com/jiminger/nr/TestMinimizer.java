@@ -11,25 +11,9 @@ public class TestMinimizer {
     @Rule
     public ExpectedException expected = ExpectedException.none();
 
-    static class MyMinFinc implements Minimizer.Func {
-
-        /**
-         * minimizing:
-         * 
-         * (x - 2)(x - 2) - 3.0;
-         */
-        @Override
-        public double func(final double[] x0) {
-            final double x = x0[0] - 2.0;
-            return (x * x) - 3.0;
-        }
-    }
-
     @Test
     public void testMinimizer() throws Throwable {
-        final Minimizer.Func f = new MyMinFinc();
-
-        final Minimizer m = new Minimizer(f);
+        final Minimizer m = new Minimizer(x -> ((x[0] - 2.0) * (x[0] - 2.0)) - 3.0);
 
         final double minVal = m.minimize(new double[] { -45.0 });
         final double minParam = m.getFinalPostion()[0];

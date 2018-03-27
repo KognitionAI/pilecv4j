@@ -22,46 +22,68 @@ package com.jiminger.nr;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.jiminger.util.NativePointerWrap;
-import com.sun.jna.NativeLibrary;
 
-import net.dempsy.util.library.NativeLibraryLoader;
-
+/**
+ * <p>This class encapsulates the running of 
+ * <a href="https://en.wikipedia.org/wiki/Powell's_method">Powell's Method</a> on a
+ * given function in order to determine a local minimum.</p>
+ * 
+ * <p>The function to be minimized can have a domain of any dimension as it takes an array
+ * of {@code double}s and returns the value that needs to be minimized.</p>
+ * 
+ * <p>For example, to minimize the function {@code (x - 2)^2 - 3} you would:</p>
+ * 
+ * <pre>
+ * {@code
+ * final Minimizer m = new Minimizer(x -> ((x[0] - 2.0) * (x[0] - 2.0)) - 3.0);
+ * final double minVal = m.minimize(new double[] { -45.0 });
+ * final double minParam = m.getFinalPostion()[0];
+ * }
+ * </pre>
+ */
 public class Minimizer {
-    public static final String LIBNAME = "utilities.jiminger.com";
+    private static MinimizerAPI API = MinimizerAPI.API;
 
-    public static void init() {
-        NativeLibraryLoader.loader()
-                .library(LIBNAME)
-                .addCallback((dir, libname, oslibname) -> {
-                    NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
-                })
-                .load();
-    }
-
-    MinimizerAPI API = MinimizerAPI.API;
-
-    static {
-        init();
-    }
+    // static lock ... the native code used is not threadsafe. This is fixable if needed.
+    private static Object lock = new Object();
 
     private final Func f;
     private double[] minVec;
 
+    /**
+     * Interface representing the function/lambda to be minimized.
+     */
+    @FunctionalInterface
+    public interface Func {
+        public double func(double[] x);
+    }
+
+    /**
+     * Default float tolerance.
+     */
     public static double ftol = 1.0e-10;
 
-    // static lock ... JNA code used is not threadsafe
-    public static Object lock = new Object();
-
+    /**
+     * Construct the minimizer with the function to be minimized.
+     */
     public Minimizer(final Func f) {
         this.f = f;
     }
 
+    /**
+     * Minimize the function that the {@link Minimizer} was instantiated with using the
+     * identity matrix as the starting position.
+     */
     public double minimize(final double[] p)
             throws MinimizerException {
         final double[][] xi = newUnitMatrix(p.length);
         return minimize(p, xi);
     }
 
+    /**
+     * Minimize the function that the {@link Minimizer} was instantiated with using the
+     * supplied starting position.
+     */
     public double minimize(final double[] p, final double[][] xi) throws MinimizerException {
         minVec = new double[p.length];
         synchronized (lock) {
@@ -89,7 +111,7 @@ public class Minimizer {
         // cheap mutable to detect and pass around the side exceptions thrown by Func
         final AtomicReference<RuntimeException> error = new AtomicReference<>(null);
 
-        final double ret = MinimizerAPI.API.dominimize((x, p_status) -> {
+        final double ret = API.dominimize((x, p_status) -> {
             int xindex = 0;
             for (int i = 0; i < n; i++) {
                 tmp[i] = x.getFloat(xindex);
@@ -109,7 +131,7 @@ public class Minimizer {
             throw new MinimizerException("Exception ocurred in function being minimized.", error.get());
 
         if (status[0] != 0) {
-            try (final NativePointerWrap message = new NativePointerWrap(MinimizerAPI.API.nrGetErrorMessage());) {
+            try (final NativePointerWrap message = new NativePointerWrap(API.nrGetErrorMessage());) {
                 final String msgStr = message.ptr.getString(0, "UTF-8");
                 throw new MinimizerException("Powell mimimization failed with a non-zero status (" + status[0] + ") and message \"" + msgStr + "\"");
             }
@@ -118,13 +140,11 @@ public class Minimizer {
         return ret;
     }
 
+    /**
+     * Return the final domain value of the minimized solution.
+     */
     public double[] getFinalPostion() {
         return minVec;
-    }
-
-    @FunctionalInterface
-    public interface Func {
-        public double func(double[] x);
     }
 
     private double[][] newUnitMatrix(final int n) {

@@ -39,7 +39,7 @@ public class TensorUtils {
     public static Tensor<UInt8> toTensor(final CvRaster raster) {
         // if (fromTensorMethod == null || c == null) {
         // LOGGER.info("CvRaster " + raster + " being converted to a Tensor cannot be done with a \"zero copy.\" This may be somewhat inefficent.");
-        return Tensor.create(UInt8.class, new long[] { 1, raster.rows(), raster.cols(), raster.channels() }, raster.dataAsByteBuffer());
+        return Tensor.create(UInt8.class, new long[] { 1, raster.rows(), raster.cols(), raster.channels() }, raster.underlying);
         // } else {
         // int i;
         // try {

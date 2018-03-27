@@ -128,7 +128,7 @@ public class Frame {
 
             frameCut = true;
 
-            return dstraster.decoupled();
+            return dstraster.disown();
         }
     }
 

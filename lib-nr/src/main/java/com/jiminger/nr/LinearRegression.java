@@ -18,12 +18,14 @@ public class LinearRegression implements Func {
     }
 
     @Override
-    public double func(final double[] m) {
+    public double func(final double[] lineDefMb) {
         // TODO: this minimizes the difference in the 'y'. I might want to minimize the
         // perpendicular distance to the line.
+        final double m = lineDefMb[0];
+        final double b = lineDefMb[1];
         double error2 = 0.0;
         for (int i = 0; i < x.length; i++) {
-            final double ycur = (m[0] * x[i] + m[1]);
+            final double ycur = (m * x[i] + b);
             final double ecur = ycur - y[i];
             error2 += (ecur * ecur);
         }

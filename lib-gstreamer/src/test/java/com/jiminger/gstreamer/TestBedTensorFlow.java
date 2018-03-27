@@ -20,6 +20,7 @@ import java.util.stream.IntStream;
 
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pipeline;
+import org.freedesktop.gstreamer.elements.URIDecodeBin;
 import org.opencv.core.Core;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
@@ -44,10 +45,6 @@ public class TestBedTensorFlow {
     public static final int fontHeight = 20;
     public static final double fontScale = 3;
 
-    static {
-        CvRaster.initOpenCv();
-    }
-
     public static final String defaultSsdModel = "tensor/ssd_mobilenet_v1_coco_2017_11_17/frozen_inference_graph.pb";
     final static URI labelUri = new File(
             TestBedTensorFlow.class.getClassLoader().getResource("tensor/ssd_mobilenet_v1_coco_2017_11_17/mscoco_label_map.txt").getFile())
@@ -59,13 +56,18 @@ public class TestBedTensorFlow {
                 TestBedTensorFlow.class.getClassLoader().getResource(defaultSsdModel)
                         .getFile()).toURI();
 
+        // TODO: There is a protobufs problem mixing OpenCv and TensorFlow. TensorFlow uses
+        // a much later version than the one COMPILED INTO (WTF?) opencv so we need the TensorFlow
+        // library loaded first.
+        final Graph graph = TensorUtils.inflate(Files.readAllBytes(Paths.get(modelUri)));
+
         // setGstLogLevel(Level.FINE);
 
         Gst.init(TestBedTensorFlow.class.getSimpleName(), args);
 
         // ====================================================================
-        final Graph graph = TensorUtils.inflate(Files.readAllBytes(Paths.get(modelUri)));
         final List<String> labels = Files.readAllLines(Paths.get(labelUri), Charset.forName("UTF-8"));
+        CvRaster.initOpenCv();
 
         final BreakoutFilter bin = new BreakoutFilter("od")
                 .connectSlowFilter(bac -> {
@@ -102,10 +104,10 @@ public class TestBedTensorFlow {
                 });
 
         final ElementWrap<Pipeline> pipe = new BinBuilder()
-                // .delayed(new URIDecodeBin("source"))
-                // .with("uri", BaseTest.STREAM.toString())
+                .delayed(new URIDecodeBin("source"))
+                .with("uri", BaseTest.STREAM.toString())
                 // .with("uri", "rtsp://admin:greg0rmendel@10.1.1.20:554/")
-                .make("v4l2src")
+                // .make("v4l2src")
                 .make("videoconvert")
                 .caps("video/x-raw")
                 .tee(

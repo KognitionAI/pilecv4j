@@ -49,6 +49,14 @@ public abstract class CvRaster implements AutoCloseable {
 
     private static final CvRasterAPI API = CvRasterAPI.API;
 
+    private boolean decoupled = false;
+    private final CvMat mat;
+
+    private CvRaster(final CvMat m, final ByteBuffer underlying) {
+        this.mat = m;
+        this.underlying = underlying;
+    }
+
     /**
      * If you're going to use OpenCv classes before using CvRaster then
      * you need to bootstrap the initializing of OpenCv (which boils down
@@ -58,34 +66,47 @@ public abstract class CvRaster implements AutoCloseable {
     // causes the classloader to initialize API and load the native libs
     public static void initOpenCv() {}
 
+    /**
+     * return the {@code CvType} of the {@code CvRaster}'s underlying {@code Mat}.  
+     */
     public int type() {
         return mat.type();
     }
 
+    /**
+     * return the number of channels of the {@code CvRaster}'s underlying {@code Mat}.  
+     */
     public int channels() {
         return CvType.channels(type());
     }
 
+    /**
+     * return the number of rows of the {@code CvRaster}'s underlying {@code Mat}.  
+     */
     public int rows() {
         return mat.rows();
     }
 
+    /**
+     * return the number of columns of the {@code CvRaster}'s underlying {@code Mat}.  
+     */
     public int cols() {
         return mat.cols();
     }
 
+    /**
+     * return the elememnt size of the {@code CvRaster}'s underlying {@code Mat}.  This uses
+     * {@code CvType.ELEM_SIZE(type())}
+     */
     public int elemSize() {
         return CvType.ELEM_SIZE(type());
     }
 
+    /**
+     * Direct access to the underlying {@code Mat}'s data buffer is available, as long 
+     * as the underlying buffer is continuous.
+     */
     public final ByteBuffer underlying;
-    private boolean decoupled = false;
-    private final CvMat mat;
-
-    private CvRaster(final CvMat m, final ByteBuffer underlying) {
-        this.mat = m;
-        this.underlying = underlying;
-    }
 
     /**
      * This call should be made to hand management of the Mat over to the {@link CvRaster}. 
@@ -158,10 +179,27 @@ public abstract class CvRaster implements AutoCloseable {
         return toRaster(CvMat.zeros(rows, cols, type), closer);
     }
 
+    /**
+     * You can use this method to create a {@link CvRaster} along with it's managed Mat
+     * given a native pointer to the location of the raw data and the metadata for the 
+     * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
+     * will not be the "owner" of the data. That means YOU need to make sure that the native
+     * data buffer outlives the CvRaster or you're pretty much guaranteed a code dump.
+     */
     public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer) {
         return createManaged(rows, cols, type, pointer, null);
     }
 
+    /**
+     * You can use this method to create a {@link CvRaster} along with it's managed Mat
+     * given a native pointer to the location of the raw data and the metadata for the 
+     * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
+     * will not be the "owner" of the data. That means YOU need to make sure that the native
+     * data buffer outlives the CvRaster or you're pretty much guaranteed a code dump.
+     * 
+     * <p>The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster} 
+     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
+     */
     public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
         final long nativeObj = API.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
         if (nativeObj == 0)
@@ -470,22 +508,48 @@ public abstract class CvRaster implements AutoCloseable {
      */
     public abstract Object get(int pos); // flat get
 
+    /**
+     * Set the {@code pos}ition in the raster to the provided pixel value. The
+     * pixel value will need to comport with the CvType or you'll get an exception.
+     * For example, if the CvType is {@code CvType.CV_16SC3} then the pixel 
+     * needs to be {@code short[3]}.
+     */
     public abstract void set(int pos, Object pixel);
 
+    /**
+     * Apply the given lambda to every pixel.
+     */
     public abstract <T> void apply(final PixelSetter<T> pixelSetter);
 
+    /**
+     * Apply the given lambda to every pixel.
+     */
     public abstract <T> void apply(final FlatPixelSetter<T> pixelSetter);
 
+    /**
+     * Get the pixel for the given row/col location. The pixel value will comport with the
+     * CvType of the raster. For example, if the CvType is {@code CvType.CV_16SC3} then the pixel 
+     * will be {@code short[3]}.
+     */
     public Object get(final int row, final int col) {
         final int channels = channels();
         return get((row * cols() * channels) + (col * channels));
     }
 
+    /**
+     * Set the row/col position in the raster to the provided pixel value. The
+     * pixel value will need to comport with the CvType or you'll get an exception.
+     * For example, if the CvType is {@code CvType.CV_16SC3} then the pixel 
+     * needs to be {@code short[3]}.
+     */
     public void set(final int row, final int col, final Object pixel) {
         final int channels = channels();
         set((row * cols() * channels) + (col * channels), pixel);
     }
 
+    /**
+     * Reduce the raster to a single value of type {@code U} by applying the aggregator
+     */
     public <U> U reduce(final U identity, final PixelAggregate<Object, U> seqOp) {
         U prev = identity;
         final int rows = rows();
@@ -498,37 +562,54 @@ public abstract class CvRaster implements AutoCloseable {
         return prev;
     }
 
+    /**
+     * The total number of bytes in the raster.
+     */
     public int getNumBytes() {
         return rows() * cols() * elemSize();
     }
 
+    /**
+     * The underlying data buffer pointer as a long
+     */
     public long getNativeAddressOfData() {
         if (!mat.isContinuous())
             throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
         return Pointer.nativeValue(API.CvRaster_getData(mat.nativeObj));
     }
 
-    public ByteBuffer dataAsByteBuffer() {
-        return underlying;
-    }
-
+    /**
+     * The underlying {@code Mat} is guarded because it cannot (currently) be modified such that 
+     * the data buffer changes location without breaking the CvRaster. This allows you access to the
+     * {@code Mat} anyway. Just make sure you know what you're doing.
+     */
     public <R> R matOp(final Function<CvMat, R> op) {
         return op.apply(mat);
     }
 
+    /**
+     * The underlying {@code Mat} is guarded because it cannot (currently) be modified such that 
+     * the data buffer changes location without breaking the CvRaster. This allows you access to the
+     * {@code Mat} anyway. Just make sure you know what you're doing.
+     */
     public void matAp(final Consumer<CvMat> op) {
         op.accept(mat);
     }
 
-    public CvMat decoupled() {
+    /**
+     * This method will free the underlying {@code Mat} from being owned by this CvRaster.
+     * When a CvRaster doesn't own the underlying {@code Mat} it doesn't free it up when 
+     * it's {@code close}ed.
+     */
+    public CvMat disown() {
         decoupled = true;
         return mat;
     }
 
-    // public void show() {
-    // CvRasterNative.showImage(mat.nativeObj);
-    // }
-
+    /**
+     * This will free any owned underlying resources. You should not attempt to use the
+     * CvRaster once it's closed.
+     */
     @Override
     public void close() {
         if (mat != null && !decoupled)
@@ -577,6 +658,10 @@ public abstract class CvRaster implements AutoCloseable {
         return true;
     }
 
+    /**
+     * This is a helper comparator that verifies the byte by byte equivalent of the two
+     * underlying data buffers.
+     */
     public static boolean pixelsIdentical(final Mat m1, final Mat m2) {
         if (m1.nativeObj == m2.nativeObj)
             return true;
