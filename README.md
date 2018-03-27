@@ -7,6 +7,15 @@ This project contains several tools for creating image and video processing appl
 
 The documentation for this project is in its infancy. 
 
+## Prerequisites
+
+Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are two to take note of.
+
+1. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) will build and package into a jar file:
+   1. [OpenCV](https://opencv.org/) itself.
+   1. A native library used by `CvRaster` from `lib-image` (see below)
+1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
+
 ## Contents
 
 ### lib-image
@@ -23,6 +32,10 @@ The documentation for this project is in its infancy.
 
 `lib-gstreamer` contains a set of utilities to make using Gstreamer much easier from Java. You can construct GStreamer pipelines using a builder pattern, manage resources more easily, and it also contains a `BreakoutFilter` that allows the easy processing of video frames from within Java.
 
+### gst-breakout
+
+`gst-breakout` is a native "C" based [GStreamer](https://gstreamer.freedesktop.org/) plugin that `lib-gstreamer` depends on in order to process video frames from Java using the `BreakoutFilter`, See the Javadocs for `BreakoutFilter` in `lib-gstreamer`.
+
 ### lib-nr
 
 `lib-nr` is an implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method). As a simple example of how to use this library, you pass a function to be minimized to a Minimizer. Suppose I wanted to minimize the simple polynomial `(x-2)^2 - 3`. In this case, it's obvious the minimum is at `[2, -3]` but if we wanted to use the `Minimizer` to determine that we would pass the function to the minimizer and kick it off with an initial value as follows:
@@ -38,6 +51,15 @@ The documentation for this project is in its infancy.
 ```
 
 Powell's method is actually implemented using the algorithm from [Numerical Recipes in C](http://www.numerical.recipes/) and called using [JNA](https://github.com/java-native-access/jna). It currently isn't threadsafe but from Java there's a global lock to prevent multiple simultaneous entries. Contributions welcome.
+
+### native
+
+`native` is a supporting native C/C++ code for the above projects. It contains:
+
+1. The [Numerical Recipes in C](http://www.numerical.recipes/) implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method) which is called from the `Minimizer` in `lib-nr`.
+1. C/C++ code for writing a JPEG images into an MJPEG `avi` file written from `MJPEGWriter` in `lib-image`
+1. C++ code for performing a [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform) used by the `com.jiminger.image.houghspace.Transform` from `lib-image`.
+1. It will eventually contain native code that will support using [TensorFlow](https://www.tensorflow.org/) from Java.
 
 ### An example of it all put together
 
