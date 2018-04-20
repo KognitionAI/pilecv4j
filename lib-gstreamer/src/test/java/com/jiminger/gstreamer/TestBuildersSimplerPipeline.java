@@ -20,10 +20,11 @@ public class TestBuildersSimplerPipeline extends BaseTest {
     public void testSimplePipeline() throws Exception {
         try (final GstMain m = new GstMain(TestBuildersSimplerPipeline.class);
                 final ElementWrap<Pipeline> ew = new BinBuilder()
-                        // .make("filesrc").with("location", STREAM.getPath())
-                        .make("v4l2src")
+                        .make("filesrc").with("location", STREAM.getPath())
+                        // .make("v4l2src")
                         .delayed(new DecodeBin("source"))
-                        .make("fakesink").with("sync", "true")
+                        // .make("fakesink").with("sync", "true")
+                        .make("xvimagesink")
                         .buildPipeline();) {
             final Pipeline pipe = ew.element;
             instrument(pipe);

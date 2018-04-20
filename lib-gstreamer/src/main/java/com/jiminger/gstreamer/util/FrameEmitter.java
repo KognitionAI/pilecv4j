@@ -13,6 +13,7 @@ import com.jiminger.gstreamer.BinBuilder;
 import com.jiminger.gstreamer.BreakoutFilter;
 import com.jiminger.gstreamer.BreakoutFilter.CvRasterAndCaps;
 import com.jiminger.gstreamer.CapsBuilder;
+import com.jiminger.gstreamer.guard.ElementWrap;
 
 /**
  * This class can be used to source a fixed number of frames for testing purposes.
@@ -21,7 +22,7 @@ public class FrameEmitter implements AutoCloseable {
     public static boolean HACK_FRAME = true;
     private final static Logger LOGGER = LoggerFactory.getLogger(FrameEmitter.class);
     private static AtomicInteger sequence = new AtomicInteger(0);
-    private Bin element;
+    private ElementWrap<Bin> element;
     public final int numFrames;
 
     private int curFrames = 0;
@@ -64,7 +65,7 @@ public class FrameEmitter implements AutoCloseable {
     }
 
     public Bin disown() {
-        final Bin ret = element;
+        final Bin ret = element.disown();
         element = null;
         return ret;
     }
@@ -72,7 +73,7 @@ public class FrameEmitter implements AutoCloseable {
     @Override
     public void close() throws Exception {
         if (element != null)
-            element.dispose();
+            element.close();
     }
 
 }

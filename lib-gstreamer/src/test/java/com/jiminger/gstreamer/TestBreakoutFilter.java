@@ -45,7 +45,7 @@ public class TestBreakoutFilter extends BaseTest {
                 }
             });
 
-            GstUtils.printDetails(breakout);
+            // GstUtils.printDetails(breakout);
 
             List<Frame> frames = null;
 
@@ -65,6 +65,8 @@ public class TestBreakoutFilter extends BaseTest {
 
                 pipe.element.play();
                 GstUtils.instrument(pipe);
+                Thread.sleep(1000);
+                GstUtils.printDetails(pipe.element);
                 Gst.main();
 
                 assertTrue(poll(o -> fc.frames.size() == 40));

@@ -5,7 +5,6 @@ import java.util.List;
 import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Element;
-import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.Pad;
 import org.freedesktop.gstreamer.PadDirection;
 import org.freedesktop.gstreamer.Pipeline;
@@ -20,15 +19,8 @@ import com.jiminger.gstreamer.guard.ElementWrap;
  */
 public class BinBuilder {
     private static final Logger LOGGER = LoggerFactory.getLogger(BinBuilder.class);
-    final Branch current = new Branch();
 
-    /**
-     * Set the type of the Bin. For example, you could use "rtpbin"
-     */
-    public BinBuilder elementFactory(final String elementFactoryName) {
-        current.elementFactory(elementFactoryName);
-        return this;
-    }
+    final Branch current = new Branch();
 
     /**
      * Add an element that has dynamic pads. This will manage linking the dynamic pads
@@ -105,8 +97,37 @@ public class BinBuilder {
         return this;
     }
 
+    /**
+     * Split this element chain in multiple directions. 
+     */
     public BinBuilder tee(final Branch... branches) {
-        current.connectDownstreams(branches);
+        current.connectDownstreams(null, branches);
+        return this;
+    }
+
+    /**
+     * Split this element chain in multiple directions using a tee with the
+     * given name.
+     */
+    public BinBuilder tee(final String teeName, final Branch... branches) {
+        current.connectDownstreams(teeName, branches);
+        return this;
+    }
+
+    /**
+     * Add the full chain of elements to the given Bin/Pipeline
+     */
+    public BinBuilder addAllTo(final Bin pipe) {
+        addFullChainTo(pipe, current);
+        return this;
+    }
+
+    /**
+     * Internally link all the entire chain if Elements. These must have
+     * already been added to a Bin/Pipeline to work correctly.
+     */
+    public BinBuilder linkAll() {
+        linkFullChain(current);
         return this;
     }
 
@@ -115,9 +136,39 @@ public class BinBuilder {
      */
     public ElementWrap<Pipeline> buildPipeline() {
         final Pipeline pipe = new Pipeline();
-        current.addAllTo(pipe);
-        build(pipe, current, 0);
-        return new ElementWrap<Pipeline>(pipe) {
+        return build(pipe);
+    }
+
+    /**
+     * Convert the current builder to a {@link Bin}. This will also manage
+     * the GhostPads. 
+     */
+    public ElementWrap<Bin> buildBin() {
+        return buildBin(null, true);
+    }
+
+    /**
+     * Convert the current builder to a {@link Bin} with the given name. This will also manage
+     * the GhostPads. 
+     */
+    public ElementWrap<Bin> buildBin(final String binName) {
+        return buildBin(binName, true);
+    }
+
+    /**
+     * Convert the current builder to a {@link Bin} with the given name. If requested, this will also manage
+     * the GhostPads. 
+     */
+    public ElementWrap<Bin> buildBin(final String binName, final boolean ghostPads) {
+        final Bin bin = binName == null ? new Bin() : new Bin(binName);
+        return build(bin);
+    }
+
+    public <T extends Bin> ElementWrap<T> build(final T pipe) {
+        addFullChainTo(pipe, current);
+        linkFullChain(current);
+
+        return new ElementWrap<T>(pipe) {
 
             @Override
             public void close() {
@@ -130,62 +181,39 @@ public class BinBuilder {
 
     private static void disposeAll(final Branch cur) {
         final List<Branch> branches = cur.sinks;
-        for (int b = branches.size() - 1; b >= 0; b--) {
+
+        for (int b = branches.size() - 1; b >= 0; b--)
             disposeAll(branches.get(b));
-        }
+
         cur.disposeAll();
     }
 
-    private static int build(final Bin pipe, final Branch current, int teeNum) {
+    private static void addFullChainTo(final Bin pipe, final Branch current) {
+        current.addAllTo(pipe);
+        final List<Branch> next = current.sinks;
+        if (next.size() > 0) {
+            for (final Branch c : next)
+                addFullChainTo(pipe, c);
+        }
+    }
+
+    private static void linkFullChain(final Branch current) {
         current.linkAll();
         final List<Branch> next = current.sinks;
-        final String binName = pipe.getName();
+        final Element tee = current.tee;
         if (next.size() > 0) {
-            // add a Tee
-            final Element tee = ElementFactory.make("tee", binName + teeNum);
-            pipe.add(tee);
-            current.last.link(tee);
             int padnum = 0;
             for (final Branch c : next) {
                 final List<Pad> branchSinkPads = c.first.getSinkPads();
                 if (branchSinkPads.size() != 1)
                     throw new RuntimeException("First element in branch (" + c + ") has the wrong number of sink pad (" + branchSinkPads.size()
                             + "). It requires exactly one.");
-                c.addAllTo(pipe);
                 final Pad branchSinkPad = branchSinkPads.get(0);
                 final Pad teeSrcPad = new Pad("src_" + padnum++, PadDirection.SRC);
                 tee.addPad(teeSrcPad);
                 teeSrcPad.link(branchSinkPad);
-                teeNum = build(pipe, c, teeNum + 1);
+                linkFullChain(c);
             }
         }
-        return teeNum;
     }
-
-    /**
-     * Convert the current builder to a {@link Bin}. This will also manage
-     * the GhostPads. 
-     */
-    public Bin buildBin() {
-        return buildBin(null, true);
-    }
-
-    /**
-     * Convert the current builder to a {@link Bin} with the given name. This will also manage
-     * the GhostPads. 
-     */
-    public Bin buildBin(final String binName) {
-        return buildBin(binName, true);
-    }
-
-    /**
-     * Convert the current builder to a {@link Bin} with the given name. If requested, this will also manage
-     * the GhostPads. 
-     */
-    public Bin buildBin(final String binName, final boolean ghostPads) {
-        if (current.sinks.size() > 0)
-            throw new RuntimeException("Can't build a Bin from a graph with a Tee in it.");
-        return current.buildBin(binName, ghostPads);
-    }
-
 }
