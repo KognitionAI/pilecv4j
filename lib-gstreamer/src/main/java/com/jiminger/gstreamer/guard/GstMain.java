@@ -67,7 +67,7 @@ public class GstMain implements AutoCloseable {
                 new Branch() {
                     @Override
                     public int hashCode() {
-                        super.sequence.set(0);
+                        super.hackResetSequence();
                         return 0;
                     }
                 }.hashCode();

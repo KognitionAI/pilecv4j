@@ -88,6 +88,13 @@ public class GstUtils {
         out.println(prefix + indent + "caps:      " + p.getCaps());
         out.println(prefix + indent + "allowed:   " + p.getAllowedCaps());
         out.println(prefix + indent + "negotiated:" + p.getNegotiatedCaps());
+        final Pad peer = p.getPeer();
+        if (peer != null) {
+            final Element peerElement = peer.getParentElement();
+            out.println(prefix + indent + "peer:" + (peerElement == null ? "[null element]" : peerElement.getName()) + ":" + peer);
+        } else
+            out.println(prefix + indent + "not connected");
+        out.println();
     }
 
     public static void printDetails(final Bin pipe) {

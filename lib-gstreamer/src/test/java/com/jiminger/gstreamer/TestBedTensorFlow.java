@@ -20,7 +20,6 @@ import java.util.stream.IntStream;
 
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pipeline;
-import org.freedesktop.gstreamer.elements.URIDecodeBin;
 import org.opencv.core.Core;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
@@ -104,10 +103,10 @@ public class TestBedTensorFlow {
                 });
 
         final ElementWrap<Pipeline> pipe = new BinBuilder()
-                .delayed(new URIDecodeBin("source"))
-                .with("uri", BaseTest.STREAM.toString())
+                // .delayed(new URIDecodeBin("source"))
+                // .with("uri", BaseTest.STREAM.toString())
                 // .with("uri", "rtsp://admin:greg0rmendel@10.1.1.20:554/")
-                // .make("v4l2src")
+                .make("v4l2src")
                 .make("videoconvert")
                 .caps("video/x-raw")
                 .tee(

@@ -2,7 +2,9 @@ package com.jiminger.gstreamer;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.freedesktop.gstreamer.Bin;
@@ -11,6 +13,7 @@ import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.GhostPad;
 import org.freedesktop.gstreamer.Pad;
+import org.freedesktop.gstreamer.PadDirection;
 import org.freedesktop.gstreamer.Pipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,11 +24,19 @@ import org.slf4j.LoggerFactory;
  */
 public class Branch {
     private static final Logger LOGGER = LoggerFactory.getLogger(Branch.class);
+    final static AtomicInteger sequence = new AtomicInteger(0);
 
     private final List<List<Element>> elements = new ArrayList<>();
     private List<Element> currentList = new ArrayList<>();
+    private final Map<String, Object> binprops = new HashMap<>();
+
     private Element currentElement;
+
     private final String prefix;
+
+    private String binFactoryName = null;
+    private Pad end = null;
+
     Element first = null;
     Element last = null;
 
@@ -39,6 +50,14 @@ public class Branch {
 
     public Branch() {
         this("");
+    }
+
+    /**
+     * Set the type of the Bin that wraps this branch. For example, you could use "rtpbin"
+     */
+    public Branch elementFactory(final String elementFactoryName) {
+        this.binFactoryName = elementFactoryName;
+        return this;
     }
 
     /**
@@ -111,11 +130,111 @@ public class Branch {
     }
 
     /**
-     * Set a property on the most recently added element.
+     * Set a property on the most recently added element or if no element
+     * has been added yet, on the Bin itself.
      */
     public Branch with(final String name, final Object value) {
-        currentElement.set(name, value);
+        if (currentElement == null)
+            binprops.put(name, value);
+        else
+            currentElement.set(name, value);
         return this;
+    }
+
+    public Branch linkEnd(final Pad pad) {
+        // should be a sink pad
+        if (pad.getDirection() != PadDirection.SINK)
+            throw new IllegalArgumentException("Cannot terminate branch " + prefix + " using a " + pad.getDirection() + " direction pad.");
+        this.end = pad;
+        return this;
+    }
+
+    /**
+     * Convert the current builder to a {@link Bin}.  if requested, this 
+     * will also add GhostPads for all sink pads at the beginning of the
+     * chain and all src pads at the end of the chain. 
+     */
+    public Bin buildBin(final String binName, final boolean ghostPads) {
+        final Bin bin = binFactoryName == null || binFactoryName.isEmpty() ? (binName == null ? new Bin() : new Bin(binName))
+                : (Bin) ElementFactory.make(binFactoryName, binName == null ? nextName("bin") : binName);
+
+        if (binprops.size() > 0)
+            binprops.entrySet().stream()
+                    .forEach(e -> bin.set(e.getKey(), e.getValue()));
+
+        addAllTo(bin);
+        linkAll();
+
+        boolean endSet = false;
+        if (ghostPads) {
+            if (first != null) {
+                final List<Pad> pads = first.getSinkPads();
+                for (final Pad pad : pads)
+                    bin.addPad(new GhostPad("GstSink:" + pad.getName(), pad));
+            }
+
+            if (last != null) {
+                final List<Pad> pads = last.getSrcPads();
+                for (final Pad pad : pads) {
+                    final GhostPad gpad = new GhostPad("GstSrc:" + pad.getName(), pad);
+                    if (!endSet && end != null) {
+                        if (pads.size() > 1)
+                            LOGGER.warn("explicit branch terminating pad set but the last element has multiple src pads. Using the first pad "
+                                    + gpad.getName());
+                        gpad.link(end);
+                        endSet = true;
+                    }
+                    bin.addPad(gpad);
+                }
+            }
+        }
+
+        if (last != null && end != null && !endSet) {
+            final List<Pad> pads = last.getSrcPads();
+            if (pads.size() > 0) {
+                final Pad pad = pads.get(0);
+                if (pads.size() > 1)
+                    LOGGER.warn("explicit branch terminating pad set but the last element has multiple src pads. Using the first pad "
+                            + pad.getName());
+                pad.link(end);
+            }
+        }
+
+        return bin;
+    }
+
+    public void addAllTo(final Bin bin) {
+        for (final List<Element> c : elements) {
+            for (final Element e : c)
+                bin.add(e);
+        }
+    }
+
+    public List<Element> linkAll() {
+        final List<Element> ret = new ArrayList<>();
+
+        // each break represents a delayed
+        Element last = null;
+        for (final List<Element> c : elements) {
+            Element prev = null;
+
+            for (final Element e : c) {
+                ret.add(e);
+
+                if (last != null) {
+                    last.connect(getDelayedCallback(e));
+                    last = null;
+                }
+
+                if (prev != null)
+                    prev.link(e);
+
+                prev = e;
+            }
+            last = prev;
+        }
+
+        return ret;
     }
 
     void connectDownstreams(final Branch... downstream) {
@@ -123,51 +242,6 @@ public class Branch {
             b.source = this;
             this.sinks.add(b);
         });
-    }
-
-    /**
-     * Convert the current builder to a {@link Bin}. This will also manage
-     * the GhostPads. Currently it assumes there's a single src pad and
-     * a single sink pad at the ends of the chain of elements that have been
-     * added.
-     */
-    public Bin buildBin() {
-        final Bin bin = new Bin();
-        addAllTo(bin);
-        linkAll(bin);
-        List<Pad> pads = first.getSinkPads();
-        for (final Pad pad : pads)
-            bin.addPad(new GhostPad("GstSink:" + pad.getName(), pad));
-        pads = last.getSrcPads();
-        for (final Pad pad : pads)
-            bin.addPad(new GhostPad("GstSrc:" + pad.getName(), pad));
-        return bin;
-    }
-
-    void addAllTo(final Bin bin) {
-        for (final List<Element> c : elements) {
-            for (final Element e : c)
-                bin.add(e);
-        }
-    }
-
-    void linkAll(final Bin bin) {
-        // each break represents a delayed
-        Element last = null;
-        for (final List<Element> c : elements) {
-            Element prev = null;
-            for (final Element e : c) {
-                if (last != null) {
-                    last.connect(getDelayedCallback(e));
-                    last = null;
-                }
-                if (prev != null) {
-                    prev.link(e);
-                }
-                prev = e;
-            }
-            last = prev;
-        }
     }
 
     void disposeAll() {
@@ -182,7 +256,9 @@ public class Branch {
         }
     }
 
-    protected final AtomicInteger sequence = new AtomicInteger(0);
+    protected void hackResetSequence() {
+        sequence.set(0);
+    }
 
     private String nextName(final String basename) {
         return prefix + basename + sequence.getAndIncrement();
@@ -193,15 +269,6 @@ public class Branch {
             if (pad.isLinked())
                 return;
             pad.link(next.getSinkPads().get(0));
-            // final Caps caps = pad.getCaps();
-            // if (caps.size() > 0) {
-            // final Structure struct = caps.getStructure(0);
-            // final String capName = struct.getName();
-            // if ("video/x-raw".equalsIgnoreCase(capName))
-            // pad.link(next.getSinkPads().get(0));
-            // else if ("video".equalsIgnoreCase(struct.getString("media")))
-            // pad.link(next.getSinkPads().get(0));
-            // }
         };
     }
 }

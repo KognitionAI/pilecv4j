@@ -15,12 +15,20 @@ import org.slf4j.LoggerFactory;
 import com.jiminger.gstreamer.guard.ElementWrap;
 
 /**
- *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder patter.
+ *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder pattern.
  *  It encapsulates many of the boilerplate manipulations including naming, adding and linking elements.
  */
 public class BinBuilder {
     private static final Logger LOGGER = LoggerFactory.getLogger(BinBuilder.class);
     final Branch current = new Branch();
+
+    /**
+     * Set the type of the Bin. For example, you could use "rtpbin"
+     */
+    public BinBuilder elementFactory(final String elementFactoryName) {
+        current.elementFactory(elementFactoryName);
+        return this;
+    }
 
     /**
      * Add an element that has dynamic pads. This will manage linking the dynamic pads
@@ -92,7 +100,7 @@ public class BinBuilder {
     /**
      * Set a property on the most recently added element.
      */
-    public BinBuilder with(final String name, final String value) {
+    public BinBuilder with(final String name, final Object value) {
         current.with(name, value);
         return this;
     }
@@ -129,7 +137,7 @@ public class BinBuilder {
     }
 
     private static int build(final Bin pipe, final Branch current, int teeNum) {
-        current.linkAll(pipe);
+        current.linkAll();
         final List<Branch> next = current.sinks;
         final String binName = pipe.getName();
         if (next.size() > 0) {
@@ -156,14 +164,28 @@ public class BinBuilder {
 
     /**
      * Convert the current builder to a {@link Bin}. This will also manage
-     * the GhostPads. Currently it assumes there's a single src pad and
-     * a single sink pad at the ends of the chain of elements that have been
-     * added.
+     * the GhostPads. 
      */
     public Bin buildBin() {
+        return buildBin(null, true);
+    }
+
+    /**
+     * Convert the current builder to a {@link Bin} with the given name. This will also manage
+     * the GhostPads. 
+     */
+    public Bin buildBin(final String binName) {
+        return buildBin(binName, true);
+    }
+
+    /**
+     * Convert the current builder to a {@link Bin} with the given name. If requested, this will also manage
+     * the GhostPads. 
+     */
+    public Bin buildBin(final String binName, final boolean ghostPads) {
         if (current.sinks.size() > 0)
             throw new RuntimeException("Can't build a Bin from a graph with a Tee in it.");
-        return current.buildBin();
+        return current.buildBin(binName, ghostPads);
     }
 
 }
