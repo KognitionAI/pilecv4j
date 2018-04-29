@@ -7,8 +7,7 @@ import static org.junit.Assert.assertTrue;
 import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Test;
 
-import com.jiminger.gstreamer.guard.ElementWrap;
-import com.jiminger.gstreamer.guard.GstMain;
+import com.jiminger.gstreamer.guard.GstScope;
 import com.jiminger.gstreamer.util.FrameCatcher;
 import com.jiminger.gstreamer.util.FrameEmitter;
 
@@ -16,16 +15,17 @@ public class TestFrameEmitterAndCatcher extends BaseTest {
 
     @Test
     public void testFrameEmitterToCather() throws Exception {
-        try (final GstMain m = new GstMain(TestFrameEmitterAndCatcher.class);
+        try (final GstScope m = new GstScope(TestFrameEmitterAndCatcher.class);
                 final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
-                final FrameCatcher fc = new FrameCatcher("framecatcher");
-                final ElementWrap<Pipeline> ew = new BinBuilder()
-                        .add(fe.disown())
-                        .make("videoconvert")
-                        .caps("video/x-raw")
-                        .add(fc.disown())
-                        .buildPipeline();) {
-            final Pipeline pipe = ew.element;
+                final FrameCatcher fc = new FrameCatcher("framecatcher");) {
+
+            final Pipeline pipe = new BinBuilder()
+                    .add(fe.disown())
+                    .make("videoconvert")
+                    .caps("video/x-raw")
+                    .add(fc.disown())
+                    .buildPipeline(m);
+
             pipe.play();
             assertTrue(poll(o -> fe.isDone()));
             pipe.stop();

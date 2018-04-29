@@ -32,7 +32,6 @@ import org.tensorflow.Session.Runner;
 import org.tensorflow.Tensor;
 import org.tensorflow.types.UInt8;
 
-import com.jiminger.gstreamer.guard.ElementWrap;
 import com.jiminger.gstreamer.od.ObjectDetection;
 import com.jiminger.image.CvRaster;
 import com.jiminger.image.TensorUtils;
@@ -102,7 +101,7 @@ public class TestBedTensorFlow {
                     LOGGER.trace("Returning object detected Buffer");
                 });
 
-        final ElementWrap<Pipeline> pipe = new BinBuilder()
+        final Pipeline pipe = new BinBuilder()
                 // .delayed(new URIDecodeBin("source"))
                 // .with("uri", BaseTest.STREAM.toString())
                 // .with("uri", "rtsp://admin:greg0rmendel@10.1.1.20:554/")
@@ -140,12 +139,12 @@ public class TestBedTensorFlow {
                 .buildPipeline();
 
         instrument(pipe);
-        pipe.element.play();
+        pipe.play();
 
         Thread.sleep(5000);
 
         try (final PrintStream ps = new PrintStream(new File("/tmp/pipeline.txt"))) {
-            printDetails(pipe.element, ps);
+            printDetails(pipe, ps);
         }
 
         Gst.main();

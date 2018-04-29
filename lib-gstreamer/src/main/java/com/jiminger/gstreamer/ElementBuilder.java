@@ -3,6 +3,8 @@ package com.jiminger.gstreamer;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
 
+import com.jiminger.gstreamer.guard.GstScope;
+
 /**
  *  This class can be used to build an {@link Element} using a builder pattern.
  */
@@ -45,6 +47,10 @@ public class ElementBuilder {
 
     public Element build() {
         return currentElement;
+    }
+
+    public Element build(final GstScope scope) {
+        return scope.manage(currentElement);
     }
 
     static String nextName(final String basename) {

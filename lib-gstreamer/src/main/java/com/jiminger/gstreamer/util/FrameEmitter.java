@@ -48,14 +48,14 @@ public class FrameEmitter implements AutoCloseable {
                     return FlowReturn.OK;
                 });
 
-        element = new BinBuilder()
+        element = new ElementWrap<>(new BinBuilder()
                 .delayed(new URIDecodeBin("source")).with("uri", sourceUri)
                 .make("videoconvert")
                 .caps(new CapsBuilder("video/x-raw")
                         .addFormatConsideringEndian()
                         .buildString())
                 .add(breakout)
-                .buildBin();
+                .buildBin());
 
         this.numFrames = numFrames;
     }

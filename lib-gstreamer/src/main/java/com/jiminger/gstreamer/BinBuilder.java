@@ -1,17 +1,19 @@
 package com.jiminger.gstreamer;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Element;
+import org.freedesktop.gstreamer.GhostPad;
 import org.freedesktop.gstreamer.Pad;
-import org.freedesktop.gstreamer.PadDirection;
 import org.freedesktop.gstreamer.Pipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jiminger.gstreamer.guard.ElementWrap;
+import com.jiminger.gstreamer.guard.GstScope;
 
 /**
  *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder pattern.
@@ -20,7 +22,8 @@ import com.jiminger.gstreamer.guard.ElementWrap;
 public class BinBuilder {
     private static final Logger LOGGER = LoggerFactory.getLogger(BinBuilder.class);
 
-    final Branch current = new Branch();
+    private final Branch current = new Branch();
+    private GstScope scope = null;
 
     /**
      * Add an element that has dynamic pads. This will manage linking the dynamic pads
@@ -46,6 +49,15 @@ public class BinBuilder {
      */
     public BinBuilder delayed(final String element, final String name) {
         current.delayed(element, name);
+        return this;
+    }
+
+    /**
+     * If you want to supply your own link logic then you can call this. The most recently
+     * added element must be "delayed" or this will throw an IllegalStateException
+     */
+    public BinBuilder dynamicLink(final DynamicLink linker) {
+        current.dynamicLink(linker);
         return this;
     }
 
@@ -127,23 +139,71 @@ public class BinBuilder {
      * already been added to a Bin/Pipeline to work correctly.
      */
     public BinBuilder linkAll() {
-        linkFullChain(current);
+        Branch.linkFullChainOfBranches(current);
         return this;
+    }
+
+    public BinBuilder scope(final GstScope scope) {
+        this.scope = scope;
+        return this;
+    }
+
+    public BinBuilder createGhostPads(final Bin bin) {
+        final Element first = current.getFirstElement();
+
+        if (first != null) {
+            final List<Pad> pads = first.getSinkPads();
+            for (final Pad pad : pads)
+                bin.addPad(new GhostPad("GstSink:" + pad.getName(), pad));
+        }
+
+        final List<Element> lastList = getEndElements();
+
+        int padnum = 0;
+        if (lastList != null) {
+            for (final Element last : lastList) {
+                final List<Pad> pads = last.getSrcPads();
+                for (final Pad pad : pads) {
+                    final GhostPad gpad = new GhostPad("GstSrc:" + pad.getName() + padnum, pad);
+                    padnum++;
+                    bin.addPad(gpad);
+                }
+            }
+        }
+
+        return this;
+    }
+
+    /**
+     * Convert the current builder to a {@link Pipeline} managed by the
+     * given scope. That is, it will be automatically disposed alone with
+     * all of the elements created as part of this BinBuilder when the
+     * scope is closed.
+     */
+    public Pipeline buildPipeline(final GstScope scope) {
+        return scope.manage(buildPipeline());
     }
 
     /**
      * Convert the current builder to a {@link Pipeline}
      */
-    public ElementWrap<Pipeline> buildPipeline() {
-        final Pipeline pipe = new Pipeline();
-        return build(pipe);
+    public Pipeline buildPipeline() {
+        final Pipeline pipe = new Pipeline() {
+            @Override
+            public void dispose() {
+                LOGGER.debug("disposing " + this + " with a ref count of " + this.getRefCount());
+                super.dispose();
+                disposeAll(current);
+            }
+        };
+        return build(pipe, false);
     }
 
     /**
      * Convert the current builder to a {@link Bin}. This will also manage
      * the GhostPads. 
      */
-    public ElementWrap<Bin> buildBin() {
+    public Bin buildBin() {
         return buildBin(null, true);
     }
 
@@ -151,32 +211,56 @@ public class BinBuilder {
      * Convert the current builder to a {@link Bin} with the given name. This will also manage
      * the GhostPads. 
      */
-    public ElementWrap<Bin> buildBin(final String binName) {
+    public Bin buildBin(final String binName) {
         return buildBin(binName, true);
     }
 
     /**
-     * Convert the current builder to a {@link Bin} with the given name. If requested, this will also manage
-     * the GhostPads. 
+     * Convert the current builder to a {@link Bin} with the given name. If requested, this will 
+     * also manage the GhostPads. 
      */
-    public ElementWrap<Bin> buildBin(final String binName, final boolean ghostPads) {
-        final Bin bin = binName == null ? new Bin() : new Bin(binName);
-        return build(bin);
-    }
-
-    public <T extends Bin> ElementWrap<T> build(final T pipe) {
-        addFullChainTo(pipe, current);
-        linkFullChain(current);
-
-        return new ElementWrap<T>(pipe) {
-
+    public Bin buildBin(final String binName, final boolean ghostPads) {
+        final Bin bin = binName == null ? new Bin() {
             @Override
-            public void close() {
-                LOGGER.debug("disposing " + element + " with a ref count of " + element.getRefCount());
-                element.dispose();
+            public void dispose() {
+                LOGGER.debug("disposing " + this + " with a ref count of " + this.getRefCount());
+                super.dispose();
+                disposeAll(current);
+            }
+        } : new Bin(binName) {
+            @Override
+            public void dispose() {
+                LOGGER.debug("disposing " + this + " with a ref count of " + this.getRefCount());
+                super.dispose();
                 disposeAll(current);
             }
         };
+        return scope == null ? build(bin, ghostPads) : scope.manage(build(bin, ghostPads));
+    }
+
+    public <T extends Bin> T build(final T pipe, final boolean ghostPads) {
+        addFullChainTo(pipe, current);
+        Branch.linkFullChainOfBranches(current);
+        if (ghostPads)
+            createGhostPads(pipe);
+
+        return pipe;
+    }
+
+    public List<Element> getEndElements() {
+        final List<Element> ret = new ArrayList<>();
+        appendEnds(current, ret);
+        return ret;
+    }
+
+    private static void appendEnds(final Branch branch, final List<Element> ret) {
+        if (branch.sinks.size() == 0) {
+            final List<Element> cur = branch.stream().collect(Collectors.toList());
+            if (cur.size() > 0)
+                ret.add(cur.get(cur.size() - 1));
+        } else {
+            branch.sinks.stream().forEach(b -> appendEnds(b, ret));
+        }
     }
 
     private static void disposeAll(final Branch cur) {
@@ -194,26 +278,6 @@ public class BinBuilder {
         if (next.size() > 0) {
             for (final Branch c : next)
                 addFullChainTo(pipe, c);
-        }
-    }
-
-    private static void linkFullChain(final Branch current) {
-        current.linkAll();
-        final List<Branch> next = current.sinks;
-        final Element tee = current.tee;
-        if (next.size() > 0) {
-            int padnum = 0;
-            for (final Branch c : next) {
-                final List<Pad> branchSinkPads = c.first.getSinkPads();
-                if (branchSinkPads.size() != 1)
-                    throw new RuntimeException("First element in branch (" + c + ") has the wrong number of sink pad (" + branchSinkPads.size()
-                            + "). It requires exactly one.");
-                final Pad branchSinkPad = branchSinkPads.get(0);
-                final Pad teeSrcPad = new Pad("src_" + padnum++, PadDirection.SRC);
-                tee.addPad(teeSrcPad);
-                teeSrcPad.link(branchSinkPad);
-                linkFullChain(c);
-            }
         }
     }
 }

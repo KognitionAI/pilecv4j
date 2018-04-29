@@ -10,13 +10,12 @@ import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.GstObject;
 import org.freedesktop.gstreamer.Pad;
+import org.freedesktop.gstreamer.PadLinkReturn;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
-
-import com.jiminger.gstreamer.guard.ElementWrap;
 
 public class GstUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(GstUtils.class);
@@ -73,14 +72,6 @@ public class GstUtils {
         instrument(pipe, null);
     }
 
-    public static void instrument(final ElementWrap<Pipeline> pipe, final Bus.ERROR errCb) {
-        instrument(pipe.element, errCb);
-    }
-
-    public static void instrument(final ElementWrap<Pipeline> pipe) {
-        instrument(pipe, null);
-    }
-
     private static final String indent = "    ";
 
     public static void printDetails(final Pad p, final PrintStream out, final String prefix) {
@@ -113,6 +104,21 @@ public class GstUtils {
         printDetails(e, out, 0);
     }
 
+    public static Pad getSrcPad(final Element e) {
+        final List<Pad> pads = e.getSrcPads();
+        if (pads == null || pads.size() == 0)
+            throw new IllegalStateException("Attempted to get the single source pad from " + e + " but there aren't any.");
+        if (pads.size() > 1)
+            throw new IllegalStateException("Attempted to get the single source pad from " + e + " but there several [" + pads + "].");
+        return pads.get(0);
+    }
+
+    public static void link(final Element src, final Pad sink) {
+        final PadLinkReturn plret = GstUtils.getSrcPad(src).link(sink);
+        if (plret != PadLinkReturn.OK)
+            throw new RuntimeException("Failed to link the src element " + src + " with the sink pad " + sink + ". Result was " + plret);
+    }
+
     private static void printDetails(final Bin pipe, final PrintStream out, final int depth) {
         final List<Element> elements = pipe.getElements();
         final int numEl = elements.size();
@@ -126,7 +132,7 @@ public class GstUtils {
             tmp += indent + indent;
         final String prefix = tmp;
 
-        out.println(prefix + "Element:" + e);
+        out.println(prefix + "Element:" + e + " (child of: " + e.getParent() + ")");
         out.println(prefix + "  -------------------");
         out.println(prefix + "  sink:");
         e.getSinkPads().forEach(p -> printDetails(p, out, prefix));
@@ -142,4 +148,5 @@ public class GstUtils {
         }
 
     }
+
 }

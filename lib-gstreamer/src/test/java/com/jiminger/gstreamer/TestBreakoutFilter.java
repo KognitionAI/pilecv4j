@@ -18,8 +18,7 @@ import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import com.jiminger.gstreamer.guard.BufferWrap;
-import com.jiminger.gstreamer.guard.ElementWrap;
-import com.jiminger.gstreamer.guard.GstMain;
+import com.jiminger.gstreamer.guard.GstScope;
 import com.jiminger.gstreamer.util.FrameCatcher;
 import com.jiminger.gstreamer.util.FrameCatcher.Frame;
 import com.jiminger.gstreamer.util.FrameEmitter;
@@ -30,7 +29,7 @@ public class TestBreakoutFilter extends BaseTest {
 
     @Test
     public void testBreakoutFilterLoad() throws Exception {
-        try (final GstMain main = new GstMain();) {
+        try (final GstScope main = new GstScope();) {
             final BreakoutFilter breakout = (BreakoutFilter) ElementFactory.make("breakout", "breakout");
             breakout.connect((BreakoutFilter.NEW_SAMPLE) elem -> {
                 try (final BufferWrap buffer = elem.getCurrentBuffer();
@@ -50,31 +49,32 @@ public class TestBreakoutFilter extends BaseTest {
             List<Frame> frames = null;
 
             try (final FrameCatcher fc = new FrameCatcher("framecatcher");
-                    FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);
-                    final ElementWrap<Pipeline> pipe = new BinBuilder()
-                            .add(fe.disown())
-                            .make("videoconvert")
-                            .caps(new CapsBuilder("video/x-raw")
-                                    .addFormatConsideringEndian()
-                                    .buildString())
-                            .make("queue", "namedQueuey")
-                            .add(breakout)
-                            .make("videoconvert")
-                            .add(fc.disown())
-                            .buildPipeline();) {
+                    FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);) {
 
-                pipe.element.play();
+                final Pipeline pipe = new BinBuilder()
+                        .add(fe.disown())
+                        .make("videoconvert")
+                        .caps(new CapsBuilder("video/x-raw")
+                                .addFormatConsideringEndian()
+                                .buildString())
+                        .make("queue", "namedQueuey")
+                        .add(breakout)
+                        .make("videoconvert")
+                        .add(fc.disown())
+                        .buildPipeline(main);
+
+                pipe.play();
                 GstUtils.instrument(pipe);
                 Thread.sleep(1000);
-                GstUtils.printDetails(pipe.element);
+                GstUtils.printDetails(pipe);
                 Gst.main();
 
                 assertTrue(poll(o -> fc.frames.size() == 40));
                 Thread.sleep(10);
                 assertEquals(40, fc.frames.size());
 
-                pipe.element.stop();
-                assertTrue(poll(o -> !pipe.element.isPlaying()));
+                pipe.stop();
+                assertTrue(poll(o -> !pipe.isPlaying()));
                 Thread.sleep(100);
 
                 frames = fc.frames;

@@ -14,14 +14,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.jiminger.gstreamer.BreakoutFilter.CvRasterAndCaps;
-import com.jiminger.gstreamer.guard.ElementWrap;
-import com.jiminger.gstreamer.guard.GstMain;
+import com.jiminger.gstreamer.guard.GstScope;
 import com.jiminger.gstreamer.util.FrameCatcher;
 import com.jiminger.gstreamer.util.FrameEmitter;
 
 public class TestBreakoutPassthrough {
     static {
-        GstMain.testMode();
+        GstScope.testMode();
     }
 
     private final static Logger LOGGER = LoggerFactory.getLogger(TestBreakoutPassthrough.class);
@@ -30,36 +29,35 @@ public class TestBreakoutPassthrough {
 
     @Test
     public void testBreakoutWithPassthrough() throws Exception {
-        try (final GstMain m = new GstMain(TestBreakoutPassthrough.class);
+        try (final GstScope m = new GstScope(TestBreakoutPassthrough.class);
                 final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
-                final FrameCatcher fc = new FrameCatcher("framecatcher");
+                final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
-                final ElementWrap<Pipeline> ew = new BinBuilder()
-                        .add(fe.disown())
-                        .make("videoconvert")
-                        .caps("video/x-raw")
-                        .add(new BreakoutFilter("filter")
-                                .connect((final CvRasterAndCaps bac) -> {
-                                    if (FrameEmitter.HACK_FRAME)
-                                        LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
-                                    return FlowReturn.OK;
-                                }))
-                        .add(new BreakoutFilter("filter1")
-                                .connect((final CvRasterAndCaps bac) -> {
-                                    if (FrameEmitter.HACK_FRAME)
-                                        LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
-                                    return FlowReturn.OK;
-                                }))
-                        .add(new BreakoutFilter("filter2")
-                                .connect((final CvRasterAndCaps bac) -> {
-                                    if (FrameEmitter.HACK_FRAME)
-                                        LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
-                                    return FlowReturn.OK;
-                                }))
-                        .add(fc.disown())
-                        .buildPipeline();) {
+            final Pipeline pipe = new BinBuilder()
+                    .add(fe.disown())
+                    .make("videoconvert")
+                    .caps("video/x-raw")
+                    .add(new BreakoutFilter("filter")
+                            .connect((final CvRasterAndCaps bac) -> {
+                                if (FrameEmitter.HACK_FRAME)
+                                    LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
+                                return FlowReturn.OK;
+                            }))
+                    .add(new BreakoutFilter("filter1")
+                            .connect((final CvRasterAndCaps bac) -> {
+                                if (FrameEmitter.HACK_FRAME)
+                                    LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
+                                return FlowReturn.OK;
+                            }))
+                    .add(new BreakoutFilter("filter2")
+                            .connect((final CvRasterAndCaps bac) -> {
+                                if (FrameEmitter.HACK_FRAME)
+                                    LOGGER.trace("byte0 " + bac.raster.underlying.get(0));
+                                return FlowReturn.OK;
+                            }))
+                    .add(fc.disown())
+                    .buildPipeline(m);
 
-            final Pipeline pipe = ew.element;
             // instrument(pipe);
             pipe.play();
             assertTrue(poll(o -> fe.isDone()));

@@ -7,11 +7,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
+import org.freedesktop.gstreamer.Pad;
+import org.freedesktop.gstreamer.PadDirection;
+import org.freedesktop.gstreamer.PadLinkReturn;
 import org.freedesktop.gstreamer.Pipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,33 +28,42 @@ public class Branch {
     private static final Logger LOGGER = LoggerFactory.getLogger(Branch.class);
     final static AtomicInteger sequence = new AtomicInteger(0);
 
-    private final List<List<Element>> elements = new ArrayList<>();
-    private List<Element> currentList = new ArrayList<>();
-
+    private final List<ElementHolder> elements = new ArrayList<>();
     private final Map<String, Object> binprops = new HashMap<>();
-
-    private Element currentElement;
+    private ElementHolder currentElement;
 
     private final String prefix;
 
     // =================================================================
+    private Pad afterSinkEndPad = null;
+    private Element afterSinkEndElement = null;
+    private final String afterSinkEndElementPadName = null;
+    // =================================================================
+
+    // =================================================================
+    private Pad beforeSrcEndPad = null;
+    private Element beforeSrcEndElement = null;
+    // private final String beforeSrcEndElementPadName = null;
+    // =================================================================
+
+    // =================================================================
     // This is the first and last (non-tee) elements of this
     // straight fork.
-    Element first = null;
-    Element last = null;
+    ElementHolder first = null;
+    ElementHolder last = null;
     // =================================================================
 
     // =================================================================
     // If this branch ends in a tee then the downstream branches will be
     // managed here.
-    Branch source = null;
-    Element tee = null;
+    private Branch source = null;
+    // The tee is owned by this Branch
+    private Element tee = null;
     final List<Branch> sinks = new ArrayList<>();
     // =================================================================
 
     public Branch(final String prefix) {
         this.prefix = prefix;
-        elements.add(currentList);
     }
 
     public Branch() {
@@ -62,9 +75,7 @@ public class Branch {
      * as they're being added to the element.
      */
     public Branch delayed(final Element element) {
-        add(element);
-        currentList = new ArrayList<>();
-        elements.add(currentList);
+        add(new ElementHolder(element, true));
         return this;
     }
 
@@ -82,6 +93,21 @@ public class Branch {
      */
     public Branch delayed(final String element, final String name) {
         return delayed(ElementFactory.make(element, name));
+    }
+
+    /**
+     * If you want to supply your own link logic then you can call this. The most recently
+     * added element must be "delayed" or this will throw an IllegalStateException
+     */
+    public Branch dynamicLink(final DynamicLink linker) {
+        if (currentElement == null)
+            throw new IllegalStateException("You must add a delayed element before you can add a dynamic linker for the pads");
+        else if (!currentElement.delayed)
+            throw new IllegalStateException("You cannot dynamic link element " + currentElement.element
+                    + " because it's linking isn't \"delayed.\" That is, it's not registered as having \"Sometimes\" pads.");
+
+        currentElement.linker = linker;
+        return this;
     }
 
     /**
@@ -118,7 +144,15 @@ public class Branch {
      * Add an element that has static pads. 
      */
     public Branch add(final Element e) {
-        currentList.add(e);
+        add(new ElementHolder(e));
+        return this;
+    }
+
+    private Branch add(final ElementHolder e) {
+        if (alreadyTeminatedSinkEnd())
+            throw new IllegalStateException("You cannot add an element to a Branch once the branch has been terminated with a pad or element.");
+
+        elements.add(e);
         if (first == null)
             first = e;
         last = e;
@@ -134,20 +168,54 @@ public class Branch {
         if (currentElement == null)
             binprops.put(name, value);
         else
-            currentElement.set(name, value);
+            currentElement.element.set(name, value);
         return this;
     }
 
-    // public Branch linkEnd(final Pad pad) {
-    // // should be a sink pad
-    // if (pad.getDirection() != PadDirection.SINK)
-    // throw new IllegalArgumentException("Cannot terminate branch " + prefix + " using a " + pad.getDirection() + " direction pad.");
-    // this.end = pad;
-    // return this;
-    // }
+    public Branch linkTo(final Pad pad) {
+        if (currentElement == null) {
+            if (source != null) // the we already have the upstream element of this branch dedicated
+                throw new IllegalArgumentException("You cannot supply the source of a branch that's already downstream of a tee.");
+
+            // this is the source end pad.
+            if (pad.getDirection() != PadDirection.SRC)
+                throw new IllegalArgumentException(
+                        "You cannot supply the source of a branch using a pad with the direction " + pad.getDirection() + ".");
+            this.beforeSrcEndPad = pad;
+        } else {
+            if (tee != null) // the we already have the upstream element of this branch dedicated
+                throw new IllegalArgumentException("You cannot supply the sink of a branch that's already upstream of a tee.");
+
+            // should be a sink pad
+            if (pad.getDirection() != PadDirection.SINK)
+                throw new IllegalArgumentException("Cannot terminate branch " + prefix + " using a " + pad.getDirection() + " direction pad.");
+            this.afterSinkEndPad = pad;
+        }
+        return this;
+    }
+
+    public Branch linkTo(final Element element) {
+        if (currentElement == null) {
+            if (source != null) // the we already have the upstream element of this branch dedicated
+                throw new IllegalArgumentException("You cannot supply the source of a branch that's already downstream of a tee.");
+
+            final List<Pad> srcPads = element.getSrcPads();
+            if (srcPads == null || srcPads.size() != 1)
+                throw new IllegalArgumentException(
+                        element.getName() + " cannot be set upstream to the branch " + this + " because it has the wrong number of source pads ("
+                                + (srcPads == null ? 0 : srcPads.size()) + ").");
+            this.beforeSrcEndElement = element;
+        } else {
+            if (tee != null) // the we already have the upstream element of this branch dedicated
+                throw new IllegalArgumentException("You cannot supply the sink of a branch that's already upstream of a tee.");
+
+            this.afterSinkEndElement = element;
+        }
+        return this;
+    }
 
     public Element getSink() {
-        final Element first = elements.stream().flatMap(l -> l.stream()).findFirst().orElse(null);
+        final Element first = stream().findFirst().orElse(null);
         if (first == null)
             throw new IllegalStateException(
                     "There doesn't appear to be any elements on this " + Branch.class.getSimpleName() + ". Can't retrieve sink element.");
@@ -155,74 +223,28 @@ public class Branch {
     }
 
     public Element getSrc() {
-        final List<Element> all = elements.stream().flatMap(l -> l.stream()).collect(Collectors.toList());
+        final List<Element> all = stream().collect(Collectors.toList());
         if (all.size() == 0)
             throw new IllegalStateException(
                     "There doesn't appear to be any elements on this " + Branch.class.getSimpleName() + ". Can't retrieve src element.");
         return all.get(all.size() - 1);
     }
 
-    // /**
-    // * Convert the current builder to a {@link Bin}. if requested, this
-    // * will also add GhostPads for all sink pads at the beginning of the
-    // * chain and all src pads at the end of the chain.
-    // */
-    // public Bin buildBin(final String binName, final boolean ghostPads) {
-    // final Bin bin = binFactoryName == null || binFactoryName.isEmpty() ? (binName == null ? new Bin() : new Bin(binName))
-    // : (Bin) ElementFactory.make(binFactoryName, binName == null ? nextName("bin") : binName);
-    //
-    // if (binprops.size() > 0)
-    // binprops.entrySet().stream()
-    // .forEach(e -> bin.set(e.getKey(), e.getValue()));
-    //
-    // addAllTo(bin);
-    // linkAll();
-    //
-    // boolean endSet = false;
-    // if (ghostPads) {
-    // if (first != null) {
-    // final List<Pad> pads = first.getSinkPads();
-    // for (final Pad pad : pads)
-    // bin.addPad(new GhostPad("GstSink:" + pad.getName(), pad));
-    // }
-    //
-    // if (last != null) {
-    // final List<Pad> pads = last.getSrcPads();
-    // for (final Pad pad : pads) {
-    // final GhostPad gpad = new GhostPad("GstSrc:" + pad.getName(), pad);
-    // if (!endSet && end != null) {
-    // if (pads.size() > 1)
-    // LOGGER.warn("explicit branch terminating pad set but the last element has multiple src pads. Using the first pad "
-    // + gpad.getName());
-    // gpad.link(end);
-    // endSet = true;
-    // }
-    // bin.addPad(gpad);
-    // }
-    // }
-    // }
-    //
-    // if (last != null && end != null && !endSet) {
-    // final List<Pad> pads = last.getSrcPads();
-    // if (pads.size() > 0) {
-    // final Pad pad = pads.get(0);
-    // if (pads.size() > 1)
-    // LOGGER.warn("explicit branch terminating pad set but the last element has multiple src pads. Using the first pad "
-    // + pad.getName());
-    // pad.link(end);
-    // }
-    // }
-    //
-    // return bin;
-    // }
+    public Element getFirstElement() {
+        return stream().findFirst().orElse(null);
+    }
+
+    public Stream<Element> stream() {
+        return elements.stream().map(l -> l.element);
+    }
 
     public Branch addAllTo(final Bin bin) {
-        for (final List<Element> c : elements) {
-            for (final Element e : c)
-                bin.add(e);
-        }
+        for (final ElementHolder e : elements)
+            bin.add(e.element);
+
         if (tee != null)
             bin.add(tee);
+
         return this;
     }
 
@@ -230,34 +252,41 @@ public class Branch {
         final List<Element> ret = new ArrayList<>();
 
         // each break represents a delayed
-        Element last = null;
-        for (final List<Element> c : elements) {
-            Element prev = null;
+        ElementHolder prev = null;
+        for (final ElementHolder e : elements) {
 
-            for (final Element e : c) {
-                ret.add(e);
+            ret.add(e.element);
 
-                if (last != null) {
-                    last.connect(getDelayedCallback(e));
-                    last = null;
-                }
-
-                if (prev != null)
-                    prev.link(e);
-
-                prev = e;
+            if (prev != null && prev.delayed) {
+                prev.element.connect(getPadAddedFromDynamicLink(e.element, e.linker));
+                prev.element.connect((Element.PAD_REMOVED) (element, pad) -> {
+                    System.out.println("REMOVING PAD: " + element + " pad:" + pad);
+                });
+                last = null;
             }
-            last = prev;
+
+            if (prev != null)
+                prev.element.link(e.element);
+
+            prev = e;
         }
 
         if (tee != null)
-            last.link(tee);
+            prev.element.link(tee);
 
         return this;
     }
 
     void connectDownstreams(final String teeName, final Branch... downstream) {
+        if (alreadyTeminatedSinkEnd())
+            throw new IllegalStateException("You cannot make this branch " + this
+                    + " upstream of a tee because it's already terminated at the sink end with either another tee or a downstream element/pad.");
+
         Arrays.stream(downstream).forEach(b -> {
+            if (b.alreadyTeminatedSrcEnd())
+                throw new IllegalStateException("You cannot make this branch " + b
+                        + " downstream of a tee because it's already terminated at the src end with either another element/pad.");
+
             b.source = this;
             this.sinks.add(b);
         });
@@ -270,13 +299,78 @@ public class Branch {
             tee.dispose();
 
         for (int i = elements.size() - 1; i >= 0; i--) {
-            final List<Element> cur = elements.get(i);
-            for (int j = cur.size() - 1; j >= 0; j--) {
-                final Element ce = cur.get(j);
-                if (LOGGER.isDebugEnabled())
-                    LOGGER.debug("disposing {} with a ref count of {}", ce, ce.getRefCount());
-                ce.dispose();
+            final Element ce = elements.get(i).element;
+            if (LOGGER.isDebugEnabled())
+                LOGGER.debug("disposing {} with a ref count of {}", ce, ce.getRefCount());
+            ce.dispose();
+        }
+    }
+
+    static void linkFullChainOfBranches(final Branch current) {
+        current.linkAll();
+
+        // current.sinks will only be set if tee is also set.
+        final List<Branch> next = current.sinks;
+
+        final Element tee = current.tee;
+
+        if (next.size() > 0) {
+            int padnum = 0;
+            for (final Branch c : next) {
+                final List<Pad> branchSinkPads = c.first.element.getSinkPads();
+                if (branchSinkPads.size() != 1)
+                    throw new RuntimeException("First element in branch (" + c +
+                            ") has the wrong number of sink pad (" + branchSinkPads.size() +
+                            "). It requires exactly one.");
+                final Pad branchSinkPad = branchSinkPads.get(0);
+                final Pad teeSrcPad = new Pad("src_" + padnum++, PadDirection.SRC);
+                tee.addPad(teeSrcPad);
+                teeSrcPad.link(branchSinkPad);
+                linkFullChainOfBranches(c);
             }
+        }
+
+        // we also need to link downstream pads/elements. ... this should only be set if sinks/tee is not
+        Pad downstreamPad = null;
+        if (current.afterSinkEndPad != null)
+            downstreamPad = current.afterSinkEndPad;
+        else if (current.afterSinkEndElement != null) {
+            final Element element = current.afterSinkEndElement;
+
+            if (current.afterSinkEndElementPadName != null) {
+                downstreamPad = element.getSinkPads().stream()
+                        .filter(p -> current.afterSinkEndElementPadName.equals(p.getName()))
+                        .findFirst()
+                        .orElse(null);
+                if (downstreamPad == null)
+                    throw new IllegalStateException("Couldn't find a pad named "
+                            + current.afterSinkEndElementPadName + " among "
+                            + element.getSinkPads());
+
+            } else {
+                final List<Pad> sinkPads = element.getSinkPads();
+                if (sinkPads == null || sinkPads.size() != 1)
+                    throw new IllegalArgumentException(
+                            element.getName() + " cannot be set upstream to the branch " + current
+                                    + " because it has the wrong number of source pads ("
+                                    + (sinkPads == null ? 0 : sinkPads.size()) + ").");
+                downstreamPad = sinkPads.get(0);
+            }
+        }
+
+        if (downstreamPad != null) {
+            // should be a sink pad
+            // get the Branch's src pad
+            // current.linkAll set current.last to the last element.
+            final List<Pad> srcPads = current.last.element.getSrcPads();
+            if (srcPads == null || srcPads.size() != 1)
+                // can't link the downstream pad
+                throw new IllegalStateException("Cannot link to downstream pad " + downstreamPad
+                        + " because there are the wrong number of src pads emerging from the branch " + current + ".");
+            final PadLinkReturn plret = srcPads.get(0).link(downstreamPad);
+            if (plret != PadLinkReturn.OK)
+                throw new RuntimeException("Failed to link pads. src " + srcPads.get(0) + " to sink " + downstreamPad + ". Got a result of " + plret);
+            // System.out.println("Link result:" + plret.name());
         }
     }
 
@@ -284,15 +378,45 @@ public class Branch {
         sequence.set(0);
     }
 
+    private boolean alreadyTeminatedSinkEnd() {
+        return (afterSinkEndPad != null || afterSinkEndElement != null || tee != null);
+    }
+
+    private boolean alreadyTeminatedSrcEnd() {
+        return (beforeSrcEndPad != null || beforeSrcEndElement != null || source != null);
+    }
+
     private String nextName(final String basename) {
         return prefix + basename + sequence.getAndIncrement();
     }
 
-    private Element.PAD_ADDED getDelayedCallback(final Element next) {
+    private Element.PAD_ADDED getPadAddedFromDynamicLink(final Element next, final DynamicLink linker) {
         return (Element.PAD_ADDED) (element, pad) -> {
-            if (pad.isLinked())
-                return;
-            pad.link(next.getSinkPads().get(0));
+            linker.padAdded(element, pad, next);
         };
+    }
+
+    private static DynamicLink defaultDelayedCallback = (element, pad, sink) -> {
+        if (pad.isLinked())
+            return;
+        final List<Pad> nextPads = sink.getSinkPads();
+        System.out.println(nextPads);
+        pad.link(nextPads.get(0));
+    };
+
+    private static class ElementHolder {
+        public final Element element;
+        public final boolean delayed;
+        public DynamicLink linker;
+
+        public ElementHolder(final Element element, final boolean delayed) {
+            this.element = element;
+            this.delayed = delayed;
+            this.linker = defaultDelayedCallback;
+        }
+
+        public ElementHolder(final Element element) {
+            this(element, false);
+        }
     }
 }

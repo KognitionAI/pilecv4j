@@ -3,33 +3,34 @@ package com.jiminger.gstreamer;
 import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Test;
 
-import com.jiminger.gstreamer.guard.ElementWrap;
-import com.jiminger.gstreamer.guard.GstMain;
+import com.jiminger.gstreamer.guard.GstScope;
 
 public class TestGstMain {
     static {
-        GstMain.testMode();
+        GstScope.testMode();
     }
 
     @Test
     public void testMultipleGstMainCalls() throws Exception {
-        try (final GstMain main = new GstMain();
-                final ElementWrap<Pipeline> pipew = new BinBuilder()
-                        .make("videotestsrc")
-                        .make("fakesink")
-                        .buildPipeline();) {
-            final Pipeline pipe = pipew.element;
+        try (final GstScope main = new GstScope();) {
+
+            final Pipeline pipe = new BinBuilder()
+                    .make("videotestsrc")
+                    .make("fakesink")
+                    .buildPipeline(main);
+
             pipe.play();
             Thread.sleep(300);
             pipe.stop();
         }
 
-        try (final GstMain main = new GstMain();
-                final ElementWrap<Pipeline> pipew = new BinBuilder()
-                        .make("videotestsrc")
-                        .make("fakesink")
-                        .buildPipeline();) {
-            final Pipeline pipe = pipew.element;
+        try (final GstScope main = new GstScope();) {
+
+            final Pipeline pipe = new BinBuilder()
+                    .make("videotestsrc")
+                    .make("fakesink")
+                    .buildPipeline(main);
+
             pipe.play();
             Thread.sleep(300);
             pipe.stop();

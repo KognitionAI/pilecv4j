@@ -36,6 +36,31 @@ public class FrameCatcher implements AutoCloseable {
         }
     }
 
+    public FrameCatcher(final String name) {
+        sink = (AppSink) ElementFactory.make("appsink", name);
+        sink.setCaps(new CapsBuilder("video/x-raw")
+                .addFormatConsideringEndian()
+                .build());
+        sink.set("emit-signals", true);
+
+        sink.connect(NewSample.preroller(handler));
+        sink.connect(NewSample.sampler(handler));
+    }
+
+    public AppSink disown() {
+        final AppSink ret = sink;
+        sink = null;
+        return ret;
+    }
+
+    @Override
+    public void close() {
+        if (sink != null) {
+            sink.dispose();
+            disown();
+        }
+    }
+
     private final Function<NewSample, FlowReturn> handler = elem -> {
         try (final GstWrap<Sample> sample = new GstWrap<>(elem.pull())) {
             final Structure capsStruct = sample.obj.getCaps().getStructure(0);
@@ -60,28 +85,25 @@ public class FrameCatcher implements AutoCloseable {
         return FlowReturn.OK;
     };
 
-    public FrameCatcher(final String name) {
-        sink = (AppSink) ElementFactory.make("appsink", name);
-        sink.setCaps(new CapsBuilder("video/x-raw")
-                .addFormatConsideringEndian()
-                .build());
-        sink.set("emit-signals", true);
+    private static class NewSample {
+        public final AppSink elem;
+        public final boolean preroll;
 
-        sink.connect(NewSample.preroller(handler));
-        sink.connect(NewSample.sampler(handler));
-    }
+        public static AppSink.NEW_PREROLL preroller(final Function<NewSample, FlowReturn> func) {
+            return e -> func.apply(new NewSample(e, true));
+        }
 
-    public AppSink disown() {
-        final AppSink ret = sink;
-        sink = null;
-        return ret;
-    }
+        public static AppSink.NEW_SAMPLE sampler(final Function<NewSample, FlowReturn> func) {
+            return e -> func.apply(new NewSample(e, false));
+        }
 
-    @Override
-    public void close() {
-        if (sink != null) {
-            sink.dispose();
-            disown();
+        public NewSample(final AppSink elem, final boolean preroll) {
+            this.elem = elem;
+            this.preroll = preroll;
+        }
+
+        public Sample pull() {
+            return preroll ? elem.pullPreroll() : elem.pullSample();
         }
     }
 

@@ -16,8 +16,7 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import com.jiminger.gstreamer.guard.ElementWrap;
-import com.jiminger.gstreamer.guard.GstMain;
+import com.jiminger.gstreamer.guard.GstScope;
 import com.jiminger.gstreamer.guard.GstWrap;
 import com.jiminger.gstreamer.util.FrameCatcher;
 
@@ -27,31 +26,31 @@ public class TestBranch extends BaseTest {
 
     @Test
     public void testBranch() throws Exception {
-        try (final GstMain main = new GstMain();
+        try (final GstScope main = new GstScope();
                 final GstWrap<Caps> capsw = new GstWrap<>(new CapsBuilder("video/x-raw")
                         .addFormatConsideringEndian()
                         .add("width", "640")
                         .add("height", "480")
                         .build());
                 final FrameCatcher fc1 = new FrameCatcher("fc1");
-                final FrameCatcher fc2 = new FrameCatcher("fc2");
-                final ElementWrap<Pipeline> pipew = new BinBuilder()
-                        .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
-                        .make("videoscale")
-                        .make("videoconvert")
-                        .caps(capsw.disown())
-                        .tee(new Branch("b1_")
-                                .make("queue")
-                                .make("fakesink"),
-                                new Branch("b2_")
-                                        .make("queue")
-                                        .add(fc1.disown()),
-                                new Branch("b3_")
-                                        .make("queue")
-                                        .add(fc2.disown()))
-                        .buildPipeline();) {
+                final FrameCatcher fc2 = new FrameCatcher("fc2");) {
 
-            final Pipeline pipe = pipew.element;
+            final Pipeline pipe = new BinBuilder()
+                    .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
+                    .make("videoscale")
+                    .make("videoconvert")
+                    .caps(capsw.disown())
+                    .tee(new Branch("b1_")
+                            .make("queue")
+                            .make("fakesink"),
+                            new Branch("b2_")
+                                    .make("queue")
+                                    .add(fc1.disown()),
+                            new Branch("b3_")
+                                    .make("queue")
+                                    .add(fc2.disown()))
+                    .buildPipeline(main);
+
             instrument(pipe);
             pipe.play();
             Thread.sleep(1000);

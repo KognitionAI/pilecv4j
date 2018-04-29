@@ -17,7 +17,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.jiminger.gstreamer.guard.BufferWrap;
-import com.jiminger.gstreamer.guard.GstMain;
 import com.jiminger.image.CvRaster;
 
 public class BreakoutFilter extends BaseTransform {
@@ -80,56 +79,6 @@ public class BreakoutFilter extends BaseTransform {
         }
     }
 
-    // public static class BufferAndCaps extends CapsInfo {
-    // public final Buffer buffer;
-    // private boolean mapped = false;
-    // private MapInfoStruct mapInfo = null;
-    //
-    // private BufferAndCaps(final Buffer frameData, final Caps caps, final int w, final int h) {
-    // super(caps, w, h);
-    // this.buffer = frameData;
-    // }
-    //
-    // public ByteBuffer map(final boolean writeable) {
-    // if (mapped)
-    // throw new IllegalStateException("You can't map the same BufferAndCaps twice.");
-    // mapped = true;
-    // final ByteBuffer ret = buffer.map(writeable);
-    // ret.rewind();
-    // return ret;
-    // }
-    //
-    // public CvRaster mapToRaster(final int type, final boolean writeable) {
-    // mapInfo = new MapInfoStruct();
-    // final boolean ok = GSTBUFFER_API.gst_buffer_map(buffer, mapInfo,
-    // writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
-    // if (ok && mapInfo.data != null) {
-    // return CvRaster.createManaged(height, width, type, Pointer.nativeValue(mapInfo.data));
-    // }
-    // return null;
-    // }
-    //
-    // public BufferAndCaps unmap() {
-    // if (mapped) {
-    // buffer.unmap();
-    // mapped = false;
-    // }
-    // if (mapInfo != null) {
-    // GSTBUFFER_API.gst_buffer_unmap(buffer, mapInfo);
-    // mapInfo = null;
-    // }
-    // return this;
-    // }
-    //
-    // @Override
-    // public void close() {
-    // unmap();
-    // if (buffer != null)
-    // buffer.dispose();
-    // super.close();
-    // }
-    // }
-
     public static class CvRasterAndCaps extends CapsInfo {
         public final CvRaster raster;
         private boolean rasterDisowned = false;
@@ -188,8 +137,24 @@ public class BreakoutFilter extends BaseTransform {
 
     public BreakoutFilter connectSlowFilter(final Consumer<CvRasterAndCaps> filter) {
         final BreakoutFilter ret = connect(slowFilterSlippage = new SlowFilterSlippage(filter));
-        GstMain.register(() -> slowFilterSlippage.stop());
         return ret;
+    }
+
+    @Override
+    public void dispose() {
+        if (slowFilterSlippage != null) {
+            slowFilterSlippage.stop();
+            try {
+                slowFilterSlippage.thread.join(1000);
+            } catch (final InterruptedException ie) {
+                LOGGER.info("Interrupted while waiting for slow filter slippage thread for " + this.getName() + " to exit.");
+            }
+
+            if (slowFilterSlippage.thread.isAlive())
+                LOGGER.warn("The slow filter slippage thread for " + this.getName() + " never exited. Moving on.");
+        }
+
+        super.dispose();
     }
 
     private static class SlowFilterSlippage implements NEW_SAMPLE {
