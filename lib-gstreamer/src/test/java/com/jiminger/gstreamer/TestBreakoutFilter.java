@@ -51,7 +51,7 @@ public class TestBreakoutFilter extends BaseTest {
             try (final FrameCatcher fc = new FrameCatcher("framecatcher");
                     FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);) {
 
-                final Pipeline pipe = new BinBuilder()
+                final Pipeline pipe = new BinManager()
                         .add(fe.disown())
                         .make("videoconvert")
                         .caps(new CapsBuilder("video/x-raw")

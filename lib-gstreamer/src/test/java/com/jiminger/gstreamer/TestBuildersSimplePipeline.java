@@ -19,7 +19,7 @@ public class TestBuildersSimplePipeline extends BaseTest {
         try (final GstScope m = new GstScope(TestBuildersSimplePipeline.class);
                 final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
                     .make("videoscale")
                     .make("videoconvert")

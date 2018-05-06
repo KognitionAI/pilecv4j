@@ -14,7 +14,7 @@ public class TestGstMain {
     public void testMultipleGstMainCalls() throws Exception {
         try (final GstScope main = new GstScope();) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .make("videotestsrc")
                     .make("fakesink")
                     .buildPipeline(main);
@@ -26,7 +26,7 @@ public class TestGstMain {
 
         try (final GstScope main = new GstScope();) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .make("videotestsrc")
                     .make("fakesink")
                     .buildPipeline(main);

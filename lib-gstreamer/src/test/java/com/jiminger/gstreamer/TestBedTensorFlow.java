@@ -1,6 +1,5 @@
 package com.jiminger.gstreamer;
 
-import static com.jiminger.gstreamer.util.GstUtils.instrument;
 import static com.jiminger.gstreamer.util.GstUtils.printDetails;
 import static com.jiminger.image.TensorUtils.getMatrix;
 import static com.jiminger.image.TensorUtils.getScalar;
@@ -18,6 +17,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pipeline;
 import org.opencv.core.Core;
@@ -101,44 +101,26 @@ public class TestBedTensorFlow {
                     LOGGER.trace("Returning object detected Buffer");
                 });
 
-        final Pipeline pipe = new BinBuilder()
+        final BinManager bb = new BinManager()
                 // .delayed(new URIDecodeBin("source"))
                 // .with("uri", BaseTest.STREAM.toString())
                 // .with("uri", "rtsp://admin:greg0rmendel@10.1.1.20:554/")
                 .make("v4l2src")
                 .make("videoconvert")
                 .caps("video/x-raw")
-                .tee(
+                .teeWithMultiqueue(
                         new Branch("b2_")
-                                .make("queue")
                                 .make("videoscale")
                                 .make("videoconvert")
                                 .caps("video/x-raw,width=640,height=480")
                                 .make("xvimagesink")
-                        // .make("queue")
-                        // .make("theoraenc")
-                        // .make("oggmux")
-                        // .make("tcpserversink").with("host", "127.0.0.1").with("port", "8080")
 
-                        ,
-                        new Branch("b1_")
-                                .make("queue")
-                                .caps(new CapsBuilder("video/x-raw").addFormatConsideringEndian().build())
-                                .add(bin)
-                                .make("videoscale")
-                                .make("videoconvert")
-                                .caps(new CapsBuilder("video/x-raw").add("width=640,height=480").build())
-                                .make("queue")
-                                .make("xvimagesink").with("force-aspect-ratio", "true")
-                // .make("theoraenc")
-                // .make("oggmux")
-                // .make("tcpserversink").with("host", "127.0.0.1").with("port", "8081")
+        );
 
-                )
-
+        final Pipeline pipe = bb
                 .buildPipeline();
 
-        instrument(pipe);
+        // instrument(pipe);
         pipe.play();
 
         Thread.sleep(5000);
@@ -146,6 +128,22 @@ public class TestBedTensorFlow {
         try (final PrintStream ps = new PrintStream(new File("/tmp/pipeline.txt"))) {
             printDetails(pipe, ps);
         }
+
+        final Bin b1 = new BinManager()
+                .caps(new CapsBuilder("video/x-raw").addFormatConsideringEndian().build())
+                .add(bin)
+                .make("videoscale")
+                .make("videoconvert")
+                .caps(new CapsBuilder("video/x-raw").add("width=640,height=480").build())
+                .make("queue")
+                .make("xvimagesink").with("force-aspect-ratio", "true")
+                .buildBin("b1_");
+
+        pipe.add(b1);
+
+        bb.getPrimaryBranch().linkNewBranch(b1);
+
+        b1.syncStateWithParent();
 
         Gst.main();
     }

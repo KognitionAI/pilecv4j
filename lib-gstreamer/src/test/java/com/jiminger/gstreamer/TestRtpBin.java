@@ -24,10 +24,10 @@ public class TestRtpBin {
 
             final RtpBin h = new RtpBin()
                     .sendSession(1)
-                    .rtpFrom(new BinBuilder()
-                            .delayed("rtspsrc").with("location", "rtsp://admin:811orrac8@172.16.2.51:554/")
-                            // .make("v4l2src")
-                            // .delayed("decodebin")
+                    .rtpFrom(new BinManager()
+                            // .delayed("rtspsrc").with("location", "rtsp://admin:811orrac8@172.16.2.51:554/")
+                            .make("v4l2src")
+                            .delayed("decodebin")
                             .make("queue")
                             // .make("videoconvert")
                             // .make("x264enc").with("tune", "4").with("quantizer", "40")
@@ -46,15 +46,15 @@ public class TestRtpBin {
                             .build())
                     .rtcpRecv(new ElementBuilder("udpsrc").with("port", SELF_V + 1).build());
 
-            h.addTo(pipe);
-            h.linkAll();
+            h.conditionallyAddTo(pipe);
+            h.conditionallyLinkAll();
 
             pipe.play();
 
             Thread.sleep(500);
             // GstUtils.printDetails(pipe);
 
-            final Pipeline pipe2 = new BinBuilder()
+            final Pipeline pipe2 = new BinManager()
                     .make("udpsrc").with("port", PEER_V)
                     .caps("application/x-rtp,payload=(int)103,clock-rate=(int)90000,ssrc=(uint)" + 112233)
                     .make("rtph264depay")

@@ -19,7 +19,7 @@ public class TestBuildersEndOnError extends BaseTest {
         try (final GstScope m = new GstScope(TestFrameEmitterAndCatcher.class);
                 final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .delayed("uridecodebin", "myjunkyderidecodeybin").with("uri", STREAM.toString())
                     .make("videoconvert")
                     .caps("video/x-raw,format=RGB")

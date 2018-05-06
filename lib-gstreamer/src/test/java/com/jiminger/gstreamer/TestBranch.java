@@ -35,7 +35,7 @@ public class TestBranch extends BaseTest {
                 final FrameCatcher fc1 = new FrameCatcher("fc1");
                 final FrameCatcher fc2 = new FrameCatcher("fc2");) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
                     .make("videoscale")
                     .make("videoconvert")

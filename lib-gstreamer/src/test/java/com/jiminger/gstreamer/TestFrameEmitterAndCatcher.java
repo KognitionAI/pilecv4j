@@ -19,7 +19,7 @@ public class TestFrameEmitterAndCatcher extends BaseTest {
                 final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
                 final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .add(fe.disown())
                     .make("videoconvert")
                     .caps("video/x-raw")

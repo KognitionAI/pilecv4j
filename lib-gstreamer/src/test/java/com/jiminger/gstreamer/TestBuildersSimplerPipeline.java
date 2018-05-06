@@ -19,7 +19,7 @@ public class TestBuildersSimplerPipeline extends BaseTest {
     public void testSimplePipeline() throws Exception {
         try (final GstScope m = new GstScope(TestBuildersSimplerPipeline.class);) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .make("filesrc").with("location", STREAM.getPath())
                     .delayed(new DecodeBin("source"))
                     .make("fakesink").with("sync", "true")

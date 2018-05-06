@@ -9,7 +9,7 @@ import org.freedesktop.gstreamer.event.EOSEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jiminger.gstreamer.BinBuilder;
+import com.jiminger.gstreamer.BinManager;
 import com.jiminger.gstreamer.BreakoutFilter;
 import com.jiminger.gstreamer.BreakoutFilter.CvRasterAndCaps;
 import com.jiminger.gstreamer.CapsBuilder;
@@ -48,7 +48,7 @@ public class FrameEmitter implements AutoCloseable {
                     return FlowReturn.OK;
                 });
 
-        element = new ElementWrap<>(new BinBuilder()
+        element = new ElementWrap<>(new BinManager()
                 .delayed(new URIDecodeBin("source")).with("uri", sourceUri)
                 .make("videoconvert")
                 .caps(new CapsBuilder("video/x-raw")

@@ -26,6 +26,7 @@ public class RtpBin {
     public final String name;
 
     private final Bin rtpBin;
+    private Bin parent = null;
 
     public RtpBin(final String name) {
         this.name = name == null ? ElementBuilder.nextName("rtpbin") : name;
@@ -99,21 +100,36 @@ public class RtpBin {
         return ret == null ? rtpBin.getRequestPad(padName) : ret;
     }
 
-    public RtpBin addTo(final Bin pipe) {
-        pipe.add(rtpBin);
-        sessions.stream().forEach(s -> s.addTo(pipe));
+    public RtpBin conditionallyAddTo(final Bin pipe) {
+        if (parent == null) {
+            pipe.add(rtpBin);
+            parent = pipe;
+        } else {
+            if (parent != pipe)
+                throw new IllegalArgumentException(
+                        "Attempt to conditionally add " + rtpBin + " to a Bin " + pipe + " but it already has a different parent: " + parent);
+        }
+
+        sessions.stream().forEach(s -> s.conditionallyAddTo(pipe));
 
         return this;
     }
 
-    public RtpBin linkAll() {
+    // TODO: utility
+    private static Pad getRequestPad(final Element el, final String padName) {
+        // if the pad already exits we want to return it
+        final Pad ret = el.getPads().stream().filter(p -> padName.equals(p.getName())).findFirst().orElse(null);
+        return (ret == null) ? el.getRequestPad(padName) : ret;
+    }
+
+    public RtpBin conditionallyLinkAll() {
 
         sessions.stream().forEach(s -> {
             // incommingRtp means
             if (s.incommingRtp != null)
                 checkLink(s.incommingRtp.element, s.incommingRtp.pad().getName(), rtpBin, s.padName(false, true));
             else {
-                final Pad pad = rtpBin.getRequestPad(s.padName(false, true)); // this sets up the session even if there isn't a source right now.
+                final Pad pad = getRequestPad(rtpBin, s.padName(false, true)); // this sets up the session even if there isn't a source right now.
                 if (pad == null)
                     throw new IllegalStateException("Failed to get request pad " + s.padName(false, true));
             }
@@ -124,7 +140,7 @@ public class RtpBin {
             if (s.recvRtcp != null)
                 checkLink(s.recvRtcp.element, s.recvRtcp.pad().getName(), rtpBin, s.padName(true, true));
             else {
-                final Pad pad = rtpBin.getRequestPad(s.padName(true, true));
+                final Pad pad = getRequestPad(rtpBin, s.padName(true, true));
                 if (pad == null)
                     throw new IllegalStateException("Failed to get request pad " + s.padName(true, true));
             }
@@ -137,10 +153,34 @@ public class RtpBin {
         return this;
     }
 
-    private void checkLink(final Element src, final String srcPad, final Element sink, final String sinkPad) {
-        if (!Element.linkPads(src, srcPad, sink, sinkPad)) {
-            LOGGER.error("Link failed from src element " + src + " pad " + srcPad + " to sink element " + sink + " pad " + sinkPad);
-            throw new RuntimeException("Link failed from src element " + src + " pad " + srcPad + " to sink element " + sink + " pad " + sinkPad);
+    private static void checkLink(final Element src, final String srcPadName, final Element sink, final String sinkPadName) {
+        // see if the pad is already linked
+        final Pad srcPad = src.getSrcPads().stream().filter(p -> srcPadName.equals(p.getName())).findFirst().orElse(null);
+        if (srcPad != null) {
+            if (srcPad.isLinked()) { // is it linked to what we expect it to be linked to?
+                final Pad peer = srcPad.getPeer();
+                if (!sinkPadName.equals(peer.getName()))
+                    LOGGER.warn(
+                            "Attempt to relink a pad " + srcPad + " with a sink element " + sink + " but it's already linked to a different element");
+                return;
+            }
+        }
+
+        if (!Element.linkPads(src, srcPadName, sink, sinkPadName)) {
+            LOGGER.error("Link failed from src element " + src + " pad " + srcPadName + " to sink element " + sink + " pad " + sinkPadName);
+            throw new RuntimeException(
+                    "Link failed from src element " + src + " pad " + srcPadName + " to sink element " + sink + " pad " + sinkPadName);
+        }
+    }
+
+    private static void checkAdd(final Element el, final Bin parent) {
+        final Bin curParent = (Bin) el.getParent();
+        if (curParent == null)
+            parent.add(el);
+        else {
+            if (curParent != parent)
+                throw new IllegalArgumentException(
+                        "Attempt to conditionally add " + el + " to a Bin " + parent + " but it already has a different parent: " + curParent);
         }
     }
 
@@ -182,24 +222,33 @@ public class RtpBin {
         private ElementPad outgoingRtp = null;
         private ElementPad recvRtcp = null;
         private ElementPad sendRtcp = null;
+        private Bin parent = null;
 
         private SessionConfig(final boolean sending, final int sessionId) {
             this.sending = sending;
             this.sessionId = sessionId;
         }
 
-        private void addTo(final Bin pipe) {
-            if (incommingRtp != null)
-                pipe.add(incommingRtp.element);
+        private void conditionallyAddTo(final Bin pipe) {
+            if (parent == null) {
+                parent = pipe;
 
-            if (outgoingRtp != null)
-                pipe.add(outgoingRtp.element);
+                if (incommingRtp != null)
+                    checkAdd(incommingRtp.element, pipe);
 
-            if (recvRtcp != null)
-                pipe.add(recvRtcp.element);
+                if (outgoingRtp != null)
+                    checkAdd(outgoingRtp.element, pipe);
 
-            if (sendRtcp != null)
-                pipe.add(sendRtcp.element);
+                if (recvRtcp != null)
+                    checkAdd(recvRtcp.element, pipe);
+
+                if (sendRtcp != null)
+                    checkAdd(sendRtcp.element, pipe);
+            } else {
+                if (parent != pipe)
+                    throw new IllegalArgumentException(
+                            "Attempt to conditionally add " + this + " to a Bin " + pipe + " but it already has a different parent: " + parent);
+            }
         }
 
         public String padName(final boolean rtcp, final boolean sink) {

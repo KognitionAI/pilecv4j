@@ -16,7 +16,7 @@ public class TestFrameCatcher extends BaseTest {
         try (final GstScope m = new GstScope(TestFrameCatcher.class);
                 final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
-            final Pipeline pipe = new BinBuilder()
+            final Pipeline pipe = new BinManager()
                     .delayed("uridecodebin").with("uri", STREAM.toString())
                     .make("videoconvert")
                     .caps("video/x-raw")
