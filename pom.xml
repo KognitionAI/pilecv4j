@@ -36,7 +36,7 @@
     <build.type>debug</build.type>
     <swtgroup>org.eclipse.swt</swtgroup>
     <!-- This property is looked up using 'grep' from the script convert.sh -->
-    <opencv.version>3.4.0</opencv.version>
+    <opencv.version>3.4.1</opencv.version>
     <slf4j.version>1.7.16</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
