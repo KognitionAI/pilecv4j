@@ -8,10 +8,9 @@ import java.util.logging.Level;
 import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Bus;
 import org.freedesktop.gstreamer.Element;
-import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pad;
+import org.freedesktop.gstreamer.PadLinkException;
 import org.freedesktop.gstreamer.PadLinkReturn;
-import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.lowlevel.GstNative;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +37,8 @@ public class GstUtils {
 
     private static final GstDebugAPI gst = GstNative.load(GstDebugAPI.class);
 
-    public static final void gstDebugBinToDotFile(final Bin bin, final int details,
+    public static final void gstDebugBinToDotFile(final Bin bin, final int details,            // bus.connect(printStateChange);
+
             final String fileName) {
         gst.gst_debug_bin_to_dot_file(bin, details, fileName);
     }
@@ -51,47 +51,48 @@ public class GstUtils {
         java.util.logging.Logger.getLogger(logger).setLevel(level);
     }
 
-    public static final Bus.EOS endOnEOS(final Bin bin) {
+    private static final Bus.EOS endOnEOS(final Bin bin) {
         final Bus.EOS ret = (object) -> {
-            // if (LOGGER.isDebugEnabled())
             LOGGER.info("end-of-stream: {}", object);
             bin.stop();
-            Gst.quit();
         };
         return ret;
     }
 
-    public static final Bus.ERROR endOnError(final Bin bin, final Bus.ERROR errCb) {
-        final Bus.ERROR ret = (object, code, msg) -> {
-            LOGGER.error("error:" + object + " code:" + code + " " + msg);
-            // bin.stop();
-            // Gst.quit();
-            if (errCb != null)
-                errCb.errorMessage(object, code, msg);
-        };
-        return ret;
+    public static void stopBinOnEOS(final Bin pipe) {
+    	final Bus bus = pipe.getBus();
+    	bus.connect(endOnEOS(pipe));
     }
 
-    // public static final Bus.STATE_CHANGED printStateChange = (final GstObject source, final State old, final State current,
-    // final State pending) -> {
-    // LOGGER.debug("State of " + source + " changed from " + old + " to " + current + " with " + pending + " pending.");
-    // };
-
-    public static void instrument(final Pipeline pipe, final Bus.ERROR errCb) {
+    public static <T extends Bin> void onError(final T pipe, final Bus.ERROR errCb) {
         final Bus bus = pipe.getBus();
-        bus.connect(endOnEOS(pipe));
-        bus.connect(endOnError(pipe, errCb));
-        if (LOGGER.isDebugEnabled())
-            // bus.connect(printStateChange);
-            bus.connect((Bus.STATE_CHANGED) (s, o, c, p) -> {
-                if (s == pipe || s.getParent() == pipe)
-                    LOGGER.debug("State of " + s + " changed from " + o + " to " + c + " with " + p + " pending.");
-            });
+        bus.connect(errCb);
     }
+    
+//    private static final Bus.ERROR endOnError(final Bin bin, final Bus.ERROR errCb) {
+//        final Bus.ERROR ret = (object, code, msg) -> {
+//            LOGGER.error("error:" + object + " code:" + code + " " + msg);
+//            // bin.stop();
+//            if (errCb != null)
+//                errCb.errorMessage(object, code, msg);
+//        };
+//        return ret;
+//    }
+//    
+//    public static <T extends Bin> void onError(final T pipe, final Bus.ERROR errCb) {
+//        final Bus bus = pipe.getBus();
+//        bus.connect(endOnEOS(pipe));
+//        bus.connect(endOnError(pipe, errCb));
+//        if (LOGGER.isDebugEnabled())
+//            bus.connect((Bus.STATE_CHANGED) (s, o, c, p) -> {
+//                if (s == pipe || s.getParent() == pipe)
+//                    LOGGER.debug("State of " + s + " changed from " + o + " to " + c + " with " + p + " pending.");
+//            });
+//    }
 
-    public static void instrument(final Pipeline pipe) {
-        instrument(pipe, null);
-    }
+//    public static void instrument(final Pipeline pipe) {
+//        instrument(pipe, null);
+//    }
 
     private static final String indent = "    ";
 
@@ -134,18 +135,17 @@ public class GstUtils {
         return pads.get(0);
     }
 
-    public static void link(final Element src, final Pad sink) {
-        final PadLinkReturn plret = GstUtils.getSrcPad(src).link(sink);
-        if (plret != PadLinkReturn.OK)
-            throw new RuntimeException("Failed to link the src element " + src + " with the sink pad " + sink + ". Result was " + plret);
+    public static void safeLink(final Element src, final Pad sink) {
+    	safeLink(GstUtils.getSrcPad(src), sink);
     }
 
-    public static PadLinkReturn safeLink(final Pad srcPad, final Pad sinkPad) {
-        final PadLinkReturn linkResult = srcPad.link(sinkPad);
-        if (PadLinkReturn.OK != linkResult)
-            throw new IllegalStateException("Link failed (" + linkResult + ") linking src pad " + srcPad + " from element " + srcPad.getParent()
-                    + " to sink pad " + sinkPad + " from element " + sinkPad.getParent());
-        return linkResult;
+    public static void safeLink(final Pad srcPad, final Pad sinkPad) {
+    	try {
+    		srcPad.link(sinkPad);
+    	} catch (PadLinkException ple) {
+    		if (ple.getLinkResult() != PadLinkReturn.WAS_LINKED)
+    			throw ple;
+    	}
     }
 
     public static void safeAdd(final Bin bin, final Element e) {

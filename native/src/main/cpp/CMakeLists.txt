@@ -37,6 +37,7 @@ set (CMAKE_CXX_STANDARD 11)
 
 if(UNIX)
   add_definitions(-DUNIX)
+  # buffer overrun protection
 endif()
 
 # We're not ready for this yet. We'll need to build TensorFlow from scratch to get it to work
@@ -58,4 +59,4 @@ add_library(utilities.jiminger.com
                sources/nr/nrutil.cpp
                sources/nr/powell.cpp)
 
-target_link_libraries(utilities.jiminger.com)
+target_link_libraries(utilities.jiminger.com -Wl,-z,noexecstack)

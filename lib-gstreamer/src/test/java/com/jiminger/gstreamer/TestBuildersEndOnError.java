@@ -10,7 +10,6 @@ import org.junit.Test;
 
 import com.jiminger.gstreamer.guard.GstScope;
 import com.jiminger.gstreamer.util.FrameCatcher;
-import com.jiminger.gstreamer.util.GstUtils;
 
 public class TestBuildersEndOnError extends BaseTest {
 
@@ -19,17 +18,17 @@ public class TestBuildersEndOnError extends BaseTest {
         try (final GstScope m = new GstScope(TestFrameEmitterAndCatcher.class);
                 final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
+            final AtomicBoolean gotHere = new AtomicBoolean(false);
             final Pipeline pipe = new BinManager()
                     .delayed("uridecodebin", "myjunkyderidecodeybin").with("uri", STREAM.toString())
-                    .make("videoconvert")
-                    .caps("video/x-raw,format=RGB")
+                    // intentional mismatch between decodebin output and the FrameCatcher without a videoconvert
                     .add(fc.disown())
+                    .onError((x, y, z) -> gotHere.set(true))
                     .buildPipeline(m);
 
-            final AtomicBoolean gotHere = new AtomicBoolean(false);
-            GstUtils.instrument(pipe, (x, y, z) -> gotHere.set(true));
             pipe.play();
             assertTrue(poll(o -> gotHere.get()));
+            pipe.stop();
         }
     }
 }

@@ -1,6 +1,5 @@
 package com.jiminger.gstreamer;
 
-import static com.jiminger.gstreamer.util.GstUtils.instrument;
 import static com.jiminger.gstreamer.util.GstUtils.printDetails;
 import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertEquals;
@@ -51,7 +50,6 @@ public class TestBranch extends BaseTest {
                                     .add(fc2.disown()))
                     .buildPipeline(main);
 
-            instrument(pipe);
             pipe.play();
             Thread.sleep(1000);
             final File file = folder.newFile("pipeline.txt");

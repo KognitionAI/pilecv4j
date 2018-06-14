@@ -1,6 +1,5 @@
 package com.jiminger.gstreamer;
 
-import static com.jiminger.gstreamer.util.GstUtils.instrument;
 import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertTrue;
 
@@ -27,17 +26,23 @@ public class TestBuildersSimplePipeline extends BaseTest {
                     .add(fc.disown())
                     .buildPipeline(m);
 
-            instrument(pipe);
             pipe.play();
+            // wait until at least 1 frame goes through.
+            poll(o -> fc.frames.size() > 0);
+            // mark the # of frames to start.
+            int startingNumFrames = fc.frames.size();
+            // wait 1 second.
             Thread.sleep(1000);
+            // stop
             pipe.sendEvent(new EOSEvent());
             pipe.stop();
+            // wait until pipe stops
             assertTrue(poll(o -> !pipe.isPlaying()));
 
-            // one seconds worth of frames should be more than 25 and less than 35 (actually, should be 29)
-            final int numFrames = fc.frames.size();
-            assertTrue(20 < numFrames);
-            assertTrue(35 > numFrames);
+            // one second worth of frames should be more than 25 and less than 35 (actually, should be 29)
+            final int numFrames = fc.frames.size() - startingNumFrames;
+            assertTrue("Number of frames(" + numFrames + ") was less than 25.", 25 < numFrames);
+            assertTrue("Number of frames(" + numFrames + ") was greater than 35.", 35 >  numFrames);
         }
     }
 

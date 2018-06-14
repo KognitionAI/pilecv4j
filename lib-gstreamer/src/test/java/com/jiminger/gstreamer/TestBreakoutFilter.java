@@ -9,7 +9,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.FlowReturn;
-import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Test;
 import org.opencv.core.CvType;
@@ -44,8 +43,6 @@ public class TestBreakoutFilter extends BaseTest {
                 }
             });
 
-            // GstUtils.printDetails(breakout);
-
             List<Frame> frames = null;
 
             try (final FrameCatcher fc = new FrameCatcher("framecatcher");
@@ -61,13 +58,12 @@ public class TestBreakoutFilter extends BaseTest {
                         .add(breakout)
                         .make("videoconvert")
                         .add(fc.disown())
+                        .stopOnEndOfStream()
                         .buildPipeline(main);
 
                 pipe.play();
-                GstUtils.instrument(pipe);
                 Thread.sleep(1000);
                 GstUtils.printDetails(pipe);
-                Gst.main();
 
                 assertTrue(poll(o -> fc.frames.size() == 40));
                 Thread.sleep(10);

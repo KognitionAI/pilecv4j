@@ -14,22 +14,23 @@ public interface CvRasterAPI extends Library {
 
     static final AtomicBoolean inited = new AtomicBoolean(false);
 
-    public static String _init() {
+    public static CvRasterAPI _init() {
         if (!inited.getAndSet(true)) {
             NativeLibraryLoader.loader()
-                    .optional("opencv_ffmpeg340_64")
-                    .library("opencv_java340")
+                    .optional("opencv_ffmpeg341_64")
+                    .library("opencv_java341")
                     .library("lib-image-native.jiminger.com")
                     .addCallback((dir, libname, oslibname) -> {
-                        NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
+                    	if (LIBNAME.equals(libname))
+                    		NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
                     })
                     .load();
         }
 
-        return LIBNAME;
+        return Native.loadLibrary(LIBNAME, CvRasterAPI.class);
     }
 
-    static final CvRasterAPI API = Native.loadLibrary(_init(), CvRasterAPI.class);
+    static final CvRasterAPI API = _init();
 
     public long CvRaster_copy(long nativeMatHandle);
 

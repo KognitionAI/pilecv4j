@@ -14,7 +14,6 @@ import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
 import org.freedesktop.gstreamer.Pad;
-import org.freedesktop.gstreamer.PadLinkReturn;
 import org.freedesktop.gstreamer.Pipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -514,10 +513,7 @@ public class Branch {
                 // can't link the downstream pad
                 throw new IllegalStateException("Cannot link to downstream pad " + downstreamPad
                         + " because there are the wrong number of src pads emerging from the branch " + current + ".");
-            final PadLinkReturn plret = srcPads.get(0).link(downstreamPad);
-            if (plret != PadLinkReturn.OK)
-                throw new RuntimeException("Failed to link pads. src " + srcPads.get(0) + " to sink " + downstreamPad + ". Got a result of " + plret);
-            // System.out.println("Link result:" + plret.name());
+            srcPads.get(0).link(downstreamPad);
         }
     }
 
@@ -559,8 +555,8 @@ public class Branch {
         if (pad.isLinked())
             return;
         final List<Pad> nextPads = sink.getSinkPads();
-        System.out.println(nextPads);
-        pad.link(nextPads.get(0));
+//        System.out.println(nextPads);
+        GstUtils.safeLink(pad, nextPads.get(0));
     };
 
     private static class ElementHolder {

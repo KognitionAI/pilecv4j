@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.freedesktop.gstreamer.Bin;
+import org.freedesktop.gstreamer.Bus;
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.GhostPad;
@@ -16,6 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.jiminger.gstreamer.guard.GstScope;
+import com.jiminger.gstreamer.util.GstUtils;
 
 /**
  *  This class can be used to build either a {@link Bin} or a {@link Pipeline} using a builder pattern.
@@ -31,6 +33,8 @@ public class BinManager {
     private Bin managed = null;
 
     private int ghostPadNum = 0;
+    private boolean stopOnEos = false;
+    private Bus.ERROR onErrCb = null;
 
     /**
      * Add an element that has dynamic pads. This will manage linking the dynamic pads
@@ -185,6 +189,16 @@ public class BinManager {
         this.scope = scope;
         return this;
     }
+    
+    public BinManager stopOnEndOfStream() {
+    	this.stopOnEos = true;
+    	return this;
+    }
+
+    public BinManager onError(Bus.ERROR cb) {
+    	this.onErrCb = cb;
+    	return this;
+    }
 
     /**
      * Convert the current builder to a {@link Pipeline} managed by the
@@ -208,7 +222,7 @@ public class BinManager {
                 disposeAll(primary);
             }
         };
-        return build(pipe, false);
+        return postPocess(build(pipe, false));
     }
 
     /**
@@ -247,7 +261,8 @@ public class BinManager {
                 disposeAll(primary);
             }
         };
-        return scope == null ? build(bin, ghostPads) : scope.manage(build(bin, ghostPads));
+        final Bin ret = scope == null ? build(bin, ghostPads) : scope.manage(build(bin, ghostPads));
+        return postPocess(ret);
     }
 
     /**
@@ -304,6 +319,14 @@ public class BinManager {
         managed = pipe;
 
         return pipe;
+    }
+    
+    private <T extends Bin> T postPocess(T pipe) {
+    	if (stopOnEos)
+    		GstUtils.stopBinOnEOS(pipe);
+    	if (onErrCb != null)
+    		GstUtils.onError(pipe, onErrCb);
+    	return pipe;
     }
 
     private BinManager createGhostPads(final Bin bin) {

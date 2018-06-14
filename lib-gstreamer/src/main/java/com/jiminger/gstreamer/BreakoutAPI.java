@@ -1,17 +1,21 @@
 package com.jiminger.gstreamer;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Registry;
+import org.freedesktop.gstreamer.lowlevel.GFunctionMapper;
+import org.freedesktop.gstreamer.lowlevel.GTypeMapper;
 import org.freedesktop.gstreamer.lowlevel.GstAPI;
-import org.freedesktop.gstreamer.lowlevel.GstNative;
 import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
 
 import com.sun.jna.Library;
+import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
@@ -22,11 +26,11 @@ public interface BreakoutAPI extends Library {
     public static final String LIBNAME = "gstbreakout";
 
     public static final AtomicBoolean inited = new AtomicBoolean(false);
-
-    public static String _init() {
+    
+    public static BreakoutAPI _init() {
         if (!inited.getAndSet(true)) {
             NativeLibraryLoader.loader()
-                    .library(LIBNAME + "-1.0")
+                    .library(LIBNAME)
                     .addCallback((dir, libname, oslibname) -> {
                         NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
                         Registry.get().scanPath(dir.getAbsolutePath());
@@ -34,10 +38,14 @@ public interface BreakoutAPI extends Library {
                     .load();
         }
 
-        return LIBNAME;
+        final Map<String, Object> options = new HashMap<String, Object>();
+        options.put(Library.OPTION_TYPE_MAPPER, new GTypeMapper());
+        options.put(Library.OPTION_FUNCTION_MAPPER, new GFunctionMapper());
+
+        return Native.loadLibrary(LIBNAME, BreakoutAPI.class, options);
     }
 
-    static BreakoutAPI FILTER_API = GstNative.load(_init(), BreakoutAPI.class);
+    static BreakoutAPI FILTER_API = _init();
     static int GST_PADDING = GstAPI.GST_PADDING;
     static int GST_PADDING_LARGE = GstAPI.GST_PADDING_LARGE;
 
