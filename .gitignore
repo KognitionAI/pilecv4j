@@ -14,7 +14,10 @@ native/linux-amd64-jiminger/bin
 native/build
 
 hs_err_*.log
+core
+core.*
 
 s8/*.tif
 s8/*.bmp
 s8/*.tiff
+
