@@ -116,6 +116,9 @@ gst_breakout_class_init (GstBreakoutClass * klass)
   GstBaseTransformClass *base_transform_class = GST_BASE_TRANSFORM_CLASS (klass);
   GstVideoFilterClass *video_filter_class = GST_VIDEO_FILTER_CLASS (klass);
 
+  // This gets rid of a compiler warning for an unused static generated from G_DEFINE_TYPE_WITH_CODE
+  void* compile_warning_wastoid = gst_breakout_get_instance_private;
+
   /* Setting up pads and setting metadata should be moved to
      base_class_init if you intend to subclass this class. */
   gst_element_class_add_pad_template (GST_ELEMENT_CLASS(klass),

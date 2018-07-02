@@ -50,11 +50,6 @@
       <artifactId>slf4j-log4j12</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency> <!-- Used for TensorUtils -->
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 
   <build>

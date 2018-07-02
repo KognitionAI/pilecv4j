@@ -28,7 +28,6 @@
     <module>lib-gstreamer</module>
     <module>native</module>
     <module>gst-breakout</module>
-    <module>s8</module>
   </modules>
 
   <properties>
@@ -86,8 +85,8 @@
         </os>
       </activation>
       <properties>
-        <platform>windows-x86_64</platform>
         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
+        <platform>windows-x86_64</platform>
         <platform.option>-Ax64</platform.option>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
       </properties>
@@ -103,7 +102,6 @@
       <properties>
         <swtartifact>org.eclipse.swt.win32.win32.x86</swtartifact>
         <platform>windows-x86_32</platform>
-        <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
         <platform.option></platform.option>
       </properties>
@@ -196,7 +194,7 @@
       <dependency> <!-- Need if using Tensorflow -->
         <groupId>org.tensorflow</groupId>
         <artifactId>tensorflow</artifactId>
-        <version>1.4.0</version>
+        <version>1.8.0</version>
         <optional>true</optional>
       </dependency>
       <dependency>

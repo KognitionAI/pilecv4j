@@ -1,8 +1,8 @@
 package com.jiminger.gstreamer;
 
 import org.freedesktop.gstreamer.Element;
-import org.freedesktop.gstreamer.Pad;
 
+@FunctionalInterface
 public interface DynamicLink {
-    public void padAdded(Element src, Pad srcPadAdded, Element sink);
+    public void link(Element src, Element sink);
 }
