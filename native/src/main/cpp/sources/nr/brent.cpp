@@ -12,12 +12,12 @@ extern "C" {
    
    Given a function f, and given a bracketing triplet of abscissas ax, bx, cx (such that bx is
    between ax and cx, and f(bx) is less than both f(ax) and f(cx)), this routine isolates
-   the minimum to a fractional precision of about tol using Brent’s method. The abscissa of
+   the minimum to a fractional precision of about tol using Brentï¿½s method. The abscissa of
    the minimum is returned as xmin, and the minimum function value is returned as brent, the
    returned function value.*/
 #define SHFT(a,b,c,d) (a)=(b);(b)=(c);(c)=(d);
-float brent(float ax, float bx, float cx, float (*f)(float), float tol,
-            float *xmin)
+float brent(float ax, float bx, float cx, float (*f)(float, void*), float tol,
+            float *xmin, void* userdata)
 {
    int iter;
    float a,b,d = 0.0,etemp,fu,fv,fw,fx,p,q,r,tol1,tol2,u,v,w,x,xm;
@@ -27,7 +27,7 @@ float brent(float ax, float bx, float cx, float (*f)(float), float tol,
                           //but input abscissas need not be. 
    b=(ax > cx ? ax : cx);
    x=w=v=bx; //Initializations...
-   fw=fv=fx=(*f)(x);
+   fw=fv=fx=(*f)(x, userdata);
    for (iter=1;iter<=ITMAX;iter++) { //Main program loop.
       xm=0.5*(a+b);
       tol2=2.0*(tol1=tol*fabs(x)+ZEPS);
@@ -58,7 +58,7 @@ float brent(float ax, float bx, float cx, float (*f)(float), float tol,
          d=CGOLD*(e=(x >= xm ? a-x : b-x));
       }
       u=(fabs(d) >= tol1 ? x+d : x+SIGN(tol1,d));
-      fu=(*f)(u);
+      fu=(*f)(u, userdata);
       /*This is the one function evaluation per iteration.*/
       if (fu <= fx) { //Now decide what to do with our function evaluation.
          if (u >= x) a=x; else b=x;

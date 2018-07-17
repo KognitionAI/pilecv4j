@@ -28,9 +28,9 @@
 typedef float32_t (*Func)(float32_t*, int32_t*);
 
 extern void powell(float p[], float **xi, int n, float ftol, int *iter, float *fret,
-               float (*func)(float []));
+		float (*func)(float*, void*), void* overallUd);
 
-static float bridgefunc(float []);
+static float bridgefunc(float *, void* overallUd);
 
 #if defined(TRACE_ME)
 static void print_vector(const char* hdr, float* v, int start, int end)
@@ -50,12 +50,17 @@ static void print_matix(const char* hdr, float** m, int startrow, int endrow, in
 }
 #endif
 
-static Func jfunc;
+struct OverallUd {
+	Func jfunc;
+	int32_t g_status;
+};
+
+//static Func jfunc;
 
 // This status holds the return of the function being minimized. It the function
 //  sets it to non-zero, the iterations end and a non-zero status code is set
 //  as the result of dominimize via p_status
-static int32_t g_status;
+//static int32_t g_status;
 
 float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float64_t jftol, float64_t* minVal, int32_t* p_status)
 {
@@ -63,8 +68,9 @@ float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float6
 
    float* pf = vector(1,n);
    float** xif = matrix(1,n,1,n);
+   struct OverallUd oud;
 
-   g_status=0;
+   oud.g_status=0;
    if (p_status) *p_status = 0;
 
    for (int i = 0; i < n; i++)
@@ -81,7 +87,7 @@ float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float6
    float fret;
 
    // set side affect globals
-   jfunc = func;
+   oud.jfunc = func;
 
 #if defined(TRACE_ME)
    print_vector("before p:",pf,1,n);
@@ -89,8 +95,8 @@ float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float6
 #endif
 
    /// now i have xif, pf, ftol, 
-   powell(pf, xif, n, ftol, &iter, &fret, bridgefunc);
-   if (nrIsError() || g_status != 0)
+   powell(pf, xif, n, ftol, &iter, &fret, bridgefunc, &oud);
+   if (nrIsError() || oud.g_status != 0)
    {
      if (p_status) *p_status=1;
      return -1.0;
@@ -116,8 +122,9 @@ float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float6
    return (float64_t)fret;
 }
 
-float bridgefunc(float* v)
+float bridgefunc(float* v, void* udv)
 {
-  return (*jfunc)((float32_t*) (v + 1), &g_status);
+  struct OverallUd* ud = (struct OverallUd*)udv;
+  return (*(ud->jfunc))((float32_t*) (v + 1), &(ud->g_status));
 }
 

@@ -38,25 +38,42 @@ set (CMAKE_CXX_STANDARD 11)
 if(UNIX)
   add_definitions(-DUNIX)
   # buffer overrun protection
+  set (CMAKE_MODULE_LINKER_FLAGS "-Wl,-z,noexecstack")
 endif()
 
-# We're not ready for this yet. We'll need to build TensorFlow from scratch to get it to work
-#include_directories(${JNI_INCLUDE_DIRS} ${_stubDir} $ENV{TENSORFLOW_INCLUDE})
+message(STATUS "OpenCV Dependency version $ENV{DEP_OPENCV_VERSION}")
+
+if (DEFINED ENV{OPENCV_INSTALL})
+  set(HAVE_CUSTOM_OCV_LOCATION true)
+  message(STATUS "OPENCV_INSTALL is defined as $ENV{OPENCV_INSTALL}")
+  set (OpenCV_DIR "$ENV{OPENCV_INSTALL}/share/OpenCV")
+endif()
+
+find_package( OpenCV CONFIG REQUIRED )
+
+if (DEFINED HAVE_CUSTOM_OCV_LOCATION)
+  include_directories(${OpenCV_INCLUDE_DIRS})
+  link_directories("$ENV{OPENCV_INSTALL}/share/OpenCV/java")
+  set(OPENCV_STATIC_LIB opencv_java${OpenCV_VERSION_MAJOR}${OpenCV_VERSION_MINOR}${OpenCV_VERSION_PATCH})
+endif()
+
+if ( NOT "${OpenCV_VERSION}" STREQUAL "$ENV{DEP_OPENCV_VERSION}")
+  message(FATAL_ERROR "OpenCV Dependency version ($ENV{DEP_OPENCV_VERSION}) is different from the version being built against (${OpenCV_VERSION}).")
+endif()
 
 include_directories(sources/include)
 
 add_library(utilities.jiminger.com
-	MODULE
-# We're not ready for this yet. We'll need to build TensorFlow from scratch to get it to work
-#               com_jiminger_image_TensorUtils.h
-#               sources/tensor/TensorUtils.cpp
-               sources/houghspace/Transform.cpp
-               sources/mjpeg/jpegtoavi.cpp
-               sources/nr/minimizer.c
-               sources/nr/brent.cpp
-               sources/nr/dbrent.cpp
-               sources/nr/mnbrak.cpp
-               sources/nr/nrutil.cpp
-               sources/nr/powell.cpp)
+  MODULE
+  sources/opencv/CvRasterNative.cpp
+  sources/houghspace/Transform.cpp
+  sources/mjpeg/jpegtoavi.cpp
+  sources/nr/minimizer.c
+  sources/nr/brent.cpp
+  sources/nr/dbrent.cpp
+  sources/nr/mnbrak.cpp
+  sources/nr/nrutil.cpp
+  sources/nr/powell.cpp)
 
-target_link_libraries(utilities.jiminger.com -Wl,-z,noexecstack)
+target_link_libraries(utilities.jiminger.com 
+  ${OPENCV_STATIC_LIB})
