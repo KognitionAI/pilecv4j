@@ -1,6 +1,11 @@
 package com.jiminger.gstreamer;
 
+import static net.dempsy.util.Functional.chain;
+import static net.dempsy.util.Functional.uncheck;
+
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -19,6 +24,9 @@ import org.slf4j.LoggerFactory;
 import com.jiminger.gstreamer.guard.BufferWrap;
 import com.jiminger.image.CvRaster;
 
+import net.dempsy.util.Functional;
+import net.dempsy.util.QuietCloseable;
+
 public class BreakoutFilter extends BaseTransform {
    private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
 
@@ -27,7 +35,7 @@ public class BreakoutFilter extends BaseTransform {
 
    private static final AtomicBoolean inited = new AtomicBoolean(false);
 
-   private SlowFilterSlippage slowFilterSlippage = null;
+   private ProxyFilter proxyFilter = null;
 
    private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
 
@@ -82,10 +90,12 @@ public class BreakoutFilter extends BaseTransform {
    public static class CvRasterAndCaps extends CapsInfo {
       public final CvRaster raster;
       private boolean rasterDisowned = false;
+      private QuietCloseable imageOp;
 
       private CvRasterAndCaps(final CvRaster frameData, final Caps caps, final int w, final int h) {
          super(caps, w, h);
          this.raster = frameData;
+         this.imageOp = raster.imageOp();
       }
 
       /**
@@ -102,8 +112,14 @@ public class BreakoutFilter extends BaseTransform {
             final ByteBuffer bb = bw.map(false);
             final int capacity = bb.remaining();
 
-            raster = (tmp != null && tmp.underlying.capacity() == capacity) ? tmp : CvRaster.createManaged(h, w, type);
-            final ByteBuffer buffer = raster.underlying;
+            try (final QuietCloseable tmpAc = tmp == null ? null : tmp.imageOp();) {
+               if(tmp != null && tmp.underlying().capacity() == capacity)
+                  raster = tmp;
+               else
+                  raster = CvRaster.createManaged(h, w, type);
+            }
+            imageOp = raster.imageOp();
+            final ByteBuffer buffer = raster.underlying();
 
             // copy the data
             buffer.rewind();
@@ -113,15 +129,28 @@ public class BreakoutFilter extends BaseTransform {
 
       @Override
       public void close() {
+         if(imageOp != null)
+            imageOp.close();
          if(raster != null && !rasterDisowned)
             raster.close();
+
          super.close();
       }
 
       private CvRaster disownRaster() {
+         if(imageOp != null)
+            imageOp.close();
+         imageOp = null;
          rasterDisowned = true;
          return raster;
       }
+   }
+
+   public BreakoutFilter connect(final Consumer<CvRasterAndCaps> filter) {
+      return connect((Function<CvRasterAndCaps, FlowReturn>)rac -> {
+         filter.accept(rac);
+         return FlowReturn.OK;
+      });
    }
 
    public BreakoutFilter connect(final Function<CvRasterAndCaps, FlowReturn> filter) {
@@ -136,37 +165,68 @@ public class BreakoutFilter extends BaseTransform {
    }
 
    public BreakoutFilter connectSlowFilter(final Consumer<CvRasterAndCaps> filter) {
-      final BreakoutFilter ret = connect(slowFilterSlippage = new SlowFilterSlippage(filter));
+      return connectSlowFilter(1, filter);
+   }
+
+   public BreakoutFilter connectSlowFilter(final int numThreads, final Consumer<CvRasterAndCaps> filter) {
+      final BreakoutFilter ret = connect(proxyFilter = new SlowFilterSlippage(numThreads, filter));
+      return ret;
+   }
+
+   public BreakoutFilter connectStreamWatcher(final Consumer<CvRasterAndCaps> filter) {
+      return connectStreamWatcher(1, filter);
+   }
+
+   public BreakoutFilter connectStreamWatcher(final int numThreads, final Consumer<CvRasterAndCaps> watcher) {
+      final BreakoutFilter ret = connect(proxyFilter = new StreamWatcher(numThreads, watcher));
       return ret;
    }
 
    @Override
    public void dispose() {
-      if(slowFilterSlippage != null) {
-         slowFilterSlippage.stop();
+      if(proxyFilter != null) {
+         proxyFilter.stop();
          try {
-            slowFilterSlippage.thread.join(1000);
+            Functional.<InterruptedException>recheck(() -> proxyFilter.threads.forEach(t -> uncheck(() -> t.join(1000))));
          } catch(final InterruptedException ie) {
             LOGGER.info("Interrupted while waiting for slow filter slippage thread for " + this.getName() + " to exit.");
          }
 
-         if(slowFilterSlippage.thread.isAlive())
-            LOGGER.warn("The slow filter slippage thread for " + this.getName() + " never exited. Moving on.");
+         proxyFilter.threads.forEach(t -> {
+            if(t.isAlive())
+               LOGGER.warn("The slow filter slippage thread for " + this.getName() + " never exited. Moving on.");
+         });
       }
 
       super.dispose();
    }
 
-   private static class SlowFilterSlippage implements NEW_SAMPLE {
-      private final Thread thread;
+   private static abstract class ProxyFilter implements NEW_SAMPLE {
+      protected final List<Thread> threads = new ArrayList<>();
+      protected final AtomicBoolean stop = new AtomicBoolean(false);
+
+      public void stop() {
+         stop.set(true);
+      }
+
+      protected static void dispose(final CvRasterAndCaps bac) {
+         if(bac != null) {
+            final CvRaster old = storedBuffer.getAndSet(bac.disownRaster());
+            if(old != null)
+               LOGGER.warn("Throwing away a ByteBuffer");
+            bac.close();
+         }
+      }
+   }
+
+   private static class SlowFilterSlippage extends ProxyFilter {
       private final AtomicReference<CvRasterAndCaps> to = new AtomicReference<>(null);
       private final AtomicReference<CvRasterAndCaps> result = new AtomicReference<>(null);
       private CvRasterAndCaps current = null;
-      private final AtomicBoolean stop = new AtomicBoolean(false);
       private boolean firstOne = true;
 
-      public SlowFilterSlippage(final Consumer<CvRasterAndCaps> processor) {
-         thread = new Thread(() -> {
+      private Runnable fromProcessor(final Consumer<CvRasterAndCaps> processor) {
+         return () -> {
             while(!stop.get()) {
                CvRasterAndCaps frame = to.getAndSet(null);
                while(frame == null && !stop.get()) {
@@ -178,10 +238,12 @@ public class BreakoutFilter extends BaseTransform {
                   dispose(result.getAndSet(frame));
                } // otherwise we're stopped.
             }
-         });
+         };
+      }
 
-         thread.setDaemon(true);
-         thread.start();
+      public SlowFilterSlippage(final int numThreads, final Consumer<CvRasterAndCaps> processor) {
+         for(int i = 0; i < numThreads; i++)
+            threads.add(chain(new Thread(fromProcessor(processor)), t -> t.setDaemon(true), t -> t.start()));
       }
 
       // These are for debug logs only
@@ -237,7 +299,7 @@ public class BreakoutFilter extends BaseTransform {
                }
 
                final ByteBuffer bb = buffer.map(true);
-               final ByteBuffer curBB = current.raster.underlying;
+               final ByteBuffer curBB = current.raster.underlying();
                curBB.rewind();
                bb.put(curBB);
                // cur stays current until it's replaced, then it's disposed.
@@ -245,18 +307,40 @@ public class BreakoutFilter extends BaseTransform {
          }
          return FlowReturn.OK;
       }
+   }
 
-      public void stop() {
-         stop.set(true);
+   private static class StreamWatcher extends ProxyFilter {
+      private final AtomicReference<CvRasterAndCaps> to = new AtomicReference<>(null);
+
+      private Runnable fromProcessor(final Consumer<CvRasterAndCaps> processor) {
+         return () -> {
+            while(!stop.get()) {
+               CvRasterAndCaps frame = to.getAndSet(null);
+               while(frame == null && !stop.get()) {
+                  Thread.yield();
+                  frame = to.getAndSet(null);
+               }
+               if(frame != null && !stop.get()) {
+                  processor.accept(frame);
+               } // otherwise we're stopped.
+            }
+         };
       }
 
-      private static void dispose(final CvRasterAndCaps bac) {
-         if(bac != null) {
-            final CvRaster old = storedBuffer.getAndSet(bac.disownRaster());
-            if(old != null)
-               LOGGER.warn("Throwing away a ByteBuffer");
-            bac.close();
+      public StreamWatcher(final int numThreads, final Consumer<CvRasterAndCaps> processor) {
+         for(int i = 0; i < numThreads; i++)
+            threads.add(chain(new Thread(fromProcessor(processor)), t -> t.setDaemon(true), t -> t.start()));
+      }
+
+      @Override
+      public FlowReturn new_sample(final BreakoutFilter elem) {
+         try (final BufferWrap buffer = elem.getCurrentBuffer();) {
+
+            dispose(to.getAndSet(
+                  new CvRasterAndCaps(buffer.obj, storedBuffer.getAndSet(null), elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
+                        elem.getCurrentFrameHeight(), CvType.CV_8UC3)));
          }
+         return FlowReturn.OK;
       }
 
    }

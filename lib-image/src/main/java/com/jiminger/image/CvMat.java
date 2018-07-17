@@ -1,14 +1,19 @@
 package com.jiminger.image;
 
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
+import org.opencv.core.Mat;
+
 public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
+   private static final CvRasterAPI API = CvRasterAPI.API;
 
    private static final Method nDelete;
    private static final Method nZeros;
    private static final Method nOnes;
+   private static final Field nativeObjField;
 
    private boolean deletedAlready = false;
 
@@ -22,7 +27,10 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
 
          nOnes = org.opencv.core.Mat.class.getDeclaredMethod("n_ones", int.class, int.class, int.class);
          nOnes.setAccessible(true);
-      } catch(NoSuchMethodException | SecurityException e) {
+
+         nativeObjField = org.opencv.core.Mat.class.getDeclaredField("nativeObj");
+         nativeObjField.setAccessible(true);
+      } catch(NoSuchMethodException | NoSuchFieldException | SecurityException e) {
          throw new RuntimeException(
                "Got an exception trying to access Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
                e);
@@ -42,6 +50,19 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
 
    public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
       super(rows, cols, type, data);
+   }
+
+   public static CvMat move(final Mat mat) {
+      final long defaultMatNativeObj = API.CvRaster_defaultMat();
+      try {
+         final long nativeObjToUse = mat.nativeObj;
+         nativeObjField.set(mat, defaultMatNativeObj);
+         return new CvMat(nativeObjToUse);
+      } catch(final IllegalAccessException e) {
+         throw new RuntimeException(
+               "Got an exception trying to set Mat.nativeObj. Either the security model is too restrictive or the version of OpenCv can't be supported.",
+               e);
+      }
    }
 
    public static CvMat zeros(final int rows, final int cols, final int type) {

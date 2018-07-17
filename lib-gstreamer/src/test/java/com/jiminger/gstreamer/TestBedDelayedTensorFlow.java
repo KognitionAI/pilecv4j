@@ -72,7 +72,7 @@ public class TestBedDelayedTensorFlow {
          final BreakoutFilter bin = new BreakoutFilter("od")
                .connectSlowFilter(bac -> {
                   final CvRaster raster = bac.raster;
-                  final ByteBuffer bb = raster.underlying;
+                  final ByteBuffer bb = raster.underlying();
                   bb.rewind();
                   final int w = bac.width;
                   final int h = bac.height;

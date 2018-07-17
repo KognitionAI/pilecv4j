@@ -43,7 +43,6 @@ public class TestBedTensorFlow {
    public static final double threshold = 0.5;
    public static final int fontHeight = 20;
    public static final double fontScale = 3;
-   // public static final String rtmpDestinationUrl = "rtmp://10.1.1.14:1935/live/";
    public static final String rtmpDestinationUrl = "rtmp://localhost:1935/live/";
 
    public static final String defaultSsdModel = "tensor/ssd_mobilenet_v1_coco_2017_11_17/frozen_inference_graph.pb";
@@ -74,7 +73,7 @@ public class TestBedTensorFlow {
          final BreakoutFilter bin = new BreakoutFilter("od")
                .connectSlowFilter((final CvRasterAndCaps bac) -> {
                   final CvRaster raster = bac.raster;
-                  final ByteBuffer bb = raster.underlying;
+                  final ByteBuffer bb = raster.underlying();
                   bb.rewind();
                   final int w = bac.width;
                   final int h = bac.height;
