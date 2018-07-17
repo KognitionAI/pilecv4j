@@ -19,22 +19,23 @@ import com.jiminger.nr.Minimizer.Func;
  * direction.
  * </p>
  */
-public class LinearRegressionWithKnownSlope implements Func {
-   private final double[] y;
-   private final double[] x;
-   private double slope = 0.0;
+public class SimpleLinearRegression implements Func {
 
-   public LinearRegressionWithKnownSlope(final double slope, final double[] x, final double[] y) {
+   public final double[] y;
+   public final double[] x;
+
+   public SimpleLinearRegression(final double[] x, final double[] y) {
       this.x = x;
       this.y = y;
-      this.slope = slope;
    }
 
    @Override
-   public double func(final double[] m) {
+   public double func(final double[] lineDefMb) {
+      final double m = lineDefMb[0];
+      final double b = lineDefMb[1];
       double error2 = 0.0;
       for(int i = 0; i < x.length; i++) {
-         final double ycur = (slope * x[i] + m[0]);
+         final double ycur = (m * x[i] + b);
          final double ecur = ycur - y[i];
          error2 += (ecur * ecur);
       }
