@@ -33,7 +33,6 @@
   <properties>
     <!-- <downloadBinaries>true</downloadBinaries> -->
     <build.type>debug</build.type>
-    <swtgroup>org.eclipse.swt</swtgroup>
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
@@ -58,7 +57,6 @@
         </os>
       </activation>
       <properties>
-        <swtartifact>org.eclipse.swt.gtk.linux.x86</swtartifact>
         <platform>linux-x86_32</platform>
         <generator>Unix Makefiles</generator>
         <platform.option></platform.option>
@@ -73,7 +71,6 @@
         </os>
       </activation>
       <properties>
-        <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
         <platform.option></platform.option>
@@ -88,7 +85,6 @@
         </os>
       </activation>
       <properties>
-        <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
         <platform>windows-x86_64</platform>
         <platform.option>-Ax64</platform.option>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
@@ -103,7 +99,6 @@
         </os>
       </activation>
       <properties>
-        <swtartifact>org.eclipse.swt.win32.win32.x86</swtartifact>
         <platform>windows-x86_32</platform>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
         <platform.option></platform.option>
@@ -183,11 +178,6 @@
         <groupId>junit</groupId>
         <artifactId>junit</artifactId>
         <version>4.12</version>
-      </dependency>
-      <dependency>
-        <groupId>${swtgroup}</groupId>
-        <artifactId>${swtartifact}</artifactId>
-        <version>4.6</version>
       </dependency>
       <dependency>
         <groupId>commons-io</groupId>

@@ -346,7 +346,7 @@ public class Transform {
             final int width = hswidth;
             final int height = hsheight;
 
-            final CvRaster gradRaster = CvRaster.createManaged(height, width, CvType.CV_8UC1);
+            final CvRaster gradRaster = CvRaster.create(height, width, CvType.CV_8UC1);
 
             int max = 0;
             for (int i = 0; i < houghSpace.length; i++) {

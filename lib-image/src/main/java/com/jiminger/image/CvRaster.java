@@ -1,5 +1,7 @@
 package com.jiminger.image;
 
+import static net.dempsy.util.Functional.uncheck;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
@@ -8,6 +10,8 @@ import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -36,7 +40,7 @@ import net.dempsy.util.QuietCloseable;
  * </p>
  * 
  * <p>
- * To obtain a {@code CvRaster} you use the {@link CvRaster#manage(Mat)} as follows.
+ * To obtain a {@code CvRaster} you use the {@link CvRaster#stealMat(Mat)} as follows.
  * </p>
  * 
  * <pre>
@@ -152,8 +156,8 @@ public abstract class CvRaster implements AutoCloseable {
     * associated with the {@code Mat}. If you want to keep the {@code Mat} beyond the
     * life of the {@link CvRaster} then consider using {@link CvRaster#manageShallowCopy(Mat)}.
     */
-   public static CvRaster manage(final Mat mat) {
-      return manage(mat, null);
+   public static CvRaster stealMat(final Mat mat) {
+      return stealMat(mat, null);
    }
 
    /**
@@ -196,7 +200,7 @@ public abstract class CvRaster implements AutoCloseable {
     * that this {@link CvRaster} will be added to so that then it closes, this {@link CvRaster}
     * will also be closed {@code release}-ing the underlying {@code Mat}.
     */
-   public static CvRaster manage(final Mat mat, final Closer closer) {
+   public static CvRaster stealMat(final Mat mat, final Closer closer) {
       return toRaster(CvMat.move(mat), closer);
    }
 
@@ -230,7 +234,7 @@ public abstract class CvRaster implements AutoCloseable {
     * {@code release}-ing the underlying {@code Mat}.
     */
    public static CvRaster manageDeepCopy(final Mat mat, final Closer closer) {
-      return manage(mat.clone(), closer);
+      return stealMat(mat.clone(), closer);
    }
 
    /**
@@ -252,10 +256,10 @@ public abstract class CvRaster implements AutoCloseable {
     * You can use this method to create a {@link CvRaster} along with it's managed Mat.
     * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
     * 
-    * @see CvRaster#manage(Mat)
+    * @see CvRaster#stealMat(Mat)
     */
-   public static CvRaster createManaged(final int rows, final int cols, final int type) {
-      return createManaged(rows, cols, type, null);
+   public static CvRaster create(final int rows, final int cols, final int type) {
+      return create(rows, cols, type, null);
    }
 
    /**
@@ -266,9 +270,9 @@ public abstract class CvRaster implements AutoCloseable {
     * The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
     * 
-    * @see CvRaster#manage(Mat, com.jiminger.image.CvRaster.Closer)
+    * @see CvRaster#stealMat(Mat, com.jiminger.image.CvRaster.Closer)
     */
-   public static CvRaster createManaged(final int rows, final int cols, final int type, final Closer closer) {
+   public static CvRaster create(final int rows, final int cols, final int type, final Closer closer) {
       return toRaster(CvMat.zeros(rows, cols, type), closer);
    }
 
@@ -279,8 +283,8 @@ public abstract class CvRaster implements AutoCloseable {
     * will not be the "owner" of the data. That means YOU need to make sure that the native
     * data buffer outlives the CvRaster or you're pretty much guaranteed a code dump.
     */
-   public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer) {
-      return createManaged(rows, cols, type, pointer, null);
+   public static CvRaster create(final int rows, final int cols, final int type, final long pointer) {
+      return create(rows, cols, type, pointer, null);
    }
 
    /**
@@ -294,7 +298,7 @@ public abstract class CvRaster implements AutoCloseable {
     * The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
     */
-   public static CvRaster createManaged(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
+   public static CvRaster create(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
       final long nativeObj = API.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
       if(nativeObj == 0)
          throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
@@ -963,6 +967,62 @@ public abstract class CvRaster implements AutoCloseable {
          for(int i = 0; i < numChannels; i++)
             putter.put(pixel, i, ints[i]);
          return pixel;
+      };
+   }
+
+   @FunctionalInterface
+   public static interface KeyPressCallback {
+      public boolean keyPressed(int keyPressed);
+   }
+
+   public void show(final String name, final KeyPressCallback callback, final int waitMillis) {
+      CvRasterAPI.API.CvRaster_showImage(name, mat.nativeObj, callback == null ? null : kp -> callback.keyPressed(kp), waitMillis);
+   }
+
+   public static interface WindowHandle extends QuietCloseable {
+      public void update(Mat mat);
+   }
+
+   public WindowHandle show(final String name) {
+      final AtomicBoolean closeNow = new AtomicBoolean(false);
+      final AtomicReference<CvMat> update = new AtomicReference<CvMat>(null);
+
+      final Thread t = new Thread(() -> {
+         // create a callback that ignores the keypress but polls the state of the closeNow
+         show(name, kp -> {
+
+            final CvMat toUpdate = update.getAndSet(null);
+            if(toUpdate != null) {
+               CvRasterAPI.API.CvRaster_updateWindow(name, toUpdate.nativeObj);
+               toUpdate.close();
+            }
+
+            return closeNow.get();
+         }, 1);
+      }, "cv::imshow thread for \"" + name + "\"");
+
+      t.setDaemon(true);
+      t.start();
+
+      return new WindowHandle() {
+         boolean closed = false;
+
+         @Override
+         public void close() {
+            closed = true;
+            closeNow.set(true);
+            uncheck(() -> t.join());
+         }
+
+         @Override
+         public void update(final Mat toUpdate) {
+            if(closed)
+               throw new IllegalStateException("Cannot update closed " + WindowHandle.class.getSimpleName() + "\"" + name + "\"");
+            // Shallow copy
+            final CvMat old = update.getAndSet(new CvMat(API.CvRaster_copy(toUpdate.nativeObj)));
+            if(old != null)
+               old.close();
+         }
       };
    }
 

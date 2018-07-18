@@ -95,7 +95,7 @@ public class ImageFile {
          } else {
             if(filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
-            ret = CvRaster.manage(mat, closer);
+            ret = CvRaster.stealMat(mat, closer);
          }
       }
       LOGGER.trace("Read {} from {}", ret, filename);

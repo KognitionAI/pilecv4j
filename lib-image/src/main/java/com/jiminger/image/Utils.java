@@ -96,7 +96,7 @@ public class Utils {
    }
 
    private static CvRaster argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
-      final CvRaster raster = CvRaster.createManaged(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
+      final CvRaster raster = CvRaster.create(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
       final byte[] inpixels = bb.getData();
       if(lookup == null) // indicates a pixel compatible format
          raster.matAp(m -> m.put(0, 0, inpixels));
@@ -123,7 +123,7 @@ public class Utils {
 
    private static CvRaster argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
       final boolean hasAlpha = mask[0] != 0x0;
-      final CvRaster raster = CvRaster.createManaged(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+      final CvRaster raster = CvRaster.create(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
       final int[] inpixels = bi.getData();
       final int blue = 3;
       final int red = 1;
@@ -227,7 +227,7 @@ public class Utils {
                      + dataBuffer.getClass().getSimpleName());
             final DataBufferByte bb = (DataBufferByte)dataBuffer;
             final byte[] srcdata = bb.getData();
-            final CvRaster ret = CvRaster.createManaged(h, w, CvType.CV_8UC1);
+            final CvRaster ret = CvRaster.create(h, w, CvType.CV_8UC1);
             ret.matAp(m -> m.put(0, 0, srcdata));
             return ret;
          }
@@ -238,7 +238,7 @@ public class Utils {
                      + dataBuffer.getClass().getSimpleName());
             final DataBufferUShort bb = (DataBufferUShort)dataBuffer;
             final short[] srcdata = bb.getData();
-            final CvRaster ret = CvRaster.createManaged(h, w, CvType.CV_16UC1);
+            final CvRaster ret = CvRaster.create(h, w, CvType.CV_16UC1);
             ret.matAp(m -> m.put(0, 0, srcdata));
             return ret;
          }

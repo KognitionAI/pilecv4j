@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Caps;
@@ -116,7 +117,7 @@ public class BreakoutFilter extends BaseTransform {
                if(tmp != null && tmp.underlying().capacity() == capacity)
                   raster = tmp;
                else
-                  raster = CvRaster.createManaged(h, w, type);
+                  raster = CvRaster.create(h, w, type);
             }
             imageOp = raster.imageOp();
             final ByteBuffer buffer = raster.underlying();
@@ -173,12 +174,8 @@ public class BreakoutFilter extends BaseTransform {
       return ret;
    }
 
-   public BreakoutFilter connectStreamWatcher(final Consumer<CvRasterAndCaps> filter) {
-      return connectStreamWatcher(1, filter);
-   }
-
-   public BreakoutFilter connectStreamWatcher(final int numThreads, final Consumer<CvRasterAndCaps> watcher) {
-      final BreakoutFilter ret = connect(proxyFilter = new StreamWatcher(numThreads, watcher));
+   public BreakoutFilter connectStreamWatcher(final int numThreads, final Supplier<Consumer<CvRasterAndCaps>> watcherSupplier) {
+      final BreakoutFilter ret = connect(proxyFilter = new StreamWatcher(numThreads, watcherSupplier));
       return ret;
    }
 
@@ -327,9 +324,9 @@ public class BreakoutFilter extends BaseTransform {
          };
       }
 
-      public StreamWatcher(final int numThreads, final Consumer<CvRasterAndCaps> processor) {
+      public StreamWatcher(final int numThreads, final Supplier<Consumer<CvRasterAndCaps>> processorSupplier) {
          for(int i = 0; i < numThreads; i++)
-            threads.add(chain(new Thread(fromProcessor(processor)), t -> t.setDaemon(true), t -> t.start()));
+            threads.add(chain(new Thread(fromProcessor(processorSupplier.get())), t -> t.setDaemon(true), t -> t.start()));
       }
 
       @Override

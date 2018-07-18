@@ -58,7 +58,7 @@ public class GradientDirectionMask {
      * Generate a byte image that contains a view of the mask.
      */
     public CvRaster getMaskRaster() {
-        final CvRaster raster = CvRaster.createManaged(mheight, mwidth, CvType.CV_8UC1);
+        final CvRaster raster = CvRaster.create(mheight, mwidth, CvType.CV_8UC1);
         final byte[] pixel = new byte[1];
         raster.apply((BytePixelSetter) (row, col) -> {
             final short gradDeg = get(row, col);

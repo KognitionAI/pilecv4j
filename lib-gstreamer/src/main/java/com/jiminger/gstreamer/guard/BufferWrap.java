@@ -36,7 +36,7 @@ public class BufferWrap extends GstWrap<Buffer> {
         final boolean ok = GSTBUFFER_API.gst_buffer_map(obj, mapInfo,
                 writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
         if (ok && mapInfo.data != null) {
-            return CvRaster.createManaged(rows, cols, type, Pointer.nativeValue(mapInfo.data));
+            return CvRaster.create(rows, cols, type, Pointer.nativeValue(mapInfo.data));
         }
         return null;
     }

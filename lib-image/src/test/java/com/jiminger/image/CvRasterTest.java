@@ -16,6 +16,8 @@ import com.jiminger.image.CvRaster.BytePixelSetter;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 
+import net.dempsy.util.QuietCloseable;
+
 public class CvRasterTest {
 
    static {
@@ -61,10 +63,18 @@ public class CvRasterTest {
    }
 
    @Test
+   public void testShow() throws Exception {
+      try (final CvRaster raster = ImageFile.readMatFromFile(testImagePath);
+            QuietCloseable c = raster.show("Test");) {
+         Thread.sleep(5000);
+      }
+   }
+
+   @Test
    public void testSimpleCreate() throws Exception {
       final String expectedFileLocation = testImagePath;
 
-      try (final CvRaster raster = CvRaster.createManaged(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
+      try (final CvRaster raster = CvRaster.create(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
          raster.apply((BytePixelSetter)(r, c) -> new byte[] {(byte)(((r + c) >> 1) & 0xff)});
 
          final CvRaster expected = ImageFile.readMatFromFile(expectedFileLocation);
@@ -76,7 +86,7 @@ public class CvRasterTest {
    public void testEqualsAndNotEquals() throws Exception {
       final String expectedFileLocation = testImagePath;
 
-      try (final CvRaster raster = CvRaster.createManaged(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
+      try (final CvRaster raster = CvRaster.create(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
          raster.apply((BytePixelSetter)(r, c) -> {
             if(r == 134 && c == 144)
                return new byte[] {-1};

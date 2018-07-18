@@ -86,7 +86,7 @@ public class TestHoughTransform {
 
             final CvRaster origImage = ImageFile.readMatFromFile(testFile, closer);
 
-            final CvRaster sprocketInfoTiledImage = CvRaster.createManaged(origImage.rows(), origImage.cols(), CvType.CV_8UC1, closer);
+            final CvRaster sprocketInfoTiledImage = CvRaster.create(origImage.rows(), origImage.cols(), CvType.CV_8UC1, closer);
 
             // convert to gray scale
             final CvMat grayImage = Operations.convertToGray(origImage, closer);

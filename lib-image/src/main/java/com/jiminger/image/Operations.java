@@ -78,7 +78,7 @@ public class Operations {
       }
 
       // a byte raster to hold the dirs
-      final CvMat gradientDirImage = closer.add(CvRaster.createManaged(dxr.rows(), dxr.cols(), CvType.CV_8UC1).disown());
+      final CvMat gradientDirImage = closer.add(CvRaster.create(dxr.rows(), dxr.cols(), CvType.CV_8UC1).disown());
       gradientDirImage.put(0, 0, dirsa);
 
       return new GradientImages(CvRaster.toRaster(gradientDirImage, closer), dxr, dyr);

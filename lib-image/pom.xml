@@ -52,11 +52,6 @@
       <classifier>withlib</classifier>
       <optional>true</optional>
     </dependency>
-    <dependency> <!-- Only needed for ImageDisplay -->
-      <groupId>${swtgroup}</groupId>
-      <artifactId>${swtartifact}</artifactId>
-      <optional>true</optional>
-    </dependency>
     <dependency> <!-- Only needed to run the main here. -->
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
