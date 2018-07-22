@@ -1,7 +1,5 @@
 package com.jiminger.image;
 
-import static net.dempsy.util.Functional.uncheck;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
@@ -10,8 +8,6 @@ import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -218,7 +214,7 @@ public abstract class CvRaster implements AutoCloseable {
     * {@code release}-ing the underlying {@code Mat}.
     */
    public static CvRaster manageShallowCopy(final Mat mat, final Closer closer) {
-      final CvRaster ret = makeInstance(new CvMat(API.CvRaster_copy(mat.nativeObj))/* , getData(mat) */);
+      final CvRaster ret = makeInstance(CvMat.shallowCopy(mat));
       if(closer != null)
          closer.add(ret);
       return ret;
@@ -302,10 +298,10 @@ public abstract class CvRaster implements AutoCloseable {
       final long nativeObj = API.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
       if(nativeObj == 0)
          throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      return toRaster(new CvMat(nativeObj), closer);
+      return toRaster(CvMat.wrap(nativeObj), closer);
    }
 
-   private static CvRaster makeInstance(final CvMat mat/* , final ByteBuffer bb */) {
+   private static CvRaster makeInstance(final CvMat mat) {
       // bb.clear();
       final int type = mat.type();
       final int depth = CvType.depth(type);
@@ -967,62 +963,6 @@ public abstract class CvRaster implements AutoCloseable {
          for(int i = 0; i < numChannels; i++)
             putter.put(pixel, i, ints[i]);
          return pixel;
-      };
-   }
-
-   @FunctionalInterface
-   public static interface KeyPressCallback {
-      public boolean keyPressed(int keyPressed);
-   }
-
-   public void show(final String name, final KeyPressCallback callback, final int waitMillis) {
-      CvRasterAPI.API.CvRaster_showImage(name, mat.nativeObj, callback == null ? null : kp -> callback.keyPressed(kp), waitMillis);
-   }
-
-   public static interface WindowHandle extends QuietCloseable {
-      public void update(Mat mat);
-   }
-
-   public WindowHandle show(final String name) {
-      final AtomicBoolean closeNow = new AtomicBoolean(false);
-      final AtomicReference<CvMat> update = new AtomicReference<CvMat>(null);
-
-      final Thread t = new Thread(() -> {
-         // create a callback that ignores the keypress but polls the state of the closeNow
-         show(name, kp -> {
-
-            final CvMat toUpdate = update.getAndSet(null);
-            if(toUpdate != null) {
-               CvRasterAPI.API.CvRaster_updateWindow(name, toUpdate.nativeObj);
-               toUpdate.close();
-            }
-
-            return closeNow.get();
-         }, 1);
-      }, "cv::imshow thread for \"" + name + "\"");
-
-      t.setDaemon(true);
-      t.start();
-
-      return new WindowHandle() {
-         boolean closed = false;
-
-         @Override
-         public void close() {
-            closed = true;
-            closeNow.set(true);
-            uncheck(() -> t.join());
-         }
-
-         @Override
-         public void update(final Mat toUpdate) {
-            if(closed)
-               throw new IllegalStateException("Cannot update closed " + WindowHandle.class.getSimpleName() + "\"" + name + "\"");
-            // Shallow copy
-            final CvMat old = update.getAndSet(new CvMat(API.CvRaster_copy(toUpdate.nativeObj)));
-            if(old != null)
-               old.close();
-         }
       };
    }
 

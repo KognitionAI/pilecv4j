@@ -2,7 +2,6 @@ package com.jiminger.image;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import com.sun.jna.Callback;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
@@ -41,11 +40,15 @@ public interface CvRasterAPI extends Library {
 
    public long CvRaster_defaultMat();
 
-   public interface _KeyPressCallback extends Callback {
-      public boolean keyPressed(int keyPressed);
-   }
-
-   public void CvRaster_showImage(String name, long nativeMatHandle, _KeyPressCallback callback, int waitMillis);
+   // ==========================================================
+   // Wrapped OpenCv HighGUI API.
+   // ALL of these need to be called from a SINGLE common thread.
+   public void CvRaster_showImage(String name, long nativeMatHandle);
 
    public void CvRaster_updateWindow(String name, long nativeMatHandle);
+
+   public int CvRaster_fetchEvent(int millisToSleep);
+
+   public void CvRaster_destroyWindow(String name);
+   // ==========================================================
 }

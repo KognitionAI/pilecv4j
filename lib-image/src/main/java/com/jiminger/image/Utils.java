@@ -28,13 +28,17 @@ import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferInt;
 import java.awt.image.DataBufferUShort;
 import java.awt.image.IndexColorModel;
+import java.util.Arrays;
 
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
 import com.jiminger.image.CvRaster.BytePixelSetter;
+import com.jiminger.image.CvRaster.DoublePixelSetter;
+import com.jiminger.image.CvRaster.FlatDoublePixelSetter;
 import com.jiminger.image.geometry.PerpendicularLine;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.SimplePoint;
@@ -244,7 +248,7 @@ public class Utils {
          }
          case TYPE_USHORT_565_RGB: // 16 bit total with 5 bit r, 6 bit g, 5 bit blue
          case TYPE_USHORT_555_RGB: // 15 bit (wtf?) with 5/5/5 r/g/b.
-            throw new IllegalArgumentException("Cannot handle a BufferedImage with an alpha channel. Sorry. Ask nice maybe I'll fix it.");
+            throw new IllegalArgumentException("Cannot handle a BufferedImage with 5/6/5 RGB 16-bit packed pixels. Sorry. Ask nice maybe I'll fix it.");
          default:
             throw new IllegalArgumentException("Cannot extract pixels from a BufferedImage of type " + crappyImage.getType());
       }
@@ -462,4 +466,84 @@ public class Utils {
             new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
    }
 
+   /**
+    * This method will overlay the {@code overlay} image onto the {@code original} image by
+    * having the original image show through the overlay, everywhere the overlay has a pixel
+    * value of zero (or zero in all channels).
+    */
+   public static void overlay(final CvMat original, final CvMat dst, final CvMat overlay) {
+      try (final CvMat gray = new CvMat();
+            final CvMat invMask = new CvMat();
+            CvMat maskedOrig = new CvMat()) {
+         Imgproc.cvtColor(overlay, gray, Imgproc.COLOR_BGR2GRAY);
+         Imgproc.threshold(gray, invMask, 1, 255, Imgproc.THRESH_BINARY_INV);
+         Core.bitwise_and(original, original, maskedOrig, invMask);
+         Core.add(original, overlay, dst);
+      }
+   }
+
+   public static double[] toDoubleArray(final Mat mat) {
+      if(mat.type() != CvType.CV_64FC1)
+         throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
+               + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
+      // we're going to flatten it.
+      final int r = mat.rows();
+      final int c = mat.cols();
+      final int len = r * c;
+      final double[] ret = new double[len];
+
+      try (final CvMat toCvrt = CvMat.move(mat.reshape(0, len));) {
+         for(int i = 0; i < len; i++)
+            ret[i] = toCvrt.get(i, 0)[0];
+      }
+      return ret;
+   }
+
+   public static double[][] to2dDoubleArray(final Mat mat) {
+      if(mat.type() != CvType.CV_64FC1)
+         throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
+               + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
+      // we're going to flatten it.
+      final int r = mat.rows();
+      final int c = mat.cols();
+      final double[][] ret = new double[r][c];
+
+      for(int i = 0; i < r; i++)
+         for(int j = 0; j < c; j++)
+            ret[i][j] = mat.get(i, j)[0];
+
+      return ret;
+   }
+
+   public static CvMat toMat(final double[] a, final boolean row) {
+      final int len = a.length;
+      final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);
+      try (final CvRaster raster = CvRaster.toRaster(ret);) {
+         raster.apply((FlatDoublePixelSetter)i -> new double[] {a[i]});
+         return raster.disown();
+      }
+   }
+
+   public static CvMat toMat(final double[][] a) {
+      final int rows = a.length;
+      final int cols = a[0].length;
+
+      final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);
+      try (final CvRaster raster = CvRaster.toRaster(ret);) {
+         raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]});
+         return raster.disown();
+      }
+   }
+
+   public static void dumpMat(final Mat mat) {
+      System.out.println(CvType.typeToString(mat.type()));
+      for(int i = 0; i < mat.height(); i++) {
+         System.out.print("|");
+         for(int j = 0; j < mat.width(); j++) {
+            final double[] val = mat.get(i, j);
+            System.out.print(" " + Arrays.toString(val));
+         }
+         System.out.println(" |");
+      }
+   }
 }

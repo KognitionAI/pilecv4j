@@ -65,7 +65,7 @@ public class CvRasterTest {
    @Test
    public void testShow() throws Exception {
       try (final CvRaster raster = ImageFile.readMatFromFile(testImagePath);
-            QuietCloseable c = raster.show("Test");) {
+            QuietCloseable c = raster.matOp(m -> ImageDisplay.show(m, "Test"));) {
          Thread.sleep(5000);
       }
    }

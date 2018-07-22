@@ -37,9 +37,13 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
       }
    }
 
-   // called from CvRaster
-   CvMat(final long nativeObj) {
+   private CvMat(final long nativeObj) {
       super(nativeObj);
+   }
+
+   // called from CvRaster
+   static CvMat wrap(final long nativeObj) {
+      return new CvMat(nativeObj);
    }
 
    public CvMat() {}
@@ -50,6 +54,16 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
 
    public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
       super(rows, cols, type, data);
+   }
+
+   public static CvMat shallowCopy(final Mat mat) {
+      return new CvMat(CvRasterAPI.API.CvRaster_copy(mat.nativeObj));
+   }
+
+   public static CvMat deepCopy(final Mat mat) {
+      final CvMat ret = new CvMat();
+      mat.copyTo(ret);
+      return ret;
    }
 
    public static CvMat move(final Mat mat) {
