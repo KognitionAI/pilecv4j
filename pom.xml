@@ -38,13 +38,15 @@
          OpenCV we're building against matches what we expect. -->
     <opencv.version>3.4.2</opencv.version>
     
-    <slf4j.version>1.7.16</slf4j.version>
+    <slf4j.version>1.7.25</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
     <cmake.generator>${generator}</cmake.generator>
     <cmake.options>${platform.option}</cmake.options>
     
     <dempsy-commons.version>2.2.0-SNAPSHOT</dempsy-commons.version>
+    
+    <commons.cli.version>1.4</commons.cli.version>
   </properties>
 
   <profiles>
@@ -174,40 +176,38 @@
         <artifactId>slf4j-api</artifactId>
         <version>${slf4j.version}</version>
       </dependency>
-      <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <version>4.12</version>
-      </dependency>
-      <dependency>
+      <dependency> <!-- Requirement of using the NativeLibraryLoader from Dempsy -->
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
         <version>2.6</version>
-      </dependency>
-      <dependency> <!-- Need if using Tensorflow -->
-        <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow</artifactId>
-        <version>1.8.0</version>
-        <optional>true</optional>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
         <version>4.5.1</version>
-        <optional>true</optional>
       </dependency>
       
+      <dependency> <!-- Need if using Tensorflow -->
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow</artifactId>
+        <version>1.8.0</version>
+      </dependency>
       
       <!-- Testing -->
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-log4j12</artifactId>
         <version>${slf4j.version}</version>
-        <scope>test</scope>
+      </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.12</version>
       </dependency>
 
     </dependencies>
   </dependencyManagement>
+
 
   <scm>
     <connection>scm:ssh://jim@king-homer:443/repo/utilities</connection>
@@ -236,7 +236,17 @@
       </plugin>
     </plugins>
   </reporting>
+  
   <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>2.21.0</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
     <resources>
       <resource>
         <directory>src/main/java</directory>

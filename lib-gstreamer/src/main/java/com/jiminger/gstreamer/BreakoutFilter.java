@@ -68,8 +68,6 @@ public class BreakoutFilter extends BaseTransform {
             "gstreamer element \"" + GST_NAME + "\" doesn't support the \"caps\" property. Please use a caps filter.");
    }
 
-   private static final AtomicReference<CvRaster> storedBuffer = new AtomicReference<>();
-
    public static class CapsInfo implements AutoCloseable {
       public final Caps caps;
       public final int width;
@@ -85,6 +83,11 @@ public class BreakoutFilter extends BaseTransform {
       public void close() {
          if(caps != null)
             caps.dispose();
+      }
+
+      @Override
+      public String toString() {
+         return "CapsInfo [caps=" + caps + ", width=" + width + ", height=" + height + "]";
       }
    }
 
@@ -138,6 +141,12 @@ public class BreakoutFilter extends BaseTransform {
          super.close();
       }
 
+      @Override
+      public String toString() {
+         return "CvRasterAndCaps [raster=" + raster + ", rasterDisowned=" + rasterDisowned + ", caps=" + caps + ", width=" + width
+               + ", height=" + height + "]";
+      }
+
       private CvRaster disownRaster() {
          if(imageOp != null)
             imageOp.close();
@@ -156,10 +165,11 @@ public class BreakoutFilter extends BaseTransform {
 
    public BreakoutFilter connect(final Function<CvRasterAndCaps, FlowReturn> filter) {
       return connect((NEW_SAMPLE)elem -> {
+         final int h = elem.getCurrentFrameHeight();
+         final int w = elem.getCurrentFrameWidth();
          try (BufferWrap buffer = elem.getCurrentBuffer();
-               CvRaster raster = buffer.mapToRaster(elem.getCurrentFrameHeight(), elem.getCurrentFrameWidth(), CvType.CV_8UC3, true);
-               CvRasterAndCaps bac = new CvRasterAndCaps(raster, elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
-                     elem.getCurrentFrameHeight())) {
+               CvRaster raster = buffer.mapToRaster(h, w, CvType.CV_8UC3, true);
+               CvRasterAndCaps bac = new CvRasterAndCaps(raster, elem.getCurrentCaps(), w, h)) {
             return filter.apply(bac);
          }
       });
@@ -177,6 +187,28 @@ public class BreakoutFilter extends BaseTransform {
    public BreakoutFilter connectStreamWatcher(final int numThreads, final Supplier<Consumer<CvRasterAndCaps>> watcherSupplier) {
       final BreakoutFilter ret = connect(proxyFilter = new StreamWatcher(numThreads, watcherSupplier));
       return ret;
+   }
+
+   public BreakoutFilter connectDelayedStreamWatcher(final int numThreads,
+         final Function<CvRasterAndCaps, Supplier<Consumer<CvRasterAndCaps>>> watcherSupplier) {
+      connect(new NEW_SAMPLE() {
+
+         @Override
+         public FlowReturn new_sample(final BreakoutFilter elem) {
+            final int h = elem.getCurrentFrameHeight();
+            final int w = elem.getCurrentFrameWidth();
+            try (final BufferWrap buffer = elem.getCurrentBuffer();
+                  final CvRaster raster = buffer.mapToRaster(h, w, CvType.CV_8UC3, true);
+                  final CvRasterAndCaps bac = new CvRasterAndCaps(raster, elem.getCurrentCaps(), w, h)) {
+
+               disconnect(this);
+               connectStreamWatcher(numThreads, watcherSupplier.apply(bac));
+
+               return FlowReturn.OK;
+            }
+         }
+      });
+      return this;
    }
 
    @Override
@@ -198,6 +230,53 @@ public class BreakoutFilter extends BaseTransform {
       super.dispose();
    }
 
+   // =================================================
+   // Signals.
+   // =================================================
+   /**
+    * This callback is the main filter callback.
+    */
+   public static interface NEW_SAMPLE {
+      public FlowReturn new_sample(BreakoutFilter elem);
+   }
+
+   public BreakoutFilter connect(final NEW_SAMPLE listener) {
+      connect(NEW_SAMPLE.class, listener, new GstCallback() {
+         @SuppressWarnings("unused")
+         public FlowReturn callback(final BreakoutFilter elem) {
+            return listener.new_sample(elem);
+         }
+      });
+      return this;
+   }
+
+   public BreakoutFilter disconnect(final NEW_SAMPLE listener) {
+      disconnect(NEW_SAMPLE.class, listener);
+      return this;
+   }
+   // =================================================
+
+   // =================================================
+   // These calls should only be made from within the
+   // context of the NEW_SAMPLE callback.
+   // =================================================
+   public BufferWrap getCurrentBuffer() {
+      return new BufferWrap(gst().gst_breakout_current_frame_buffer(this), false);
+   }
+
+   public Caps getCurrentCaps() {
+      return gst().gst_breakout_current_frame_caps(this);
+   }
+
+   public int getCurrentFrameWidth() {
+      return gst().gst_breakout_current_frame_width(this);
+   }
+
+   public int getCurrentFrameHeight() {
+      return gst().gst_breakout_current_frame_height(this);
+   }
+   // =================================================
+
    private static abstract class ProxyFilter implements NEW_SAMPLE {
       protected final List<Thread> threads = new ArrayList<>();
       protected final AtomicBoolean stop = new AtomicBoolean(false);
@@ -206,14 +285,6 @@ public class BreakoutFilter extends BaseTransform {
          stop.set(true);
       }
 
-      protected static void dispose(final CvRasterAndCaps bac) {
-         if(bac != null) {
-            final CvRaster old = storedBuffer.getAndSet(bac.disownRaster());
-            if(old != null)
-               LOGGER.warn("Throwing away a ByteBuffer");
-            bac.close();
-         }
-      }
    }
 
    private static class SlowFilterSlippage extends ProxyFilter {
@@ -221,6 +292,19 @@ public class BreakoutFilter extends BaseTransform {
       private final AtomicReference<CvRasterAndCaps> result = new AtomicReference<>(null);
       private CvRasterAndCaps current = null;
       private boolean firstOne = true;
+
+      private final AtomicReference<CvRaster> storedBuffer = new AtomicReference<>();
+
+      private void dispose(final CvRasterAndCaps bac) {
+         if(bac != null) {
+            final CvRaster old = storedBuffer.getAndSet(bac.disownRaster());
+            if(old != null) {
+               old.close();
+               LOGGER.warn("Throwing away a ByteBuffer");
+            }
+            bac.close();
+         }
+      }
 
       private Runnable fromProcessor(final Consumer<CvRasterAndCaps> processor) {
          return () -> {
@@ -309,6 +393,11 @@ public class BreakoutFilter extends BaseTransform {
    private static class StreamWatcher extends ProxyFilter {
       private final AtomicReference<CvRasterAndCaps> to = new AtomicReference<>(null);
 
+      private void dispose(final CvRasterAndCaps toDispose) {
+         if(toDispose != null)
+            toDispose.close();
+      }
+
       private Runnable fromProcessor(final Consumer<CvRasterAndCaps> processor) {
          return () -> {
             while(!stop.get()) {
@@ -319,6 +408,7 @@ public class BreakoutFilter extends BaseTransform {
                }
                if(frame != null && !stop.get()) {
                   processor.accept(frame);
+                  dispose(frame);
                } // otherwise we're stopped.
             }
          };
@@ -334,7 +424,7 @@ public class BreakoutFilter extends BaseTransform {
          try (final BufferWrap buffer = elem.getCurrentBuffer();) {
 
             dispose(to.getAndSet(
-                  new CvRasterAndCaps(buffer.obj, storedBuffer.getAndSet(null), elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
+                  new CvRasterAndCaps(buffer.obj, null, elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
                         elem.getCurrentFrameHeight(), CvType.CV_8UC3)));
          }
          return FlowReturn.OK;
@@ -342,51 +432,4 @@ public class BreakoutFilter extends BaseTransform {
 
    }
 
-   // =================================================
-   // Signals.
-   // =================================================
-   /**
-    * This callback is the main filter callback.
-    */
-   public static interface NEW_SAMPLE {
-      public FlowReturn new_sample(BreakoutFilter elem);
-   }
-
-   public BreakoutFilter connect(final NEW_SAMPLE listener) {
-      connect(NEW_SAMPLE.class, listener, new GstCallback() {
-         @SuppressWarnings("unused")
-         public FlowReturn callback(final BreakoutFilter elem) {
-            return listener.new_sample(elem);
-         }
-      });
-      return this;
-   }
-   // =================================================
-
-   // =================================================
-   // These calls should only be made from within the
-   // context of the NEW_SAMPLE callback.
-   // =================================================
-   public BufferWrap getCurrentBuffer() {
-      return new BufferWrap(gst().gst_breakout_current_frame_buffer(this), false);
-   }
-
-   public Caps getCurrentCaps() {
-      return gst().gst_breakout_current_frame_caps(this);
-   }
-
-   public int getCurrentFrameWidth() {
-      return gst().gst_breakout_current_frame_width(this);
-   }
-
-   public int getCurrentFrameHeight() {
-      return gst().gst_breakout_current_frame_height(this);
-   }
-
-   // public BufferAndCaps getCurrentBufferAndCaps() {
-   // final _FrameDetails fd = new _FrameDetails();
-   // BreakoutFilter.gst().gst_breakout_current_frame_details(this, fd);
-   // return new BufferAndCaps(new Buffer(initializer(fd.buffer)), new Caps(initializer(fd.caps)), fd.width, fd.height);
-   // }
-   // =================================================
 }

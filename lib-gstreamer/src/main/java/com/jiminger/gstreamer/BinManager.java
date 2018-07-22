@@ -5,6 +5,8 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -38,6 +40,7 @@ public class BinManager {
 
    private int ghostPadNum = 0;
    private boolean stopOnEos = false;
+   private CountDownLatch stopLatch = null;
    private OnError<?> onErrCb = null;
 
    /**
@@ -81,6 +84,11 @@ public class BinManager {
     */
    public BinManager dynamicLink(final DynamicLink linker) {
       current.dynamicLink(linker);
+      return this;
+   }
+
+   public BinManager accessElement(final Consumer<Element> onCreateCallback) {
+      current.accessElement(onCreateCallback);
       return this;
    }
 
@@ -135,8 +143,15 @@ public class BinManager {
    /**
     * Conditionally apply the consumer to the BinManager
     */
-   public BinManager doIf(final boolean predicate, final Consumer<BinManager> doThis) {
-      if(predicate)
+   public BinManager optionally(final boolean predicate, final Consumer<BinManager> doThis) {
+      return optionally(() -> predicate, doThis);
+   }
+
+   /**
+    * Conditionally apply the consumer to the BinManager
+    */
+   public BinManager optionally(final BooleanSupplier predicate, final Consumer<BinManager> doThis) {
+      if(predicate.getAsBoolean())
          doThis.accept(this);
 
       return this;
@@ -214,9 +229,19 @@ public class BinManager {
    /**
     * Set the Bin to stop/shutdown when it reaches the end of the stream.
     */
-   public BinManager stopOnEndOfStream() {
+   public BinManager stopOnEndOfStream(final CountDownLatch stopLatch) {
+      if(this.stopOnEos)
+         throw new IllegalStateException("You cannot call stopOnEndOfStream more than once on a " + BinManager.class.getSimpleName());
       this.stopOnEos = true;
+      this.stopLatch = stopLatch;
       return this;
+   }
+
+   /**
+    * Set the Bin to stop/shutdown when it reaches the end of the stream.
+    */
+   public BinManager stopOnEndOfStream() {
+      return stopOnEndOfStream(null);
    }
 
    @FunctionalInterface
@@ -361,7 +386,7 @@ public class BinManager {
 
    private <T extends Bin> T postPocess(final T pipe) {
       if(stopOnEos)
-         GstUtils.stopBinOnEOS(pipe);
+         GstUtils.stopBinOnEOS(pipe, stopLatch);
 
       // ======================================================================
       // Set up the error handler

@@ -5,6 +5,7 @@ import java.io.PrintStream;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
@@ -58,17 +59,9 @@ public class GstUtils {
       java.util.logging.Logger.getLogger(logger).setLevel(level);
    }
 
-   private static final Bus.EOS endOnEOS(final Bin bin) {
-      final Bus.EOS ret = (object) -> {
-         LOGGER.info("end-of-stream: {}", object);
-         bin.stop();
-      };
-      return ret;
-   }
-
-   public static void stopBinOnEOS(final Bin pipe) {
+   public static void stopBinOnEOS(final Bin pipe, final CountDownLatch latch) {
       final Bus bus = pipe.getBus();
-      bus.connect(endOnEOS(pipe));
+      bus.connect(getEndOnEOSCallback(pipe, latch));
    }
 
    public static <T extends Bin> void onError(final T pipe, final Bus.ERROR errCb) {
@@ -91,6 +84,16 @@ public class GstUtils {
             }
          }
       }
+   }
+
+   private static final Bus.EOS getEndOnEOSCallback(final Bin bin, final CountDownLatch latch) {
+      final Bus.EOS ret = (object) -> {
+         LOGGER.info("end-of-stream: {}", object);
+         bin.stop();
+         if(latch != null)
+            latch.countDown();
+      };
+      return ret;
    }
 
    private static final String indent = "    ";

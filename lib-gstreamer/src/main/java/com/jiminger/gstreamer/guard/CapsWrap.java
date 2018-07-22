@@ -1,5 +1,10 @@
 package com.jiminger.gstreamer.guard;
 
+import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Structure;
 
@@ -7,6 +12,19 @@ public class CapsWrap extends GstWrap<Caps> {
 
    public CapsWrap(final Caps caps) {
       super(caps);
+   }
+
+   public List<String> getMediaType() {
+      if(obj == null)
+         return Collections.emptyList();
+
+      final int numCaps = obj.size();
+      return IntStream.range(0, numCaps)
+            .mapToObj(i -> obj.getStructure(i))
+            .filter(o -> o != null)
+            .map(o -> o.getName())
+            .filter(n -> n != null)
+            .collect(Collectors.toList());
    }
 
    public String get(final String name) {

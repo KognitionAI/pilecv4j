@@ -164,6 +164,11 @@ public class Branch {
       return this;
    }
 
+   public Branch accessElement(final Consumer<Element> onCreateCallback) {
+      onCreateCallback.accept(currentElement.element);
+      return this;
+   }
+
    /**
     * Add an element that has static pads.
     */
@@ -588,4 +593,5 @@ public class Branch {
          this(element, false);
       }
    }
+
 }
