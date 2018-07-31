@@ -11,9 +11,7 @@ The documentation for this project is in its infancy.
 
 Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are two to take note of.
 
-1. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) will build and package into a jar file:
-   1. [OpenCV](https://opencv.org/) itself.
-   1. A native library used by `CvRaster` from `lib-image` (see below)
+1. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file:
 1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
 
 ## Contents
@@ -56,7 +54,8 @@ Powell's method is actually implemented using the algorithm from [Numerical Reci
 
 `native` is a supporting native C/C++ code for the above projects. It contains:
 
-1. The [Numerical Recipes in C](http://www.numerical.recipes/) implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method) which is called from the `Minimizer` in `lib-nr`.
+1. The navive code that supports `CvRaster`.
+1. The [Numerical Recipes in C](http://www.numerical.recipes/) implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method) which is called from the `Minimizer` in `lib-nr`. This implementation's been modified so it can be used recursively and from multuple threads.
 1. C/C++ code for writing a JPEG images into an MJPEG `avi` file written from `MJPEGWriter` in `lib-image`
 1. C++ code for performing a [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform) used by the `com.jiminger.image.houghspace.Transform` from `lib-image`.
 1. It will eventually contain native code that will support using [TensorFlow](https://www.tensorflow.org/) from Java.
