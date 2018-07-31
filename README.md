@@ -11,7 +11,7 @@ The documentation for this project is in its infancy.
 
 Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are two to take note of.
 
-1. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file:
+1. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file.
 1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
 
 ## Contents
@@ -66,7 +66,7 @@ See the [TestBedTensorFlow.java](https://github.com/jimfcarroll/utilities/blob/m
 
 ## History
 
-It grew out of an old project from 2004. Details of that old project can be found at [S8](http://jiminger.com/s8/) and the still working image processing code can be found in the sub project `s8` which will probably be moved to its own repository shortly.
+It grew out of an old project from 2004. Details of that old project can be found at [S8](http://jiminger.com/s8/) and the still working image processing code can be found in the separate github repository [s8](https://github.com/jimfcarroll/s8).
 
 In brief the original project was my attempt to convert my parents library of legacy super-8 mm film to DVD. I have actually got this working and have scanned several 400 foot rolls of film. See the above link for details.
 
