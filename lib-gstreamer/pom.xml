@@ -50,10 +50,12 @@
       <artifactId>slf4j-log4j12</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency> <!-- Used for TensorUtils -->
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow</artifactId>
+    <dependency> <!-- Used for a test -->
+      <groupId>com.jiminger</groupId>
+      <artifactId>tensorflow-lib-jar</artifactId>
+      <classifier>withlib</classifier>
       <scope>test</scope>
+      <optional>true</optional>
     </dependency>
   </dependencies>
 

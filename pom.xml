@@ -37,7 +37,8 @@
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
     <opencv.version>3.4.2</opencv.version>
-    
+
+    <tensorflow.version>1.10.0</tensorflow.version>    
     <slf4j.version>1.7.25</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
@@ -127,6 +128,12 @@
         <classifier>withlib</classifier>
         <version>${opencv.version}</version>
       </dependency>
+      <dependency>
+        <groupId>com.jiminger</groupId>
+        <artifactId>tensorflow-lib-jar</artifactId>
+        <classifier>withlib</classifier>
+        <version>${tensorflow.version}</version>
+      </dependency>
 
       <!-- Internal to the product -->
       <dependency>
@@ -187,12 +194,6 @@
         <version>4.5.1</version>
       </dependency>
       
-      <dependency> <!-- Need if using Tensorflow -->
-        <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow</artifactId>
-        <version>1.8.0</version>
-      </dependency>
-      
       <!-- Testing -->
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -210,9 +211,9 @@
 
 
   <scm>
-    <connection>scm:ssh://jim@king-homer:443/repo/utilities</connection>
-    <developerConnection>scm:ssh://jim@king-homer:443/repo/utilities</developerConnection>
-    <url>scm:ssh://jim@king-homer:443/repo/utilities</url>
+    <developerConnection>scm:git:git@github.com:jimfcarroll/utilities.git</developerConnection>
+    <tag>master</tag>
+    <url>https://github.com/jimfcarroll/utilities</url>
   </scm>
 
   <repositories>

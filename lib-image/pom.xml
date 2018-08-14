@@ -42,10 +42,11 @@
     </dependency>
     
     <dependency> <!-- Used for TensorUtils -->
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow</artifactId>
+      <groupId>com.jiminger</groupId>
+      <artifactId>tensorflow-lib-jar</artifactId>
+      <classifier>withlib</classifier>
       <optional>true</optional>
-    </dependency>    
+    </dependency>
     <dependency> <!-- Only needed to run the main here. -->
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
