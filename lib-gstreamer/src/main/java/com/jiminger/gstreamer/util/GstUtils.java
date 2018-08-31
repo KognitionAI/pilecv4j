@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.io.StringWriter;
 import java.nio.charset.Charset;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -24,8 +25,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
+import com.jiminger.gstreamer.Branch;
+import com.jiminger.gstreamer.BreakoutFilter;
+
 public class GstUtils {
    private static final Logger LOGGER = LoggerFactory.getLogger(GstUtils.class);
+   public static final String DEFAULT_APP_NAME = "kognition";
 
    static {
       SLF4JBridgeHandler.removeHandlersForRootLogger();
@@ -44,6 +49,12 @@ public class GstUtils {
    }
 
    private static final GstDebugAPI gst = GstNative.load(GstDebugAPI.class);
+   private static int inited = 0;
+   private static boolean testMode = true; // this is broken in GStreamer. Always in test mode.
+
+   public synchronized static void testMode() {
+      testMode = true;
+   }
 
    public static final void gstDebugBinToDotFile(final Bin bin, final int details,            // bus.connect(printStateChange);
 
@@ -69,20 +80,46 @@ public class GstUtils {
       bus.connect(errCb);
    }
 
-   private static boolean gstInited = false; // double checked locking ... OH NO!!!!
-
    /**
     * Safely call Gst.init(). This manages multiple calls and makes sure it's only called
     * once.
     */
    public static void safeGstInit() {
-      if(!gstInited) {
-         synchronized(GstUtils.class) {
-            if(!gstInited) {
-               Gst.init();
-               gstInited = true;
+      safeGstInit(DEFAULT_APP_NAME, new String[0]);
+   }
+
+   /**
+    * Safely call Gst.init(). This manages multiple calls and makes sure it's only called
+    * once.
+    */
+   public static void safeGstInit(final String appName, final String[] args) {
+      if(inited == 0) {
+         Gst.init(appName, args);
+
+         additionalClasses(); // this is a hack for fixing an MT problem
+      }
+      inited++;
+      BreakoutFilter.init();
+   }
+
+   /**
+    * Safely call Gst.deinit() (if not in "testmode"). This manages multiple nested calls
+    * and makes sure it's only called once.
+    */
+   public static void safeGstDeinit() {
+      if(!testMode) {
+         inited--;
+         if(inited == 0)
+            Gst.deinit();
+      } else {
+         // reset the Branch counter.
+         new Branch() {
+            @Override
+            public int hashCode() {
+               super.hackResetSequence();
+               return 0;
             }
-         }
+         }.hashCode(); // what better way to call a hidden protected method?
       }
    }
 
@@ -224,4 +261,50 @@ public class GstUtils {
       }
    }
 
+   // This hack prevents an obscure deadlock. See:
+   // https://groups.google.com/forum/#!topic/gstreamer-java/byigl-Rpafs
+   private static void additionalClasses() {
+      // this list was obtained using:
+      //
+      // grep -r Structure | grep extends | grep com.sun.jna | sed -e "s/.java:.*$//1" | sort | uniq | sed -e "s|\/|.|g"
+      // | sed -e "s/$/\",/1" | sed -e "s/^src./\"/g"
+      //
+      // from the root of the gst1-java-core source directory.
+      Arrays.asList(
+            "org.freedesktop.gstreamer.lowlevel.BaseSinkAPI",
+            "org.freedesktop.gstreamer.lowlevel.BaseSrcAPI",
+            "org.freedesktop.gstreamer.lowlevel.BaseTransformAPI",
+            "org.freedesktop.gstreamer.lowlevel.GlibAPI",
+            "org.freedesktop.gstreamer.lowlevel.GObjectAPI",
+            "org.freedesktop.gstreamer.lowlevel.GSignalAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstBufferAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstColorBalanceAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstControllerAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstControlSourceAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstDeviceProviderAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstElementAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstEventAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstInterpolationControlSourceAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstLFOControlSourceAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstMessageAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstMiniObjectAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstObjectAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstQueryAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstSampleAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstStructureAPI",
+            "org.freedesktop.gstreamer.lowlevel.GValueAPI")
+            .forEach(cn -> {
+               try {
+                  Class.forName(cn);
+               } catch(final ClassNotFoundException cnfe) {
+                  LOGGER.warn("The Gstreamer Java class \"" + cn +
+                        "\" doesn't appear on the classpath. Please regenerate the list of classes to load.");
+               } catch(final Throwable ule) {
+                  // we are going to assume you don't need this class in this current process.
+                  LOGGER.debug("Couldn't load class \"" + cn + "\" due to a " + ule.getClass().getSimpleName());
+               }
+            });
+
+   }
 }

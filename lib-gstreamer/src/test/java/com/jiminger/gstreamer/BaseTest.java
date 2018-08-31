@@ -3,11 +3,11 @@ package com.jiminger.gstreamer;
 import java.io.File;
 import java.net.URI;
 
-import com.jiminger.gstreamer.guard.GstScope;
+import com.jiminger.gstreamer.util.GstUtils;
 
 public class BaseTest {
    static {
-      GstScope.testMode();
+      GstUtils.testMode();
    }
 
    public final static URI STREAM = new File(

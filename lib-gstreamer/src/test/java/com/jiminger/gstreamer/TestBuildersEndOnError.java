@@ -21,11 +21,12 @@ public class TestBuildersEndOnError extends BaseTest {
 
          final AtomicBoolean gotHere = new AtomicBoolean(false);
          final Pipeline pipe = new BinManager()
+               .scope(m)
                .delayed("uridecodebin", "myjunkyderidecodeybin").with("uri", STREAM.toString())
                // intentional mismatch between decodebin output and the FrameCatcher without a videoconvert
                .add(fc.disown())
                .onAnyError((q, x, y, z) -> gotHere.set(true))
-               .buildPipeline(m);
+               .buildPipeline();
 
          pipe.play();
          assertTrue(poll(o -> gotHere.get()));

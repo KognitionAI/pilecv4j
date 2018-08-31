@@ -267,14 +267,14 @@ public class BinManager {
       return this;
    }
 
-   /**
-    * Convert the current builder to a {@link Pipeline} managed by the given scope.
-    * That is, it will be automatically disposed alone with all of the elements
-    * created as part of this BinBuilder when the scope is closed.
-    */
-   public Pipeline buildPipeline(final GstScope scope) {
-      return scope.manage(buildPipeline());
-   }
+   // /**
+   // * Convert the current builder to a {@link Pipeline} managed by the given scope.
+   // * That is, it will be automatically disposed alone with all of the elements
+   // * created as part of this BinBuilder when the scope is closed.
+   // */
+   // public Pipeline buildPipeline(final GstScope scope) {
+   // return scope.manage(buildPipeline());
+   // }
 
    /**
     * Convert the current builder to a {@link Pipeline}
@@ -283,12 +283,16 @@ public class BinManager {
       final Pipeline pipe = new Pipeline() {
          @Override
          public void dispose() {
-            LOGGER.debug("disposing " + this + " with a ref count of " + this.getRefCount());
+            if(LOGGER.isTraceEnabled())
+               LOGGER.trace("disposing {} with a ref count of {}", this, this.getRefCount());
             super.dispose();
             disposeAll(primary);
          }
       };
-      return postPocess(build(pipe, false));
+      final Pipeline ret = postPocess(build(pipe, false));
+      if(scope != null)
+         scope.manage(ret);
+      return ret;
    }
 
    /**

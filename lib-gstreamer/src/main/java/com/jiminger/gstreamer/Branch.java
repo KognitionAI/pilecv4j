@@ -434,8 +434,8 @@ public class Branch {
 
       for(int i = elements.size() - 1; i >= 0; i--) {
          final Element ce = elements.get(i).element;
-         if(LOGGER.isDebugEnabled())
-            LOGGER.debug("disposing {} with a ref count of {}", ce, ce.getRefCount());
+         if(LOGGER.isTraceEnabled())
+            LOGGER.trace("disposing {} with a ref count of {}", ce, ce.getRefCount());
          ce.dispose();
       }
    }

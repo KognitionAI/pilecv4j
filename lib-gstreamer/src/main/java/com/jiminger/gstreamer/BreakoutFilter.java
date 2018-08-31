@@ -99,7 +99,7 @@ public class BreakoutFilter extends BaseTransform {
       private CvRasterAndCaps(final CvRaster frameData, final Caps caps, final int w, final int h) {
          super(caps, w, h);
          this.raster = frameData;
-         this.imageOp = raster.imageOp();
+         this.imageOp = raster == null ? null : raster.imageOp();
       }
 
       /**
@@ -170,7 +170,7 @@ public class BreakoutFilter extends BaseTransform {
          try (BufferWrap buffer = elem.getCurrentBuffer();
                CvRaster raster = buffer.mapToRaster(h, w, CvType.CV_8UC3, true);
                CvRasterAndCaps bac = new CvRasterAndCaps(raster, elem.getCurrentCaps(), w, h)) {
-            return filter.apply(bac);
+            return (raster == null) ? FlowReturn.OK : filter.apply(bac);
          }
       });
    }

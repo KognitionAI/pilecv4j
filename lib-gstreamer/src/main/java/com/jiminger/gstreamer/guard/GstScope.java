@@ -4,34 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.freedesktop.gstreamer.Element;
-import org.freedesktop.gstreamer.Gst;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.jiminger.gstreamer.Branch;
-import com.jiminger.gstreamer.BreakoutFilter;
+import com.jiminger.gstreamer.util.GstUtils;
 
 import net.dempsy.util.Functional;
 
 public class GstScope implements AutoCloseable {
    private static final Logger LOGGER = LoggerFactory.getLogger(GstScope.class);
 
-   private static int inited = 0;
-   private static boolean testMode = true; // this is broken in GStreamer. Always in test mode.
-
    private final List<AutoCloseable> cleanups = new ArrayList<>();
 
-   public synchronized static void testMode() {
-      testMode = true;
-   }
-
    public GstScope() {
-      synchronized(GstScope.class) {
-         if(inited == 0)
-            Gst.init();
-         inited++;
-      }
-      BreakoutFilter.init();
+      this(GstUtils.DEFAULT_APP_NAME, new String[0]);
    }
 
    public GstScope(final Class<?> testClass) {
@@ -43,11 +29,7 @@ public class GstScope implements AutoCloseable {
    }
 
    public GstScope(final String appName, final String[] args) {
-      synchronized(GstScope.class) {
-         if(inited == 0)
-            Gst.init(appName, args);
-         inited++;
-      }
+      GstUtils.safeGstInit(appName, args);
    }
 
    public void register(final AutoCloseable ac) {
@@ -70,20 +52,7 @@ public class GstScope implements AutoCloseable {
          }
          cleanups.clear();
 
-         if(!testMode) {
-            inited--;
-            if(inited == 0)
-               Gst.deinit();
-         } else {
-            // reset the Branch counter.
-            new Branch() {
-               @Override
-               public int hashCode() {
-                  super.hackResetSequence();
-                  return 0;
-               }
-            }.hashCode();
-         }
+         GstUtils.safeGstDeinit();
       }
    }
 

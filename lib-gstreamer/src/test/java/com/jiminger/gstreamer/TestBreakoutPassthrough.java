@@ -15,13 +15,14 @@ import com.jiminger.gstreamer.BreakoutFilter.CvRasterAndCaps;
 import com.jiminger.gstreamer.guard.GstScope;
 import com.jiminger.gstreamer.util.FrameCatcher;
 import com.jiminger.gstreamer.util.FrameEmitter;
+import com.jiminger.gstreamer.util.GstUtils;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 public class TestBreakoutPassthrough {
    static {
-      GstScope.testMode();
+      GstUtils.testMode();
    }
 
    private final static Logger LOGGER = LoggerFactory.getLogger(TestBreakoutPassthrough.class);
@@ -35,6 +36,7 @@ public class TestBreakoutPassthrough {
             final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
          final Pipeline pipe = new BinManager()
+               .scope(m)
                .add(fe.disown())
                .make("videoconvert")
                .caps("video/x-raw")
@@ -57,7 +59,7 @@ public class TestBreakoutPassthrough {
                         return FlowReturn.OK;
                      }))
                .add(fc.disown())
-               .buildPipeline(m);
+               .buildPipeline();
 
          // instrument(pipe);
          pipe.play();
