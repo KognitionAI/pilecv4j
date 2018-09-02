@@ -36,7 +36,7 @@
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv.version>3.4.2</opencv.version>
+    <opencv.version>3.4.3</opencv.version>
 
     <tensorflow.version>1.9.0</tensorflow.version>    
     <slf4j.version>1.7.25</slf4j.version>
