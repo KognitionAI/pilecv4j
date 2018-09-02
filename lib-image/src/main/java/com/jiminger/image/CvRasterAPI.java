@@ -17,8 +17,8 @@ public interface CvRasterAPI extends Library {
    public static CvRasterAPI _init() {
       if(!inited.getAndSet(true)) {
          NativeLibraryLoader.loader()
-               .optional("opencv_ffmpeg342_64")
-               .library("opencv_java342")
+               .optional("opencv_ffmpeg343_64")
+               .library("opencv_java343")
                .library("utilities.jiminger.com")
                .addCallback((dir, libname, oslibname) -> {
                   if(LIBNAME.equals(libname))
