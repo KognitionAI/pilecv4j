@@ -77,6 +77,7 @@ public class RtspServer implements AutoCloseable {
    }
 
    private static class FeedDef {
+      @SuppressWarnings("unused") // this is potentially serialized to a file.
       public final String name;
       public String rtspPath = null;
       public String filePath = null;

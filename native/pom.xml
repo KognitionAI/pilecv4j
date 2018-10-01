@@ -55,7 +55,7 @@
               <environmentVariables>
                 <CMAKE_CLASSIFIER>${platform}</CMAKE_CLASSIFIER>
                 <PROJECT_VERSION>${project.version}</PROJECT_VERSION>
-                <DEP_OPENCV_VERSION>${opencv.version}</DEP_OPENCV_VERSION>
+                <DEP_OPENCV_VERSION>${opencv-base.version}</DEP_OPENCV_VERSION>
               </environmentVariables>
               <downloadBinaries>${download.cmake}</downloadBinaries>
             </configuration>

@@ -22,12 +22,6 @@
       <optional>true</optional>
     </dependency>
     
-    <dependency>
-      <groupId>com.jiminger</groupId>
-      <artifactId>native-lib</artifactId>
-      <classifier>${platform}</classifier>
-    </dependency>
-    
     <!-- Third party deps -->
     <dependency>
       <groupId>com.jiminger</groupId>

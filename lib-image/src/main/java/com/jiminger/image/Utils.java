@@ -28,7 +28,8 @@ import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferInt;
 import java.awt.image.DataBufferUShort;
 import java.awt.image.IndexColorModel;
-import java.util.Arrays;
+import java.io.PrintStream;
+import java.lang.reflect.Array;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -36,9 +37,15 @@ import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
+import com.jiminger.image.CvRaster.BytePixelConsumer;
 import com.jiminger.image.CvRaster.BytePixelSetter;
 import com.jiminger.image.CvRaster.DoublePixelSetter;
 import com.jiminger.image.CvRaster.FlatDoublePixelSetter;
+import com.jiminger.image.CvRaster.FloatPixelConsumer;
+import com.jiminger.image.CvRaster.ImageOpContext;
+import com.jiminger.image.CvRaster.IntPixelConsumer;
+import com.jiminger.image.CvRaster.PixelConsumer;
+import com.jiminger.image.CvRaster.ShortPixelConsumer;
 import com.jiminger.image.geometry.PerpendicularLine;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.SimplePoint;
@@ -123,6 +130,31 @@ public class Utils {
          });
       }
       return raster;
+   }
+
+   @SuppressWarnings("unchecked")
+   public static void dump(final CvRaster raster, final PrintStream out) {
+      try (ImageOpContext ctx = raster.imageOp()) {
+         @SuppressWarnings("rawtypes")
+         final PixelConsumer pp = CvRaster.makePixelPrinter(out, raster.type());
+         for(int r = 0; r < raster.rows(); r++) {
+            out.print("[");
+            for(int c = 0; c < raster.cols() - 1; c++) {
+               out.print(" ");
+               pp.accept(r, c, raster.get(r, c));
+               out.print(",");
+            }
+            out.print(" ");
+            pp.accept(r, raster.cols() - 1, raster.get(r, raster.cols() - 1));
+            out.println("]");
+         }
+      }
+   }
+
+   public static void dump(final Mat mat, final PrintStream out) {
+      try (CvRaster r = CvRaster.manageShallowCopy(mat)) {
+         dump(r, out);
+      }
    }
 
    private static CvRaster argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
@@ -482,6 +514,45 @@ public class Utils {
       }
    }
 
+   @SuppressWarnings("unchecked")
+   public static <T> T toArray(final Mat mat, final Class<T> clazz) {
+      final int type = mat.type();
+      final int channels = CvType.channels(type);
+      final int rows = mat.rows();
+      final int cols = mat.cols();
+      final T ret;
+      try (final CvRaster raster = CvRaster.manageShallowCopy(mat);
+            final ImageOpContext io = raster.imageOp();) {
+         switch(CvType.depth(type)) {
+            case CvType.CV_8S:
+            case CvType.CV_8U:
+               ret = (T)Array.newInstance(byte.class, rows, cols, channels);
+               raster.forEach((BytePixelConsumer)(r, c, p) -> System.arraycopy(p, 0, ((byte[][][])ret)[r][c], 0, channels));
+               break;
+            case CvType.CV_16S:
+            case CvType.CV_16U:
+               ret = (T)Array.newInstance(short.class, rows, cols, channels);
+               raster.forEach((ShortPixelConsumer)(r, c, p) -> System.arraycopy(p, 0, ((short[][][])ret)[r][c], 0, channels));
+               break;
+            case CvType.CV_32S:
+               ret = (T)Array.newInstance(int.class, rows, cols, channels);
+               raster.forEach((IntPixelConsumer)(r, c, p) -> System.arraycopy(p, 0, ((int[][][])ret)[r][c], 0, channels));
+               break;
+            case CvType.CV_32F:
+               ret = (T)Array.newInstance(float.class, rows, cols, channels);
+               raster.forEach((FloatPixelConsumer)(r, c, p) -> System.arraycopy(p, 0, ((float[][][])ret)[r][c], 0, channels));
+               break;
+            case CvType.CV_64F:
+               ret = (T)Array.newInstance(double.class, rows, cols, channels);
+               raster.forEach((FloatPixelConsumer)(r, c, p) -> System.arraycopy(p, 0, ((double[][][])ret)[r][c], 0, channels));
+               break;
+            default:
+               throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
+         }
+      }
+      return ret;
+   }
+
    public static double[] toDoubleArray(final Mat mat) {
       if(mat.type() != CvType.CV_64FC1)
          throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
@@ -517,8 +588,8 @@ public class Utils {
 
    public static CvMat toMat(final double[] a, final boolean row) {
       final int len = a.length;
-      final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);
-      try (final CvRaster raster = CvRaster.toRaster(ret);) {
+      try (final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);
+            final CvRaster raster = CvRaster.manageShallowCopy(ret);) {
          raster.apply((FlatDoublePixelSetter)i -> new double[] {a[i]});
          return raster.disown();
       }
@@ -528,22 +599,10 @@ public class Utils {
       final int rows = a.length;
       final int cols = a[0].length;
 
-      final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);
-      try (final CvRaster raster = CvRaster.toRaster(ret);) {
+      try (final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);
+            final CvRaster raster = CvRaster.manageShallowCopy(ret);) {
          raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]});
          return raster.disown();
-      }
-   }
-
-   public static void dumpMat(final Mat mat) {
-      System.out.println(CvType.typeToString(mat.type()));
-      for(int i = 0; i < mat.height(); i++) {
-         System.out.print("|");
-         for(int j = 0; j < mat.width(); j++) {
-            final double[] val = mat.get(i, j);
-            System.out.print(" " + Arrays.toString(val));
-         }
-         System.out.println(" |");
       }
    }
 }

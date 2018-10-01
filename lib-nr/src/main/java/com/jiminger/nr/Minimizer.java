@@ -50,7 +50,9 @@ import com.jiminger.util.NativePointerWrap;
  * </pre>
  */
 public class Minimizer {
-   private static MinimizerAPI API = MinimizerAPI.API;
+   static {
+      MinimizerAPI._init();
+   }
 
    private final Func f;
    private double[] minVec;
@@ -135,7 +137,7 @@ public class Minimizer {
       // cheap mutable to detect and pass around the side exceptions thrown by Func
       final AtomicReference<RuntimeException> error = new AtomicReference<>(null);
 
-      final double ret = API.dominimize((x, p_status) -> {
+      final double ret = MinimizerAPI.dominimize((x, p_status) -> {
          int xindex = 0;
          for(int i = 0; i < n; i++) {
             tmp[i] = x.getFloat(xindex);
@@ -155,7 +157,7 @@ public class Minimizer {
          throw new MinimizerException("Exception ocurred in function being minimized.", error.get());
 
       if(status[0] != 0) {
-         try (final NativePointerWrap message = new NativePointerWrap(API.nrGetErrorMessage());) {
+         try (final NativePointerWrap message = new NativePointerWrap(MinimizerAPI.nrGetErrorMessage());) {
             final String msgStr = message.ptr.getString(0, "UTF-8");
             throw new MinimizerException("Powell mimimization failed with a non-zero status (" + status[0] + ") and message \"" + msgStr + "\"");
          }

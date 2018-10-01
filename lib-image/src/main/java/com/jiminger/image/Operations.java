@@ -45,43 +45,43 @@ public class Operations {
    }
 
    public static CvRaster canny(final GradientImages gis, final double tlow, final double thigh, final Closer closer) {
-      final CvMat edgeImage = new CvMat();
-      gis.dx.matAp(dx -> gis.dy.matAp(dy -> Imgproc.Canny(dx, dy, edgeImage, tlow, thigh, true)));
-      return CvRaster.toRaster(edgeImage, closer);
+      try (final CvMat edgeImage = new CvMat();) {
+         gis.dx.matAp(dx -> gis.dy.matAp(dy -> Imgproc.Canny(dx, dy, edgeImage, tlow, thigh, true)));
+         return CvRaster.manageShallowCopy(edgeImage, closer);
+      }
    }
 
    public static GradientImages gradient(final CvMat grayImage, final int kernelSize, final Closer closerp) {
-      @SuppressWarnings("resource")
-      final Closer closer = (closerp == null) ? new Closer() : closerp;
 
       // find gradient image
-      final CvMat dx = new CvMat();
-      final CvMat dy = new CvMat();
-      Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-      final CvRaster dxr = CvRaster.toRaster(dx, closer);
-      Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-      final CvRaster dyr = CvRaster.toRaster(dy, closer);
-      final int numPixelsInGradient = dxr.rows() * dxr.cols();
-      final byte[] dirsa = new byte[numPixelsInGradient];
+      try (final CvMat dx = new CvMat();
+            final CvMat dy = new CvMat();) {
+         Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+         final CvRaster dxr = CvRaster.manageShallowCopy(dx, closerp);
+         Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
+         final CvRaster dyr = CvRaster.manageShallowCopy(dy, closerp);
+         final int numPixelsInGradient = dxr.rows() * dxr.cols();
+         final byte[] dirsa = new byte[numPixelsInGradient];
 
-      final short[] tmpdx = new short[numPixelsInGradient];
-      dxr.matAp(m -> m.get(0, 0, tmpdx));
+         final short[] tmpdx = new short[numPixelsInGradient];
+         dxr.matAp(m -> m.get(0, 0, tmpdx));
 
-      try (ImageOpContext dxrIo = dxr.imageOp();
-            ImageOpContext dyrIo = dyr.imageOp();) {
-         for(int pos = 0; pos < numPixelsInGradient; pos++) {
-            // calculate the angle
-            final double dxv = ((short[])dxr.get(pos))[0];
-            final double dyv = 0.0 - ((short[])dyr.get(pos))[0]; // flip y axis.
-            dirsa[pos] = angle_byte(dxv, dyv);
+         try (ImageOpContext dxrIo = dxr.imageOp();
+               ImageOpContext dyrIo = dyr.imageOp();) {
+            for(int pos = 0; pos < numPixelsInGradient; pos++) {
+               // calculate the angle
+               final double dxv = ((short[])dxr.get(pos))[0];
+               final double dyv = 0.0 - ((short[])dyr.get(pos))[0]; // flip y axis.
+               dirsa[pos] = angle_byte(dxv, dyv);
+            }
+         }
+
+         // a byte raster to hold the dirs
+         try (final CvMat gradientDirImage = new CvMat(dxr.rows(), dxr.cols(), CvType.CV_8UC1);) {
+            gradientDirImage.put(0, 0, dirsa);
+            return new GradientImages(CvRaster.manageShallowCopy(gradientDirImage, closerp), dxr, dyr);
          }
       }
-
-      // a byte raster to hold the dirs
-      final CvMat gradientDirImage = closer.add(CvRaster.create(dxr.rows(), dxr.cols(), CvType.CV_8UC1).disown());
-      gradientDirImage.put(0, 0, dirsa);
-
-      return new GradientImages(CvRaster.toRaster(gradientDirImage, closer), dxr, dyr);
    }
 
    public static CvMat convertToGray(final CvRaster origImage) {

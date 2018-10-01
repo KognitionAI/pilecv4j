@@ -20,6 +20,10 @@ import org.slf4j.LoggerFactory;
 import net.dempsy.util.QuietCloseable;
 
 public class ImageDisplay {
+   static {
+      CvRasterAPI._init();
+   }
+
    private static Logger LOGGER = LoggerFactory.getLogger(ImageDisplay.class);
 
    @FunctionalInterface
@@ -53,13 +57,13 @@ public class ImageDisplay {
             try {
                if(state.windows.size() > 0) {
                   // then we can check for a key press.
-                  final int key = CvRasterAPI.API.CvRaster_fetchEvent(1);
+                  final int key = CvRasterAPI.CvRaster_fetchEvent(1);
                   final List<String> toCloseUp = state.callbacks.values().stream()
                         .map(cb -> cb.keyPressed(key))
                         .filter(n -> n != null)
                         .map(n -> {
                            // need to close the window and cleanup.
-                           CvRasterAPI.API.CvRaster_destroyWindow(n);
+                           CvRasterAPI.CvRaster_destroyWindow(n);
                            // okay. We got here so the window should be closed.
                            return n; // we're building a list of objects to closeup
                         })
@@ -150,7 +154,7 @@ public class ImageDisplay {
    private static void doShow(final Mat mat, final String name, final CvKeyPressCallback callback) {
       LOGGER.debug("Showing image {} in window {} ", mat, name);
       uncheck(() -> commands.put(s -> {
-         CvRasterAPI.API.CvRaster_showImage(name, mat.nativeObj);
+         CvRasterAPI.CvRaster_showImage(name, mat.nativeObj);
          // if we got here, we're going to assume the windows was created.
          if(callback != null)
             s.callbacks.put(name, callback);
@@ -184,7 +188,7 @@ public class ImageDisplay {
          final CvMat toUpdate = update.getAndSet(null);
 
          if(toUpdate != null) {
-            CvRasterAPI.API.CvRaster_updateWindow(name, toUpdate.nativeObj);
+            CvRasterAPI.CvRaster_updateWindow(name, toUpdate.nativeObj);
             toUpdate.close();
          }
 

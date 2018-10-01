@@ -8,7 +8,9 @@ import java.nio.ByteBuffer;
 import org.opencv.core.Mat;
 
 public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
-   private static final CvRasterAPI API = CvRasterAPI.API;
+   static {
+      CvRasterAPI._init();
+   }
 
    private static final Method nDelete;
    private static final Method nZeros;
@@ -42,7 +44,7 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    }
 
    // called from CvRaster
-   static CvMat wrap(final long nativeObj) {
+   public static CvMat wrapNative(final long nativeObj) {
       return new CvMat(nativeObj);
    }
 
@@ -57,7 +59,7 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    }
 
    public static CvMat shallowCopy(final Mat mat) {
-      return new CvMat(CvRasterAPI.API.CvRaster_copy(mat.nativeObj));
+      return new CvMat(CvRasterAPI.CvRaster_copy(mat.nativeObj));
    }
 
    public static CvMat deepCopy(final Mat mat) {
@@ -67,7 +69,7 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    }
 
    public static CvMat move(final Mat mat) {
-      final long defaultMatNativeObj = API.CvRaster_defaultMat();
+      final long defaultMatNativeObj = CvRasterAPI.CvRaster_defaultMat();
       try {
          final long nativeObjToUse = mat.nativeObj;
          nativeObjField.set(mat, defaultMatNativeObj);

@@ -36,9 +36,10 @@
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv.version>3.4.3</opencv.version>
+    <opencv-base.version>3.4.3</opencv-base.version>
+    <opencv.version>${opencv-base.version}-cuda9.2</opencv.version>
 
-    <tensorflow.version>1.9.0</tensorflow.version>    
+    <tensorflow.version>1.11.0</tensorflow.version>    
     <slf4j.version>1.7.25</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->

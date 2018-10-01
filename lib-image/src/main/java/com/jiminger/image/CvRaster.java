@@ -1,11 +1,13 @@
 package com.jiminger.image;
 
+import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Consumer;
@@ -36,7 +38,7 @@ import net.dempsy.util.QuietCloseable;
  * </p>
  * 
  * <p>
- * To obtain a {@code CvRaster} you use the {@link CvRaster#stealMat(Mat)} as follows.
+ * To obtain a {@code CvRaster} you use the {@link CvRaster#move(Mat)} as follows.
  * </p>
  * 
  * <pre>
@@ -55,14 +57,17 @@ import net.dempsy.util.QuietCloseable;
  */
 public abstract class CvRaster implements AutoCloseable {
 
-   private static final CvRasterAPI API = CvRasterAPI.API;
+   static {
+      CvRasterAPI._init();
+   }
 
    private boolean decoupled = false;
    private final CvMat mat;
+   protected ByteBuffer currentBuffer = null;
+   private int refCountForCurrentBuffer = 0;
 
-   private CvRaster(final CvMat m/* , final ByteBuffer underlying */) {
+   private CvRaster(final CvMat m) {
       this.mat = m;
-      // this.underlying = underlying;
    }
 
    /**
@@ -131,9 +136,6 @@ public abstract class CvRaster implements AutoCloseable {
       };
    }
 
-   protected ByteBuffer currentBuffer = null;
-   private int refCountForCurrentBuffer = 0;
-
    /**
     * Direct access to the underlying {@code Mat}'s data buffer is available, as long
     * as the underlying buffer is continuous.
@@ -152,8 +154,8 @@ public abstract class CvRaster implements AutoCloseable {
     * associated with the {@code Mat}. If you want to keep the {@code Mat} beyond the
     * life of the {@link CvRaster} then consider using {@link CvRaster#manageShallowCopy(Mat)}.
     */
-   public static CvRaster stealMat(final Mat mat) {
-      return stealMat(mat, null);
+   public static CvRaster move(final Mat mat) {
+      return move(mat, null);
    }
 
    /**
@@ -175,13 +177,6 @@ public abstract class CvRaster implements AutoCloseable {
    }
 
    /**
-    * convert/wrap a CvMat into a CvRaster
-    */
-   public static CvRaster toRaster(final CvMat mat) {
-      return toRaster(mat, null);
-   }
-
-   /**
     * <p>
     * This call should be made to hand management of the Mat over to the {@link CvRaster}.
     * The Mat will be {@link CvMat#move(Mat)}ed so the Mat shouldn't be used after this
@@ -196,7 +191,7 @@ public abstract class CvRaster implements AutoCloseable {
     * that this {@link CvRaster} will be added to so that then it closes, this {@link CvRaster}
     * will also be closed {@code release}-ing the underlying {@code Mat}.
     */
-   public static CvRaster stealMat(final Mat mat, final Closer closer) {
+   public static CvRaster move(final Mat mat, final Closer closer) {
       return toRaster(CvMat.move(mat), closer);
    }
 
@@ -230,29 +225,14 @@ public abstract class CvRaster implements AutoCloseable {
     * {@code release}-ing the underlying {@code Mat}.
     */
    public static CvRaster manageDeepCopy(final Mat mat, final Closer closer) {
-      return stealMat(mat.clone(), closer);
-   }
-
-   /**
-    * convert/wrap a CvMat into a CvRaster
-    * 
-    * <p>
-    * The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
-    * will be added to so that then it closes, this {@link CvRaster} will also be closed
-    * {@code release}-ing the underlying {@code Mat}.
-    */
-   public static CvRaster toRaster(final CvMat mat, final Closer closer) {
-      final CvRaster ret = makeInstance(mat/* , getData(mat) */);
-      if(closer != null)
-         closer.add(ret);
-      return ret;
+      return move(mat.clone(), closer);
    }
 
    /**
     * You can use this method to create a {@link CvRaster} along with it's managed Mat.
     * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
     * 
-    * @see CvRaster#stealMat(Mat)
+    * @see CvRaster#move(Mat)
     */
    public static CvRaster create(final int rows, final int cols, final int type) {
       return create(rows, cols, type, null);
@@ -266,7 +246,7 @@ public abstract class CvRaster implements AutoCloseable {
     * The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
     * 
-    * @see CvRaster#stealMat(Mat, com.jiminger.image.CvRaster.Closer)
+    * @see CvRaster#move(Mat, com.jiminger.image.CvRaster.Closer)
     */
    public static CvRaster create(final int rows, final int cols, final int type, final Closer closer) {
       return toRaster(CvMat.zeros(rows, cols, type), closer);
@@ -295,10 +275,10 @@ public abstract class CvRaster implements AutoCloseable {
     * will be added to so that then it closes, this {@link CvRaster} will also be closed.
     */
    public static CvRaster create(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
-      final long nativeObj = API.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+      final long nativeObj = CvRasterAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
       if(nativeObj == 0)
          throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      return toRaster(CvMat.wrap(nativeObj), closer);
+      return toRaster(CvMat.wrapNative(nativeObj), closer);
    }
 
    private static CvRaster makeInstance(final CvMat mat) {
@@ -378,6 +358,7 @@ public abstract class CvRaster implements AutoCloseable {
 
                @Override
                protected void prep() {
+
                   sb = currentBuffer.asShortBuffer();
                }
 
@@ -705,7 +686,7 @@ public abstract class CvRaster implements AutoCloseable {
    public long getNativeAddressOfData() {
       if(!mat.isContinuous())
          throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      return Pointer.nativeValue(API.CvRaster_getData(mat.nativeObj));
+      return Pointer.nativeValue(CvRasterAPI.CvRaster_getData(mat.nativeObj));
    }
 
    /**
@@ -804,15 +785,6 @@ public abstract class CvRaster implements AutoCloseable {
       return bb1.compareTo(bb2) == 0;
    }
 
-   private static ByteBuffer _getData(final Mat mat) {
-      if(!mat.isContinuous())
-         throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      final Pointer dataPtr = API.CvRaster_getData(mat.nativeObj);
-      if(Pointer.nativeValue(dataPtr) == 0)
-         throw new IllegalArgumentException("Cannot access raw data in Mat. It may be uninitialized.");
-      return dataPtr.getByteBuffer(0, mat.elemSize() * mat.total());
-   }
-
    public static <T> T copyToPrimitiveArray(final CvRaster m) {
       return copyToPrimitiveArray(m.mat);
    }
@@ -857,7 +829,6 @@ public abstract class CvRaster implements AutoCloseable {
          default:
             throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
       }
-
    }
 
    @FunctionalInterface
@@ -949,9 +920,31 @@ public abstract class CvRaster implements AutoCloseable {
             return new short[channels];
          case CvType.CV_32S:
             return new int[channels];
+         case CvType.CV_32F:
+            return new float[channels];
+         case CvType.CV_64F:
+            return new double[channels];
          default:
             throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
+      }
+   }
 
+   public static PixelConsumer<?> makePixelPrinter(final PrintStream stream, final int type) {
+      switch(CvType.depth(type)) {
+         case CvType.CV_8S:
+         case CvType.CV_8U:
+            return (BytePixelConsumer)(final int r, final int c, final byte[] pixel) -> stream.print(Arrays.toString(pixel));
+         case CvType.CV_16S:
+         case CvType.CV_16U:
+            return (ShortPixelConsumer)(final int r, final int c, final short[] pixel) -> stream.print(Arrays.toString(pixel));
+         case CvType.CV_32S:
+            return (IntPixelConsumer)(final int r, final int c, final int[] pixel) -> stream.print(Arrays.toString(pixel));
+         case CvType.CV_32F:
+            return (FloatPixelConsumer)(final int r, final int c, final float[] pixel) -> stream.print(Arrays.toString(pixel));
+         case CvType.CV_64F:
+            return (DoublePixelConsumer)(final int r, final int c, final double[] pixel) -> stream.print(Arrays.toString(pixel));
+         default:
+            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
       }
    }
 
@@ -1104,6 +1097,15 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
+   private static ByteBuffer _getData(final Mat mat) {
+      if(!mat.isContinuous())
+         throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
+      final Pointer dataPtr = CvRasterAPI.CvRaster_getData(mat.nativeObj);
+      if(Pointer.nativeValue(dataPtr) == 0)
+         throw new IllegalArgumentException("Cannot access raw data in Mat. It may be uninitialized.");
+      return dataPtr.getByteBuffer(0, mat.elemSize() * mat.total());
+   }
+
    private static ByteBuffer getData(final Mat mat) {
       final ByteBuffer ret = _getData(mat);
       if(ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
@@ -1111,4 +1113,18 @@ public abstract class CvRaster implements AutoCloseable {
       return ret;
    }
 
+   /**
+    * convert/wrap a CvMat into a CvRaster
+    * 
+    * <p>
+    * The {@link com.jiminger.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
+    * will be added to so that then it closes, this {@link CvRaster} will also be closed
+    * {@code release}-ing the underlying {@code Mat}.
+    */
+   private static CvRaster toRaster(final CvMat mat, final Closer closer) {
+      final CvRaster ret = makeInstance(mat/* , getData(mat) */);
+      if(closer != null)
+         closer.add(ret);
+      return ret;
+   }
 }
