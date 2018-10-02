@@ -7,8 +7,12 @@ import java.nio.ByteBuffer;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
+   private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
+
    static {
       CvRasterAPI._init();
    }
@@ -121,7 +125,12 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
 
    // Prevent finalize from being called
    @Override
-   protected void finalize() throws Throwable {}
+   protected void finalize() throws Throwable {
+      if(!deletedAlready) {
+         LOGGER.debug("Finalizing a {} that hasn't been closed.", CvMat.class.getSimpleName());
+         close();
+      }
+   }
 
    @Override
    public void close() {

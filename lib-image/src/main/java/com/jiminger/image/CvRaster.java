@@ -18,6 +18,7 @@ import org.opencv.core.Mat;
 
 import com.sun.jna.Pointer;
 
+import net.dempsy.util.Functional;
 import net.dempsy.util.QuietCloseable;
 
 /**
@@ -1032,6 +1033,7 @@ public abstract class CvRaster implements AutoCloseable {
 
    public static class Closer implements AutoCloseable {
       private final List<AutoCloseable> rastersToClose = new LinkedList<>();
+      private final List<Mat> rawMats = new LinkedList<>();
 
       public <T extends AutoCloseable> T add(final T mat) {
          if(mat != null)
@@ -1039,16 +1041,16 @@ public abstract class CvRaster implements AutoCloseable {
          return mat;
       }
 
+      public <T extends Mat> T addMat(final T mat) {
+         if(mat != null)
+            rawMats.add(0, mat);
+         return mat;
+      }
+
       @Override
       public void close() {
-         rastersToClose.stream().forEach(
-               r -> {
-                  try {
-                     r.close();
-                  } catch(final Exception e) {
-                     // impossible
-                  }
-               });
+         rastersToClose.stream().forEach(r -> Functional.uncheck(() -> r.close()));
+         rawMats.stream().forEach(r -> CvMat.move(r).close());
       }
 
       public void release() {
