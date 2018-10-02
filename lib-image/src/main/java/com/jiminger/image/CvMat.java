@@ -5,12 +5,16 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
 
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
 
 public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    static {
       CvRasterAPI._init();
    }
+
+   // This is used when there's an input matrix that can't be null but should be ignored.
+   public static final Mat nullMat = new Mat();
 
    private static final Method nDelete;
    private static final Method nZeros;
@@ -56,6 +60,20 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
 
    public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
       super(rows, cols, type, data);
+   }
+
+   /**
+    * This performs a proper matrix multiplication that returns this * other.
+    * The called should take control of the matrix returned.
+    */
+   public CvMat mm(final Mat other) {
+      return mm(other, 1.0D);
+   }
+
+   public CvMat mm(final Mat other, final double scale) {
+      final Mat ret = new Mat();
+      Core.gemm(this, other, scale, nullMat, 0.0D, ret);
+      return CvMat.move(ret);
    }
 
    public static CvMat shallowCopy(final Mat mat) {

@@ -14,6 +14,7 @@ void CvRaster_showImage(const char* name, uint64_t native);
 void CvRaster_updateWindow(const char* name, uint64_t native);
 int32_t CvRaster_fetchEvent(int32_t millisToSleep);
 void CvRaster_destroyWindow(const char* name);
+void CvRaster_noArray();
 }
 
 void* CvRaster_getData(uint64_t native) {

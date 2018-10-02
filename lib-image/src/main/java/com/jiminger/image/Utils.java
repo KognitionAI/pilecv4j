@@ -34,6 +34,8 @@ import java.lang.reflect.Array;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfPoint2f;
+import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
 
@@ -49,6 +51,8 @@ import com.jiminger.image.CvRaster.ShortPixelConsumer;
 import com.jiminger.image.geometry.PerpendicularLine;
 import com.jiminger.image.geometry.Point;
 import com.jiminger.image.geometry.SimplePoint;
+
+import net.dempsy.util.QuietCloseable;
 
 public class Utils {
    public static final ColorModel grayColorModel;
@@ -134,6 +138,7 @@ public class Utils {
 
    @SuppressWarnings("unchecked")
    public static void dump(final CvRaster raster, final PrintStream out) {
+      raster.matAp(out::println);
       try (ImageOpContext ctx = raster.imageOp()) {
          @SuppressWarnings("rawtypes")
          final PixelConsumer pp = CvRaster.makePixelPrinter(out, raster.type());
@@ -155,6 +160,10 @@ public class Utils {
       try (CvRaster r = CvRaster.manageShallowCopy(mat)) {
          dump(r, out);
       }
+   }
+
+   public static void dump(final Mat mat) {
+      dump(mat, System.out);
    }
 
    private static CvRaster argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
@@ -603,6 +612,30 @@ public class Utils {
             final CvRaster raster = CvRaster.manageShallowCopy(ret);) {
          raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]});
          return raster.disown();
+      }
+   }
+
+   public static CvMat pointsToColumns2D(final Mat undistoredPoint) {
+      final MatOfPoint2f matOfPoints = new MatOfPoint2f(undistoredPoint);
+      try (final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
+         final double[][] points = matOfPoints.toList().stream()
+               .map(p -> new double[] {p.x,p.y})
+               .toArray(double[][]::new);
+         try (CvMat pointsAsMat = Utils.toMat(points);) {
+            return CvMat.move(pointsAsMat.t());
+         }
+      }
+   }
+
+   public static CvMat pointsToColumns3D(final Mat undistoredPoint) {
+      final MatOfPoint3f matOfPoints = new MatOfPoint3f(undistoredPoint);
+      try (final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
+         final double[][] points = matOfPoints.toList().stream()
+               .map(p -> new double[] {p.x,p.y,p.z})
+               .toArray(double[][]::new);
+         try (CvMat pointsAsMat = Utils.toMat(points);) {
+            return CvMat.move(pointsAsMat.t());
+         }
       }
    }
 }
