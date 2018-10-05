@@ -525,9 +525,17 @@ public class Utils {
 
    @SuppressWarnings("unchecked")
    public static <T> T toArray(final Mat mat, final Class<T> clazz) {
+      final int rows = mat.rows();
+      if(rows == 0) {
+         Class<?> component = clazz;
+         while(component.isArray())
+            component = component.getComponentType();
+         return (T)Array.newInstance(component, 0, 0, 0);
+      }
+
       final int type = mat.type();
       final int channels = CvType.channels(type);
-      final int rows = mat.rows();
+
       final int cols = mat.cols();
       final T ret;
       try (final CvRaster raster = CvRaster.manageShallowCopy(mat);

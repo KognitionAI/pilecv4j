@@ -226,7 +226,14 @@ public abstract class CvRaster implements AutoCloseable {
     * {@code release}-ing the underlying {@code Mat}.
     */
    public static CvRaster manageDeepCopy(final Mat mat, final Closer closer) {
-      return move(mat.clone(), closer);
+      if(mat.rows() == 0)
+         return move(new Mat(mat.rows(), mat.cols(), mat.type()));
+      if(mat.isContinuous())
+         return move(mat.clone(), closer);
+
+      final Mat newMat = new Mat(mat.rows(), mat.cols(), mat.type());
+      mat.copyTo(newMat);
+      return move(newMat, closer);
    }
 
    /**

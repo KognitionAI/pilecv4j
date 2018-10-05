@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
+   private static boolean TRACK_MEMORY_LEAKS = false;
 
    static {
       CvRasterAPI._init();
@@ -26,6 +27,8 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    private static final Field nativeObjField;
 
    private boolean deletedAlready = false;
+
+   private final RuntimeException stackTrace;
 
    static {
       try {
@@ -49,6 +52,7 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
 
    private CvMat(final long nativeObj) {
       super(nativeObj);
+      stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException() : null;
    }
 
    // called from CvRaster
@@ -56,14 +60,18 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
       return new CvMat(nativeObj);
    }
 
-   public CvMat() {}
+   public CvMat() {
+      stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException() : null;
+   }
 
    public CvMat(final int rows, final int cols, final int type) {
       super(rows, cols, type);
+      stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException() : null;
    }
 
    public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
       super(rows, cols, type, data);
+      stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException() : null;
    }
 
    /**
@@ -128,6 +136,8 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
    protected void finalize() throws Throwable {
       if(!deletedAlready) {
          LOGGER.debug("Finalizing a {} that hasn't been closed.", CvMat.class.getSimpleName());
+         if(TRACK_MEMORY_LEAKS)
+            LOGGER.debug("Here's where I was instantiated: ", stackTrace);
          close();
       }
    }
