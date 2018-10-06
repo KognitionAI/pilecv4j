@@ -20,6 +20,8 @@ import net.dempsy.util.QuietCloseable;
 
 public class CvRasterTest {
 
+   public final static boolean SHOW = false; /// can only set this to true when building on a machine with a display
+
    static {
       CvRaster.initOpenCv();
    }
@@ -64,9 +66,11 @@ public class CvRasterTest {
 
    @Test
    public void testShow() throws Exception {
-      try (final CvRaster raster = ImageFile.readMatFromFile(testImagePath);
-            QuietCloseable c = raster.matOp(m -> ImageDisplay.show(m, "Test"));) {
-         Thread.sleep(5000);
+      if(SHOW) {
+         try (final CvRaster raster = ImageFile.readMatFromFile(testImagePath);
+               QuietCloseable c = raster.matOp(m -> ImageDisplay.show(m, "Test"));) {
+            Thread.sleep(5000);
+         }
       }
    }
 
