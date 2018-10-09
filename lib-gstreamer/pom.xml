@@ -3,8 +3,8 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.jiminger</groupId>
-    <artifactId>utilities</artifactId>
+    <artifactId>pilecv4j-parent</artifactId>
+    <groupId>ai.kognition.pilecv4j</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
   <artifactId>lib-gstreamer</artifactId>
@@ -13,18 +13,18 @@
   <dependencies>
     <!-- Internal deps -->
     <dependency>
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-image</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>gst-breakout</artifactId>
       <classifier>${platform}</classifier>
     </dependency>
   
     <!-- Sister project -->
     <dependency>
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>opencv-lib-jar</artifactId>
       <classifier>withlib</classifier>
     </dependency>
@@ -51,7 +51,7 @@
       <scope>test</scope>
     </dependency>
     <dependency> <!-- Used for a test -->
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>tensorflow-lib-jar</artifactId>
       <classifier>withlib</classifier>
       <scope>test</scope>

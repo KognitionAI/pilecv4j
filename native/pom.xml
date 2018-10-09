@@ -5,8 +5,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <groupId>com.jiminger</groupId>
-    <artifactId>utilities</artifactId>
+    <artifactId>pilecv4j-parent</artifactId>
+    <groupId>ai.kognition.pilecv4j</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
 

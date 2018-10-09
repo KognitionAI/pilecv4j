@@ -3,8 +3,8 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>com.jiminger</groupId>
-    <artifactId>utilities</artifactId>
+    <artifactId>pilecv4j-parent</artifactId>
+    <groupId>ai.kognition.pilecv4j</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
   <artifactId>lib-image</artifactId>
@@ -12,31 +12,31 @@
   <description></description>
   <dependencies>
     <dependency>
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-util</artifactId>
     </dependency>
     
     <dependency> <!-- Used for Transform -->
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-nr</artifactId>
       <optional>true</optional>
     </dependency>
     
     <!-- Third party deps -->
     <dependency>
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>native-lib</artifactId>
       <classifier>${platform}</classifier>
     </dependency>
 
     <dependency> <!-- needed for image work but not numerical recipies -->
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>opencv-lib-jar</artifactId>
       <classifier>withlib</classifier>
     </dependency>
     
     <dependency> <!-- Used for TensorUtils -->
-      <groupId>com.jiminger</groupId>
+      <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>tensorflow-lib-jar</artifactId>
       <classifier>withlib</classifier>
       <optional>true</optional>

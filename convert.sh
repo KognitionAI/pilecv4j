@@ -105,12 +105,12 @@ for entry in $FILES; do
         CP="`cpath "$MAVEN_REPO/com/jiminger/lib-image/1.0-SNAPSHOT/lib-image-1.0-SNAPSHOT.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/lib-util/1.0-SNAPSHOT/lib-util-1.0-SNAPSHOT.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/opencv-lib-jar/$OPENCV_VERSION/opencv-lib-jar-$OPENCV_VERSION-withlib.jar"`$CSEP`cpath "$MAVEN_REPO/com/jiminger/opencv-lib-jar/$OPENCV_VERSION/opencv-lib-jar-$OPENCV_VERSION.jar"`$CSEP`cpath "$MAVEN_REPO/opencv/opencv/$OPENCV_VERSION/opencv-$OPENCV_VERSION.jar"`$CSEP`cpath "$MAVEN_REPO/commons-io/commons-io/2.0.1/commons-io-2.0.1.jar"`"
         SRC=`cpath "$SRCDIR/$entry"`
         DST=`cpath "$DSTDIR/$BASE.$DE"`
-        RESULTS=`java -Xmx5G -cp $CP com.jiminger.image.ImageFile -i "$SRC" -o "$DST"`
+        RESULTS=`java -Xmx5G -cp $CP ai.kognition.pilecv4j.image.ImageFile -i "$SRC" -o "$DST"`
         if [ $? -ne 0 ]; then
             echo "FAILED to run the image convert. See the above error."
             echo "Running: "
             echo "--------------------------------------------"
-            echo "java -Xmx5G -cp \$CP com.jiminger.image.ImageFile -i \"$SRC\" -o \"$DST\""
+            echo "java -Xmx5G -cp \$CP ai.kognition.ImageFile -i \"$SRC\" -o \"$DST\""
             echo "--------------------------------------------"
             echo "$RESULTS"
         fi

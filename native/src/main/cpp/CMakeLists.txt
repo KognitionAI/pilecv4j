@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.4)
-project (utilities.jiminger.com)
+project (ai.kognition.pilecv4j)
 
 include(CheckTypeSize)
 CHECK_TYPE_SIZE(float FLOAT_SIZE BUILTIN_TYPES_ONLY)
@@ -63,7 +63,7 @@ endif()
 
 include_directories(sources/include)
 
-add_library(utilities.jiminger.com
+add_library(ai.kognition.pilecv4j
   MODULE
   sources/opencv/CvRasterNative.cpp
   sources/houghspace/Transform.cpp
@@ -75,5 +75,5 @@ add_library(utilities.jiminger.com
   sources/nr/nrutil.cpp
   sources/nr/powell.cpp)
 
-target_link_libraries(utilities.jiminger.com 
+target_link_libraries(ai.kognition.pilecv4j
   ${OPENCV_STATIC_LIB})

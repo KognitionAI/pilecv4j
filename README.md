@@ -20,11 +20,11 @@ Most dependencies will be picked up automatically from [maven central](https://w
 
 `lib-image` contains the main image processing routines and OpenCv functionality. It contains some decent general purpose classes but also some more esoteric implementations that might be hard to find in other places.
 
-1. `com.jiminger.image.CvRaster` is an alternative (actually, an extention) to the OpenCv Java `Mat`. It allows for direct manipulation of the actual data contained in the `Mat` in a more convenient manner. See the Javadocs for `CvRaster` for more information.
-1. `com.jiminger.image.ImageFile` is a means of loading and writing images to disk. It's more robust than most implemetations since it uses `OpenCv` and falls back to `ImageIO` when that doesn't work.
-1. `com.jiminger.image.houghspace.Transform` is a generalized [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform). It's written from scratch and doesn't use `OpenCv`'s who's implementation isn't "generalized" anyway.
-1. `com.jiminger.image.mjpeg.MJPEGWriter` will take a series of images and write a "Motion JPEG" movie file.
-1. `com.jiminger.image.TensorUtils` is a lightweight wrapper around TensorFlow. It will eventually grow to a "zero-copy" utility that makes TensorFlow much easier to use from Java. Currently it's not that extensive.
+1. `ai.kognition.pilecv4j.image.CvRaster` is an alternative (actually, an extention) to the OpenCv Java `Mat`. It allows for direct manipulation of the actual data contained in the `Mat` in a more convenient manner. See the Javadocs for `CvRaster` for more information.
+1. `ai.kognition.pilecv4j.image.ImageFile` is a means of loading and writing images to disk. It's more robust than most implemetations since it uses `OpenCv` and falls back to `ImageIO` when that doesn't work.
+1. `ai.kognition.pilecv4j.image.houghspace.Transform` is a generalized [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform). It's written from scratch and doesn't use `OpenCv`'s who's implementation isn't "generalized" anyway.
+1. `ai.kognition.pilecv4j.image.mjpeg.MJPEGWriter` will take a series of images and write a "Motion JPEG" movie file.
+1. `ai.kognition.pilecv4j.image.TensorUtils` is a lightweight wrapper around TensorFlow. It will eventually grow to a "zero-copy" utility that makes TensorFlow much easier to use from Java. Currently it's not that extensive.
 
 ### lib-gstreamer
 
@@ -57,12 +57,12 @@ Powell's method is actually implemented using the algorithm from [Numerical Reci
 1. The navive code that supports `CvRaster`.
 1. The [Numerical Recipes in C](http://www.numerical.recipes/) implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method) which is called from the `Minimizer` in `lib-nr`. This implementation's been modified so it can be used recursively and from multuple threads.
 1. C/C++ code for writing a JPEG images into an MJPEG `avi` file written from `MJPEGWriter` in `lib-image`
-1. C++ code for performing a [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform) used by the `com.jiminger.image.houghspace.Transform` from `lib-image`.
+1. C++ code for performing a [Hough Transform](https://en.wikipedia.org/wiki/Hough_transform) used by the `ai.kognition.pilecv4j.image.houghspace.Transform` from `lib-image`.
 1. It will eventually contain native code that will support using [TensorFlow](https://www.tensorflow.org/) from Java.
 
 ### An example of it all put together
 
-See the [TestBedTensorFlow.java](https://github.com/jimfcarroll/utilities/blob/master/lib-gstreamer/src/test/java/com/jiminger/gstreamer/TestBedTensorFlow.java) class for an example of GStreamer, OpenCv, and TensorFlow put together in a single Java application using the libraries here.
+See the [TestBedTensorFlow.java](https://github.com/KognitionAI/pilecv4j/blob/master/lib-gstreamer/src/test/java/ai/kognition/pilecv4j/gstreamer/TestBedTensorFlow.java) class for an example of GStreamer, OpenCv, and TensorFlow put together in a single Java application using the libraries here.
 
 ## History
 

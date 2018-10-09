@@ -387,18 +387,18 @@ static gboolean plugin_init (GstPlugin * plugin) {
 #define VERSION "0.0.1-SNAPSHOT"
 #endif
 #ifndef PACKAGE
-#define PACKAGE "com_jiminger_lib-gstreamer"
+#define PACKAGE "ai_kognition_pilecv4j_lib-gstreamer"
 #endif
 #ifndef PACKAGE_NAME
-#define PACKAGE_NAME "Jiminger.com GStreamer lib"
+#define PACKAGE_NAME "Kognition.ai GStreamer lib"
 #endif
 #ifndef GST_PACKAGE_ORIGIN
-#define GST_PACKAGE_ORIGIN "https://github.com/jimfcarroll/gst-breakout"
+#define GST_PACKAGE_ORIGIN "https://github.com/KognitionAI/pilecv4j/"
 #endif
 
 GST_PLUGIN_DEFINE (GST_VERSION_MAJOR,
     GST_VERSION_MINOR,
     breakout,
-    "FIXME plugin description",
+    "A filter that allows a callback from Java",
     plugin_init, VERSION, "LGPL", PACKAGE_NAME, GST_PACKAGE_ORIGIN)
 

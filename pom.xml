@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
-  <groupId>com.jiminger</groupId>
-  <artifactId>utilities</artifactId>
+  <groupId>ai.kognition.pilecv4j</groupId>
   <version>1.0-SNAPSHOT</version>
   <name>Jiminger utilities (${project.version})</name>
   <description>Various Utilities for coding support</description>
   <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
+  <artifactId>pilecv4j-parent</artifactId>
 
   <!-- These are global dependencies -->
   <dependencies>
@@ -124,13 +124,13 @@
         <scope>import</scope>
       </dependency>
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>opencv-lib-jar</artifactId>
         <classifier>withlib</classifier>
         <version>${opencv.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>tensorflow-lib-jar</artifactId>
         <classifier>withlib</classifier>
         <version>${tensorflow.version}</version>
@@ -138,28 +138,28 @@
 
       <!-- Internal to the product -->
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>lib-util</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>lib-nr</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>lib-image</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>native-lib</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>com.jiminger</groupId>
+        <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>gst-breakout</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
