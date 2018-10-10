@@ -11,7 +11,7 @@ The documentation for this project is in its infancy.
 
 Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are two to take note of.
 
-1. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [opencv-packaging](https://github.com/jimfcarroll/opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file.
+1. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file.
 1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
 
 ## Contents
