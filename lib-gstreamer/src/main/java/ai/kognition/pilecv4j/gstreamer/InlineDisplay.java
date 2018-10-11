@@ -84,7 +84,6 @@ public class InlineDisplay implements Consumer<CvRasterAndCaps> {
                   adjustedSize.ref = new Size(m.width(), m.height());
                else
                   adjustedSize.ref = new Size(Math.round(m.width() * scale), Math.round(m.height() * scale));
-               System.out.println(adjustedSize.ref);
             }
 
             try (final CvMat lmat = new CvMat()) {

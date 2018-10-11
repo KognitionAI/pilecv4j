@@ -192,7 +192,7 @@ public class ImageDisplay {
             toUpdate.close();
          }
 
-         if(keyPressCallback != null) {
+         if(keyPressCallback != null && kp >= 0) {
             if(keyPressCallback.keyPressed(kp))
                closeNow.set(true);
          } else if(kp == 32)
