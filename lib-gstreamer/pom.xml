@@ -57,6 +57,12 @@
       <scope>test</scope>
       <optional>true</optional>
     </dependency>
+    <dependency> <!-- Used for the SwtImageDisplay -->
+      <groupId>org.eclipse.swt</groupId>
+      <artifactId>${swtartifact}</artifactId>
+      <scope>test</scope>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
 
   <build>

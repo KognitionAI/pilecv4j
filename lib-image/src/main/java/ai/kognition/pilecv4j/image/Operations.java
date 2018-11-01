@@ -6,11 +6,18 @@ import java.awt.image.IndexColorModel;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.imgproc.Imgproc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
-import ai.kognition.pilecv4j.image.CvRaster.ImageOpContext;
 
 public class Operations {
+   private static Logger LOGGER = LoggerFactory.getLogger(Operations.class);
+
+   static {
+      CvMat.initOpenCv();
+   }
+
    public static byte EDGE = (byte)-1;
    public static final byte ROVERLAY = (byte)100;
    public static final byte GOVERLAY = (byte)101;
@@ -32,22 +39,29 @@ public class Operations {
       cvrtScaleDenom[CvType.CV_8S] = (0x7f);
    }
 
-   public static class GradientImages {
-      public final CvRaster gradientDir;
-      public final CvRaster dx;
-      public final CvRaster dy;
+   public static class GradientImages implements AutoCloseable {
+      public final CvMat gradientDir;
+      public final CvMat dx;
+      public final CvMat dy;
 
-      private GradientImages(final CvRaster gradientDir, final CvRaster dx, final CvRaster dy) {
+      private GradientImages(final CvMat gradientDir, final CvMat dx, final CvMat dy) {
          this.gradientDir = gradientDir;
          this.dx = dx;
          this.dy = dy;
       }
+
+      @Override
+      public void close() throws Exception {
+         gradientDir.close();
+         dy.close();
+         dx.close();
+      }
    }
 
-   public static CvRaster canny(final GradientImages gis, final double tlow, final double thigh, final Closer closer) {
+   public static CvMat canny(final GradientImages gis, final double tlow, final double thigh, final Closer closer) {
       try (final CvMat edgeImage = new CvMat();) {
-         gis.dx.matAp(dx -> gis.dy.matAp(dy -> Imgproc.Canny(dx, dy, edgeImage, tlow, thigh, true)));
-         return CvRaster.manageShallowCopy(edgeImage, closer);
+         Imgproc.Canny(gis.dx, gis.dy, edgeImage, tlow, thigh, true);
+         return edgeImage.returnMe();
       }
    }
 
@@ -57,48 +71,37 @@ public class Operations {
       try (final CvMat dx = new CvMat();
             final CvMat dy = new CvMat();) {
          Imgproc.Sobel(grayImage, dx, CvType.CV_16S, 1, 0, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-         final CvRaster dxr = CvRaster.manageShallowCopy(dx, closerp);
          Imgproc.Sobel(grayImage, dy, CvType.CV_16S, 0, 1, kernelSize, 1.0, 0.0, Core.BORDER_REPLICATE);
-         final CvRaster dyr = CvRaster.manageShallowCopy(dy, closerp);
-         final int numPixelsInGradient = dxr.rows() * dxr.cols();
+         final int numPixelsInGradient = dx.rows() * dx.cols();
          final byte[] dirsa = new byte[numPixelsInGradient];
 
          final short[] tmpdx = new short[numPixelsInGradient];
-         dxr.matAp(m -> m.get(0, 0, tmpdx));
+         dx.get(0, 0, tmpdx);
 
-         try (ImageOpContext dxrIo = dxr.imageOp();
-               ImageOpContext dyrIo = dyr.imageOp();) {
-            for(int pos = 0; pos < numPixelsInGradient; pos++) {
-               // calculate the angle
-               final double dxv = ((short[])dxr.get(pos))[0];
-               final double dyv = 0.0 - ((short[])dyr.get(pos))[0]; // flip y axis.
-               dirsa[pos] = angle_byte(dxv, dyv);
-            }
-         }
+         dx.rasterAp(dxr -> {
+            dy.rasterAp(dyr -> {
+               for(int pos = 0; pos < numPixelsInGradient; pos++) {
+                  // calculate the angle
+                  final double dxv = ((short[])dxr.get(pos))[0];
+                  final double dyv = 0.0 - ((short[])dyr.get(pos))[0]; // flip y axis.
+                  dirsa[pos] = angle_byte(dxv, dyv);
+               }
+            });
+         });
 
          // a byte raster to hold the dirs
-         try (final CvMat gradientDirImage = new CvMat(dxr.rows(), dxr.cols(), CvType.CV_8UC1);) {
+         try (final CvMat gradientDirImage = new CvMat(dx.rows(), dx.cols(), CvType.CV_8UC1);) {
             gradientDirImage.put(0, 0, dirsa);
-            return new GradientImages(CvRaster.manageShallowCopy(gradientDirImage, closerp), dxr, dyr);
+            final GradientImages ret = new GradientImages(gradientDirImage.returnMe(), dx.returnMe(), dy.returnMe());
+            return closerp == null ? ret : closerp.add(ret);
          }
       }
-   }
-
-   public static CvMat convertToGray(final CvRaster origImage) {
-      return convertToGray(origImage, null);
-   }
-
-   public static CvMat convertToGray(final CvRaster origImage, final Closer closer) {
-      // convert to gray scale
-      final CvMat grayImage = closer == null ? origImage.matOp(m -> convertToGray(m))
-            : closer.add(origImage.matOp(m -> convertToGray(m)));
-      return grayImage;
    }
 
    public static CvMat convertToGray(final CvMat src) {
       final CvMat workingImage = new CvMat();
       if(src.depth() != CvType.CV_8U) {
-         System.out.print("converting image to 8-bit grayscale ... ");
+         LOGGER.debug("converting image to 8-bit grayscale ... ");
          src.convertTo(workingImage, CvType.CV_8U, 255.0 / cvrtScaleDenom[src.depth()]);
          Imgproc.cvtColor(workingImage, workingImage, Imgproc.COLOR_BGR2GRAY);
          return workingImage;

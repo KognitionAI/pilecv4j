@@ -48,11 +48,11 @@ import org.slf4j.LoggerFactory;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 
 public class ImageFile {
-   private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
-
    static {
-      CvRaster.initOpenCv();
+      CvMat.initOpenCv();
    }
+
+   private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
 
    public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {
       LOGGER.trace("Reading image from {}", filename);
@@ -75,27 +75,27 @@ public class ImageFile {
       return ret;
    }
 
-   public static CvRaster readMatFromFile(final String filename) throws IOException {
-      return readMatFromFile(filename, null);
-   }
-
-   public static CvRaster readMatFromFile(final String filename, final Closer closer) throws IOException {
+   /**
+    * Read a {@link CvMat} from a file. You should make sure this is assigned in a try-with-resource
+    * or the CvMat will leak.
+    */
+   public static CvMat readMatFromFile(final String filename) throws IOException {
       LOGGER.trace("Reading image from {}", filename);
       final File f = new File(filename);
       if(!f.exists())
          throw new FileNotFoundException(filename);
 
-      final CvRaster ret;
+      final CvMat ret;
 
       try (Closer cx = new Closer()) {
          final Mat mat = Imgcodecs.imread(filename, IMREAD_UNCHANGED);
          if(mat == null) {
             LOGGER.debug("Failed to read '" + filename + "' using OpenCV");
-            ret = Utils.img2CvRaster(ImageIO.read(f));
+            ret = Utils.img2CvMat(ImageIO.read(f));
          } else {
             if(filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
                Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
-            ret = CvRaster.move(mat, closer);
+            ret = CvMat.move(mat);
          }
       }
       LOGGER.trace("Read {} from {}", ret, filename);
@@ -115,23 +115,17 @@ public class ImageFile {
    public static void writeImageFile(final BufferedImage ri, final String filename) throws IOException {
       if(!doWrite(ri, filename)) {
          LOGGER.debug("Failed to write '" + filename + "' using ImageIO");
-         if(!doWrite(Utils.img2CvRaster(ri), filename))
-            throw new IllegalArgumentException("Failed to write");
-      }
-   }
-
-   public static void writeImageFile(final CvRaster ri, final String filename) throws IOException {
-      if(!doWrite(ri, filename)) {
-         LOGGER.debug("Failed to write '" + filename + "' using OpenCV");
-         final BufferedImage bi = ri.matOp(m -> Utils.mat2Img(m));
-         if(!doWrite(bi, filename))
+         if(!doWrite(Utils.img2CvMat(ri), filename))
             throw new IllegalArgumentException("Failed to write");
       }
    }
 
    public static void writeImageFile(final Mat ri, final String filename) throws IOException {
-      try (CvRaster raster = CvRaster.manageShallowCopy(ri)) {
-         writeImageFile(raster, filename);
+      if(!doWrite(ri, filename)) {
+         LOGGER.debug("Failed to write '" + filename + "' using OpenCV");
+         final BufferedImage bi = Utils.mat2Img(ri);
+         if(!doWrite(bi, filename))
+            throw new IllegalArgumentException("Failed to write");
       }
    }
 
@@ -162,9 +156,9 @@ public class ImageFile {
       return wrote;
    }
 
-   private static boolean doWrite(final CvRaster ri, final String filename) throws IOException {
+   private static boolean doWrite(final Mat ri, final String filename) throws IOException {
       LOGGER.trace("Writing image {} to {}", ri, filename);
-      return ri.matOp(m -> (Boolean)Imgcodecs.imwrite(filename, m));
+      return Imgcodecs.imwrite(filename, ri);
    }
 
    private static double scale(final int width, final int height, final ImageDestinationDefinition dest) {

@@ -47,6 +47,11 @@
       <scope>runtime</scope>
       <optional>true</optional>
     </dependency>
+    <dependency> <!-- Used for the SwtImageDisplay -->
+      <groupId>org.eclipse.swt</groupId>
+      <artifactId>${swtartifact}</artifactId>
+      <optional>true</optional>
+    </dependency>
     
     <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
     <dependency>

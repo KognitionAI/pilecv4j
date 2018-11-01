@@ -32,11 +32,9 @@ import org.tensorflow.Session.Runner;
 import org.tensorflow.Tensor;
 import org.tensorflow.types.UInt8;
 
-import ai.kognition.pilecv4j.gstreamer.BinManager;
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvRasterAndCaps;
+import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.od.ObjectDetection;
-import ai.kognition.pilecv4j.image.CvRaster;
+import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.TensorUtils;
 
 public class TestBedTensorFlow {
@@ -69,43 +67,41 @@ public class TestBedTensorFlow {
 
       // ====================================================================
       final List<String> labels = Files.readAllLines(Paths.get(labelUri), Charset.forName("UTF-8"));
-      CvRaster.initOpenCv();
       try (final Session session = new Session(graph);) {
 
          final BreakoutFilter bin = new BreakoutFilter("od")
-               .connectSlowFilter((final CvRasterAndCaps bac) -> {
-                  final CvRaster raster = bac.raster;
-                  final ByteBuffer bb = raster.underlying();
-                  bb.rewind();
-                  final int w = bac.width;
-                  final int h = bac.height;
+               .connectSlowFilter((final CvMatAndCaps bac) -> {
+                  final CvMat mat = bac.mat;
+                  final List<ObjectDetection> det = mat.rasterOp(r -> {
+                     final ByteBuffer bb = r.underlying();
+                     bb.rewind();
+                     final int w = bac.width;
+                     final int h = bac.height;
 
-                  final List<ObjectDetection> det;
-                  try (final Tensor<UInt8> tensor = Tensor.create(UInt8.class, new long[] {1,h,w,3}, bb);) {
-                     bb.rewind(); // need to rewind after being passed to create
-                     det = executeGraph(graph, tensor, session);
-                  }
-
-                  raster.matAp(mat -> {
-                     final int thickness = (int)(0.003d * mat.width());
-                     final int fontShift = thickness + (int)(fontHeight * fontScale);
-                     det.stream().filter(d -> d.probability > threshold)
-                           .forEach(d -> {
-                              final int classification = d.classification;
-                              final String label = classification < labels.size() ? labels.get(classification)
-                                    : Integer.toString(classification);
-                              Imgproc.putText(mat, label,
-                                    new Point(d.xmin * mat.width() + thickness, d.ymin * mat.height() + fontShift),
-                                    Core.FONT_HERSHEY_SIMPLEX, fontScale, new Scalar(0xff, 0xff, 0xff), thickness);
-                              Imgproc.rectangle(mat, new Point(d.xmin * mat.width(), d.ymin * mat.height()),
-                                    new Point(d.xmax * mat.width(), d.ymax * mat.height()),
-                                    new Scalar(0xff, 0xff, 0xff), thickness);
-                           });
+                     try (final Tensor<UInt8> tensor = Tensor.create(UInt8.class, new long[] {1,h,w,3}, bb);) {
+                        bb.rewind(); // need to rewind after being passed to create
+                        return executeGraph(graph, tensor, session);
+                     }
                   });
 
-                  LOGGER.trace("Returning object detected Buffer");
-                  // return FlowReturn.OK;
+                  final int thickness = (int)(0.003d * mat.width());
+                  final int fontShift = thickness + (int)(fontHeight * fontScale);
+                  det.stream().filter(d -> d.probability > threshold)
+                        .forEach(d -> {
+                           final int classification = d.classification;
+                           final String label = classification < labels.size() ? labels.get(classification)
+                                 : Integer.toString(classification);
+                           Imgproc.putText(mat, label,
+                                 new Point(d.xmin * mat.width() + thickness, d.ymin * mat.height() + fontShift),
+                                 Core.FONT_HERSHEY_SIMPLEX, fontScale, new Scalar(0xff, 0xff, 0xff), thickness);
+                           Imgproc.rectangle(mat, new Point(d.xmin * mat.width(), d.ymin * mat.height()),
+                                 new Point(d.xmax * mat.width(), d.ymax * mat.height()),
+                                 new Scalar(0xff, 0xff, 0xff), thickness);
+                        });
                });
+
+         LOGGER.trace("Returning object detected Buffer");
+         // return FlowReturn.OK;
 
          final BinManager bb = new BinManager()
                // .delayed(new URIDecodeBin("source")).with("uri", BaseTest.STREAM.toString())

@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import com.sun.jna.Pointer;
 
-import ai.kognition.pilecv4j.image.CvRaster;
+import ai.kognition.pilecv4j.image.CvMat;
 
 public class BufferWrap extends GstWrap<Buffer> {
    private static final Logger LOGGER = LoggerFactory.getLogger(BufferWrap.class);
@@ -36,12 +36,12 @@ public class BufferWrap extends GstWrap<Buffer> {
       return ret;
    }
 
-   public CvRaster mapToRaster(final int rows, final int cols, final int type, final boolean writeable) {
+   public CvMat mapToCvMat(final int rows, final int cols, final int type, final boolean writeable) {
       mapInfo = new MapInfoStruct();
       final boolean ok = GSTBUFFER_API.gst_buffer_map(obj, mapInfo,
             writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
       if(ok && mapInfo.data != null) {
-         return CvRaster.create(rows, cols, type, Pointer.nativeValue(mapInfo.data));
+         return CvMat.create(rows, cols, type, Pointer.nativeValue(mapInfo.data));
       }
       LOGGER.error("Failed to create extract a frame from the buffer.");
       return null;
