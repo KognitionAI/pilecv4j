@@ -27,17 +27,13 @@ import java.util.List;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
-import ai.kognition.pilecv4j.image.CvRaster;
+import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
 import ai.kognition.pilecv4j.util.CommandLineParser;
 
 public class MJPEGWriter {
    static {
-      ImageAPI._init();
-   }
-
-   static {
-      CvRaster.initOpenCv();
+      CvMat.initOpenCv();
    }
 
    static public File pdir = null;

@@ -4,19 +4,31 @@ import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
+/**
+ * <p>
+ * This class is an easier (perhaps) and more efficient interface to an OpenCV Mat.
+ * Than the one available through the Java wrapper.
+ * </p>
+ */
+public class CvMat extends Mat implements AutoCloseable {
    private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
    private static boolean TRACK_MEMORY_LEAKS = false;
+   private boolean skipCloseOnceForReturn = false;
 
    static {
       CvRasterAPI._init();
+      ImageAPI._init();
    }
+
+   public static void initOpenCv() {}
 
    // This is used when there's an input matrix that can't be null but should be ignored.
    public static final Mat nullMat = new Mat();
@@ -88,16 +100,97 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
       return CvMat.move(ret);
    }
 
+   public <T> T rasterOp(final Function<CvRaster, T> function) {
+      try (final CvRaster raster = CvRaster.makeInstance(this)) {
+         return function.apply(raster);
+      }
+   }
+
+   public void rasterAp(final Consumer<CvRaster> function) {
+      try (final CvRaster raster = CvRaster.makeInstance(this)) {
+         function.accept(raster);
+      }
+   }
+
+   public long numBytes() {
+      return elemSize() * rows() * cols();
+   }
+
+   @Override
+   public void close() {
+      if(!skipCloseOnceForReturn) {
+         if(!deletedAlready) {
+            try {
+               nDelete.invoke(this, super.nativeObj);
+            } catch(IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+               throw new RuntimeException(
+                     "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
+                     e);
+            }
+            deletedAlready = true;
+         }
+      } else
+         skipCloseOnceForReturn = false; // next close counts.
+   }
+
+   @Override
+   public String toString() {
+      return "CvMat: (" + getClass().getName() + "@" + Integer.toHexString(hashCode()) + ") " + super.toString();
+   }
+
+   public static <T> T rasterOp(final Mat mat, final Function<CvRaster, T> function) {
+      if(mat instanceof CvMat)
+         return ((CvMat)mat).rasterOp(function);
+      else {
+         try (CvRaster raster = CvRaster.makeInstance(mat)) {
+            return function.apply(raster);
+         }
+      }
+   }
+
+   public static void rasterAp(final Mat mat, final Consumer<CvRaster> function) {
+      if(mat instanceof CvMat)
+         ((CvMat)mat).rasterAp(function);
+      else {
+         try (CvRaster raster = CvRaster.makeInstance(mat)) {
+            function.accept(raster);
+         }
+      }
+   }
+
+   /**
+    * This call should be made to manage a copy of the Mat using a {@link CvRaster}.
+    * NOTE!! Changes to the {@link CvMat} will be reflected in the {@link Mat} and
+    * vs. vrs. If you want a deep copy/clone of the original Mat then consider
+    * using {@link CvMat#deepCopy(Mat)}.
+    */
    public static CvMat shallowCopy(final Mat mat) {
       return new CvMat(CvRasterAPI.CvRaster_copy(mat.nativeObj));
    }
 
+   /**
+    * This call will manage a complete deep copy of the provided {@code Mat}.
+    * Changes in one will not be reflected in the other.
+    */
    public static CvMat deepCopy(final Mat mat) {
-      final CvMat ret = new CvMat();
-      mat.copyTo(ret);
-      return ret;
+      if(mat.rows() == 0)
+         return move(new Mat(mat.rows(), mat.cols(), mat.type()));
+      if(mat.isContinuous())
+         return move(mat.clone());
+
+      final CvMat newMat = new CvMat(mat.rows(), mat.cols(), mat.type());
+      mat.copyTo(newMat);
+      return newMat;
    }
 
+   /**
+    * This call should be made to hand management of the Mat over to the {@link CvMat}.
+    * The Mat shouldn't be used after this
+    * call or, at least, it shouldn't be assumed to still be pointing to the same image
+    * data. When the CvRaster is closed, it will release the data that was originally
+    * associated with the {@code Mat}. If you want to keep the {@code Mat} beyond the
+    * life of the {@link CvMat} returnec, then consider using {@link CvMat#shallowCopy(Mat)}.
+    */
    public static CvMat move(final Mat mat) {
       final long defaultMatNativeObj = CvRasterAPI.CvRaster_defaultMat();
       try {
@@ -131,6 +224,26 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
       }
    }
 
+   /**
+    * You can use this method to create a {@link CvMat}
+    * given a native pointer to the location of the raw data, and the metadata for the
+    * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
+    * will not be the "owner" of the data. That means YOU need to make sure that the native
+    * data buffer outlives the CvRaster or you're pretty much guaranteed a core dump.
+    */
+   public static CvMat create(final int rows, final int cols, final int type, final long pointer) {
+      final long nativeObj = CvRasterAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+      if(nativeObj == 0)
+         throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
+      return CvMat.wrapNative(nativeObj);
+   }
+
+   public CvMat returnMe() {
+      // hacky, yet efficient.
+      skipCloseOnceForReturn = true;
+      return this;
+   }
+
    // Prevent finalize from being called
    @Override
    protected void finalize() throws Throwable {
@@ -141,24 +254,4 @@ public class CvMat extends org.opencv.core.Mat implements AutoCloseable {
          close();
       }
    }
-
-   @Override
-   public void close() {
-      if(!deletedAlready) {
-         try {
-            nDelete.invoke(this, super.nativeObj);
-         } catch(IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-            throw new RuntimeException(
-                  "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
-                  e);
-         }
-         deletedAlready = true;
-      }
-   }
-
-   @Override
-   public String toString() {
-      return "CvMat: (" + getClass().getName() + "@" + Integer.toHexString(hashCode()) + ") " + super.toString();
-   }
-
 }

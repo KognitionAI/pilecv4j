@@ -37,6 +37,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.MatOfPoint3f;
 import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelConsumer;
@@ -44,7 +45,6 @@ import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.FlatDoublePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.FloatPixelConsumer;
-import ai.kognition.pilecv4j.image.CvRaster.ImageOpContext;
 import ai.kognition.pilecv4j.image.CvRaster.IntPixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.PixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.ShortPixelConsumer;
@@ -64,11 +64,10 @@ public class Utils {
    }
 
    public static BufferedImage mat2Img(final Mat in) {
-      final Object data = CvRaster.copyToPrimitiveArray(in);
-      int type;
-
       final int inChannels = in.channels();
       if(inChannels == 1) { // assume gray
+         final int type;
+
          switch(CvType.depth(in.type())) {
             case CV_8U:
             case CV_8S:
@@ -82,23 +81,26 @@ public class Utils {
                throw new IllegalArgumentException(
                      "Cannot convert a Mat with a type of " + CvType.typeToString(in.type()) + " to a BufferedImage");
          }
+
+         final BufferedImage out = new BufferedImage(in.width(), in.height(), type);
+         CvRaster.copyToPrimitiveArray(in, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
+         return out;
       } else if(inChannels == 3) {
          final int cvDepth = CvType.depth(in.type());
          if(cvDepth != CV_8U && cvDepth != CV_8S)
             throw new IllegalArgumentException("Cannot convert RGB Mats with elements larger than a byte yet.");
-         type = BufferedImage.TYPE_3BYTE_BGR;
+
+         final BufferedImage out = new BufferedImage(in.width(), in.height(), BufferedImage.TYPE_3BYTE_BGR);
+         CvRaster.copyToPrimitiveArray(in, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
+         return out;
       } else if(inChannels == 4)
          throw new IllegalArgumentException("Can't handle alpha channel yet.");
       else
          throw new IllegalArgumentException("Can't handle an image with " + inChannels + " channels");
 
-      final BufferedImage out = new BufferedImage(in.width(), in.height(), type);
-
-      out.getRaster().setDataElements(0, 0, in.width(), in.height(), data);
-      return out;
    }
 
-   public static BufferedImage mat2Img(final CvRaster in, final IndexColorModel colorModel) {
+   public static BufferedImage mat2Img(final Mat in, final IndexColorModel colorModel) {
       BufferedImage out;
 
       if(in.channels() != 1 || CvType.depth(in.type()) != CvType.CV_8U)
@@ -110,55 +112,48 @@ public class Utils {
       return out;
    }
 
-   private static CvRaster argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
-      final CvRaster raster = CvRaster.create(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);
-      final byte[] inpixels = bb.getData();
-      if(lookup == null) // indicates a pixel compatible format
-         raster.matAp(m -> m.put(0, 0, inpixels));
-      else {
-         final boolean hasAlpha = lookup[0] != -1;
-         final int alpha = lookup[0];
-         final int blue = lookup[3];
-         final int red = lookup[1];
-         final int green = lookup[2];
-         final byte[] outpixel = new byte[skip]; // pixel length
-         final int colsXchannels = raster.cols() * raster.channels();
-         raster.apply((BytePixelSetter)(r, c) -> {
-            final int pos = (r * colsXchannels) + (c * skip);
-            outpixel[0] = inpixels[pos + blue];
-            outpixel[1] = inpixels[pos + green];
-            outpixel[2] = inpixels[pos + red];
-            if(hasAlpha)
-               outpixel[3] = inpixels[pos + alpha];
-            return outpixel;
-         });
+   private static CvMat argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
+      try (final CvMat retMat = new CvMat(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);) {
+         final byte[] inpixels = bb.getData();
+         if(lookup == null) // indicates a pixel compatible format
+            retMat.put(0, 0, inpixels);
+         else {
+            final boolean hasAlpha = lookup[0] != -1;
+            final int alpha = lookup[0];
+            final int blue = lookup[3];
+            final int red = lookup[1];
+            final int green = lookup[2];
+            final byte[] outpixel = new byte[skip]; // pixel length
+            final int colsXchannels = retMat.cols() * retMat.channels();
+            retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
+               final int pos = (r * colsXchannels) + (c * skip);
+               outpixel[0] = inpixels[pos + blue];
+               outpixel[1] = inpixels[pos + green];
+               outpixel[2] = inpixels[pos + red];
+               if(hasAlpha)
+                  outpixel[3] = inpixels[pos + alpha];
+               return outpixel;
+            }));
+         }
+         return retMat.returnMe();
       }
-      return raster;
    }
 
    @SuppressWarnings("unchecked")
    public static void dump(final CvRaster raster, final PrintStream out) {
-      raster.matAp(out::println);
-      try (ImageOpContext ctx = raster.imageOp()) {
-         @SuppressWarnings("rawtypes")
-         final PixelConsumer pp = CvRaster.makePixelPrinter(out, raster.type());
-         for(int r = 0; r < raster.rows(); r++) {
-            out.print("[");
-            for(int c = 0; c < raster.cols() - 1; c++) {
-               out.print(" ");
-               pp.accept(r, c, raster.get(r, c));
-               out.print(",");
-            }
+      out.println(raster.mat);
+      @SuppressWarnings("rawtypes")
+      final PixelConsumer pp = CvRaster.makePixelPrinter(out, raster.type());
+      for(int r = 0; r < raster.rows(); r++) {
+         out.print("[");
+         for(int c = 0; c < raster.cols() - 1; c++) {
             out.print(" ");
-            pp.accept(r, raster.cols() - 1, raster.get(r, raster.cols() - 1));
-            out.println("]");
+            pp.accept(r, c, raster.get(r, c));
+            out.print(",");
          }
-      }
-   }
-
-   public static void dump(final Mat mat, final PrintStream out) {
-      try (CvRaster r = CvRaster.manageShallowCopy(mat)) {
-         dump(r, out);
+         out.print(" ");
+         pp.accept(r, raster.cols() - 1, raster.get(r, raster.cols() - 1));
+         out.println("]");
       }
    }
 
@@ -166,17 +161,21 @@ public class Utils {
       dump(mat, System.out);
    }
 
-   private static CvRaster argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
+   public static void dump(final Mat mat, final PrintStream out) {
+      CvMat.rasterAp(mat, raster -> dump(raster, out));
+   }
+
+   private static CvMat argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
       final boolean hasAlpha = mask[0] != 0x0;
-      final CvRaster raster = CvRaster.create(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+      final CvMat retMat = new CvMat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
       final int[] inpixels = bi.getData();
       final int blue = 3;
       final int red = 1;
       final int green = 2;
       final int alpha = 0;
       final byte[] outpixel = new byte[hasAlpha ? 4 : 3]; // pixel length
-      final int cols = raster.cols();
-      raster.apply((BytePixelSetter)(r, c) -> {
+      final int cols = retMat.cols();
+      retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
          final int pixel = inpixels[(r * cols) + c];
          outpixel[0] = (byte)((pixel & mask[blue]) >>> shift[blue]);
          outpixel[1] = (byte)((pixel & mask[green]) >>> shift[green]);
@@ -184,11 +183,11 @@ public class Utils {
          if(hasAlpha)
             outpixel[3] = (byte)((pixel & mask[alpha]) >>> shift[alpha]);
          return outpixel;
-      });
-      return raster;
+      }));
+      return retMat;
    }
 
-   public static CvRaster img2CvRaster(final BufferedImage crappyImage) {
+   public static CvMat img2CvMat(final BufferedImage crappyImage) {
       final int w = crappyImage.getWidth();
       final int h = crappyImage.getHeight();
 
@@ -272,8 +271,8 @@ public class Utils {
                      + dataBuffer.getClass().getSimpleName());
             final DataBufferByte bb = (DataBufferByte)dataBuffer;
             final byte[] srcdata = bb.getData();
-            final CvRaster ret = CvRaster.create(h, w, CvType.CV_8UC1);
-            ret.matAp(m -> m.put(0, 0, srcdata));
+            final CvMat ret = new CvMat(h, w, CvType.CV_8UC1);
+            ret.put(0, 0, srcdata);
             return ret;
          }
          case TYPE_USHORT_GRAY: {
@@ -283,8 +282,8 @@ public class Utils {
                      + dataBuffer.getClass().getSimpleName());
             final DataBufferUShort bb = (DataBufferUShort)dataBuffer;
             final short[] srcdata = bb.getData();
-            final CvRaster ret = CvRaster.create(h, w, CvType.CV_16UC1);
-            ret.matAp(m -> m.put(0, 0, srcdata));
+            final CvMat ret = new CvMat(h, w, CvType.CV_16UC1);
+            ret.put(0, 0, srcdata);
             return ret;
          }
          case TYPE_USHORT_565_RGB: // 16 bit total with 5 bit r, 6 bit g, 5 bit blue
@@ -537,9 +536,8 @@ public class Utils {
       final int channels = CvType.channels(type);
 
       final int cols = mat.cols();
-      final T ret;
-      try (final CvRaster raster = CvRaster.manageShallowCopy(mat);
-            final ImageOpContext io = raster.imageOp();) {
+      return CvMat.rasterOp(mat, raster -> {
+         final T ret;
          switch(CvType.depth(type)) {
             case CvType.CV_8S:
             case CvType.CV_8U:
@@ -566,8 +564,8 @@ public class Utils {
             default:
                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
          }
-      }
-      return ret;
+         return ret;
+      });
    }
 
    public static double[] toDoubleArray(final Mat mat) {
@@ -605,10 +603,9 @@ public class Utils {
 
    public static CvMat toMat(final double[] a, final boolean row) {
       final int len = a.length;
-      try (final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);
-            final CvRaster raster = CvRaster.manageShallowCopy(ret);) {
-         raster.apply((FlatDoublePixelSetter)i -> new double[] {a[i]});
-         return raster.disown();
+      try (final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);) {
+         ret.rasterAp(raster -> raster.apply((FlatDoublePixelSetter)i -> new double[] {a[i]}));
+         return ret.returnMe();
       }
    }
 
@@ -616,10 +613,9 @@ public class Utils {
       final int rows = a.length;
       final int cols = a[0].length;
 
-      try (final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);
-            final CvRaster raster = CvRaster.manageShallowCopy(ret);) {
-         raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]});
-         return raster.disown();
+      try (final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);) {
+         ret.rasterAp(raster -> raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]}));
+         return ret.returnMe();
       }
    }
 
@@ -645,5 +641,20 @@ public class Utils {
             return CvMat.move(pointsAsMat.t());
          }
       }
+   }
+
+   public static Size perserveAspectRatio(final Mat mat, final Size newSize) {
+      return perserveAspectRatio(mat.size(), newSize);
+
+   }
+
+   public static Size perserveAspectRatio(final Size originalMatSize, final Size newSize) {
+      // calculate the appropriate resize
+      final double fh = newSize.height / originalMatSize.height;
+      final double fw = newSize.width / originalMatSize.width;
+      final double scale = fw < fh ? fw : fh;
+      return (scale >= 1.0) ? new Size(originalMatSize.width, originalMatSize.height)
+            : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+
    }
 }

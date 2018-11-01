@@ -30,11 +30,12 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.opencv.core.CvType;
+import org.opencv.core.Mat;
 
-import ai.kognition.pilecv4j.image.CvRaster;
+import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.image.CvRaster.FlatBytePixelSetter;
 import ai.kognition.pilecv4j.image.ImageAPI;
 import ai.kognition.pilecv4j.image.Utils;
-import ai.kognition.pilecv4j.image.CvRaster.FlatBytePixelSetter;
 import ai.kognition.pilecv4j.image.geometry.Point;
 import ai.kognition.pilecv4j.image.geometry.WeightedPoint;
 import ai.kognition.pilecv4j.image.houghspace.internal.GradientDirectionMask;
@@ -44,7 +45,7 @@ import ai.kognition.pilecv4j.nr.MinimizerException;
 
 public class Transform {
    static {
-      ImageAPI._init();
+      CvMat.initOpenCv();
    }
 
    public final double quantFactor;
@@ -65,56 +66,54 @@ public class Transform {
     * This method assumes raster is an edge detected image. If gradient raster is supplied then it will be used to
     * greatly improve the results.
     */
-   public HoughSpace transform(final CvRaster raster, final CvRaster gradientRaster, final int houghThreshold) {
+   public HoughSpace transform(final CvMat raster, final CvMat gradientRaster, final int houghThreshold) {
       final int height = raster.rows();
       final int width = raster.cols();
       return transform(raster, gradientRaster, houghThreshold, 0, height - 1, 0, width - 1);
    }
 
-   public HoughSpace transform(final CvRaster raster, final CvRaster gradientRaster, final int houghThreshold,
-         int rowstart, int rowend, int colstart, int colend) {
-      final int height = raster.rows();
-      final int width = raster.cols();
+   public HoughSpace transform(final CvMat mat, final CvMat gradient, final int houghThreshold,
+         final int rowstartp, final int rowendp, final int colstartp, final int colendp) {
+      final int height = mat.rows();
+      final int width = mat.cols();
 
-      final long gradientDirImage = gradientRaster == null ? 0 : gradientRaster.getNativeAddressOfData();
+      return gradient.rasterOp(gradientRaster -> mat.rasterOp(raster -> {
+         final long gradientDirImage = gradientRaster == null ? 0 : gradientRaster.getNativeAddressOfData();
 
-      // the size of the hough space should be quantFactor smaller
-      final int htheight = (int)((height) / quantFactor) + 1;
-      final int htwidth = (int)((width) / quantFactor) + 1;
+         // the size of the hough space should be quantFactor smaller
+         final int htheight = (int)((height) / quantFactor) + 1;
+         final int htwidth = (int)((width) / quantFactor) + 1;
 
-      final short[] ret = new short[htheight * htwidth];
+         final short[] ret = new short[htheight * htwidth];
 
-      final HoughSpaceEntryManager hsem = new HoughSpaceEntryManager(quantFactor);
+         final HoughSpaceEntryManager hsem = new HoughSpaceEntryManager(quantFactor);
 
-      final ImageAPI.AddHoughSpaceEntryContributorFunc cb = (final int orow, final int ocol, final int hsr, final int hsc,
-            final int hscount) -> {
-         try {
-            hsem.addHoughSpaceEntryContributor(orow, ocol, hsr, hsc, hscount);
-         } catch(final RuntimeException rte) {
-            rte.printStackTrace(System.err);
-            return false;
-         }
-         return true;
-      };
+         final ImageAPI.AddHoughSpaceEntryContributorFunc cb = (final int orow, final int ocol, final int hsr, final int hsc,
+               final int hscount) -> {
+            try {
+               hsem.addHoughSpaceEntryContributor(orow, ocol, hsr, hsc, hscount);
+            } catch(final RuntimeException rte) {
+               rte.printStackTrace(System.err);
+               return false;
+            }
+            return true;
+         };
 
-      if(rowstart < 0)
-         rowstart = 0;
-      if(rowend >= height)
-         rowend = height - 1;
-      if(colstart < 0)
-         colstart = 0;
-      if(colend >= width)
-         colend = width - 1;
+         final int rowstart = (rowstartp < 0) ? 0 : rowstartp;
+         final int rowend = (rowendp >= height) ? height - 1 : rowendp;
+         final int colstart = (colstartp < 0) ? 0 : colstartp;
+         final int colend = (colendp >= width) ? width - 1 : colendp;
 
-      ImageAPI.Transform_houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
-            mask.mask, mask.mwidth, mask.mheight, mask.maskcr, mask.maskcc,
-            gradDirMask.mask, gradDirMask.mwidth, gradDirMask.mheight, gradDirMask.maskcr, gradDirMask.maskcc,
-            gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, cb, houghThreshold,
-            rowstart, rowend, colstart, colend, Mask.EDGE);
+         ImageAPI.Transform_houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
+               mask.mask, mask.mwidth, mask.mheight, mask.maskcr, mask.maskcc,
+               gradDirMask.mask, gradDirMask.mwidth, gradDirMask.mheight, gradDirMask.maskcr, gradDirMask.maskcc,
+               gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, cb, houghThreshold,
+               rowstart, rowend, colstart, colend, Mask.EDGE);
 
-      hsem.entryMap.clear(); // help the gc
+         hsem.entryMap.clear(); // help the gc
 
-      return new HoughSpace(ret, htwidth, htheight, quantFactor, hsem.entries);
+         return new HoughSpace(ret, htwidth, htheight, quantFactor, hsem.entries);
+      }));
    }
 
    public List<Cluster> cluster(final List<HoughSpaceEntry> houghEntries, final double percentModelCoverage) {
@@ -144,12 +143,12 @@ public class Transform {
       return ret;
    }
 
-   public List<Fit> bestFit(final List<Cluster> clusters, final CvRaster ti, final byte overlayPixelValueRemovedEdge,
+   public List<Fit> bestFit(final List<Cluster> clusters, final CvMat ti, final byte overlayPixelValueRemovedEdge,
          final byte overlayPixelValueEdge) {
       return bestFit(clusters, ti, overlayPixelValueRemovedEdge, overlayPixelValueEdge, null);
    }
 
-   public List<Fit> bestFit(final List<Cluster> clusters, final CvRaster ti, final byte overlayPixelValueRemovedEdge,
+   public List<Fit> bestFit(final List<Cluster> clusters, final CvMat ti, final byte overlayPixelValueRemovedEdge,
          final byte overlayPixelValueEdge, final List<java.awt.Point> savedPruned) {
       return clusters.stream()
             .map(c -> bestFit(c, ti, overlayPixelValueRemovedEdge, overlayPixelValueEdge, savedPruned))
@@ -162,7 +161,7 @@ public class Transform {
     * what finds the actual feature from the cluster. The passed image and overlay
     * values are for bookkeeping only. A null ti means ignore book keeping.
     */
-   public Fit bestFit(final Cluster cluster, final CvRaster ti, final byte overlayPixelValueRemovedEdge, final byte overlayPixelValueEdge)
+   public Fit bestFit(final Cluster cluster, final CvMat ti, final byte overlayPixelValueRemovedEdge, final byte overlayPixelValueEdge)
          throws MinimizerException {
       return bestFit(cluster, ti, overlayPixelValueRemovedEdge, overlayPixelValueEdge, null);
    }
@@ -173,7 +172,7 @@ public class Transform {
     * finds the actual feature from the cluster. The passed image and overlay values
     * are for bookkeeping only. A null ti means ignore book keeping.
     */
-   public Fit bestFit(final Cluster cluster, final CvRaster ti, final byte overlayPixelValueRemovedEdge, final byte overlayPixelValueEdge,
+   public Fit bestFit(final Cluster cluster, final CvMat ti, final byte overlayPixelValueRemovedEdge, final byte overlayPixelValueEdge,
          final List<java.awt.Point> savedPruned)
          throws MinimizerException {
       // need to go through the raster around the cluster using the highest
@@ -223,8 +222,10 @@ public class Transform {
          final byte[] overlayRemovedEdgePixel = new byte[] {overlayPixelValueRemovedEdge};
          if(ti != null) {
             if(pruned.size() > 0) {
-               for(final java.awt.Point p: pruned)
-                  ti.set(p.y, p.x, overlayRemovedEdgePixel);
+               ti.rasterAp(raster -> {
+                  for(final java.awt.Point p: pruned)
+                     raster.set(p.y, p.x, overlayRemovedEdgePixel);
+               });
             }
          }
 
@@ -237,23 +238,25 @@ public class Transform {
 
       if(ti != null) {
          final byte[] overlayPixelEdge = new byte[] {overlayPixelValueEdge};
-         for(final java.awt.Point p: edgeVals)
-            ti.set(p.y, p.x, overlayPixelEdge);
+         ti.rasterAp(raster -> {
+            for(final java.awt.Point p: edgeVals)
+               raster.set(p.y, p.x, overlayPixelEdge);
+         });
       }
 
       return new Fit(result[1], result[0], result[3], result[2], cluster, stdDev, edgeVals);
    }
 
-   public static void drawClusters(final List<Cluster> clusters, final CvRaster ti, final byte color) {
+   public static void drawClusters(final List<Cluster> clusters, final Mat ti, final byte color) {
       final Color colorC = new Color(color, color, color);
       for(final Cluster c: clusters)
-         ti.matAp(m -> Utils.drawCircle(c.imageRow(), c.imageCol(), m, colorC));
+         Utils.drawCircle(c.imageRow(), c.imageCol(), ti, colorC);
    }
 
-   public static void drawFits(final List<Transform.Fit> fits, final CvRaster ti, final byte color) {
+   public static void drawFits(final List<Transform.Fit> fits, final Mat ti, final byte color) {
       final Color colorC = new Color(color, color, color);
       for(final Fit c: fits)
-         ti.matAp(m -> Utils.drawCircle((int)Math.round(c.cr), (int)Math.round(c.cc), m, colorC));
+         Utils.drawCircle((int)Math.round(c.cr), (int)Math.round(c.cc), ti, colorC);
    }
 
    public static class HoughSpaceEntryManager {
@@ -345,32 +348,33 @@ public class Transform {
       public double quantFactor;
       public List<HoughSpaceEntry> backMapEntries;
 
-      public CvRaster getTransformRaster() {
+      public CvMat getTransformRaster() {
          final int width = hswidth;
          final int height = hsheight;
 
-         final CvRaster gradRaster = CvRaster.create(height, width, CvType.CV_8UC1);
+         try (final CvMat gradRaster = new CvMat(height, width, CvType.CV_8UC1);) {
 
-         int max = 0;
-         for(int i = 0; i < houghSpace.length; i++) {
-            final int count = houghSpace[i];
-            if(max < count)
-               max = count;
+            int max = 0;
+            for(int i = 0; i < houghSpace.length; i++) {
+               final int count = houghSpace[i];
+               if(max < count)
+                  max = count;
+            }
+
+            final byte[] pixel = new byte[1];
+            final double finalMax = max;
+            gradRaster.rasterAp(raster -> raster.apply((FlatBytePixelSetter)pos -> {
+               int intVal = (int)(((houghSpace[pos]) / finalMax) * 255.0);
+               if(intVal < 0)
+                  intVal = 0;
+               else if(intVal > 255)
+                  intVal = 255;
+               pixel[0] = (byte)intVal;
+               return pixel;
+            }));
+
+            return gradRaster.returnMe();
          }
-
-         final byte[] pixel = new byte[1];
-         final double finalMax = max;
-         gradRaster.apply((FlatBytePixelSetter)pos -> {
-            int intVal = (int)(((houghSpace[pos]) / finalMax) * 255.0);
-            if(intVal < 0)
-               intVal = 0;
-            else if(intVal > 255)
-               intVal = 255;
-            pixel[0] = (byte)intVal;
-            return pixel;
-         });
-
-         return gradRaster;
       }
 
       public List<HoughSpaceEntry> getSortedEntries() {
@@ -384,7 +388,7 @@ public class Transform {
        * This method does not do much any more. Now it simply writes the inverse transform (that is,
        * the edge pixels identified by the transform) back into the image for debugging purposes.
        */
-      public List<HoughSpaceEntry> inverseTransform(final CvRaster ti, final byte overlayPixelValue,
+      public List<HoughSpaceEntry> inverseTransform(final CvMat ti, final byte overlayPixelValue,
             final byte peakCircleColorValue) {
          final List<HoughSpaceEntry> sortedSet = getSortedEntries();
          final Color peakCircleColor = new Color(peakCircleColorValue, peakCircleColorValue, peakCircleColorValue);
@@ -397,10 +401,12 @@ public class Transform {
                final int eir = e.ir;
                final int eic = e.ic;
 
-               ti.matAp(m -> Utils.drawCircle(eir, eic, m, peakCircleColor));
+               Utils.drawCircle(eir, eic, ti, peakCircleColor);
 
-               for(final java.awt.Point p: e.contributingImagePoints)
-                  ti.set(p.y, p.x, overlayPixel);
+               ti.rasterAp(raster -> {
+                  for(final java.awt.Point p: e.contributingImagePoints)
+                     raster.set(p.y, p.x, overlayPixel);
+               });
             }
          }
 

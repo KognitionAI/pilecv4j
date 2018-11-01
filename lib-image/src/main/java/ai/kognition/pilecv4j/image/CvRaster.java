@@ -10,7 +10,6 @@ import java.nio.ShortBuffer;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.opencv.core.CvType;
@@ -19,66 +18,19 @@ import org.opencv.core.Mat;
 import com.sun.jna.Pointer;
 
 import net.dempsy.util.Functional;
-import net.dempsy.util.QuietCloseable;
 
 /**
- * <p>
- * This class is an easier (perhaps) and more efficient interface to an OpenCV Mat.
- * Than the one available through the Java wrapper.
- * </p>
  * 
- * <p>
- * <b>NOTE: This class only works when {@code Mat.isContinuous()} is {@code true}</b>
- * </p>
- * 
- * <p>
- * To use it you as {@code CvRaster} to "manage" a {@code Mat}. Using the {@code Mat} through
- * the {@code CvRaster} will then operate directly on the image data in the {@code Mat} in a
- * "zero copy" form. When the {@code CvRaster} is closed, the underlying {@code Mat} will be
- * "released" if the {@code CvRaster} is managing the {@code Mat}.
- * </p>
- * 
- * <p>
- * To obtain a {@code CvRaster} you use the {@link CvRaster#move(Mat)} as follows.
- * </p>
- * 
- * <pre>
- * <code>
- * try (CvRaster raster = CvRaster.manage(mat);) {
- *      // do something with the raster
- * } // raster closed and Mat released
- * </code>
- * </pre>
- * 
- * <p>
- * If the {@code Mat} will outlive the {@code CvRaster} then you can use the {@link CvRaster#unmanaged(Mat)}
- * method to obtain the CvRaster. In this case you need to ensure that the {@code Mat} is not released
- * prior to the last use of the {@code CvRaster} which should be to {@code close} it.
- * </p>
  */
 public abstract class CvRaster implements AutoCloseable {
 
-   static {
-      CvRasterAPI._init();
-   }
+   public final Mat mat;
+   protected final ByteBuffer currentBuffer;
 
-   private boolean decoupled = false;
-   private final CvMat mat;
-   protected ByteBuffer currentBuffer = null;
-   private int refCountForCurrentBuffer = 0;
-
-   private CvRaster(final CvMat m) {
+   private CvRaster(final Mat m) {
       this.mat = m;
+      this.currentBuffer = getData(m);
    }
-
-   /**
-    * If you're going to use OpenCv classes before using CvRaster then
-    * you need to bootstrap the initializing of OpenCv (which boils down
-    * to loading the native libraries). This can be done by calling
-    * this method.
-    */
-   // causes the classloader to initialize API and load the native libs
-   public static void initOpenCv() {}
 
    /**
     * return the {@code CvType} of the {@code CvRaster}'s underlying {@code Mat}.
@@ -116,27 +68,6 @@ public abstract class CvRaster implements AutoCloseable {
       return CvType.ELEM_SIZE(type());
    }
 
-   @FunctionalInterface
-   public static interface ImageOpContext extends QuietCloseable {}
-
-   /**
-    * This is NOT thread safe.
-    * TODO: Make this thread safe without locking
-    */
-   public ImageOpContext imageOp() {
-      refCountForCurrentBuffer++;
-      if(currentBuffer == null) {
-         currentBuffer = getData(mat);
-         prep();
-      }
-
-      return () -> {
-         refCountForCurrentBuffer--;
-         if(refCountForCurrentBuffer <= 0)
-            currentBuffer = null;
-      };
-   }
-
    /**
     * Direct access to the underlying {@code Mat}'s data buffer is available, as long
     * as the underlying buffer is continuous.
@@ -145,468 +76,6 @@ public abstract class CvRaster implements AutoCloseable {
       if(currentBuffer == null)
          throw new NullPointerException("You cannot perform this operation without opening an \"imageOp\" on the " + CvRaster.class.getSimpleName());
       return currentBuffer;
-   }
-
-   /**
-    * This call should be made to hand management of the Mat over to the {@link CvRaster}.
-    * The Mat will be {@link CvMat#move(Mat)}ed so the Mat shouldn't be used after this
-    * call or, at least, it shouldn't be assumed to still be pointing to the same image
-    * data. When the CvRaster is closed, it will release the data that was originally
-    * associated with the {@code Mat}. If you want to keep the {@code Mat} beyond the
-    * life of the {@link CvRaster} then consider using {@link CvRaster#manageShallowCopy(Mat)}.
-    */
-   public static CvRaster move(final Mat mat) {
-      return move(mat, null);
-   }
-
-   /**
-    * This call should be made to manage a copy of the Mat using a {@link CvRaster}.
-    * NOTE!! Changes to the {@link CvRaster} will be reflected in the {@link Mat} and
-    * vs. vrs. If you want a deep copy/clone of the original Mat then consider
-    * using {@link CvRaster#manageDeepCopy(Mat)}.
-    */
-   public static CvRaster manageShallowCopy(final Mat mat) {
-      return manageShallowCopy(mat, null);
-   }
-
-   /**
-    * This call will manage a complete deep copy of the provided {@code Mat}.
-    * Changes in one will not be reflected in the other.
-    */
-   public static CvRaster manageDeepCopy(final Mat mat) {
-      return manageDeepCopy(mat, null);
-   }
-
-   /**
-    * <p>
-    * This call should be made to hand management of the Mat over to the {@link CvRaster}.
-    * The Mat will be {@link CvMat#move(Mat)}ed so the Mat shouldn't be used after this
-    * call or, at least, it shouldn't be assumed to still be pointing to the same image
-    * data. When the CvRaster is closed, it will release the data that was originally
-    * associated with the {@code Mat}. If you want to keep the {@code Mat} beyond the
-    * life of the {@link CvRaster} then consider using {@link CvRaster#manageShallowCopy(Mat)}.
-    * </p>
-    * 
-    * <p>
-    * The {@link ai.kognition.pilecv4j.image.CvRaster.Closer} is an {@link AutoCloseable} context
-    * that this {@link CvRaster} will be added to so that then it closes, this {@link CvRaster}
-    * will also be closed {@code release}-ing the underlying {@code Mat}.
-    */
-   public static CvRaster move(final Mat mat, final Closer closer) {
-      return toRaster(CvMat.move(mat), closer);
-   }
-
-   /**
-    * <p>
-    * This call should be made to manage a copy of the Mat using a {@link CvRaster}.
-    * NOTE!! Changes to the {@link CvRaster} will be reflected in the {@link Mat} and
-    * vs. vrs. If you want a deep copy/clone of the original Mat then consider
-    * using {@link CvRaster#manageDeepCopy(Mat)}.
-    * </p>
-    * 
-    * <p>
-    * The {@link ai.kognition.pilecv4j.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
-    * will be added to so that then it closes, this {@link CvRaster} will also be closed
-    * {@code release}-ing the underlying {@code Mat}.
-    */
-   public static CvRaster manageShallowCopy(final Mat mat, final Closer closer) {
-      final CvRaster ret = makeInstance(CvMat.shallowCopy(mat));
-      if(closer != null)
-         closer.add(ret);
-      return ret;
-   }
-
-   /**
-    * This call will manage a complete deep copy of the provided {@code Mat}.
-    * Changes in one will not be reflected in the other.
-    * 
-    * <p>
-    * The {@link ai.kognition.pilecv4j.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
-    * will be added to so that then it closes, this {@link CvRaster} will also be closed
-    * {@code release}-ing the underlying {@code Mat}.
-    */
-   public static CvRaster manageDeepCopy(final Mat mat, final Closer closer) {
-      if(mat.rows() == 0)
-         return move(new Mat(mat.rows(), mat.cols(), mat.type()));
-      if(mat.isContinuous())
-         return move(mat.clone(), closer);
-
-      final Mat newMat = new Mat(mat.rows(), mat.cols(), mat.type());
-      mat.copyTo(newMat);
-      return move(newMat, closer);
-   }
-
-   /**
-    * You can use this method to create a {@link CvRaster} along with it's managed Mat.
-    * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
-    * 
-    * @see CvRaster#move(Mat)
-    */
-   public static CvRaster create(final int rows, final int cols, final int type) {
-      return create(rows, cols, type, null);
-   }
-
-   /**
-    * You can use this method to create a {@link CvRaster} along with it's managed Mat.
-    * It's equivalent to {@code CvRaster.manage(Mat.zeros(rows, cols, type)); }
-    * 
-    * <p>
-    * The {@link ai.kognition.pilecv4j.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
-    * will be added to so that then it closes, this {@link CvRaster} will also be closed.
-    * 
-    * @see CvRaster#move(Mat, ai.kognition.pilecv4j.image.CvRaster.Closer)
-    */
-   public static CvRaster create(final int rows, final int cols, final int type, final Closer closer) {
-      return toRaster(CvMat.zeros(rows, cols, type), closer);
-   }
-
-   /**
-    * You can use this method to create a {@link CvRaster} along with it's managed Mat
-    * given a native pointer to the location of the raw data and the metadata for the
-    * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
-    * will not be the "owner" of the data. That means YOU need to make sure that the native
-    * data buffer outlives the CvRaster or you're pretty much guaranteed a code dump.
-    */
-   public static CvRaster create(final int rows, final int cols, final int type, final long pointer) {
-      return create(rows, cols, type, pointer, null);
-   }
-
-   /**
-    * You can use this method to create a {@link CvRaster} along with it's managed Mat
-    * given a native pointer to the location of the raw data and the metadata for the
-    * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
-    * will not be the "owner" of the data. That means YOU need to make sure that the native
-    * data buffer outlives the CvRaster or you're pretty much guaranteed a code dump.
-    * 
-    * <p>
-    * The {@link ai.kognition.pilecv4j.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
-    * will be added to so that then it closes, this {@link CvRaster} will also be closed.
-    */
-   public static CvRaster create(final int rows, final int cols, final int type, final long pointer, final Closer closer) {
-      final long nativeObj = CvRasterAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
-      if(nativeObj == 0)
-         throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      return toRaster(CvMat.wrapNative(nativeObj), closer);
-   }
-
-   private static CvRaster makeInstance(final CvMat mat) {
-      // bb.clear();
-      final int type = mat.type();
-      final int depth = CvType.depth(type);
-
-      switch(depth) {
-         case CvType.CV_8S:
-         case CvType.CV_8U:
-            return new CvRaster(mat/* , bb */) {
-               final byte[] zeroPixel = new byte[channels()];
-               ByteBuffer bb = null;
-
-               @Override
-               protected void prep() {
-                  bb = currentBuffer;
-               }
-
-               @Override
-               public void zero(final int row, final int col) {
-                  set(row, col, zeroPixel);
-               }
-
-               @Override
-               public Object get(final int pos) {
-                  final byte[] ret = new byte[channels()];
-                  bb.position(pos);
-                  bb.get(ret);
-                  return ret;
-               }
-
-               @Override
-               public void set(final int pos, final Object pixel) {
-                  final byte[] p = (byte[])pixel;
-                  bb.position(pos);
-                  bb.put(p);
-               }
-
-               @Override
-               public <T> void forEach(final PixelConsumer<T> pc) {
-                  final BytePixelConsumer bpc = (BytePixelConsumer)pc;
-                  final byte[] pixel = new byte[channels()];
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     bb.position(rowOffset + (col * channels));
-                     bb.get(pixel);
-                     bpc.accept(row, col, pixel);
-                  });
-               }
-
-               @Override
-               public <T> void apply(final PixelSetter<T> ps) {
-                  final BytePixelSetter bps = (BytePixelSetter)ps;
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     bb.position(rowOffset + (col * channels));
-                     bb.put(bps.pixel(row, col));
-                  });
-               }
-
-               @Override
-               public <T> void apply(final FlatPixelSetter<T> ps) {
-                  final FlatBytePixelSetter bps = (FlatBytePixelSetter)ps;
-                  iterateOver(pos -> {
-                     bb.position(pos);
-                     bb.put(bps.pixel(pos));
-                  });
-               }
-
-            };
-         case CvType.CV_16U:
-         case CvType.CV_16S:
-            return new CvRaster(mat/* , bb */) {
-               ShortBuffer sb = null;
-               final short[] zeroPixel = new short[channels()]; // zeroed already
-
-               @Override
-               protected void prep() {
-
-                  sb = currentBuffer.asShortBuffer();
-               }
-
-               @Override
-               public void zero(final int row, final int col) {
-                  set(row, col, zeroPixel);
-               }
-
-               @Override
-               public Object get(final int pos) {
-                  final short[] ret = new short[channels()];
-                  sb.position(pos);
-                  sb.get(ret);
-                  return ret;
-               }
-
-               @Override
-               public void set(final int pos, final Object pixel) {
-                  final short[] p = (short[])pixel;
-                  sb.position(pos);
-                  sb.put(p);
-               }
-
-               @Override
-               public <T> void forEach(final PixelConsumer<T> pc) {
-                  final ShortPixelConsumer bpc = (ShortPixelConsumer)pc;
-                  final short[] pixel = new short[channels()];
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     sb.position(rowOffset + (col * channels));
-                     sb.get(pixel);
-                     bpc.accept(row, col, pixel);
-                  });
-               }
-
-               @Override
-               public <T> void apply(final PixelSetter<T> ps) {
-                  final ShortPixelSetter bps = (ShortPixelSetter)ps;
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     sb.position(rowOffset + (col * channels));
-                     sb.put(bps.pixel(row, col));
-                  });
-               }
-
-               @Override
-               public <T> void apply(final FlatPixelSetter<T> ps) {
-                  final FlatShortPixelSetter bps = (FlatShortPixelSetter)ps;
-                  iterateOver(pos -> {
-                     sb.position(pos);
-                     sb.put(bps.pixel(pos));
-                  });
-               }
-            };
-         case CvType.CV_32S:
-            return new CvRaster(mat/* , bb */) {
-               IntBuffer ib = null;
-               final int[] zeroPixel = new int[channels()]; // zeroed already
-
-               @Override
-               protected void prep() {
-                  ib = currentBuffer.asIntBuffer();
-               }
-
-               @Override
-               public void zero(final int row, final int col) {
-                  set(row, col, zeroPixel);
-               }
-
-               @Override
-               public Object get(final int pos) {
-                  final int[] ret = new int[channels()];
-                  ib.position(pos);
-                  ib.get(ret);
-                  return ret;
-               }
-
-               @Override
-               public void set(final int pos, final Object pixel) {
-                  final int[] p = (int[])pixel;
-                  ib.position(pos);
-                  ib.put(p);
-               }
-
-               @Override
-               public <T> void forEach(final PixelConsumer<T> pc) {
-                  final IntPixelConsumer bpc = (IntPixelConsumer)pc;
-                  final int[] pixel = new int[channels()];
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     ib.position(rowOffset + (col * channels));
-                     ib.get(pixel);
-                     bpc.accept(row, col, pixel);
-                  });
-               }
-
-               @Override
-               public <T> void apply(final PixelSetter<T> ps) {
-                  final IntPixelSetter bps = (IntPixelSetter)ps;
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     ib.position(rowOffset + (col * channels));
-                     ib.put(bps.pixel(row, col));
-                  });
-               }
-
-               @Override
-               public <T> void apply(final FlatPixelSetter<T> ps) {
-                  final FlatIntPixelSetter bps = (FlatIntPixelSetter)ps;
-                  iterateOver(pos -> {
-                     ib.position(pos);
-                     ib.put(bps.pixel(pos));
-                  });
-               }
-            };
-         case CvType.CV_32F:
-            return new CvRaster(mat/* , bb */) {
-               FloatBuffer fb = null;
-               final float[] zeroPixel = new float[channels()]; // zeroed already
-
-               @Override
-               protected void prep() {
-                  fb = currentBuffer.asFloatBuffer();
-               }
-
-               @Override
-               public void zero(final int row, final int col) {
-                  set(row, col, zeroPixel);
-               }
-
-               @Override
-               public Object get(final int pos) {
-                  final float[] ret = new float[channels()];
-                  fb.position(pos);
-                  fb.get(ret);
-                  return ret;
-               }
-
-               @Override
-               public void set(final int pos, final Object pixel) {
-                  final float[] p = (float[])pixel;
-                  fb.position(pos);
-                  fb.put(p);
-               }
-
-               @Override
-               public <T> void forEach(final PixelConsumer<T> pc) {
-                  final FloatPixelConsumer bpc = (FloatPixelConsumer)pc;
-                  final float[] pixel = new float[channels()];
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     fb.position(rowOffset + (col * channels));
-                     fb.get(pixel);
-                     bpc.accept(row, col, pixel);
-                  });
-               }
-
-               @Override
-               public <T> void apply(final PixelSetter<T> ps) {
-                  final FloatPixelSetter bps = (FloatPixelSetter)ps;
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     fb.position(rowOffset + (col * channels));
-                     fb.put(bps.pixel(row, col));
-                  });
-               }
-
-               @Override
-               public <T> void apply(final FlatPixelSetter<T> ps) {
-                  final FlatFloatPixelSetter bps = (FlatFloatPixelSetter)ps;
-                  iterateOver(pos -> {
-                     fb.position(pos);
-                     fb.put(bps.pixel(pos));
-                  });
-               }
-            };
-         case CvType.CV_64F:
-            return new CvRaster(mat/* , bb */) {
-               DoubleBuffer db = null;
-               final double[] zeroPixel = new double[channels()]; // zeroed already
-
-               @Override
-               protected void prep() {
-                  db = currentBuffer.asDoubleBuffer();
-               }
-
-               @Override
-               public void zero(final int row, final int col) {
-                  set(row, col, zeroPixel);
-               }
-
-               @Override
-               public Object get(final int pos) {
-                  final double[] ret = new double[channels()];
-                  db.position(pos);
-                  db.get(ret);
-                  return ret;
-               }
-
-               @Override
-               public void set(final int pos, final Object pixel) {
-                  final double[] p = (double[])pixel;
-                  db.position(pos);
-                  db.put(p);
-               }
-
-               @Override
-               public <T> void forEach(final PixelConsumer<T> pc) {
-                  final DoublePixelConsumer bpc = (DoublePixelConsumer)pc;
-                  final double[] pixel = new double[channels()];
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     db.position(rowOffset + (col * channels));
-                     db.get(pixel);
-                     bpc.accept(row, col, pixel);
-                  });
-               }
-
-               @Override
-               public <T> void apply(final PixelSetter<T> ps) {
-                  final DoublePixelSetter bps = (DoublePixelSetter)ps;
-                  final int channels = channels();
-                  iterateOver((row, col, rowOffset) -> {
-                     db.position(rowOffset + (col * channels));
-                     db.put(bps.pixel(row, col));
-                  });
-               }
-
-               @Override
-               public <T> void apply(final FlatPixelSetter<T> ps) {
-                  final FlatDoublePixelSetter bps = (FlatDoublePixelSetter)ps;
-                  iterateOver(pos -> {
-                     db.position(pos);
-                     db.put(bps.pixel(pos));
-                  });
-               }
-            };
-         default:
-            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
-      }
    }
 
    /**
@@ -642,8 +111,6 @@ public abstract class CvRaster implements AutoCloseable {
     * Apply the given lambda to every pixel.
     */
    public abstract <T> void forEach(final PixelConsumer<T> consumer);
-
-   protected abstract void prep();
 
    /**
     * Get the pixel for the given row/col location. The pixel value will comport with the
@@ -697,47 +164,9 @@ public abstract class CvRaster implements AutoCloseable {
       return Pointer.nativeValue(CvRasterAPI.CvRaster_getData(mat.nativeObj));
    }
 
-   /**
-    * The underlying {@code Mat} is guarded because it cannot (currently) be modified such that
-    * the data buffer changes location without breaking the CvRaster. This allows you access to the
-    * {@code Mat} anyway. Just make sure you know what you're doing.
-    */
-   public <R> R matOp(final Function<CvMat, R> op) {
-      try (final ImageOpContext io = imageOp()) {
-         return op.apply(mat);
-      }
-   }
-
-   /**
-    * The underlying {@code Mat} is guarded because it cannot (currently) be modified such that
-    * the data buffer changes location without breaking the CvRaster. This allows you access to the
-    * {@code Mat} anyway. Just make sure you know what you're doing.
-    */
-   public void matAp(final Consumer<CvMat> op) {
-      try (final ImageOpContext io = imageOp()) {
-         op.accept(mat);
-      }
-   }
-
-   /**
-    * This method will free the underlying {@code Mat} from being owned by this CvRaster.
-    * When a CvRaster doesn't own the underlying {@code Mat} it doesn't free it up when
-    * it's {@code close}ed.
-    */
-   public CvMat disown() {
-      decoupled = true;
-      return mat;
-   }
-
-   /**
-    * This will free any owned underlying resources. You should not attempt to use the
-    * CvRaster once it's closed.
-    */
    @Override
    public void close() {
-      if(mat != null && !decoupled)
-         mat.close();
-      decoupled = true;
+      // clean up the direct byte buffer?
    }
 
    @Override
@@ -809,7 +238,6 @@ public abstract class CvRaster implements AutoCloseable {
          case CvType.CV_8S:
          case CvType.CV_8U: {
             final byte[] data = new byte[rows * cols * channels];
-
             m.get(0, 0, data);
             return (T)data;
          }
@@ -833,6 +261,38 @@ public abstract class CvRaster implements AutoCloseable {
             final double[] data = new double[rows * cols * channels];
             m.get(0, 0, data);
             return (T)data;
+         }
+         default:
+            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
+      }
+   }
+
+   public static <T> void copyToPrimitiveArray(final Mat m, final T data) {
+      final int type = m.type();
+      final int depth = CvType.depth(type);
+
+      switch(depth) {
+         case CvType.CV_8S:
+         case CvType.CV_8U: {
+            m.get(0, 0, (byte[])data);
+            return;
+         }
+         case CvType.CV_16U:
+         case CvType.CV_16S: {
+            m.get(0, 0, (short[])data);
+            return;
+         }
+         case CvType.CV_32S: {
+            m.get(0, 0, (int[])data);
+            return;
+         }
+         case CvType.CV_32F: {
+            m.get(0, 0, (float[])data);
+            return;
+         }
+         case CvType.CV_64F: {
+            m.get(0, 0, (double[])data);
+            return;
          }
          default:
             throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
@@ -1070,6 +530,299 @@ public abstract class CvRaster implements AutoCloseable {
       R apply(R prev, P pixel, int row, int col);
    }
 
+   static CvRaster makeInstance(final Mat mat) {
+      final int type = mat.type();
+      final int depth = CvType.depth(type);
+
+      switch(depth) {
+         case CvType.CV_8S:
+         case CvType.CV_8U:
+            return new CvRaster(mat) {
+               final byte[] zeroPixel = new byte[channels()];
+               ByteBuffer bb = currentBuffer;
+
+               @Override
+               public void zero(final int row, final int col) {
+                  set(row, col, zeroPixel);
+               }
+
+               @Override
+               public Object get(final int pos) {
+                  final byte[] ret = new byte[channels()];
+                  bb.position(pos);
+                  bb.get(ret);
+                  return ret;
+               }
+
+               @Override
+               public void set(final int pos, final Object pixel) {
+                  final byte[] p = (byte[])pixel;
+                  bb.position(pos);
+                  bb.put(p);
+               }
+
+               @Override
+               public <T> void forEach(final PixelConsumer<T> pc) {
+                  final BytePixelConsumer bpc = (BytePixelConsumer)pc;
+                  final byte[] pixel = new byte[channels()];
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     bb.position(rowOffset + (col * channels));
+                     bb.get(pixel);
+                     bpc.accept(row, col, pixel);
+                  });
+               }
+
+               @Override
+               public <T> void apply(final PixelSetter<T> ps) {
+                  final BytePixelSetter bps = (BytePixelSetter)ps;
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     bb.position(rowOffset + (col * channels));
+                     bb.put(bps.pixel(row, col));
+                  });
+               }
+
+               @Override
+               public <T> void apply(final FlatPixelSetter<T> ps) {
+                  final FlatBytePixelSetter bps = (FlatBytePixelSetter)ps;
+                  iterateOver(pos -> {
+                     bb.position(pos);
+                     bb.put(bps.pixel(pos));
+                  });
+               }
+
+            };
+         case CvType.CV_16U:
+         case CvType.CV_16S:
+            return new CvRaster(mat) {
+               ShortBuffer sb = currentBuffer.asShortBuffer();
+               final short[] zeroPixel = new short[channels()]; // zeroed already
+
+               @Override
+               public void zero(final int row, final int col) {
+                  set(row, col, zeroPixel);
+               }
+
+               @Override
+               public Object get(final int pos) {
+                  final short[] ret = new short[channels()];
+                  sb.position(pos);
+                  sb.get(ret);
+                  return ret;
+               }
+
+               @Override
+               public void set(final int pos, final Object pixel) {
+                  final short[] p = (short[])pixel;
+                  sb.position(pos);
+                  sb.put(p);
+               }
+
+               @Override
+               public <T> void forEach(final PixelConsumer<T> pc) {
+                  final ShortPixelConsumer bpc = (ShortPixelConsumer)pc;
+                  final short[] pixel = new short[channels()];
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     sb.position(rowOffset + (col * channels));
+                     sb.get(pixel);
+                     bpc.accept(row, col, pixel);
+                  });
+               }
+
+               @Override
+               public <T> void apply(final PixelSetter<T> ps) {
+                  final ShortPixelSetter bps = (ShortPixelSetter)ps;
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     sb.position(rowOffset + (col * channels));
+                     sb.put(bps.pixel(row, col));
+                  });
+               }
+
+               @Override
+               public <T> void apply(final FlatPixelSetter<T> ps) {
+                  final FlatShortPixelSetter bps = (FlatShortPixelSetter)ps;
+                  iterateOver(pos -> {
+                     sb.position(pos);
+                     sb.put(bps.pixel(pos));
+                  });
+               }
+            };
+         case CvType.CV_32S:
+            return new CvRaster(mat) {
+               IntBuffer ib = currentBuffer.asIntBuffer();
+               final int[] zeroPixel = new int[channels()]; // zeroed already
+
+               @Override
+               public void zero(final int row, final int col) {
+                  set(row, col, zeroPixel);
+               }
+
+               @Override
+               public Object get(final int pos) {
+                  final int[] ret = new int[channels()];
+                  ib.position(pos);
+                  ib.get(ret);
+                  return ret;
+               }
+
+               @Override
+               public void set(final int pos, final Object pixel) {
+                  final int[] p = (int[])pixel;
+                  ib.position(pos);
+                  ib.put(p);
+               }
+
+               @Override
+               public <T> void forEach(final PixelConsumer<T> pc) {
+                  final IntPixelConsumer bpc = (IntPixelConsumer)pc;
+                  final int[] pixel = new int[channels()];
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     ib.position(rowOffset + (col * channels));
+                     ib.get(pixel);
+                     bpc.accept(row, col, pixel);
+                  });
+               }
+
+               @Override
+               public <T> void apply(final PixelSetter<T> ps) {
+                  final IntPixelSetter bps = (IntPixelSetter)ps;
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     ib.position(rowOffset + (col * channels));
+                     ib.put(bps.pixel(row, col));
+                  });
+               }
+
+               @Override
+               public <T> void apply(final FlatPixelSetter<T> ps) {
+                  final FlatIntPixelSetter bps = (FlatIntPixelSetter)ps;
+                  iterateOver(pos -> {
+                     ib.position(pos);
+                     ib.put(bps.pixel(pos));
+                  });
+               }
+            };
+         case CvType.CV_32F:
+            return new CvRaster(mat) {
+               FloatBuffer fb = currentBuffer.asFloatBuffer();
+               final float[] zeroPixel = new float[channels()]; // zeroed already
+
+               @Override
+               public void zero(final int row, final int col) {
+                  set(row, col, zeroPixel);
+               }
+
+               @Override
+               public Object get(final int pos) {
+                  final float[] ret = new float[channels()];
+                  fb.position(pos);
+                  fb.get(ret);
+                  return ret;
+               }
+
+               @Override
+               public void set(final int pos, final Object pixel) {
+                  final float[] p = (float[])pixel;
+                  fb.position(pos);
+                  fb.put(p);
+               }
+
+               @Override
+               public <T> void forEach(final PixelConsumer<T> pc) {
+                  final FloatPixelConsumer bpc = (FloatPixelConsumer)pc;
+                  final float[] pixel = new float[channels()];
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     fb.position(rowOffset + (col * channels));
+                     fb.get(pixel);
+                     bpc.accept(row, col, pixel);
+                  });
+               }
+
+               @Override
+               public <T> void apply(final PixelSetter<T> ps) {
+                  final FloatPixelSetter bps = (FloatPixelSetter)ps;
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     fb.position(rowOffset + (col * channels));
+                     fb.put(bps.pixel(row, col));
+                  });
+               }
+
+               @Override
+               public <T> void apply(final FlatPixelSetter<T> ps) {
+                  final FlatFloatPixelSetter bps = (FlatFloatPixelSetter)ps;
+                  iterateOver(pos -> {
+                     fb.position(pos);
+                     fb.put(bps.pixel(pos));
+                  });
+               }
+            };
+         case CvType.CV_64F:
+            return new CvRaster(mat) {
+               DoubleBuffer db = currentBuffer.asDoubleBuffer();
+               final double[] zeroPixel = new double[channels()]; // zeroed already
+
+               @Override
+               public void zero(final int row, final int col) {
+                  set(row, col, zeroPixel);
+               }
+
+               @Override
+               public Object get(final int pos) {
+                  final double[] ret = new double[channels()];
+                  db.position(pos);
+                  db.get(ret);
+                  return ret;
+               }
+
+               @Override
+               public void set(final int pos, final Object pixel) {
+                  final double[] p = (double[])pixel;
+                  db.position(pos);
+                  db.put(p);
+               }
+
+               @Override
+               public <T> void forEach(final PixelConsumer<T> pc) {
+                  final DoublePixelConsumer bpc = (DoublePixelConsumer)pc;
+                  final double[] pixel = new double[channels()];
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     db.position(rowOffset + (col * channels));
+                     db.get(pixel);
+                     bpc.accept(row, col, pixel);
+                  });
+               }
+
+               @Override
+               public <T> void apply(final PixelSetter<T> ps) {
+                  final DoublePixelSetter bps = (DoublePixelSetter)ps;
+                  final int channels = channels();
+                  iterateOver((row, col, rowOffset) -> {
+                     db.position(rowOffset + (col * channels));
+                     db.put(bps.pixel(row, col));
+                  });
+               }
+
+               @Override
+               public <T> void apply(final FlatPixelSetter<T> ps) {
+                  final FlatDoublePixelSetter bps = (FlatDoublePixelSetter)ps;
+                  iterateOver(pos -> {
+                     db.position(pos);
+                     db.put(bps.pixel(pos));
+                  });
+               }
+            };
+         default:
+            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
+      }
+   }
+
    protected static interface PixelIterator {
       public void accept(int row, int col, int rowOffset);
    }
@@ -1079,12 +832,10 @@ public abstract class CvRaster implements AutoCloseable {
       final int cols = cols();
       final int channels = channels();
       final int colsXchannels = cols * channels;
-      try (ImageOpContext io = imageOp()) {
-         for(int row = 0; row < rows; row++) {
-            final int rowOffset = row * colsXchannels;
-            for(int col = 0; col < cols; col++) {
-               piter.accept(row, col, rowOffset);
-            }
+      for(int row = 0; row < rows; row++) {
+         final int rowOffset = row * colsXchannels;
+         for(int col = 0; col < cols; col++) {
+            piter.accept(row, col, rowOffset);
          }
       }
    }
@@ -1099,10 +850,8 @@ public abstract class CvRaster implements AutoCloseable {
       final int channels = channels();
       final int numElements = (rows * cols * channels);
 
-      try (ImageOpContext io = imageOp()) {
-         for(int pos = 0; pos < numElements; pos += channels) {
-            piter.accept(pos);
-         }
+      for(int pos = 0; pos < numElements; pos += channels) {
+         piter.accept(pos);
       }
    }
 
@@ -1122,18 +871,4 @@ public abstract class CvRaster implements AutoCloseable {
       return ret;
    }
 
-   /**
-    * convert/wrap a CvMat into a CvRaster
-    * 
-    * <p>
-    * The {@link ai.kognition.pilecv4j.image.CvRaster.Closer} is an {@link AutoCloseable} context that this {@link CvRaster}
-    * will be added to so that then it closes, this {@link CvRaster} will also be closed
-    * {@code release}-ing the underlying {@code Mat}.
-    */
-   private static CvRaster toRaster(final CvMat mat, final Closer closer) {
-      final CvRaster ret = makeInstance(mat/* , getData(mat) */);
-      if(closer != null)
-         closer.add(ret);
-      return ret;
-   }
 }

@@ -12,9 +12,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.gstreamer.BinManager;
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvRasterAndCaps;
+import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.FrameEmitter;
@@ -45,9 +43,9 @@ public class TestSlowFrameProcessing {
                .make("videoconvert")
                .caps("video/x-raw")
                .add(new BreakoutFilter("filter1")
-                     .connectSlowFilter((final CvRasterAndCaps bac) -> {
+                     .connectSlowFilter((final CvMatAndCaps bac) -> {
                         if(FrameEmitter.HACK_FRAME)
-                           LOGGER.trace("byte0 " + bac.raster.underlying().get(0));
+                           LOGGER.trace("byte0 " + bac.mat.rasterOp(r -> r.underlying().get(0)));
                         uncheck(() -> Thread.sleep(100)); // ~10 frame/second
                         slowFramesProcessed.incrementAndGet();
                      }))

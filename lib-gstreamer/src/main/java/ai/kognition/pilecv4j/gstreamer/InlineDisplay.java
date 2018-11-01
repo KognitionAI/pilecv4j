@@ -10,92 +10,113 @@ import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvRasterAndCaps;
+import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.CvRaster;
 import ai.kognition.pilecv4j.image.ImageDisplay;
 import ai.kognition.pilecv4j.image.ImageDisplay.KeyPressCallback;
-import ai.kognition.pilecv4j.image.ImageDisplay.WindowHandle;
+import ai.kognition.pilecv4j.image.Utils;
 
 import net.dempsy.util.MutableRef;
 
-public class InlineDisplay implements Consumer<CvRasterAndCaps> {
+public class InlineDisplay implements Consumer<CvMatAndCaps> {
    private static final Logger LOGGER = LoggerFactory.getLogger(InlineDisplay.class);
 
+   public static String DEFAULT_WINDOW_NAME = "inline-display";
+
    private final boolean deepCopy;
-   private WindowHandle window = null;
+   private ImageDisplay window = null;
    private Pipeline stopOnClose = null;
    private CountDownLatch stopLatch = null;
-   private final KeyPressCallback kpc;
    private final Size screenDim;
 
    private final MutableRef<Size> adjustedSize = new MutableRef<>();
 
-   private InlineDisplay(final Size screenDim, final boolean deepCopy, final KeyPressCallback kpc, final boolean preserveAspectRatio) {
+   private InlineDisplay(final Size screenDim, final boolean deepCopy, final KeyPressCallback kpc, final boolean preserveAspectRatio,
+         final ImageDisplay.Implementation impl, final String windowName) {
       this.deepCopy = deepCopy;
-      this.kpc = kpc;
       this.screenDim = screenDim;
 
       if(!preserveAspectRatio)
          adjustedSize.ref = screenDim;
+
+      window = new ImageDisplay.Builder()
+            .windowName(windowName)
+            .implementation(impl)
+            .closeCallback(() -> {
+               if(stopOnClose != null) {
+                  GstUtils.stopBinOnEOS(stopOnClose, stopLatch);
+                  LOGGER.debug("Emitting EOS");
+                  stopOnClose.sendEvent(new EOSEvent());
+               }
+            })
+            .keyPressHandler(kpc)
+            .build();
+
    }
 
-   public InlineDisplay(final boolean deepCopy, final KeyPressCallback kpc) {
-      this(null, deepCopy, kpc, true);
-   }
+   public static class Builder {
 
-   public InlineDisplay(final boolean deepCopy) {
-      this(deepCopy, null);
-   }
+      private boolean deepCopy = true;
+      private KeyPressCallback kpc = null;
+      private Size screenDim = null;
+      private boolean preserveAspectRatio = true;
+      private ImageDisplay.Implementation impl = ImageDisplay.DEFAULT_IMPLEMENTATION;
+      private String windowName = DEFAULT_WINDOW_NAME;
 
-   public InlineDisplay() {
-      this(true, null);
-   }
+      public Builder deepCopy(final boolean deepCopy) {
+         this.deepCopy = deepCopy;
+         return this;
+      }
 
-   public InlineDisplay(final Size screenDim, final KeyPressCallback kpc) {
-      this(screenDim, true, kpc, true);
-   }
+      public Builder keyPressCallback(final KeyPressCallback kpc) {
+         this.kpc = kpc;
+         return this;
+      }
 
-   public InlineDisplay(final Size screenDim, final boolean preserveAspectRatio) {
-      this(screenDim, true, null, preserveAspectRatio);
-   }
+      public Builder dim(final Size screenDim) {
+         this.screenDim = screenDim;
+         return this;
+      }
 
-   public InlineDisplay(final Size screenDim, final boolean preserveAspectRatio, final KeyPressCallback kpc) {
-      this(screenDim, true, kpc, preserveAspectRatio);
-   }
+      public Builder preserveAspectRatio(final boolean preserveAspectRatio) {
+         this.preserveAspectRatio = preserveAspectRatio;
+         return this;
+      }
 
-   public InlineDisplay(final Size screenDim) {
-      this(screenDim, null);
+      public Builder implementation(final ImageDisplay.Implementation impl) {
+         this.impl = impl;
+         return this;
+      }
+
+      public Builder windowName(final String windowName) {
+         this.windowName = windowName;
+         return this;
+      }
+
+      public InlineDisplay build() {
+         return new InlineDisplay(screenDim, deepCopy, kpc, preserveAspectRatio, impl, windowName);
+      }
    }
 
    @Override
-   public void accept(final CvRasterAndCaps rac) {
-      final CvRaster r = rac.raster;
+   public void accept(final CvMatAndCaps rac) {
+      final CvMat m = rac.mat;
 
-      r.matAp(m -> {
-         if(screenDim != null) {
-            if(adjustedSize.ref == null) {
-               // calculate the appropriate resize
-               final double fh = screenDim.height / m.rows();
-               final double fw = screenDim.width / m.cols();
-               final double scale = fw < fh ? fw : fh;
-               if(scale >= 1.0)
-                  adjustedSize.ref = new Size(m.width(), m.height());
-               else
-                  adjustedSize.ref = new Size(Math.round(m.width() * scale), Math.round(m.height() * scale));
-            }
-
-            try (final CvMat lmat = new CvMat()) {
-               Imgproc.resize(m, lmat, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST);
-               process(lmat);
-            }
-         } else {
-            try (final CvMat lmat = deepCopy ? CvMat.deepCopy(m) : CvMat.shallowCopy(m)) {
-               process(lmat);
-            }
+      if(screenDim != null) {
+         if(adjustedSize.ref == null) {
+            adjustedSize.ref = Utils.perserveAspectRatio(m, screenDim);
          }
-      });
+
+         try (final CvMat lmat = new CvMat()) {
+            Imgproc.resize(m, lmat, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST);
+            process(lmat);
+         }
+      } else {
+         try (final CvMat lmat = deepCopy ? CvMat.deepCopy(m) : CvMat.shallowCopy(m)) {
+            process(lmat);
+         }
+      }
    }
 
    public void stopOnClose(final Pipeline pipe, final CountDownLatch stopLatch) {
@@ -104,15 +125,6 @@ public class InlineDisplay implements Consumer<CvRasterAndCaps> {
    }
 
    private void process(final CvMat lmat) {
-      if(window == null)
-         window = ImageDisplay.show(lmat, "inline-display", () -> {
-            if(stopOnClose != null) {
-               GstUtils.stopBinOnEOS(stopOnClose, stopLatch);
-               LOGGER.debug("Emitting EOS");
-               stopOnClose.sendEvent(new EOSEvent());
-            }
-         }, kpc);
-      else
-         window.update(lmat);
+      window.update(lmat);
    }
 }
