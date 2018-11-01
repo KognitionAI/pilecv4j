@@ -12,6 +12,7 @@ import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
+import ai.kognition.pilecv4j.image.CvRaster.GetChannelValueAsInt;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -114,4 +115,23 @@ public class CvRasterTest {
       }
    }
 
+   @Test
+   public void testReduce() throws Exception {
+      try (final CvMat mat = new CvMat(255, 255, CvType.CV_8UC1);) {
+         mat.rasterAp(raster -> {
+            raster.apply((BytePixelSetter)(r, c) -> new byte[] {(byte)c});
+         });
+
+         final GetChannelValueAsInt valueFetcher = CvRaster.channelValueFetcher(mat.type());
+         final long sum = CvMat.rasterOp(mat,
+               raster -> raster.reduce(Long.valueOf(0), (prev, pixel, row, col) -> Long.valueOf(prev.longValue() + valueFetcher.get(pixel, 0))));
+
+         long expected = 0;
+         for(int i = 0; i < 255; i++)
+            expected = expected + i;
+         expected *= 255;
+
+         assertEquals(expected, sum);
+      }
+   }
 }

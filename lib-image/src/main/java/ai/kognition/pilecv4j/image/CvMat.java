@@ -15,7 +15,8 @@ import org.slf4j.LoggerFactory;
 /**
  * <p>
  * This class is an easier (perhaps) and more efficient interface to an OpenCV Mat.
- * Than the one available through the Java wrapper.
+ * Than the one available through the Java wrapper. It includes more efficient resource
+ * management as an {@link AutoCloseable}.
  * </p>
  */
 public class CvMat extends Mat implements AutoCloseable {

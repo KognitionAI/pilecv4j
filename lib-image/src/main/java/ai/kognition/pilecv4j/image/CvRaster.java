@@ -20,6 +20,33 @@ import com.sun.jna.Pointer;
 import net.dempsy.util.Functional;
 
 /**
+ * <p>
+ * {@link CvRaster} is a utility for direct access to the underlying Mat's data buffer
+ * from java using a {@code DirectByteBuffer}. You can get access to an underlying
+ * Mat's data buffer by passing a lambda to the appropriate CvMat method.
+ * </p>
+ * 
+ * <pre>
+ * <code>
+ * CvMat.rasterAp(mat, raster -> {
+ *   // do something with the raster which contains a DirectByteBuffer
+ *   // that can be retrieved using:
+ *   ByteBuffer bb = raster.underlying();
+ * });
+ * </code>
+ * </pre>
+ * 
+ * Alternatively you can apply a lambda to the {@link CvRaster} using one of the available
+ * methods. For example, this will add up all of the pixel values in grayscale byte image
+ * and return the result
+ * 
+ * <pre>
+ * <code>
+ * GetChannelValueAsInt valueFetcher = CvRaster.channelValueFetcher(mat.type());
+ * final long sum = CvMat.rasterOp(mat,
+ *   raster -> raster.reduce(Long.valueOf(0), (prev, pixel, row, col) -> Long.valueOf(prev.longValue() + valueFetcher.get(pixel, 0))));
+ * </code>
+ * </pre>
  * 
  */
 public abstract class CvRaster implements AutoCloseable {
@@ -222,10 +249,16 @@ public abstract class CvRaster implements AutoCloseable {
       return bb1.compareTo(bb2) == 0;
    }
 
+   /**
+    * Copy the entire image to a primitive array of the appropriate type.
+    */
    public static <T> T copyToPrimitiveArray(final CvRaster m) {
       return copyToPrimitiveArray(m.mat);
    }
 
+   /**
+    * Copy the entire image to a primitive array of the appropriate type.
+    */
    @SuppressWarnings("unchecked")
    public static <T> T copyToPrimitiveArray(final Mat m) {
       final int rows = m.rows();
@@ -267,6 +300,9 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
+   /**
+    * Copy the entire image to a primitive array of the appropriate type.
+    */
    public static <T> void copyToPrimitiveArray(final Mat m, final T data) {
       final int type = m.type();
       final int depth = CvType.depth(type);
@@ -299,24 +335,31 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
+   /**
+    * Instances of this interface will return the channel value of the given pixel as an int.
+    * You can obtain an instance of this interface for the appropriate {@link CvType} using
+    * {@link CvRaster#channelValueFetcher(int)}.
+    */
    @FunctionalInterface
    public static interface GetChannelValueAsInt {
       public int get(Object pixel, int channel);
    }
 
+   /**
+    * Instances of this interface will set the channel value of the given pixel.
+    * You can obtain an instance of this interface for the appropriate {@link CvType} using
+    * {@link CvRaster#channelValuePutter(int)}.
+    */
    @FunctionalInterface
    public static interface PutChannelValueFromInt {
       public void put(Object pixel, int channel, int channelValue);
    }
 
-   @FunctionalInterface
-   public static interface PixelToInts extends Function<Object, int[]> {}
-
-   @FunctionalInterface
-   public static interface IntsToPixel extends Function<int[], Object> {}
-
-   public static PutChannelValueFromInt channelValuePutter(final CvRaster raster) {
-      switch(CvType.depth(raster.type())) {
+   /**
+    * Create the appropriate {@link PutChannelValueAsInt} instance for the given type.
+    */
+   public static PutChannelValueFromInt channelValuePutter(final int type) {
+      switch(CvType.depth(type)) {
          case CvType.CV_8S:
             return (p, ch, chv) -> ((byte[])p)[ch] = (byte)((chv > Byte.MAX_VALUE) ? Byte.MAX_VALUE : chv);
          case CvType.CV_8U:
@@ -328,12 +371,15 @@ public abstract class CvRaster implements AutoCloseable {
          case CvType.CV_32S:
             return (p, ch, chv) -> ((int[])p)[ch] = chv;
          default:
-            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
+            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
       }
    }
 
-   public static GetChannelValueAsInt channelValueFetcher(final CvRaster raster) {
-      switch(CvType.depth(raster.type())) {
+   /**
+    * Create the appropriate {@link GetChannelValueAsInt} instance for the given type.
+    */
+   public static GetChannelValueAsInt channelValueFetcher(final int type) {
+      switch(CvType.depth(type)) {
          case CvType.CV_8S:
             return (p, ch) -> (int)((byte[])p)[ch];
          case CvType.CV_8U:
@@ -345,13 +391,13 @@ public abstract class CvRaster implements AutoCloseable {
          case CvType.CV_32S:
             return (p, ch) -> ((int[])p)[ch];
          default:
-            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
+            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
       }
    }
 
-   public static PixelToInts pixelToIntsConverter(final CvRaster raster) {
-      final GetChannelValueAsInt fetcher = channelValueFetcher(raster);
-      final int numChannels = raster.channels();
+   public static Function<Object, int[]> pixelToIntsConverter(final int type) {
+      final GetChannelValueAsInt fetcher = channelValueFetcher(type);
+      final int numChannels = CvType.channels(type);
       final int[] ret = new int[numChannels];
       return(p -> {
          for(int i = 0; i < numChannels; i++)
@@ -360,8 +406,8 @@ public abstract class CvRaster implements AutoCloseable {
       });
    }
 
-   public static int numChannelElementValues(final CvRaster raster) {
-      switch(CvType.depth(raster.type())) {
+   public static int numChannelElementValues(final int type) {
+      switch(CvType.depth(type)) {
          case CvType.CV_8S:
          case CvType.CV_8U:
             return 256;
@@ -369,12 +415,8 @@ public abstract class CvRaster implements AutoCloseable {
          case CvType.CV_16U:
             return 65536;
          default:
-            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(raster.type()));
+            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
       }
-   }
-
-   public static Object makePixel(final CvRaster raster) {
-      return makePixel(raster.type());
    }
 
    public static Object makePixel(final int type) {
@@ -416,10 +458,10 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
-   public static IntsToPixel intsToPixelConverter(final CvRaster raster) {
-      final PutChannelValueFromInt putter = channelValuePutter(raster);
-      final int numChannels = raster.channels();
-      final Object pixel = makePixel(raster);
+   public static Function<int[], Object> intsToPixelConverter(final int type) {
+      final PutChannelValueFromInt putter = channelValuePutter(type);
+      final int numChannels = CvType.channels(type);
+      final Object pixel = makePixel(type);
       return ints -> {
          for(int i = 0; i < numChannels; i++)
             putter.put(pixel, i, ints[i]);
