@@ -29,6 +29,8 @@ public class CvRasterAPI {
 
    public static native long CvRaster_copy(long nativeMatHandle);
 
+   public static native void CvRaster_assign(long nativeHandleDest, long nativeMatHandleSrc);
+
    public static native Pointer CvRaster_getData(long nativeMatHandle);
 
    public static native long CvRaster_makeMatFromRawDataReference(int rows, int cols, int type, long dataLong);

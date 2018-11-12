@@ -68,7 +68,6 @@ public class CvMat extends Mat implements AutoCloseable {
       stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException() : null;
    }
 
-   // called from CvRaster
    public static CvMat wrapNative(final long nativeObj) {
       return new CvMat(nativeObj);
    }
@@ -223,6 +222,13 @@ public class CvMat extends Mat implements AutoCloseable {
                "Got an exception trying to call Mat.n_ones. Either the security model is too restrictive or the version of OpenCv can't be supported.",
                e);
       }
+   }
+
+   /**
+    * This implements {@code leftOp = rightOp}
+    */
+   public static void reassign(final Mat leftOp, final Mat rightOp) {
+      CvRasterAPI.CvRaster_assign(leftOp.nativeObj, rightOp.nativeObj);
    }
 
    /**

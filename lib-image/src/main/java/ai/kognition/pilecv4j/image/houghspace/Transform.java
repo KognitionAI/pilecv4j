@@ -313,9 +313,9 @@ public class Transform {
 
       @Override
       public int hashCode() {
-         return new Integer(r).hashCode() +
-               new Integer(c).hashCode() +
-               new Integer(count).hashCode();
+         return Integer.hashCode(r) +
+               Integer.hashCode(c) +
+               Integer.hashCode(count);
       }
 
       @Override

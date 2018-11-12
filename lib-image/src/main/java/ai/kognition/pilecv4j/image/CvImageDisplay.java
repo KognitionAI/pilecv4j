@@ -109,7 +109,6 @@ public class CvImageDisplay implements ImageDisplay {
          while(!callback.shown.get())
             Thread.yield();
       }
-
    }
 
    @Override
@@ -187,18 +186,17 @@ public class CvImageDisplay implements ImageDisplay {
             shownSet = true;
          }
 
-         final CvMat toUpdate = update.getAndSet(null);
-
-         if(toUpdate != null) {
-            CvRasterAPI.CvRaster_updateWindow(name, toUpdate.nativeObj);
-            toUpdate.close();
+         try (final CvMat toUpdate = update.getAndSet(null);) {
+            if(toUpdate != null)
+               CvRasterAPI.CvRaster_updateWindow(name, toUpdate.nativeObj);
          }
 
-         if(keyPressCallback != null && kp >= 0) {
+         if(keyPressCallback != null && kp >= 0)
+
+         {
             if(keyPressCallback.keyPressed(kp))
                closeNow.set(true);
-         } else if(kp == 32)
-            closeNow.set(true);
+         } else if(kp == 32) closeNow.set(true);
 
          return closeNow.get() ? name : null;
       }

@@ -8,6 +8,7 @@
 extern "C" {
 void* CvRaster_getData(uint64_t native);
 uint64_t CvRaster_copy(uint64_t native);
+void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle);
 uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong);
 uint64_t CvRaster_defaultMat();
 void CvRaster_showImage(const char* name, uint64_t native);
@@ -35,6 +36,14 @@ uint64_t CvRaster_copy(uint64_t native) {
 	cv::Mat* newMat = new cv::Mat((*mat));
 	return (uint64_t) newMat;
 }
+
+void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle) {
+	cv::Mat* dst = (cv::Mat*) destHandle;
+	cv::Mat* src = (cv::Mat*) srcHandle;
+
+        *dst = *src;
+}
+
 
 uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong) {
 	void* data = (void*) dataLong;

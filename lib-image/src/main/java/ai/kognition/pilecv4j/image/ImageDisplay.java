@@ -1,16 +1,25 @@
 package ai.kognition.pilecv4j.image;
 
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.QuietCloseable;
 
 public interface ImageDisplay extends QuietCloseable {
+   static final Logger LOGGER = LoggerFactory.getLogger(ImageDisplay.class);
 
    public void update(final Mat toUpdate);
 
    @FunctionalInterface
    public static interface KeyPressCallback {
       public boolean keyPressed(int keyPressed);
+   }
+
+   @FunctionalInterface
+   public static interface SelectCallback {
+      public boolean select(Point pointClicked);
    }
 
    public static enum Implementation {
@@ -23,8 +32,9 @@ public interface ImageDisplay extends QuietCloseable {
       private KeyPressCallback keyPressHandler = null;
       private Implementation implementation = DEFAULT_IMPLEMENTATION;
       private Runnable closeCallback = null;
-      private Mat toShow;
-      private String windowName;
+      private Mat toShow = null;
+      private String windowName = "";
+      private SelectCallback selectCallback = null;
 
       public Builder keyPressHandler(final KeyPressCallback keyPressHandler) {
          this.keyPressHandler = keyPressHandler;
@@ -41,6 +51,11 @@ public interface ImageDisplay extends QuietCloseable {
          return this;
       }
 
+      public Builder selectCallback(final SelectCallback selectCallback) {
+         this.selectCallback = selectCallback;
+         return this;
+      }
+
       public Builder windowName(final String windowName) {
          this.windowName = windowName;
          return this;
@@ -53,10 +68,13 @@ public interface ImageDisplay extends QuietCloseable {
 
       public ImageDisplay build() {
          switch(implementation) {
-            case HIGHGUI:
+            case HIGHGUI: {
+               if(selectCallback != null)
+                  LOGGER.info("The select callback will be ignored when using the HIGHGUI implementation of ImageDisplay");
                return new CvImageDisplay(toShow, windowName, closeCallback, keyPressHandler);
+            }
             case SWT:
-               return new SwtImageDisplay(toShow, windowName, closeCallback, keyPressHandler);
+               return new SwtImageDisplay(toShow, windowName, closeCallback, keyPressHandler, selectCallback);
             default:
                throw new IllegalStateException();
          }
