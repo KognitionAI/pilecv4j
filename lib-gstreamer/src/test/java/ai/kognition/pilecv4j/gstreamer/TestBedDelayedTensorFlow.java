@@ -21,7 +21,6 @@ import org.freedesktop.gstreamer.Bin;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.elements.URIDecodeBin;
-import org.opencv.core.Core;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.imgproc.Imgproc;
@@ -36,8 +35,9 @@ import org.tensorflow.types.UInt8;
 import ai.kognition.pilecv4j.gstreamer.od.ObjectDetection;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.TensorUtils;
+import ai.kognition.pilecv4j.image.Utils;
 
-public class TestBedDelayedTensorFlow {
+public class TestBedDelayedTensorFlow extends BaseTest {
    private static final Logger LOGGER = LoggerFactory.getLogger(TestBedDelayedTensorFlow.class);
 
    public static final double threshold = 0.5;
@@ -92,7 +92,7 @@ public class TestBedDelayedTensorFlow {
                                  : Integer.toString(classification);
                            Imgproc.putText(mat, label,
                                  new Point(d.xmin * mat.width() + thickness, d.ymin * mat.height() + fontShift),
-                                 Core.FONT_HERSHEY_SIMPLEX, fontScale, new Scalar(0xff, 0xff, 0xff), thickness);
+                                 Utils.OCV_FONT_HERSHEY_SIMPLEX, fontScale, new Scalar(0xff, 0xff, 0xff), thickness);
                            Imgproc.rectangle(mat, new Point(d.xmin * mat.width(), d.ymin * mat.height()),
                                  new Point(d.xmax * mat.width(), d.ymax * mat.height()),
                                  new Scalar(0xff, 0xff, 0xff), thickness);

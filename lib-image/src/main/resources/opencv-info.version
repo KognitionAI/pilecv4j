@@ -1,0 +1,3 @@
+opencv-build.version=${opencv-build.version}
+opencv-short.version=${opencv-short.version}
+

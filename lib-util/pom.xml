@@ -17,5 +17,10 @@
       <artifactId>jna</artifactId>
       <optional>true</optional>
     </dependency>
+    <dependency> <!-- Needed for the NativeLibraryLoader -->
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
 </project>

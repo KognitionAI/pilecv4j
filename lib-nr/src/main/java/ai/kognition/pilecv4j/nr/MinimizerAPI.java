@@ -5,7 +5,7 @@ import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
-import net.dempsy.util.library.NativeLibraryLoader;
+import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
 public class MinimizerAPI {
 

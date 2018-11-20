@@ -36,7 +36,16 @@
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv-base.version>3.4.3</opencv-base.version>
+    <opencv-build.version>4.0.0</opencv-build.version>
+    <opencv-short.version>400</opencv-short.version>
+
+    <!-- Normally the opencv-base version is the same as the opencv-build version   -->
+    <!--  however, the build version needs to be unadulterated by version suffixes -->
+    <!--  so opencv-base.version of 4.0.0-rc implies a opencv-build version of 4.0.0  -->
+    <opencv-base.version>${opencv-build.version}</opencv-base.version>
+    <!-- <opencv-base.version>${opencv-build.version}-rc</opencv-base.version> -->
+
+    <!-- The artifact version -->
     <opencv.version>${opencv-base.version}-cuda9.2</opencv.version>
 
     <tensorflow.version>1.11.0</tensorflow.version>    
@@ -203,7 +212,12 @@
         <artifactId>${swtartifact}</artifactId>
         <version>4.6</version>
       </dependency>
-      
+      <dependency>
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>2.6</version>
+      </dependency>
+            
       <!-- Testing -->
       <dependency>
         <groupId>org.slf4j</groupId>

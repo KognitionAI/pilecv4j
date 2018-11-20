@@ -11,6 +11,7 @@ import static java.awt.image.BufferedImage.TYPE_INT_RGB;
 import static java.awt.image.BufferedImage.TYPE_USHORT_555_RGB;
 import static java.awt.image.BufferedImage.TYPE_USHORT_565_RGB;
 import static java.awt.image.BufferedImage.TYPE_USHORT_GRAY;
+import static net.dempsy.util.Functional.uncheck;
 import static org.opencv.core.CvType.CV_16S;
 import static org.opencv.core.CvType.CV_16U;
 import static org.opencv.core.CvType.CV_8S;
@@ -30,7 +31,12 @@ import java.awt.image.DataBufferUShort;
 import java.awt.image.IndexColorModel;
 import java.io.PrintStream;
 import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 
+import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -57,10 +63,48 @@ import net.dempsy.util.QuietCloseable;
 public class Utils {
    public static final ColorModel grayColorModel;
 
+   /**
+    * This is set through reflection because the source changed between OpenCV 3 and OpenCV 4.
+    */
+   public final static int OCV_FONT_HERSHEY_SIMPLEX;
+
+   private final static Method OCV_UNDISTORT_METHOD;
+   private final static Method OCV_UNDISTORT_POINTS_METHOD;
+
+   // Dynamically determine if we're at major version 3 or 4 of OpenCV and set the variables appropriately.
+   static {
+      // this 3.x.x uses Core while 4.x.x uses Imgproc
+      OCV_FONT_HERSHEY_SIMPLEX = uncheck(() -> Integer.valueOf(getStaticField("FONT_HERSHEY_SIMPLEX", Core.class, Imgproc.class).getInt(null))).intValue();
+      OCV_UNDISTORT_METHOD = getStaticMethod("undistort", new Class<?>[] {Mat.class,Mat.class,Mat.class,Mat.class}, Imgproc.class, Calib3d.class);
+      OCV_UNDISTORT_POINTS_METHOD = getStaticMethod("undistortPoints",
+            new Class<?>[] {MatOfPoint2f.class,MatOfPoint2f.class,Mat.class,Mat.class,Mat.class,Mat.class},
+            Imgproc.class, Calib3d.class);
+   }
+
    static {
       final ColorSpace cs = ColorSpace.getInstance(ColorSpace.CS_GRAY);
       final int[] nBits = {8};
       grayColorModel = new ComponentColorModel(cs, nBits, false, true, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
+   }
+
+   public static void undistort(final Mat src, final Mat dst, final Mat cameraMatrix, final Mat distCoeffs) {
+      try {
+         OCV_UNDISTORT_METHOD.invoke(null, src, dst, cameraMatrix, distCoeffs);
+      } catch(final IllegalAccessException e) {
+         throw new IllegalStateException("The method " + OCV_UNDISTORT_METHOD.getName() + " isn't accessible.", e);
+      } catch(final InvocationTargetException e) {
+         throw(RuntimeException)e.getCause();
+      }
+   }
+
+   public static void undistortPoints(final MatOfPoint2f src, final MatOfPoint2f dst, final Mat cameraMatrix, final Mat distCoeffs, final Mat R, final Mat P) {
+      try {
+         OCV_UNDISTORT_POINTS_METHOD.invoke(null, src, dst, cameraMatrix, distCoeffs, R, P);
+      } catch(final IllegalAccessException e) {
+         throw new IllegalStateException("The method " + OCV_UNDISTORT_METHOD.getName() + " isn't accessible.", e);
+      } catch(final InvocationTargetException e) {
+         throw(RuntimeException)e.getCause();
+      }
    }
 
    public static BufferedImage mat2Img(final Mat in) {
@@ -656,5 +700,43 @@ public class Utils {
       return (scale >= 1.0) ? new Size(originalMatSize.width, originalMatSize.height)
             : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
 
+   }
+
+   private static Field getStaticField(final String fieldName, final Class<?>... classes) {
+      final Field field = Arrays.stream(classes)
+            .map(c -> {
+               try {
+                  return c.getDeclaredField(fieldName);
+               } catch(final NoSuchFieldException nsfe) {
+                  return null;
+               }
+            })
+            .filter(f -> f != null)
+            .findFirst()
+            .orElse(null);
+
+      if(field == null)
+         throw new IllegalStateException("The version of OpenCV defined as a dependency doesn't seem to have " + fieldName
+               + "  defined in any of these classes: " + Arrays.toString(classes));
+      return field;
+   }
+
+   private static Method getStaticMethod(final String methodName, final Class<?>[] parameters, final Class<?>... classes) {
+      final Method method = Arrays.stream(classes)
+            .map(c -> {
+               try {
+                  return c.getDeclaredMethod(methodName, parameters);
+               } catch(final NoSuchMethodException nsfe) {
+                  return null;
+               }
+            })
+            .filter(f -> f != null)
+            .findFirst()
+            .orElse(null);
+
+      if(method == null)
+         throw new IllegalStateException("The version of OpenCV defined as a dependency doesn't seem to have the method " + methodName
+               + "  defined in any of these classes: " + Arrays.toString(classes));
+      return method;
    }
 }

@@ -43,18 +43,16 @@ endif()
 
 message(STATUS "OpenCV Dependency version $ENV{DEP_OPENCV_VERSION}")
 
-if (DEFINED ENV{OPENCV_INSTALL})
-  set(HAVE_CUSTOM_OCV_LOCATION true)
-  message(STATUS "OPENCV_INSTALL is defined as $ENV{OPENCV_INSTALL}")
-  set (OpenCV_DIR "$ENV{OPENCV_INSTALL}/share/OpenCV")
-endif()
-
 find_package( OpenCV CONFIG REQUIRED )
 
-if (DEFINED HAVE_CUSTOM_OCV_LOCATION)
-  include_directories(${OpenCV_INCLUDE_DIRS})
-  link_directories("$ENV{OPENCV_INSTALL}/share/OpenCV/java")
-  set(OPENCV_STATIC_LIB opencv_java${OpenCV_VERSION_MAJOR}${OpenCV_VERSION_MINOR}${OpenCV_VERSION_PATCH})
+include_directories(${OpenCV_INCLUDE_DIRS})
+set(OPENCV_STATIC_LIB opencv_java${OpenCV_VERSION_MAJOR}${OpenCV_VERSION_MINOR}${OpenCV_VERSION_PATCH})
+if ( "${OpenCV_VERSION_MAJOR}" STREQUAL "3" )
+  link_directories("${OpenCV_INSTALL_PATH}/share/OpenCV/java")
+elseif( "${OpenCV_VERSION_MAJOR}" STREQUAL "4" )
+  link_directories("${OpenCV_INSTALL_PATH}/share/java/opencv4")
+else()
+  message(FATAL_ERROR "Can only build OpenCV version 3.x.x or version 4.x.x")
 endif()
 
 if ( NOT "${OpenCV_VERSION}" STREQUAL "$ENV{DEP_OPENCV_VERSION}")
