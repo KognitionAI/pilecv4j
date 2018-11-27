@@ -44,15 +44,29 @@ endif()
 message(STATUS "OpenCV Dependency version $ENV{DEP_OPENCV_VERSION}")
 
 find_package( OpenCV CONFIG REQUIRED )
+set(OPENCV_SHORT_VERSION "${OpenCV_VERSION_MAJOR}${OpenCV_VERSION_MINOR}${OpenCV_VERSION_PATCH}")
+
+#get_cmake_property(_variableNames VARIABLES)
+#list (SORT _variableNames)
+#foreach (_variableName ${_variableNames})
+#   message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
+#execute_process(COMMAND "${CMAKE_COMMAND}" "-E" "environment")
 
 include_directories(${OpenCV_INCLUDE_DIRS})
-set(OPENCV_STATIC_LIB opencv_java${OpenCV_VERSION_MAJOR}${OpenCV_VERSION_MINOR}${OpenCV_VERSION_PATCH})
-if ( "${OpenCV_VERSION_MAJOR}" STREQUAL "3" )
-  link_directories("${OpenCV_INSTALL_PATH}/share/OpenCV/java")
-elseif( "${OpenCV_VERSION_MAJOR}" STREQUAL "4" )
+set(OPENCV_STATIC_LIB opencv_java${OPENCV_SHORT_VERSION})
+if(EXISTS "${OpenCV_INSTALL_PATH}/share/java/opencv4/${OPENCV_STATIC_LIB}" )
+  # OpenCV 4 Linux
   link_directories("${OpenCV_INSTALL_PATH}/share/java/opencv4")
+elseif (EXISTS "${OpenCV_INSTALL_PATH}/share/OpenCV/java/" )
+  # OpenCV 3 Linux
+  link_directories("${OpenCV_INSTALL_PATH}/share/OpenCV/java")
+elseif (EXISTS "${OpenCV_INSTALL_PATH}/java/${OPENCV_STATIC_LIB}.dll" )
+  # OpenCV 3&4 Windows
+  link_directories("${OpenCV_INSTALL_PATH}/java" "${OpenCV_DIR}")
+  set(OPENCV_STATIC_LIB ${OPENCV_STATIC_LIB} "opencv_highgui${OPENCV_SHORT_VERSION}")
 else()
-  message(FATAL_ERROR "Can only build OpenCV version 3.x.x or version 4.x.x")
+  message(FATAL_ERROR "Can't determine the directory where the library ${OPENCV_STATIC_LIB} is on this platform.")
 endif()
 
 if ( NOT "${OpenCV_VERSION}" STREQUAL "$ENV{DEP_OPENCV_VERSION}")
