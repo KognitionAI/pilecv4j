@@ -55,7 +55,7 @@ set(OPENCV_SHORT_VERSION "${OpenCV_VERSION_MAJOR}${OpenCV_VERSION_MINOR}${OpenCV
 
 include_directories(${OpenCV_INCLUDE_DIRS})
 set(OPENCV_STATIC_LIB opencv_java${OPENCV_SHORT_VERSION})
-if(EXISTS "${OpenCV_INSTALL_PATH}/share/java/opencv4/${OPENCV_STATIC_LIB}" )
+if(EXISTS "${OpenCV_INSTALL_PATH}/share/java/opencv4/lib${OPENCV_STATIC_LIB}.so" )
   # OpenCV 4 Linux
   link_directories("${OpenCV_INSTALL_PATH}/share/java/opencv4")
 elseif (EXISTS "${OpenCV_INSTALL_PATH}/share/OpenCV/java/" )

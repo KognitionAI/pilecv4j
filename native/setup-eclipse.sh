@@ -3,12 +3,12 @@
 ##################################################
 # preamble
 set -e
-cd "$(dirname "$0")"
+cd "$(dirname "$BASH_SOURCE")"
 SCRIPTDIR="$(pwd -P)"
 ##################################################
 
 usage() {
-    echo "usage: OPENCV_INSTALL=/path/to/opencv/install $0 opencv-version"
+    echo "usage: OPENCV_INSTALL=/path/to/opencv/install $BASH_SOURCE opencv-version"
     exit 1
 }
 

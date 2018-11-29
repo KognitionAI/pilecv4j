@@ -73,7 +73,7 @@ public class SwingImageDisplay implements ImageDisplay {
    public static QuietCloseable showImage(final BufferedImage iioimage) throws InvocationTargetException, InterruptedException {
       final AtomicReference<JFrame> frame = new AtomicReference<JFrame>(null);
       SwingUtilities.invokeAndWait(() -> {
-         final JPanel p = new ScrollImageTest(iioimage);
+         final JPanel p = new ScrollImagePanel(iioimage);
          final JFrame f = new JFrame();
          f.setContentPane(p);
          f.setSize(iioimage.getWidth(), iioimage.getHeight());
@@ -84,10 +84,10 @@ public class SwingImageDisplay implements ImageDisplay {
       return () -> frame.get().dispose();
    }
 
-   public static class ScrollImageTest extends JPanel {
+   public static class ScrollImagePanel extends JPanel {
       private static final long serialVersionUID = 1L;
 
-      public ScrollImageTest(final BufferedImage image) {
+      public ScrollImagePanel(final BufferedImage image) {
          final JPanel canvas = new JPanel() {
             private static final long serialVersionUID = 1L;
 
