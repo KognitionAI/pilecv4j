@@ -7,6 +7,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -286,6 +287,7 @@ public class BreakoutFilter extends BaseTransform {
       private boolean firstOne = true;
 
       private final AtomicReference<CvMat> storedBuffer = new AtomicReference<>();
+      private static AtomicLong threadSequence = new AtomicLong(0);
 
       private void dispose(final CvMatAndCaps bac) {
          if(bac != null) {
@@ -316,7 +318,11 @@ public class BreakoutFilter extends BaseTransform {
 
       public SlowFilterSlippage(final int numThreads, final Consumer<CvMatAndCaps> processor) {
          for(int i = 0; i < numThreads; i++)
-            threads.add(chain(new Thread(fromProcessor(processor)), t -> t.setDaemon(true), t -> t.start()));
+            threads.add(chain(new Thread(fromProcessor(processor), nextThreadName()), t -> t.setDaemon(true), t -> t.start()));
+      }
+
+      private String nextThreadName() {
+         return SlowFilterSlippage.class.getSimpleName() + "-thread-" + threadSequence.getAndIncrement();
       }
 
       // These are for debug logs only
