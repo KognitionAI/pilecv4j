@@ -75,6 +75,28 @@ endif()
 
 include_directories(sources/include)
 
+if(MSVC)
+  # Set compiler options.
+  set(variables
+    CMAKE_C_FLAGS_DEBUG
+    CMAKE_C_FLAGS_MINSIZEREL
+    CMAKE_C_FLAGS_RELEASE
+    CMAKE_C_FLAGS_RELWITHDEBINFO
+    CMAKE_CXX_FLAGS_DEBUG
+    CMAKE_CXX_FLAGS_MINSIZEREL
+    CMAKE_CXX_FLAGS_RELEASE
+    CMAKE_CXX_FLAGS_RELWITHDEBINFO
+    )
+  message(STATUS "MSVC -> forcing use of statically-linked runtime." )
+  foreach(variable ${variables})
+    if(${variable} MATCHES "/MD")
+      string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
+    endif()
+  endforeach()
+
+  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+endif()
+
 add_library(ai.kognition.pilecv4j
   MODULE
   sources/opencv/CvRasterNative.cpp

@@ -1,5 +1,8 @@
 #ifndef _NR_UTILS_H_
 #define _NR_UTILS_H_
+
+#include "kog_exports.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -52,7 +55,7 @@ void nrerror2(const char error_text[]);
 int nrIsError();
 // this acts as a MOVE operation on the char* returned.
 //  It's then owned by the called.
-char* nrGetErrorMessage();
+KAI_EXPORT char* nrGetErrorMessage();
 /**********************************************/
 float *vector(long nl, long nh);
 int *ivector(long nl, long nh);

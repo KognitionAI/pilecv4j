@@ -50,13 +50,6 @@
       <artifactId>slf4j-log4j12</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency> <!-- Used for a test -->
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>tensorflow-lib-jar</artifactId>
-      <classifier>withlib</classifier>
-      <scope>test</scope>
-      <optional>true</optional>
-    </dependency>
     <dependency> <!-- Used for the SwtImageDisplay -->
       <groupId>org.eclipse.swt</groupId>
       <artifactId>${swtartifact}</artifactId>

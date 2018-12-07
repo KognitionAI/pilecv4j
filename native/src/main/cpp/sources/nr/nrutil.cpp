@@ -2,6 +2,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "nrutil.h"
+
 #define NR_END 1
 #define FREE_ARG char*
 

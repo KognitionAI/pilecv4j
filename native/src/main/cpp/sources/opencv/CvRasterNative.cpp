@@ -4,18 +4,19 @@
 #include <opencv2/highgui.hpp>
 
 #include "jfloats.h"
+#include "kog_exports.h"
 
 extern "C" {
-void* CvRaster_getData(uint64_t native);
-uint64_t CvRaster_copy(uint64_t native);
-void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle);
-uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong);
-uint64_t CvRaster_defaultMat();
-void CvRaster_showImage(const char* name, uint64_t native);
-void CvRaster_updateWindow(const char* name, uint64_t native);
-int32_t CvRaster_fetchEvent(int32_t millisToSleep);
-void CvRaster_destroyWindow(const char* name);
-void CvRaster_noArray();
+KAI_EXPORT void* CvRaster_getData(uint64_t native);
+KAI_EXPORT uint64_t CvRaster_copy(uint64_t native);
+KAI_EXPORT void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle);
+KAI_EXPORT uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong);
+KAI_EXPORT uint64_t CvRaster_defaultMat();
+KAI_EXPORT void CvRaster_showImage(const char* name, uint64_t native);
+KAI_EXPORT void CvRaster_updateWindow(const char* name, uint64_t native);
+KAI_EXPORT int32_t CvRaster_fetchEvent(int32_t millisToSleep);
+KAI_EXPORT void CvRaster_destroyWindow(const char* name);
+KAI_EXPORT void CvRaster_noArray();
 }
 
 void* CvRaster_getData(uint64_t native) {

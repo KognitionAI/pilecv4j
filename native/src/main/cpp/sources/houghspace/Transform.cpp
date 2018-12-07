@@ -21,13 +21,14 @@
 #include <stdio.h>
 #include <list>
 #include "jfloats.h"
+#include "kog_exports.h"
 
 using namespace std;
 
 typedef int32_t (*AddHoughSpaceEntryContributorFunc)(int32_t orow, int32_t ocol,int32_t hsr, int32_t hsc, int32_t hscount);
 
 extern "C" {
-void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImage,
+KAI_EXPORT void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImage,
  void* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
  void* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
  float64_t gradientDirSlopDeg, float64_t quantFactor, int16_t* ret, int32_t hswidth, int32_t hsheight,

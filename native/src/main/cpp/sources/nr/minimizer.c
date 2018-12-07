@@ -24,6 +24,7 @@
 
 #include "nrutil.h"
 #include "jfloats.h"
+#include "kog_exports.h"
 
 typedef float32_t (*Func)(float32_t*, int32_t*);
 
@@ -62,7 +63,7 @@ struct OverallUd {
 //  as the result of dominimize via p_status
 //static int32_t g_status;
 
-float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float64_t jftol, float64_t* minVal, int32_t* p_status)
+KAI_EXPORT float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float64_t jftol, float64_t* minVal, int32_t* p_status)
 {
    uint32_t pos;
 

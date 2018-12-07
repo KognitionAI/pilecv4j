@@ -34,13 +34,19 @@
       <artifactId>opencv-lib-jar</artifactId>
       <classifier>withlib</classifier>
     </dependency>
-    
-    <dependency> <!-- Used for TensorUtils -->
+
+    <!-- Used for TensorUtils -->
+    <!--    <dependency> 
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>tensorflow-lib-jar</artifactId>
       <classifier>withlib</classifier>
       <optional>true</optional>
+    </dependency> -->
+    <dependency>
+      <groupId>org.tensorflow</groupId>
+      <artifactId>tensorflow</artifactId>
     </dependency>
+
     <dependency> <!-- Only needed to run the main here. -->
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>

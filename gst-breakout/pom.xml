@@ -89,6 +89,16 @@
                     <include name="**/*.dylib"/>
                   </fileset>
                 </checksum>
+                <copy todir="${project.build.directory}/dll-staging">
+                  <fileset dir="${project.build.directory}/build">
+                    <include name="**/*.dll"/>
+                    <include name="**/*.pdb"/>
+                    <include name="**/*.so"/>
+                    <include name="**/*.dylib"/>
+                    <include name="**/*.MD5"/>
+                  </fileset>
+                  <flattenmapper/>
+                </copy>                
               </tasks>
             </configuration>
             <goals>

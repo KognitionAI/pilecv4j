@@ -1,6 +1,6 @@
 /***********************************************************************
     Legacy Film to DVD Project
-    Copyright (C) 2005 James F. Carroll
+    Copyright (C) 2018 James F. Carroll
 
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,20 +17,14 @@
     Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 ****************************************************************************/
 
-#ifndef _JPEG_TO_AVI__
-#define _JPEG_TO_AVI__
+#ifndef _KOG_EXPORTS__
+#define _KOG_EXPORTS__
 
-#include <cstdint>
-#include <cstdbool>
-#include "kog_exports.h"
-
-extern "C" {
-KAI_EXPORT  bool mjpeg_initializeMJPEG(const char* filename);
-KAI_EXPORT  bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight);
-KAI_EXPORT  bool mjpeg_close(int32_t jfps);
-KAI_EXPORT  void mjpeg_cleanUp();
-}
-
+#ifdef _MSC_VER
+#define KAI_EXPORT __declspec(dllexport)
+#else
+#define KAI_EXPORT
+#endif
 
 #endif
 
