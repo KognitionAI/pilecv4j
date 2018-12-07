@@ -1,5 +1,6 @@
 #project build directories
-native/build
+native/**/build
+gst-breakout/**/build
 */bin
 /bin
 
