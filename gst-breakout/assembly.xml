@@ -7,7 +7,7 @@
   <fileSets>
     <fileSet>
       <directory>${project.build.directory}/dll-staging</directory>
-      <outputDirectory>/</outputDirectory>
+      <outputDirectory>${platform}</outputDirectory>
       <includes> 
         <include>**/*.dll</include>
         <include>**/*.pdb</include>

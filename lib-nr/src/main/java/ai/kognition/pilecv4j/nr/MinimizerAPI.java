@@ -2,24 +2,24 @@ package ai.kognition.pilecv4j.nr;
 
 import com.sun.jna.Callback;
 import com.sun.jna.Native;
-import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
-import ai.kognition.pilecv4j.util.NativeLibraryLoader;
+import ai.kognition.pilecv4j.util.HackLoadLibrary;
 
 public class MinimizerAPI {
 
-   public static final String LIBNAME = "ai.kognition.pilecv4j";
+//   public static final String LIBNAME = "ai.kognition.pilecv4j";
 
    static {
-      NativeLibraryLoader.loader()
-            .library(LIBNAME)
-            .addCallback((dir, libname, oslibname) -> {
-               NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
-            })
-            .load();
+//      NativeLibraryLoader.loader()
+//            .library(LIBNAME)
+//            .addCallback((dir, libname, oslibname) -> {
+//               NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
+//            })
+//            .load();
 
-      Native.register(LIBNAME);
+	  HackLoadLibrary.init();
+      Native.register(HackLoadLibrary.LIBNAME);
    }
 
    static void _init() {}

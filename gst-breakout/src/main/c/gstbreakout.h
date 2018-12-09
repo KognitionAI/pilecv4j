@@ -23,6 +23,8 @@
 #include <gst/video/video.h>
 #include <gst/video/gstvideofilter.h>
 
+#include "kog_exports.h"
+
 G_BEGIN_DECLS
 
 #define GST_TYPE_BREAKOUT   (gst_breakout_get_type())
@@ -63,13 +65,13 @@ struct _GstBreakoutClass
   /* eventually private */
 };
 
-GType gst_breakout_get_type (void);
+KAI_EXPORT GType gst_breakout_get_type (void);
 
 // get data about the current frame.
-GstBuffer* gst_breakout_current_frame_buffer (GstBreakout* breakout);
-guint32 gst_breakout_current_frame_width     (GstBreakout* breakout);
-guint32 gst_breakout_current_frame_height    (GstBreakout* breakout);
-GstCaps* gst_breakout_current_frame_caps     (GstBreakout* breakout);
+KAI_EXPORT GstBuffer* gst_breakout_current_frame_buffer (GstBreakout* breakout);
+KAI_EXPORT guint32 gst_breakout_current_frame_width     (GstBreakout* breakout);
+KAI_EXPORT guint32 gst_breakout_current_frame_height    (GstBreakout* breakout);
+KAI_EXPORT GstCaps* gst_breakout_current_frame_caps     (GstBreakout* breakout);
 
 G_END_DECLS
 

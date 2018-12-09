@@ -28,6 +28,10 @@
       <artifactId>native-lib</artifactId>
       <classifier>${platform}</classifier>
     </dependency>
+    <dependency> <!-- Needed for the NativeLibraryLoader -->
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
 
     <dependency> <!-- needed for image work but not numerical recipies -->
       <groupId>ai.kognition.pilecv4j</groupId>

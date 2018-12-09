@@ -76,7 +76,11 @@ endif()
 include_directories(sources/include)
 
 if(MSVC)
-  # Set compiler options.
+  # ===========================================================
+  # Swith linking against the dynamic runtime to linking against
+  # the static runtime since that's required to link against
+  # the highgui static library since that's the way that was
+  # built. 
   set(variables
     CMAKE_C_FLAGS_DEBUG
     CMAKE_C_FLAGS_MINSIZEREL
@@ -93,8 +97,6 @@ if(MSVC)
       string(REGEX REPLACE "/MD" "/MT" ${variable} "${${variable}}")
     endif()
   endforeach()
-
-  set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 endif()
 
 add_library(ai.kognition.pilecv4j

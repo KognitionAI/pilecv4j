@@ -21,6 +21,15 @@
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-util</artifactId>
     </dependency>
+    <dependency> <!-- Needed for the NativeLibraryLoader -->
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency> <!-- this can be removed when the HackLoadLibrary is removed -->
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>opencv-lib-jar</artifactId>
+      <classifier>withlib</classifier>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>

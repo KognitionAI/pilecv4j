@@ -22,5 +22,19 @@
       <artifactId>commons-io</artifactId>
       <optional>true</optional>
     </dependency>
+    <dependency> <!-- Needed for the NativeLibraryLoader -->
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <optional>true</optional>
+    </dependency>
   </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+  </build>
 </project>

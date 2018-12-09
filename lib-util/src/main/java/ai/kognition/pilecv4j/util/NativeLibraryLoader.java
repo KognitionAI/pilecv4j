@@ -39,8 +39,10 @@ import org.slf4j.LoggerFactory;
  */
 public class NativeLibraryLoader {
    private static final Logger LOGGER = LoggerFactory.getLogger(NativeLibraryLoader.class);
-
+   
    private static Set<String> loaded = new HashSet<>();
+   
+   private static PlatformDetection platform = new PlatformDetection();
 
    public static class Loader {
       private final List<LibraryDefinition> libs = new ArrayList<>();
@@ -94,6 +96,7 @@ public class NativeLibraryLoader {
                .forEach(ld -> {
                   final String libFileName = System.mapLibraryName(ld.libName);
                   final String libMD5FileName = libFileName + ".MD5";
+                  
                   LOGGER.trace("Native library \"" + ld.libName + "\" platform specific file name is \"" + libFileName + "\"");
                   final File libFile = new File(tmpDir, libFileName);
                   final File libMD5File = new File(tmpDir, libMD5FileName);
@@ -142,16 +145,17 @@ public class NativeLibraryLoader {
       }
 
    }
-
+   
    private static boolean copyFromJar(final Loader.LibraryDefinition ld, final String libFileName, final File libFile, final String libMD5FileName,
          final File libMD5File) throws UnsatisfiedLinkError {
-      LOGGER.debug("Copying native library \"" + ld.libName + "\" from the jar file.");
+	      String libFilePath = platform + "/" + libFileName;
+      LOGGER.debug("Copying native library \"" + libFilePath + "\" from the jar file.");
       final boolean loadMe = rethrowIOException(() -> {
-         try (InputStream is = getInputStream(libFileName)) {
+         try (InputStream is = getInputStream(libFilePath)) {
             if(is == null) {
                if(ld.required)
                   throw new UnsatisfiedLinkError(
-                        "Required native library \"" + ld.libName + "\" with platform representation \"" + libFileName
+                        "Required native library \"" + ld.libName + "\" with platform representation \"" + libFilePath
                               + "\" doesn't appear to exist in any jar file on the classpath");
                else {
                   // if we're not required and it's missing, we're fine
@@ -162,14 +166,14 @@ public class NativeLibraryLoader {
             FileUtils.copyInputStreamToFile(is, libFile);
             return true;
          }
-      }, libFileName);
+      }, libFilePath);
 
       if(loadMe) // loadMe is only set if the library was in the jar (and copied onto the disk).
          // otherwise we can just skip trying to load the MD5
          rethrowIOException(() -> {
             try (InputStream is = getInputStream(libMD5FileName)) {
                if(is == null) {
-                  LOGGER.info("The library \"{}\" doesn't appear to have a coresponding MD5. Reloading from jar file.", libFileName);
+                  LOGGER.info("The library \"{}\" doesn't appear to have a coresponding MD5. Reloading from jar file.", libFilePath);
                } else {
                   FileUtils.copyInputStreamToFile(is, libMD5File);
                }

@@ -22,7 +22,16 @@ import net.dempsy.util.QuietCloseable;
 
 public class CvRasterTest {
 
-   public final static boolean SHOW = false; /// can only set this to true when building on a machine with a display
+   public final static boolean SHOW; /// can only set this to true when building on a machine with a display
+
+	static {
+		final String sysOpSHOW =System.getProperty("pilecv4j.SHOW");
+		boolean sysOpSet = sysOpSHOW != null;
+		boolean show = ("".equals(sysOpSHOW) || Boolean.parseBoolean(sysOpSHOW));
+		if (!sysOpSet)
+			show = Boolean.parseBoolean(System.getenv("PILECV4J_SHOW"));
+		SHOW = show;
+	}
 
    static {
       CvMat.initOpenCv();
@@ -36,7 +45,7 @@ public class CvRasterTest {
 
    @Rule
    public TemporaryFolder tempDir = new TemporaryFolder();
-
+   
    @Test
    public void testMove() throws Exception {
       try (final CvMat cvmat = scopedGetAndMove();) {

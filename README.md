@@ -1,4 +1,3 @@
-
 ## What is this project?
 
 This project contains several tools for creating image and video processing applications in Java. It combines [GStreamer](https://gstreamer.freedesktop.org/), [OpenCv](https://opencv.org/), and [TensorFlow](https://www.tensorflow.org/) into an interoparable Java system.
@@ -65,10 +64,27 @@ Powell's method is actually implemented using the algorithm from [Numerical Reci
 
 See the [TestBedTensorFlow.java](https://github.com/KognitionAI/pilecv4j/blob/master/lib-gstreamer/src/test/java/ai/kognition/pilecv4j/gstreamer/TestBedTensorFlow.java) class for an example of GStreamer, OpenCv, and TensorFlow put together in a single Java application using the libraries here.
 
+## Building and building against these libraries.
+
+To build this you will need to have built OpenCV using [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging). The directory where [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) installed the build should containe, in a subdirectory somewhere, the CMake configuration file, `OpenCVModules.cmake`. For example, for OpenCV 4.0.0, the file is at `[install-location]/x64/vc15/staticlib` on Windows and ... on Linux. You need to supply this location to the build.
+
+Also, you will need to have the `gstreamer` (development) installed. If it's installed in the default location on Linux, the build should pick it up automatically. On Windows you'll need to install it and point to the location of the pkg-config information.
+
+On Windows, under MSYS, an example of the command line to build this looks like
+
+```
+OpenCV_DIR=/c/utils/opencv4.0.0/installed/x64/vc15/staticlib PKG_CONFIG_PATH=/c/gstreamer/1.0/x86_64/lib/pkgconfig mvn -Dgenerator="Visual Studio 15 2017" clean install
+```
+
+NOTE: On Windows, since you'll be building using MSYS bash shell, you'll need to add gstreamer lib directories to your PATH environment variable since, for some reason, MSYS overrides the Windows native PATH. My entry in `.bashrc` looks like the following:
+
+```
+export PATH="$PATH":/c/gstreamer/1.0/x86_64/bin:/c/gstreamer/1.0/x86_64/lib/gstream-1.0
+```
+
 ## History
 
 It grew out of an old project from 2004. Details of that old project can be found at [S8](http://jiminger.com/s8/) and the still working image processing code can be found in the separate github repository [s8](https://github.com/jimfcarroll/s8).
 
 In brief the original project was my attempt to convert my parents library of legacy super-8 mm film to DVD. I have actually got this working and have scanned several 400 foot rolls of film. See the above link for details.
-
 

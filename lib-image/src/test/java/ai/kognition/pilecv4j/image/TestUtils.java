@@ -21,7 +21,7 @@ public class TestUtils {
    final String testImageFilename = new File(
          getClass().getClassLoader().getResource("test-images/people.jpeg").getFile()).getAbsolutePath();
 
-   public final static boolean SHOW = false;
+   public final static boolean SHOW = CvRasterTest.SHOW;
 
    public static void compare(final CvMat mat, final BufferedImage im) {
       final boolean oneChannel = mat.channels() == 1;
