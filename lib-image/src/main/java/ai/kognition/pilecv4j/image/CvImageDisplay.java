@@ -3,11 +3,10 @@ package ai.kognition.pilecv4j.image;
 import static net.dempsy.util.Functional.uncheck;
 
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -29,6 +28,8 @@ public class CvImageDisplay implements ImageDisplay {
    // check cv::waitKey or nothing happens in OpenCv::HighGUI
    private static ArrayBlockingQueue<Consumer<WindowsState>> commands = new ArrayBlockingQueue<>(2);
    public static AtomicBoolean stillRunningEvents = new AtomicBoolean(true);
+   
+   private final CountDownLatch countDown = new CountDownLatch(1);
 
    @FunctionalInterface
    private static interface CvKeyPressCallback {
@@ -36,8 +37,13 @@ public class CvImageDisplay implements ImageDisplay {
    }
 
    private static class WindowsState {
-      final Set<String> windows = new HashSet<>();
+      final Map<String, CvImageDisplay> windows = new HashMap<>();
       final Map<String, CvKeyPressCallback> callbacks = new HashMap<>();
+      
+      void remove(String n) {
+    	  callbacks.remove(n);
+    	  windows.remove(n);
+      }
    }
 
    static {
@@ -51,20 +57,25 @@ public class CvImageDisplay implements ImageDisplay {
                if(state.windows.size() > 0) {
                   // then we can check for a key press.
                   final int key = CvRasterAPI.CvRaster_fetchEvent(1);
-                  final List<String> toCloseUp = state.callbacks.values().stream()
+                  final Set<String> toCloseUp = state.callbacks.values().stream()
                         .map(cb -> cb.keyPressed(key))
                         .filter(n -> n != null)
-                        .map(n -> {
-                           // need to close the window and cleanup.
-                           CvRasterAPI.CvRaster_destroyWindow(n);
-                           // okay. We got here so the window should be closed.
-                           return n; // we're building a list of objects to closeup
-                        })
-                        .collect(Collectors.toList());
-
+                        .collect(Collectors.toSet());
+                  
+                  toCloseUp.addAll(state.windows.keySet().stream()
+                  	.filter(CvRasterAPI::CvRaster_isWindowClosed)
+                  	.collect(Collectors.toSet()));
+                  
                   toCloseUp.forEach(n -> {
-                     state.windows.remove(n);
-                     state.callbacks.remove(n);
+                	  // need to close the window and cleanup.
+                	  CvRasterAPI.CvRaster_destroyWindow(n);
+                      CvImageDisplay id = state.windows.get(n);
+                      if (id != null)
+                    	  id.closeNow.set(true);
+                              
+                	  state.remove(n);
+                	  if (id != null)
+                		  id.close();
                   });
                }
 
@@ -94,6 +105,7 @@ public class CvImageDisplay implements ImageDisplay {
    private final Runnable closeCallback;
    private final String name;
    private boolean shownYet = false;
+   private final AtomicBoolean closeNow = new AtomicBoolean(false);
 
    CvImageDisplay(final Mat mat, final String name, final Runnable closeCallback, final KeyPressCallback kpCallback) {
 
@@ -101,7 +113,7 @@ public class CvImageDisplay implements ImageDisplay {
       this.name = name;
 
       // create a callback that ignores the keypress but polls the state of the closeNow
-      this.callback = new ShowKeyPressCallback(name, kpCallback);
+      this.callback = new ShowKeyPressCallback(this, kpCallback);
 
       if(mat != null) {
          doShow(mat, name, callback);
@@ -110,14 +122,21 @@ public class CvImageDisplay implements ImageDisplay {
             Thread.yield();
       }
    }
+   
+   public void waitUntilClosed() throws InterruptedException {
+	   countDown.await();
+   }
 
    @Override
    public void close() {
-      LOGGER.trace("Closing window \"{}\"", name);
-      closed = true;
-      callback.closeNow.set(true);
-      if(closeCallback != null)
-         closeCallback.run();
+	   if (! closed) {
+		   LOGGER.trace("Closing window \"{}\"", name);
+		   countDown.countDown();
+		   closed = true;
+		   closeNow.set(true);
+		   if(closeCallback != null)
+			   closeCallback.run();
+	   }
    }
 
    @Override
@@ -127,7 +146,7 @@ public class CvImageDisplay implements ImageDisplay {
          return;
       }
 
-      if(callback.closeNow.get() && !closed) {
+      if(closeNow.get() && !closed) {
          close();
          LOGGER.debug("Attempting to update a closed window with {}", toUpdate);
          return;
@@ -157,7 +176,7 @@ public class CvImageDisplay implements ImageDisplay {
             // if we got here, we're going to assume the windows was created.
             if(callback != null)
                s.callbacks.put(name, callback);
-            s.windows.add(name);
+            s.windows.put(name, this);
          }
       }));
       shownYet = true;
@@ -166,15 +185,14 @@ public class CvImageDisplay implements ImageDisplay {
    // a callback that ignores the keypress but polls the state of the closeNow
    private static class ShowKeyPressCallback implements CvKeyPressCallback {
       final AtomicBoolean shown = new AtomicBoolean(false);
-      final AtomicBoolean closeNow = new AtomicBoolean(false);
       final AtomicReference<CvMat> update = new AtomicReference<CvMat>(null);
-      final String name;
       final KeyPressCallback keyPressCallback;
+      final CvImageDisplay window;
 
       private boolean shownSet = false;
 
-      private ShowKeyPressCallback(final String name, final KeyPressCallback keyPressCallback) {
-         this.name = name;
+      private ShowKeyPressCallback(final CvImageDisplay window, final KeyPressCallback keyPressCallback) {
+         this.window = window;
          this.keyPressCallback = keyPressCallback;
       }
 
@@ -188,17 +206,15 @@ public class CvImageDisplay implements ImageDisplay {
 
          try (final CvMat toUpdate = update.getAndSet(null);) {
             if(toUpdate != null)
-               CvRasterAPI.CvRaster_updateWindow(name, toUpdate.nativeObj);
+               CvRasterAPI.CvRaster_updateWindow(window.name, toUpdate.nativeObj);
          }
 
-         if(keyPressCallback != null && kp >= 0)
-
-         {
+         if(keyPressCallback != null && kp >= 0) {
             if(keyPressCallback.keyPressed(kp))
-               closeNow.set(true);
-         } else if(kp == 32) closeNow.set(true);
+               window.closeNow.set(true);
+         } else if(kp == 32) window.closeNow.set(true);
 
-         return closeNow.get() ? name : null;
+         return window.closeNow.get() ? window.name : null;
       }
    }
 }

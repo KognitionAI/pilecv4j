@@ -102,16 +102,20 @@ public class SwingImageDisplay implements ImageDisplay {
          setLayout(new BorderLayout());
          add(sp, BorderLayout.CENTER);
       }
-
    }
 
    @Override
    public void close() {
-      // TODO Auto-generated method stub
+	   // TODO Auto-generated method stub
    }
 
    @Override
    public void update(final Mat toUpdate) {
-      // TODO Auto-generated method stub
+	   // TODO Auto-generated method stub
+   }
+
+   @Override
+   public void waitUntilClosed() throws InterruptedException {
+	   // TODO Auto-generated method stub
    }
 }

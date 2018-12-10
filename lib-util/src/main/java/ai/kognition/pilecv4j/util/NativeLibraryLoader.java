@@ -149,6 +149,7 @@ public class NativeLibraryLoader {
    private static boolean copyFromJar(final Loader.LibraryDefinition ld, final String libFileName, final File libFile, final String libMD5FileName,
          final File libMD5File) throws UnsatisfiedLinkError {
 	      String libFilePath = platform + "/" + libFileName;
+	      String libMD5FilePath = platform + "/" + libMD5FileName;
       LOGGER.debug("Copying native library \"" + libFilePath + "\" from the jar file.");
       final boolean loadMe = rethrowIOException(() -> {
          try (InputStream is = getInputStream(libFilePath)) {
@@ -171,14 +172,14 @@ public class NativeLibraryLoader {
       if(loadMe) // loadMe is only set if the library was in the jar (and copied onto the disk).
          // otherwise we can just skip trying to load the MD5
          rethrowIOException(() -> {
-            try (InputStream is = getInputStream(libMD5FileName)) {
+            try (InputStream is = getInputStream(libMD5FilePath)) {
                if(is == null) {
                   LOGGER.info("The library \"{}\" doesn't appear to have a coresponding MD5. Reloading from jar file.", libFilePath);
                } else {
                   FileUtils.copyInputStreamToFile(is, libMD5File);
                }
             }
-         }, libMD5FileName);
+         }, libMD5FilePath);
 
       return loadMe;
    }

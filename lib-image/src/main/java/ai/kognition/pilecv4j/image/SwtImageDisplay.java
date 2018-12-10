@@ -1,11 +1,9 @@
 package ai.kognition.pilecv4j.image;
 
-import static org.opencv.core.CvType.CV_8S;
-import static org.opencv.core.CvType.CV_8U;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.IntStream;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.KeyEvent;
@@ -17,13 +15,12 @@ import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.graphics.ImageData;
 import org.eclipse.swt.graphics.PaletteData;
 import org.eclipse.swt.graphics.Point;
+import org.eclipse.swt.graphics.RGB;
 import org.eclipse.swt.graphics.Rectangle;
-import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.ScrollBar;
 import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.CvType;
@@ -48,6 +45,7 @@ public class SwtImageDisplay implements ImageDisplay {
    private final CountDownLatch started = new CountDownLatch(1);
 
    final AtomicBoolean alreadySized = new AtomicBoolean(false);
+   private boolean setupCalled = false;
 
    public SwtImageDisplay(final Mat mat, final String name, final Runnable closeCallback, final KeyPressCallback kpCallback,
          final SelectCallback selectCallback) {
@@ -56,7 +54,6 @@ public class SwtImageDisplay implements ImageDisplay {
       // create a callback that ignores the keypress but polls the state of the closeNow
       this.callback = kpCallback;
       this.selectCallback = selectCallback;
-      setup();
       if(mat != null)
          update(mat);
    }
@@ -65,16 +62,8 @@ public class SwtImageDisplay implements ImageDisplay {
       started.await();
    }
 
-   private SwtImageDisplay(final boolean dontInitMe) {
-      this.name = null;
-      this.closeCallback = null;
-      this.callback = null;
-      this.selectCallback = null;
-      shell = new Shell(display);
-      shell.setLayout(new FillLayout());
-   }
-
    private void setup() {
+     setupCalled = true;
       final CountDownLatch latch = new CountDownLatch(1);
 
       eventThread = new Thread(() -> {
@@ -138,6 +127,8 @@ public class SwtImageDisplay implements ImageDisplay {
                   canvas.redraw();
                }
             });
+            
+            shell.addListener(SWT.Close, e -> close());
 
             canvas.addListener(SWT.Paint, e -> {
                final Image lcurrentImage = currentImageRef.get();
@@ -241,8 +232,11 @@ public class SwtImageDisplay implements ImageDisplay {
 
    @Override
    public synchronized void update(final Mat image) {
-      Display.getDefault().syncExec(() -> {
-         final ImageData next = convertToSWT(image);
+     if (!setupCalled)
+        setup();
+     
+      display.syncExec(() -> {
+         final ImageData next = convertToDisplayableSWT(image);
          final Image nextImage = new Image(display, next);
          final Image prev = currentImageRef.getAndSet(nextImage);
          if(prev != null)
@@ -262,7 +256,7 @@ public class SwtImageDisplay implements ImageDisplay {
    public void close() {
       if(!done.get()) {
          done.set(true);
-         Display.getDefault().syncExec(() -> {
+         display.syncExec(() -> {
             if(Thread.currentThread() == eventThread) {
                if(canvas != null) {
                   canvas.dispose();
@@ -279,47 +273,50 @@ public class SwtImageDisplay implements ImageDisplay {
    public void waitUntilClosed() throws InterruptedException {
       eventLoopDoneLatch.await();
    }
-
-   public static void main(final String[] args) throws Exception {
-      try (final SwtImageDisplay id = new SwtImageDisplay(true);) {
-         final FileDialog dialog = new FileDialog(id.shell, SWT.OPEN);
-         dialog.setText("Open an image file or cancel");
-         final String string = dialog.open();
-
-         if(string != null) {
-            final CvMat iioimage = ImageFile.readMatFromFile(string);
-            id.setup();
-            id.update(iioimage);
-         } else
-            id.setup();
-
-         id.waitUntilClosed();
-      }
-   }
-
+   
    @FunctionalInterface
    private static interface PixGet {
       int get(int row, int col);
    }
+   
+   static RGB[] grayscalePaletteColors = new RGB[256];
+   static {
+      IntStream.range(0, 256).forEach(i -> grayscalePaletteColors[i] = new RGB(i,i,i));
+   }
 
-   static ImageData convertToSWT(final Mat mat) {
-      final int inChannels = mat.channels();
-      final int cvDepth = CvType.depth(mat.type());
+   public static ImageData convertToDisplayableSWT(final Mat toUse) {
+	   try (CvMat displayable = ImageDisplay.displayable(toUse)) {
+		   return convertToSWT(displayable);
+	   }
+   }
+   
+   public static ImageData convertToSWT(final Mat toUse) {
+      final int type = toUse.type();
+      final int inChannels = toUse.channels();
+      final int cvDepth = CvType.depth(type);
+      if(cvDepth != CvType.CV_8U && cvDepth != CvType.CV_8S)
+          throw new IllegalArgumentException("Cannot convert Mat to SWT image with elements larger than a byte yet.");
 
-      final int width = mat.cols();
-      final int height = mat.rows();
-      if(inChannels == 1 || inChannels == 3) {
-         if(cvDepth != CV_8U && cvDepth != CV_8S)
-            throw new IllegalArgumentException("Cannot convert BGR Mat to SWT image with elements larger than a byte yet.");
+      final PaletteData palette;
+      switch (inChannels) {
+      case 1:
+          palette =  new PaletteData(grayscalePaletteColors);
+          break;
+      case 3:
+          palette = new PaletteData(0x0000FF, 0x00FF00, 0xFF0000);
+          break;
+      case 4:
+          throw new IllegalArgumentException("Can't handle alpha channel yet.");
+      default:
+          throw new IllegalArgumentException("Can't handle an image with " + inChannels + " channels");
+      }
 
-         final ImageData id = new ImageData(width, height, inChannels == 1 ? 8 : 24,
-               inChannels == 1 ? new PaletteData(0x0000FF, 0x0000FF, 0x0000FF) : new PaletteData(0x0000FF, 0x00FF00, 0xFF0000));
-         CvMat.rasterAp(mat, raster -> raster.currentBuffer.get(id.data));
-         return id;
-      } else if(inChannels == 4)
-         throw new IllegalArgumentException("Can't handle alpha channel yet.");
-      else
-         throw new IllegalArgumentException("Can't handle an image with " + inChannels + " channels");
+      final int width = toUse.cols();
+      final int height = toUse.rows();
+      final int elemSize = CvType.ELEM_SIZE(type);
+      final ImageData id = new ImageData(width, height, elemSize * 8, palette, 1, new byte[width * height * elemSize]);
+      CvMat.rasterAp(toUse, raster -> raster.currentBuffer.get(id.data));
+      return id;
    }
 
 }

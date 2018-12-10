@@ -115,13 +115,15 @@ public class ImageFile {
    public static void writeImageFile(final BufferedImage ri, final String filename) throws IOException {
       if(!doWrite(ri, filename)) {
          LOGGER.debug("Failed to write '" + filename + "' using ImageIO");
-         if(!doWrite(Utils.img2CvMat(ri), filename))
-            throw new IllegalArgumentException("Failed to write");
+         try (CvMat mat = Utils.img2CvMat(ri);) {
+        	 if(!doWrite(mat, filename, true))
+        		 throw new IllegalArgumentException("Failed to write");
+         }
       }
    }
 
    public static void writeImageFile(final Mat ri, final String filename) throws IOException {
-      if(!doWrite(ri, filename)) {
+      if(!doWrite(ri, filename, false)) {
          LOGGER.debug("Failed to write '" + filename + "' using OpenCV");
          final BufferedImage bi = Utils.mat2Img(ri);
          if(!doWrite(bi, filename))
@@ -156,9 +158,18 @@ public class ImageFile {
       return wrote;
    }
 
-   private static boolean doWrite(final Mat ri, final String filename) throws IOException {
+   private static boolean doWrite(final Mat ri, final String filename, boolean canOverwrite) throws IOException {
       LOGGER.trace("Writing image {} to {}", ri, filename);
-      return Imgcodecs.imwrite(filename, ri);
+      try (final CvMat newMat = new CvMat(); ) {
+    	  final Mat toWrite;
+    	  if (filename.endsWith(".jp2")) {
+    		  toWrite = (canOverwrite) ? ri : newMat;
+    		  Imgproc.cvtColor(ri, toWrite, Imgproc.COLOR_BGR2RGB);
+    	  } else
+    		  toWrite = ri;
+
+    	  return Imgcodecs.imwrite(filename, toWrite);
+      }
    }
 
    private static double scale(final int width, final int height, final ImageDestinationDefinition dest) {

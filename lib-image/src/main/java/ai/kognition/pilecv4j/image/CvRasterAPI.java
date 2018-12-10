@@ -63,6 +63,8 @@ public class CvRasterAPI {
    public static native int CvRaster_fetchEvent(int millisToSleep);
 
    public static native void CvRaster_destroyWindow(String name);
+   
+   public static native boolean CvRaster_isWindowClosed(String name);
    // ==========================================================
 
 }

@@ -21,7 +21,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CvMat extends Mat implements AutoCloseable {
    private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
-   private static boolean TRACK_MEMORY_LEAKS = false;
+   private static boolean TRACK_MEMORY_LEAKS = true;
    private boolean skipCloseOnceForReturn = false;
 
    static {

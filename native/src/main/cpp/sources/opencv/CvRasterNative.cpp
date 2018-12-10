@@ -7,16 +7,16 @@
 #include "kog_exports.h"
 
 extern "C" {
-KAI_EXPORT void* CvRaster_getData(uint64_t native);
-KAI_EXPORT uint64_t CvRaster_copy(uint64_t native);
-KAI_EXPORT void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle);
-KAI_EXPORT uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong);
-KAI_EXPORT uint64_t CvRaster_defaultMat();
-KAI_EXPORT void CvRaster_showImage(const char* name, uint64_t native);
-KAI_EXPORT void CvRaster_updateWindow(const char* name, uint64_t native);
-KAI_EXPORT int32_t CvRaster_fetchEvent(int32_t millisToSleep);
-KAI_EXPORT void CvRaster_destroyWindow(const char* name);
-KAI_EXPORT void CvRaster_noArray();
+  KAI_EXPORT void* CvRaster_getData(uint64_t native);
+  KAI_EXPORT uint64_t CvRaster_copy(uint64_t native);
+  KAI_EXPORT void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle);
+  KAI_EXPORT uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong);
+  KAI_EXPORT uint64_t CvRaster_defaultMat();
+  KAI_EXPORT void CvRaster_showImage(const char* name, uint64_t native);
+  KAI_EXPORT void CvRaster_updateWindow(const char* name, uint64_t native);
+  KAI_EXPORT int32_t CvRaster_fetchEvent(int32_t millisToSleep);
+  KAI_EXPORT void CvRaster_destroyWindow(const char* name);
+  KAI_EXPORT bool CvRaster_isWindowClosed(const char* name);
 }
 
 void* CvRaster_getData(uint64_t native) {
@@ -81,4 +81,9 @@ int32_t CvRaster_fetchEvent(int32_t millisToSleep) {
 void CvRaster_destroyWindow(const char* name) {
 	cv::String sname(name);
 	cv::destroyWindow(sname);
+}
+
+bool CvRaster_isWindowClosed(const char* name) {
+	cv::String sname(name);
+	return cv::getWindowProperty(sname, 0) < 0;
 }
