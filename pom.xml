@@ -46,7 +46,7 @@
     <!-- <opencv-base.version>${opencv-build.version}-rc</opencv-base.version> -->
 
     <!-- The artifact version -->
-    <opencv.version>${opencv-base.version}</opencv.version>
+    <opencv.version>${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
     <tensorflow.version>1.11.0</tensorflow.version>    
     <slf4j.version>1.7.25</slf4j.version>
@@ -73,6 +73,7 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86</swtartifact>
         <platform>linux-x86_32</platform>
         <generator>Unix Makefiles</generator>
+        <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <platform.option></platform.option>
       </properties>
     </profile>
@@ -88,6 +89,7 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
+        <opencv-gpu.version-extention>-cuda9.2</opencv-gpu.version-extention>
         <platform.option></platform.option>
       </properties>
     </profile>
@@ -103,6 +105,7 @@
         <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
         <platform>windows-x86_64</platform>
         <platform.option>-Ax64</platform.option>
+        <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
       </properties>
     </profile>
@@ -118,6 +121,7 @@
         <swtartifact>org.eclipse.swt.win32.win32.x86</swtartifact>
         <platform>windows-x86_32</platform>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
+        <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <platform.option></platform.option>
       </properties>
     </profile>
@@ -142,18 +146,17 @@
         <classifier>withlib</classifier>
         <version>${opencv.version}</version>
       </dependency>
-<!--      <dependency>
+      <dependency>
         <groupId>ai.kognition.pilecv4j</groupId>
         <artifactId>tensorflow-lib-jar</artifactId>
         <classifier>withlib</classifier>
         <version>${tensorflow.version}</version>
-        </dependency>  -->
+      </dependency>
       <dependency>
         <groupId>org.tensorflow</groupId>
         <artifactId>tensorflow</artifactId>
         <version>${tensorflow.version}</version>
       </dependency>
-
 
       <!-- Internal to the product -->
       <dependency>
@@ -273,6 +276,11 @@
   
   <reporting>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.1.1</version>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-javadoc-plugin</artifactId>
