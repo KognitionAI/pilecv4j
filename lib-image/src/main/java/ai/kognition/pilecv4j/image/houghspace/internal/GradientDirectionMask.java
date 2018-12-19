@@ -58,17 +58,18 @@ public class GradientDirectionMask {
     * Generate a byte image that contains a view of the mask.
     */
    public CvMat getMaskRaster() {
-      final CvMat raster = new CvMat(mheight, mwidth, CvType.CV_8UC1);
-      final byte[] pixel = new byte[1];
-      raster.rasterAp(r -> r.apply((BytePixelSetter)(row, col) -> {
-         final short gradDeg = get(row, col);
-         int gradByte = (int)Math.round((gradDeg * 256.0) / 360.0);
-         if(gradByte >= 256)
-            gradByte = 0;
-         pixel[0] = (byte)(gradByte & 0xff);
-         return pixel;
-      }));
-      return raster;
+      try (final CvMat raster = new CvMat(mheight, mwidth, CvType.CV_8UC1);) {
+         final byte[] pixel = new byte[1];
+         raster.rasterAp(r -> r.apply((BytePixelSetter)(row, col) -> {
+            final short gradDeg = get(row, col);
+            int gradByte = (int)Math.round((gradDeg * 256.0) / 360.0);
+            if(gradByte >= 256)
+               gradByte = 0;
+            pixel[0] = (byte)(gradByte & 0xff);
+            return pixel;
+         }));
+         return raster.returnMe();
+      }
    }
 
    public static GradientDirectionMask generateGradientMask(final Model m, final double w, final double h, final double quantFactor) {
