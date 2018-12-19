@@ -39,9 +39,9 @@ import org.slf4j.LoggerFactory;
  */
 public class NativeLibraryLoader {
    private static final Logger LOGGER = LoggerFactory.getLogger(NativeLibraryLoader.class);
-   
+
    private static Set<String> loaded = new HashSet<>();
-   
+
    private static PlatformDetection platform = new PlatformDetection();
 
    public static class Loader {
@@ -96,7 +96,7 @@ public class NativeLibraryLoader {
                .forEach(ld -> {
                   final String libFileName = System.mapLibraryName(ld.libName);
                   final String libMD5FileName = libFileName + ".MD5";
-                  
+
                   LOGGER.trace("Native library \"" + ld.libName + "\" platform specific file name is \"" + libFileName + "\"");
                   final File libFile = new File(tmpDir, libFileName);
                   final File libMD5File = new File(tmpDir, libMD5FileName);
@@ -112,14 +112,14 @@ public class NativeLibraryLoader {
                      if(fileMD5 != null) {
                         // read the MD5 from the jar.
                         final String jarMD5 = rethrowIOException(() -> {
-                           try (InputStream is = getInputStream(libMD5FileName)) {
+                           try (InputStream is = getInputStream(platform + "/" + libMD5FileName)) {
                               if(is == null) {
                                  LOGGER.info("The library \"{}\" doesn't appear to have a coresponding MD5. Reloading from jar file.", libFileName);
                                  return null;
                               } else
                                  return IOUtils.toString(is, StandardCharsets.UTF_8.name());
                            }
-                        }, libMD5FileName);
+                        }, platform + "/" + libMD5FileName);
                         // if the fileMD5 contents doesn't equal the jarMD5 contents then we need to
                         // re-copy the library from the jar file.
                         copyMeFromJar = (!fileMD5.equals(jarMD5));
@@ -145,11 +145,11 @@ public class NativeLibraryLoader {
       }
 
    }
-   
+
    private static boolean copyFromJar(final Loader.LibraryDefinition ld, final String libFileName, final File libFile, final String libMD5FileName,
          final File libMD5File) throws UnsatisfiedLinkError {
-	      String libFilePath = platform + "/" + libFileName;
-	      String libMD5FilePath = platform + "/" + libMD5FileName;
+      final String libFilePath = platform + "/" + libFileName;
+      final String libMD5FilePath = platform + "/" + libMD5FileName;
       LOGGER.debug("Copying native library \"" + libFilePath + "\" from the jar file.");
       final boolean loadMe = rethrowIOException(() -> {
          try (InputStream is = getInputStream(libFilePath)) {
