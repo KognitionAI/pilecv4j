@@ -177,11 +177,22 @@ public class BreakoutFilter extends BaseTransform {
       return ret;
    }
 
+   /**
+    * A "stream watcher" as opposed to a "filter" can have no affect on the frames flowing through the
+    * pipeline. It receives frames in the form of a {@link CvMatAndCaps} but any changes to the
+    * {@link CvMat} will not be put back into the pipeline.
+    */
    public BreakoutFilter connectStreamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> watcherSupplier) {
       final BreakoutFilter ret = connect(proxyFilter = new StreamWatcher(numThreads, watcherSupplier));
       return ret;
    }
 
+   /**
+    * This is the an alternate means of supplying a "stream watcher" (see {@link #connectStreamWatcher} for an
+    * explanation of the difference between a "stream watcher" and a "filter"). In this case the {@code watcherSupplier}
+    * will be invoked on the first frame allowing initialization of the stream watcher to be done separate from the
+    * {@code Consumer<CvMatAndCaps>}.
+    */
    public BreakoutFilter connectDelayedStreamWatcher(final int numThreads,
          final Function<CvMatAndCaps, Supplier<Consumer<CvMatAndCaps>>> watcherSupplier) {
       connect(new NEW_SAMPLE() {
@@ -392,6 +403,7 @@ public class BreakoutFilter extends BaseTransform {
 
    private static class StreamWatcher extends ProxyFilter {
       private final AtomicReference<CvMatAndCaps> to = new AtomicReference<>(null);
+      private final AtomicLong sequence = new AtomicLong(0);
 
       private void dispose(final CvMatAndCaps toDispose) {
          if(toDispose != null)
@@ -416,13 +428,13 @@ public class BreakoutFilter extends BaseTransform {
 
       public StreamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> processorSupplier) {
          for(int i = 0; i < numThreads; i++)
-            threads.add(chain(new Thread(fromProcessor(processorSupplier.get())), t -> t.setDaemon(true), t -> t.start()));
+            threads.add(chain(new Thread(fromProcessor(processorSupplier.get()), "Stream Watcher " + sequence.getAndIncrement()), t -> t.setDaemon(true),
+                  t -> t.start()));
       }
 
       @Override
       public FlowReturn new_sample(final BreakoutFilter elem) {
          try (final BufferWrap buffer = elem.getCurrentBuffer();) {
-
             dispose(to.getAndSet(
                   new CvMatAndCaps(buffer.obj, null, elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
                         elem.getCurrentFrameHeight(), CvType.CV_8UC3)));

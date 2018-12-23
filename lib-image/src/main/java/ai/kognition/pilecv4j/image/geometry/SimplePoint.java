@@ -27,7 +27,7 @@ public class SimplePoint implements Point {
 
    @Override
    public String toString() {
-      return "(r:" + r + ",c:" + c + ")";
+      return Point.toString(this);
    }
 
    @Override
