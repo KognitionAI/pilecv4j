@@ -36,8 +36,8 @@
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv-build.version>4.0.0</opencv-build.version>
-    <opencv-short.version>400</opencv-short.version>
+    <opencv-build.version>4.0.1</opencv-build.version>
+    <opencv-short.version>401</opencv-short.version>
 
     <!-- Normally the opencv-base version is the same as the opencv-build version   -->
     <!--  however, the build version needs to be unadulterated by version suffixes -->

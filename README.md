@@ -13,6 +13,12 @@ Most dependencies will be picked up automatically from [maven central](https://w
 1. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file.
 1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
 1. [gstreamer](https://gstreamer.freedesktop.org/) is a native library for creating and managing video pipelines. The development libraries will need to be installed on the system. Currently the native build for `gst-gstreamer` assumes gstreamer's [PkgConfig](https://en.wikipedia.org/wiki/Pkg-config) is available on the CMake [FindPkgConfig](https://cmake.org/cmake/help/v3.13/module/FindPkgConfig.html) search path.
+1. On Windows you'll need to install the correct [PkgConfig](https://en.wikipedia.org/wiki/Pkg-config). Under `mingw64` bash you can install it using:
+```
+pacman -Su mingw-w64-x86_64-pkg-config
+```
+It doesn't seem to work if you install it using `pacman -Su pkg-config` as that package doesn't translate the paths correctly.
+
 
 ## Contents
 
