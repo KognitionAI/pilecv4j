@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.image;
+package ai.kognition.pilecv4j.image.display;
 
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -12,17 +12,23 @@ import org.opencv.core.Point;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.image.ImageFile;
+import ai.kognition.pilecv4j.image.display.swt.SwtImageDisplay;
+
 import net.dempsy.util.QuietCloseable;
 
 public interface ImageDisplay extends QuietCloseable {
-   public static final String DEFAULT_WINDOWS_NAME_PREFIX="Window";
+   public static final String DEFAULT_WINDOWS_NAME_PREFIX = "Window";
    static AtomicLong sequence = new AtomicLong(0);
 
    static final Logger LOGGER = LoggerFactory.getLogger(ImageDisplay.class);
 
    public void update(final Mat toUpdate);
-   
+
    public void waitUntilClosed() throws InterruptedException;
+
+   public void setCloseCallback(Runnable closeCallback);
 
    @FunctionalInterface
    public static interface KeyPressCallback {
@@ -38,7 +44,8 @@ public interface ImageDisplay extends QuietCloseable {
       HIGHGUI, SWT
    }
 
-   public static Implementation DEFAULT_IMPLEMENTATION = Implementation.HIGHGUI;
+   // public static Implementation DEFAULT_IMPLEMENTATION = Implementation.HIGHGUI;
+   public static Implementation DEFAULT_IMPLEMENTATION = Implementation.SWT;
 
    public static class Builder {
       private KeyPressCallback keyPressHandler = null;
@@ -47,7 +54,7 @@ public interface ImageDisplay extends QuietCloseable {
       private Mat toShow = null;
       private String windowName = DEFAULT_WINDOWS_NAME_PREFIX + " " + sequence.incrementAndGet();
       private SelectCallback selectCallback = null;
-      
+
       public Builder keyPressHandler(final KeyPressCallback keyPressHandler) {
          this.keyPressHandler = keyPressHandler;
          return this;
@@ -92,51 +99,49 @@ public interface ImageDisplay extends QuietCloseable {
          }
       }
    }
-   
-   public static CvMat displayable(Mat mat) {
-	   final int type = mat.type();
-	   
-	   final int depth = CvType.depth(type);
-	   if (depth == CvType.CV_8U || depth == CvType.CV_8S)
-		   return CvMat.shallowCopy(mat);
-	   
-	   final int inChannels = mat.channels();
-	   if (inChannels != 1 && inChannels != 3)
-		   throw new IllegalArgumentException("Cannot handle an image of type " + CvType.typeToString(type) + "  yet.");
-	   
-	   int newType = (inChannels == 1 ) ? CvType.CV_8UC1 : CvType.CV_8UC3;
-	   try (CvMat ret = new CvMat()) {
 
-		   mat.convertTo(ret, newType, 1.0 / 256.0);
-		   return ret.returnMe();
-	   }
+   public static CvMat displayable(final Mat mat) {
+      final int type = mat.type();
+
+      final int depth = CvType.depth(type);
+      if(depth == CvType.CV_8U || depth == CvType.CV_8S)
+         return CvMat.shallowCopy(mat);
+
+      final int inChannels = mat.channels();
+      if(inChannels != 1 && inChannels != 3)
+         throw new IllegalArgumentException("Cannot handle an image of type " + CvType.typeToString(type) + "  yet.");
+
+      final int newType = (inChannels == 1) ? CvType.CV_8UC1 : CvType.CV_8UC3;
+      try (CvMat ret = new CvMat()) {
+
+         mat.convertTo(ret, newType, 1.0 / 256.0);
+         return ret.returnMe();
+      }
    }
 
    public static void main(final String[] args) throws Exception {
-	      try (final ImageDisplay id = new Builder()
-	    		  .implementation(Implementation.SWT)
-	    		  .build();) {
-	    	 String string = (args.length > 0 ? args[0] : null);
-	    	 if (string == null) {
-	    		 Display display = new Display();
-	    		 Shell shell = new Shell(display);
-	    		 try (QuietCloseable c1 = () -> display.close();
-	    				 QuietCloseable c2 = () -> shell.close()){
-	    			 final FileDialog dialog = new FileDialog(shell, SWT.OPEN);
-	    			 dialog.setText("Open an image file or cancel");
-	    			 string = dialog.open();
-	    		 }
-	    	 }
-	    	 
+      try (final ImageDisplay id = new Builder()
+            .implementation(Implementation.SWT)
+            .build();) {
+         String string = (args.length > 0 ? args[0] : null);
+         if(string == null) {
+            final Display display = new Display();
+            final Shell shell = new Shell(display);
+            try (QuietCloseable c1 = () -> display.close();
+                  QuietCloseable c2 = () -> shell.close()) {
+               final FileDialog dialog = new FileDialog(shell, SWT.OPEN);
+               dialog.setText("Open an image file or cancel");
+               string = dialog.open();
+            }
+         }
 
-	         if(string != null) {
-	            final CvMat iioimage = ImageFile.readMatFromFile(string);
-	            id.update(iioimage);
-	         } 
+         if(string != null) {
+            final CvMat iioimage = ImageFile.readMatFromFile(string);
+            id.update(iioimage);
+         }
 
-	         id.waitUntilClosed();
-	      }
-	   }
-
+         id.waitUntilClosed();
+      }
+   }
 
 }

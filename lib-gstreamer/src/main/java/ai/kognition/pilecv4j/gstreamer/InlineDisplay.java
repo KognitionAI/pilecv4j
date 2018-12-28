@@ -13,9 +13,9 @@ import org.slf4j.LoggerFactory;
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.ImageDisplay;
-import ai.kognition.pilecv4j.image.ImageDisplay.KeyPressCallback;
 import ai.kognition.pilecv4j.image.Utils;
+import ai.kognition.pilecv4j.image.display.ImageDisplay;
+import ai.kognition.pilecv4j.image.display.ImageDisplay.KeyPressCallback;
 
 import net.dempsy.util.MutableRef;
 
@@ -23,6 +23,7 @@ public class InlineDisplay implements Consumer<CvMatAndCaps> {
    private static final Logger LOGGER = LoggerFactory.getLogger(InlineDisplay.class);
 
    public static String DEFAULT_WINDOW_NAME = "inline-display";
+   public static boolean DEFAULT_DEEP_COPY = true;
 
    private final boolean deepCopy;
    private ImageDisplay window = null;
@@ -31,6 +32,23 @@ public class InlineDisplay implements Consumer<CvMatAndCaps> {
    private final Size screenDim;
 
    private final MutableRef<Size> adjustedSize = new MutableRef<>();
+
+   public InlineDisplay(final ImageDisplay display) {
+      this(display, DEFAULT_DEEP_COPY);
+   }
+
+   public InlineDisplay(final ImageDisplay display, final boolean deepCopy) {
+      this.window = display;
+      screenDim = null;
+      this.deepCopy = deepCopy;
+      this.window.setCloseCallback(() -> {
+         if(stopOnClose != null) {
+            GstUtils.stopBinOnEOS(stopOnClose, stopLatch);
+            LOGGER.debug("Emitting EOS");
+            stopOnClose.sendEvent(new EOSEvent());
+         }
+      });
+   }
 
    private InlineDisplay(final Size screenDim, final boolean deepCopy, final KeyPressCallback kpc, final boolean preserveAspectRatio,
          final ImageDisplay.Implementation impl, final String windowName) {
@@ -57,7 +75,7 @@ public class InlineDisplay implements Consumer<CvMatAndCaps> {
 
    public static class Builder {
 
-      private boolean deepCopy = true;
+      private boolean deepCopy = DEFAULT_DEEP_COPY;
       private KeyPressCallback kpc = null;
       private Size screenDim = null;
       private boolean preserveAspectRatio = true;
@@ -105,7 +123,7 @@ public class InlineDisplay implements Consumer<CvMatAndCaps> {
 
       if(screenDim != null) {
          if(adjustedSize.ref == null) {
-            adjustedSize.ref = Utils.perserveAspectRatio(m, screenDim);
+            adjustedSize.ref = Utils.preserveAspectRatio(m, screenDim);
          }
 
          try (final CvMat lmat = new CvMat()) {

@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.image;
+package ai.kognition.pilecv4j.image.display.swing;
 /******************************************************************************
  * Copyright (c) 2000, 2004 IBM Corporation and others.
  * All rights reserved. This program and the accompanying materials
@@ -34,6 +34,9 @@ import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.FileDialog;
 import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.Mat;
+
+import ai.kognition.pilecv4j.image.ImageFile;
+import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 import net.dempsy.util.QuietCloseable;
 
@@ -106,16 +109,22 @@ public class SwingImageDisplay implements ImageDisplay {
 
    @Override
    public void close() {
-	   // TODO Auto-generated method stub
+      // TODO Auto-generated method stub
    }
 
    @Override
    public void update(final Mat toUpdate) {
-	   // TODO Auto-generated method stub
+      // TODO Auto-generated method stub
    }
 
    @Override
    public void waitUntilClosed() throws InterruptedException {
-	   // TODO Auto-generated method stub
+      // TODO Auto-generated method stub
+   }
+
+   @Override
+   public void setCloseCallback(final Runnable closeCallback) {
+      // TODO Auto-generated method stub
+
    }
 }

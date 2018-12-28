@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.image;
+package ai.kognition.pilecv4j.image.display;
 
 import static net.dempsy.util.Functional.uncheck;
 
@@ -16,9 +16,12 @@ import org.opencv.core.Mat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.image.CvRasterAPI;
+
 public class CvImageDisplay implements ImageDisplay {
    static {
-      CvRasterAPI._init();
+      CvMat.initOpenCv();
    }
 
    private static Logger LOGGER = LoggerFactory.getLogger(CvImageDisplay.class);
@@ -28,7 +31,7 @@ public class CvImageDisplay implements ImageDisplay {
    // check cv::waitKey or nothing happens in OpenCv::HighGUI
    private static ArrayBlockingQueue<Consumer<WindowsState>> commands = new ArrayBlockingQueue<>(2);
    public static AtomicBoolean stillRunningEvents = new AtomicBoolean(true);
-   
+
    private final CountDownLatch countDown = new CountDownLatch(1);
 
    @FunctionalInterface
@@ -39,10 +42,10 @@ public class CvImageDisplay implements ImageDisplay {
    private static class WindowsState {
       final Map<String, CvImageDisplay> windows = new HashMap<>();
       final Map<String, CvKeyPressCallback> callbacks = new HashMap<>();
-      
-      void remove(String n) {
-    	  callbacks.remove(n);
-    	  windows.remove(n);
+
+      void remove(final String n) {
+         callbacks.remove(n);
+         windows.remove(n);
       }
    }
 
@@ -61,21 +64,21 @@ public class CvImageDisplay implements ImageDisplay {
                         .map(cb -> cb.keyPressed(key))
                         .filter(n -> n != null)
                         .collect(Collectors.toSet());
-                  
+
                   toCloseUp.addAll(state.windows.keySet().stream()
-                  	.filter(CvRasterAPI::CvRaster_isWindowClosed)
-                  	.collect(Collectors.toSet()));
-                  
+                        .filter(CvRasterAPI::CvRaster_isWindowClosed)
+                        .collect(Collectors.toSet()));
+
                   toCloseUp.forEach(n -> {
-                	  // need to close the window and cleanup.
-                	  CvRasterAPI.CvRaster_destroyWindow(n);
-                      CvImageDisplay id = state.windows.get(n);
-                      if (id != null)
-                    	  id.closeNow.set(true);
-                              
-                	  state.remove(n);
-                	  if (id != null)
-                		  id.close();
+                     // need to close the window and cleanup.
+                     CvRasterAPI.CvRaster_destroyWindow(n);
+                     final CvImageDisplay id = state.windows.get(n);
+                     if(id != null)
+                        id.closeNow.set(true);
+
+                     state.remove(n);
+                     if(id != null)
+                        id.close();
                   });
                }
 
@@ -102,7 +105,7 @@ public class CvImageDisplay implements ImageDisplay {
 
    private boolean closed = false;
    private final ShowKeyPressCallback callback;
-   private final Runnable closeCallback;
+   private Runnable closeCallback;
    private final String name;
    private boolean shownYet = false;
    private final AtomicBoolean closeNow = new AtomicBoolean(false);
@@ -122,21 +125,27 @@ public class CvImageDisplay implements ImageDisplay {
             Thread.yield();
       }
    }
-   
+
+   @Override
+   public void setCloseCallback(final Runnable closeCallback) {
+      this.closeCallback = closeCallback;
+   }
+
+   @Override
    public void waitUntilClosed() throws InterruptedException {
-	   countDown.await();
+      countDown.await();
    }
 
    @Override
    public void close() {
-	   if (! closed) {
-		   LOGGER.trace("Closing window \"{}\"", name);
-		   countDown.countDown();
-		   closed = true;
-		   closeNow.set(true);
-		   if(closeCallback != null)
-			   closeCallback.run();
-	   }
+      if(!closed) {
+         LOGGER.trace("Closing window \"{}\"", name);
+         countDown.countDown();
+         closed = true;
+         closeNow.set(true);
+         if(closeCallback != null)
+            closeCallback.run();
+      }
    }
 
    @Override

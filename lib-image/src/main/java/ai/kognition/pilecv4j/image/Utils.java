@@ -687,12 +687,12 @@ public class Utils {
       }
    }
 
-   public static Size perserveAspectRatio(final Mat mat, final Size newSize) {
-      return perserveAspectRatio(mat.size(), newSize);
+   public static Size preserveAspectRatio(final Mat mat, final Size newSize) {
+      return preserveAspectRatio(mat.size(), newSize);
 
    }
 
-   public static Size perserveAspectRatio(final Size originalMatSize, final Size newSize) {
+   public static Size preserveAspectRatio(final Size originalMatSize, final Size newSize) {
       // calculate the appropriate resize
       final double fh = newSize.height / originalMatSize.height;
       final double fw = newSize.width / originalMatSize.width;

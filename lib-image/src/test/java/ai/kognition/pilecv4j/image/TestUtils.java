@@ -10,6 +10,8 @@ import org.opencv.core.CvType;
 import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
+import ai.kognition.pilecv4j.image.display.ImageDisplay;
+import ai.kognition.pilecv4j.image.display.swing.SwingImageDisplay;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;

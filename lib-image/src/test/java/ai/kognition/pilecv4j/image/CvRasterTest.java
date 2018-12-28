@@ -13,6 +13,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.GetChannelValueAsInt;
+import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
