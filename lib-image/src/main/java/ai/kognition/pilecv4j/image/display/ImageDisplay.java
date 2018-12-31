@@ -44,8 +44,7 @@ public interface ImageDisplay extends QuietCloseable {
       HIGHGUI, SWT
    }
 
-   // public static Implementation DEFAULT_IMPLEMENTATION = Implementation.HIGHGUI;
-   public static Implementation DEFAULT_IMPLEMENTATION = Implementation.SWT;
+   public static Implementation DEFAULT_IMPLEMENTATION = Implementation.HIGHGUI;
 
    public static class Builder {
       private KeyPressCallback keyPressHandler = null;
