@@ -56,6 +56,8 @@ public class GradientDirectionMask {
 
    /**
     * Generate a byte image that contains a view of the mask.
+    * 
+    * @return A CvMat with the byte image of the mask. The caller owns the CvMat.
     */
    public CvMat getMaskRaster() {
       try (final CvMat raster = new CvMat(mheight, mwidth, CvType.CV_8UC1);) {

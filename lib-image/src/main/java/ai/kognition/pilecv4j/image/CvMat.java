@@ -235,7 +235,7 @@ public class CvMat extends Mat implements AutoCloseable {
     * given a native pointer to the location of the raw data, and the metadata for the
     * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
     * will not be the "owner" of the data. That means YOU need to make sure that the native
-    * data buffer outlives the CvRaster or you're pretty much guaranteed a core dump.
+    * data buffer outlives the {@link CvMat} or you're pretty much guaranteed a core dump.
     */
    public static CvMat create(final int rows, final int cols, final int type, final long pointer) {
       final long nativeObj = ImageAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);

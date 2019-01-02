@@ -1,6 +1,5 @@
 package ai.kognition.pilecv4j.image.display.swt;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.stream.IntStream;
 
 import org.eclipse.swt.graphics.ImageData;
@@ -17,34 +16,8 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 public class SwtUtils {
    private static Display theDisplay = null;
 
-   // only accessed from the event thread.
-   private static boolean done = false;
-   private static CountDownLatch latch = null;
-   private static Thread eventThread;
-
-   private static Thread makeNewEventThread() {
-      return new Thread(() -> {
-
-         theDisplay = new Display();
-         latch.countDown();
-
-         try {
-            while(!theDisplay.isDisposed() && !done) {
-               if(!theDisplay.readAndDispatch()) {
-                  if(!done)
-                     theDisplay.sleep();
-               }
-            }
-         } finally {
-            if(theDisplay != null && !theDisplay.isDisposed())
-               theDisplay.dispose();
-         }
-
-      }, "SWT Display Event Thread");
-   }
-
    public static synchronized Display getDisplay() {
-      if(eventThread == null) {
+      if(theDisplay == null) {
          try {
             startSwt();
          } catch(final InterruptedException e) {
@@ -54,26 +27,25 @@ public class SwtUtils {
       return theDisplay;
    }
 
-   public static synchronized void startSwt() throws InterruptedException {
-      if(eventThread != null)
-         throw new IllegalStateException("Swt seems to already be running.");
-      eventThread = makeNewEventThread();
-      latch = new CountDownLatch(1);
-      eventThread.setDaemon(true);
-      eventThread.start();
+   private static synchronized void startSwt() throws InterruptedException {
+      ImageDisplay.syncExec(() -> {
+         theDisplay = new Display();
 
-      // don't exit until theDisplay is set
-      latch.await();
-      latch = null;
+         ImageDisplay.addEventPollingRunnable(() -> {
+            ImageDisplay.syncExec(() -> {
+               while(theDisplay.readAndDispatch());
+            });
+         });
+      });
    }
 
    public static synchronized void stopSwt() throws InterruptedException {
-      if(eventThread == null)
-         throw new IllegalStateException("Swt doesn't seem to be running.");
-      theDisplay.syncExec(() -> done = true);
-      eventThread.interrupt();
-      eventThread.join();
-      eventThread = null;
+      ImageDisplay.syncExec(() -> {
+         theDisplay.syncExec(() -> {
+             if(theDisplay != null && !theDisplay.isDisposed())
+               theDisplay.dispose();
+         });
+      });
    }
 
    private static RGB[] grayscalePaletteColors = new RGB[256];

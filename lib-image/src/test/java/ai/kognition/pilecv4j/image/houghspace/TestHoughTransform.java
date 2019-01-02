@@ -98,17 +98,17 @@ public class TestHoughTransform {
 
          // edge detection
          final double tlow = (tlowpct / 100.0) * thigh;
-         final CvMat edgeRaster = Operations.canny(gis, tlow, thigh, closer);
+         final CvMat edgeRaster = closer.add(Operations.canny(gis, tlow, thigh, closer));
          ImageFile.writeImageFile(edgeRaster, new File(rootDir, "tmpedge.bmp").getAbsolutePath());
 
          final Transform transform = new Transform(sm, quantFactor, 1.0, 10.0);
 
          final Transform.HoughSpace houghSpace = transform.transform(edgeRaster, gradientDirRaster, houghThreshold);
 
-         ImageFile.writeImageFile(houghSpace.getTransformRaster(), new File(rootDir, "tmpht.bmp").getAbsolutePath());
+         ImageFile.writeImageFile(closer.add(houghSpace.createTransformCvMat()), new File(rootDir, "tmpht.bmp").getAbsolutePath());
 
-         ImageFile.writeImageFile(transform.mask.getMaskImage(), new File(rootDir, "tmpmask.bmp").getAbsolutePath());
-         ImageFile.writeImageFile(transform.gradDirMask.getMaskRaster(), new File(rootDir, "tmpdirmask.bmp").getAbsolutePath());
+         ImageFile.writeImageFile(closer.addMat(transform.mask.getMaskImage()), new File(rootDir, "tmpmask.bmp").getAbsolutePath());
+         ImageFile.writeImageFile(closer.add(transform.gradDirMask.getMaskRaster()), new File(rootDir, "tmpdirmask.bmp").getAbsolutePath());
 
          final List<HoughSpaceEntry> hse = houghSpace.inverseTransform(sprocketInfoTiledImage, COVERLAY, ROVERLAY);
 

@@ -8,11 +8,13 @@ import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Canvas;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.ScrollBar;
 import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.Mat;
 
 import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 import net.dempsy.util.Functional;
 
@@ -25,7 +27,8 @@ public class ScrollableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
       super.setup(new Canvas(parent, SWT.NO_BACKGROUND | SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL), closeCallback, kpCallback, selectCallback);
 
-      display.syncExec(() -> {
+      final Display display = SwtUtils.getDisplay();
+      ImageDisplay.syncExec(() -> {
 
          canvas.addListener(SWT.Paint, e -> {
             try (final CvMat lcurrentImageMat = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {

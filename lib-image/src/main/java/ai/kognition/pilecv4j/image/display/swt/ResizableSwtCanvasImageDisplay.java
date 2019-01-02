@@ -11,6 +11,7 @@ import org.eclipse.swt.layout.RowData;
 import org.eclipse.swt.layout.RowLayout;
 import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Layout;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
@@ -18,6 +19,7 @@ import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.Utils;
+import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 import net.dempsy.util.Functional;
 
@@ -50,7 +52,9 @@ public class ResizableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
          updateBounds();
       }
 
-      display.syncExec(() -> {
+      final Display display = SwtUtils.getDisplay();
+
+      ImageDisplay.syncExec(() -> {
          canvas.addListener(SWT.Paint, e -> {
             try (final CvMat lcurrentImageMat = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
                if(lcurrentImageMat != null) {

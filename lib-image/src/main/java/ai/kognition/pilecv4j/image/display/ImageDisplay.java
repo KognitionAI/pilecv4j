@@ -1,5 +1,11 @@
 package ai.kognition.pilecv4j.image.display;
 
+import static net.dempsy.util.Functional.chain;
+
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.swt.SWT;
@@ -16,19 +22,88 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.swt.SwtImageDisplay;
 
+import net.dempsy.util.Functional;
 import net.dempsy.util.QuietCloseable;
+public abstract class ImageDisplay implements QuietCloseable {
+   private static final Logger LOGGER = LoggerFactory.getLogger(ImageDisplay.class);
+   private static final AtomicLong sequence = new AtomicLong(0);
+   private static Thread executorThread;
 
-public interface ImageDisplay extends QuietCloseable {
+   private static final ExecutorService executor = Executors.newSingleThreadExecutor(
+         r -> chain(executorThread = new Thread(r, "ImageDisplay Main Thread"), t -> t.setDaemon(true)));
+
    public static final String DEFAULT_WINDOWS_NAME_PREFIX = "Window";
-   static AtomicLong sequence = new AtomicLong(0);
+   public static final Implementation DEFAULT_IMPLEMENTATION = Implementation.HIGHGUI;
 
-   static final Logger LOGGER = LoggerFactory.getLogger(ImageDisplay.class);
+   private static final List<Runnable> eventPolling = new CopyOnWriteArrayList<>();
+   private static Thread eventPollingEmitterLoop = null;
 
-   public void update(final Mat toUpdate);
+   public static synchronized void addEventPollingRunnable(Runnable eventPoller) {
+      eventPolling.add(eventPoller);
+      if(eventPollingEmitterLoop == null) {
+         eventPollingEmitterLoop = new Thread(() -> {
+            int curIndex = 0;
+            while(true) {
+               final int numPollingRunnables = eventPolling.size();
+               if(numPollingRunnables == 0)
+                  Functional.uncheck(() -> Thread.sleep(1));
+               else {
+                  if(curIndex >= eventPolling.size())
+                     curIndex = 0;
 
-   public void waitUntilClosed() throws InterruptedException;
+                  final Runnable curRunnable = eventPolling.get(curIndex++);
+                  try {
+                     curRunnable.run();
+                  } catch(Throwable th) {
+                     LOGGER.warn("Exception thrown by {} when polling for events. But yet, I'm continuing on.", curRunnable, th);
+                  }
+               }
+            }
+         }, "ImageDisplay Event Loop Emitter");
+         eventPollingEmitterLoop.setDaemon(true);
+         eventPollingEmitterLoop.start();
+      }
+   }
 
-   public void setCloseCallback(Runnable closeCallback);
+   public static void syncExec(Runnable eventHandler) {
+      if(eventHandler == null)
+         throw new NullPointerException("Cannot pass a null Runnable to " + ImageDisplay.class.getSimpleName() + ".syncExec.");
+      if(Thread.currentThread() == executorThread) {
+         try {
+            eventHandler.run();
+         } catch(RuntimeException rte) {
+            LOGGER.info("Exception processing {} event.", ImageDisplay.class.getSimpleName(), rte);
+         }
+      } else {
+         Object waiter = new Object();
+         try {
+            synchronized(waiter) {
+               executor.submit(() -> {
+                  synchronized(waiter) {
+                     try (QuietCloseable qc = () -> waiter.notify();) {
+                        eventHandler.run();
+                     }
+                  }
+               });
+               waiter.wait();
+            }
+         } catch(RuntimeException rte) {
+            LOGGER.info("Exception processing {} event.", ImageDisplay.class.getSimpleName(), rte);
+         } catch(InterruptedException ie) {
+            throw new RuntimeException(ie);
+         }
+      }
+   }
+
+   public static void asyncExec(Runnable eventHandler) {
+      executor.submit(eventHandler);
+   }
+
+   public abstract void update(final Mat toUpdate);
+
+   public abstract void waitUntilClosed() throws InterruptedException;
+
+   public abstract void setCloseCallback(Runnable closeCallback);
 
    @FunctionalInterface
    public static interface KeyPressCallback {
@@ -44,14 +119,12 @@ public interface ImageDisplay extends QuietCloseable {
       HIGHGUI, SWT
    }
 
-   public static Implementation DEFAULT_IMPLEMENTATION = Implementation.HIGHGUI;
-
    public static class Builder {
       private KeyPressCallback keyPressHandler = null;
       private Implementation implementation = DEFAULT_IMPLEMENTATION;
       private Runnable closeCallback = null;
       private Mat toShow = null;
-      private String windowName = DEFAULT_WINDOWS_NAME_PREFIX + " " + sequence.incrementAndGet();
+      private String windowName = DEFAULT_WINDOWS_NAME_PREFIX + "_" + sequence.incrementAndGet();
       private SelectCallback selectCallback = null;
 
       public Builder keyPressHandler(final KeyPressCallback keyPressHandler) {

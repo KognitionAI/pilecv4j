@@ -58,6 +58,11 @@ public class Operations {
       }
    }
 
+   /**
+    * Perform a Canny edge detection.
+    * 
+    * @return A CvMat with the edge detection results. The caller owns the CvMat.
+    */
    public static CvMat canny(final GradientImages gis, final double tlow, final double thigh, final Closer closer) {
       try (final CvMat edgeImage = new CvMat();) {
          Imgproc.Canny(gis.dx, gis.dy, edgeImage, tlow, thigh, true);

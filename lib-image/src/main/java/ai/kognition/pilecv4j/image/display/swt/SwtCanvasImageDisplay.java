@@ -11,15 +11,17 @@ import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseListener;
 import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Listener;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
-public abstract class SwtCanvasImageDisplay implements ImageDisplay {
+public abstract class SwtCanvasImageDisplay extends ImageDisplay {
+   private static final Logger LOGGER = LoggerFactory.getLogger(SwtCanvasImageDisplay.class);
 
    // Event callbacks
    protected KeyPressCallback callback;
@@ -29,7 +31,7 @@ public abstract class SwtCanvasImageDisplay implements ImageDisplay {
    protected final AtomicReference<CvMat> currentImageRef = new AtomicReference<CvMat>(null);
    protected final AtomicBoolean done = new AtomicBoolean(false);
    protected Canvas canvas;
-   protected Display display;
+   // protected Display display;
    protected Composite parent;
    protected final CountDownLatch waitUntilClosedLatch = new CountDownLatch(1);
 
@@ -45,7 +47,7 @@ public abstract class SwtCanvasImageDisplay implements ImageDisplay {
       removeCurrentCloseCallback();
       this.closeCallback = e -> closeCallback.run();
       if(closeCallback != null) {
-         display.syncExec(() -> {
+         ImageDisplay.syncExec(() -> {
             canvas.addListener(SWT.Dispose, this.closeCallback);
          });
       }
@@ -53,7 +55,7 @@ public abstract class SwtCanvasImageDisplay implements ImageDisplay {
 
    private void removeCurrentCloseCallback() {
       if(this.closeCallback != null) {
-         display.syncExec(() -> {
+         ImageDisplay.syncExec(() -> {
             canvas.removeListener(SWT.Dispose, this.closeCallback);
          });
       }
@@ -63,12 +65,12 @@ public abstract class SwtCanvasImageDisplay implements ImageDisplay {
          final SelectCallback selectCallback) {
       this.canvas = canvas;
       this.parent = canvas.getParent();
-      this.display = canvas.getDisplay();
+      // this.display = canvas.getDisplay();
 
       this.callback = kpCallback;
       this.selectCallback = selectCallback;
 
-      display.syncExec(() -> {
+      ImageDisplay.syncExec(() -> {
          if(selectCallback != null) {
             canvas.addMouseListener(new MouseListener() {
 
@@ -118,7 +120,7 @@ public abstract class SwtCanvasImageDisplay implements ImageDisplay {
    public void close() {
       if(!done.get()) {
          done.set(true);
-         display.syncExec(() -> {
+         ImageDisplay.syncExec(() -> {
             if(canvas != null) {
                canvas.dispose();
                final CvMat img = currentImageRef.getAndSet(null);
@@ -133,7 +135,8 @@ public abstract class SwtCanvasImageDisplay implements ImageDisplay {
 
    @Override
    public void update(final Mat image) {
-      display.syncExec(() -> {
+      LOGGER.trace("Showing image {}", image);
+      ImageDisplay.syncExec(() -> {
          // final ImageData next = convertToDisplayableSWT(image);
          // final Image nextImage = new Image(display, next);
          final CvMat prev = currentImageRef.getAndSet(CvMat.shallowCopy(image));

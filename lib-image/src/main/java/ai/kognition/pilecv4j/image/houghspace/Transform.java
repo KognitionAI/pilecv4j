@@ -277,7 +277,6 @@ public class Transform {
             entryMap.put(hsrc, e);
             entries.add(e);
          }
-         // System.out.println("HoughSpaceEntry:" + e);
 
          e.addContribution(imrow, imcol);
       }
@@ -348,7 +347,10 @@ public class Transform {
       public double quantFactor;
       public List<HoughSpaceEntry> backMapEntries;
 
-      public CvMat getTransformRaster() {
+      /**
+       * @return A CvMat of the Hough space for the model. The caller owns the CvMat
+       */
+      public CvMat createTransformCvMat() {
          final int width = hswidth;
          final int height = hsheight;
 

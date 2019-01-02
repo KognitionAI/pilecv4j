@@ -12,7 +12,7 @@ import org.opencv.core.Mat;
 
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
-public class SwtImageDisplay implements ImageDisplay {
+public class SwtImageDisplay extends ImageDisplay {
 
    private final String name;
 
@@ -41,8 +41,8 @@ public class SwtImageDisplay implements ImageDisplay {
 
    private void setup() {
       setupCalled = true;
-      this.display = SwtUtils.getDisplay();
-      display.syncExec(() -> {
+      display = SwtUtils.getDisplay();
+      ImageDisplay.syncExec(() -> {
          shell = new Shell(display);
          if(name != null) shell.setText(name);
 
@@ -71,7 +71,7 @@ public class SwtImageDisplay implements ImageDisplay {
    @Override
    public void close() {
       if(display != null) {
-         display.syncExec(() -> {
+         ImageDisplay.syncExec(() -> {
             if(canvasWriter != null)
                canvasWriter.close();
             if(shell != null)

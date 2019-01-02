@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
 
-public class CvImageDisplay implements ImageDisplay {
+public class CvImageDisplay extends ImageDisplay {
    static {
       CvMat.initOpenCv();
    }
@@ -50,56 +50,55 @@ public class CvImageDisplay implements ImageDisplay {
    }
 
    static {
-      final Thread mainEvent = new Thread(() -> {
+      final WindowsState state = new WindowsState();
 
-         final WindowsState state = new WindowsState();
+      ImageDisplay.addEventPollingRunnable(() -> {
+         if(stillRunningEvents.get()) {
+            ImageDisplay.syncExec(() -> {
+               // System.out.println(state.windows);
+               try {
+                  if(state.windows.size() > 0) {
+                     // then we can check for a key press.
+                     final int key = ImageAPI.CvRaster_fetchEvent(1);
+                     final Set<String> toCloseUp = state.callbacks.values().stream()
+                           .map(cb -> cb.keyPressed(key))
+                           .filter(n -> n != null)
+                           .collect(Collectors.toSet());
 
-         while(stillRunningEvents.get()) {
-            // System.out.println(state.windows);
-            try {
-               if(state.windows.size() > 0) {
-                  // then we can check for a key press.
-                  final int key = ImageAPI.CvRaster_fetchEvent(1);
-                  final Set<String> toCloseUp = state.callbacks.values().stream()
-                        .map(cb -> cb.keyPressed(key))
-                        .filter(n -> n != null)
-                        .collect(Collectors.toSet());
+                     toCloseUp.addAll(state.windows.keySet().stream()
+                           .filter(ImageAPI::CvRaster_isWindowClosed)
+                           .collect(Collectors.toSet()));
 
-                  toCloseUp.addAll(state.windows.keySet().stream()
-                        .filter(ImageAPI::CvRaster_isWindowClosed)
-                        .collect(Collectors.toSet()));
+                     toCloseUp.forEach(n -> {
+                        // need to close the window and cleanup.
+                        ImageAPI.CvRaster_destroyWindow(n);
+                        final CvImageDisplay id = state.windows.get(n);
+                        if(id != null)
+                           id.closeNow.set(true);
 
-                  toCloseUp.forEach(n -> {
-                     // need to close the window and cleanup.
-                     ImageAPI.CvRaster_destroyWindow(n);
-                     final CvImageDisplay id = state.windows.get(n);
-                     if(id != null)
-                        id.closeNow.set(true);
-
-                     state.remove(n);
-                     if(id != null)
-                        id.close();
-                  });
-               }
-
-               // we need to check to see if there's any commands to execute.
-               final Consumer<WindowsState> cmd = commands.poll();
-               if(cmd != null) {
-                  try {
-                     cmd.accept(state);
-                  } catch(final Exception e) {
-                     LOGGER.error("OpenCv::HighGUI command \"{}\" threw an excetion.", cmd, e);
+                        state.remove(n);
+                        if(id != null)
+                           id.close();
+                     });
                   }
+
+                  // we need to check to see if there's any commands to execute.
+                  final Consumer<WindowsState> cmd = commands.poll();
+                  if(cmd != null) {
+                     try {
+                        cmd.accept(state);
+                     } catch(final Exception e) {
+                        LOGGER.error("OpenCv::HighGUI command \"{}\" threw an excetion.", cmd, e);
+                     }
+                  }
+               } catch(final Throwable th) {
+                  LOGGER.error("OpenCv::HighGUI CRITICAL ERROR! But yet, I persist.", th);
                }
-            } catch(final Throwable th) {
-               LOGGER.error("OpenCv::HighGUI CRITICAL ERROR! But yet, I persist.", th);
-            }
+            });
          }
 
-      }, "OpenCv::HighGUI event thread");
+      });
 
-      mainEvent.setDaemon(true);
-      mainEvent.start();
    }
    // ==============================================================
 
@@ -175,7 +174,7 @@ public class CvImageDisplay implements ImageDisplay {
    }
 
    private void doShow(final Mat mat, final String name, final CvKeyPressCallback callback) {
-      LOGGER.debug("Showing image {} in window {} ", mat, name);
+      LOGGER.trace("Showing image {} in window {} ", mat, name);
 
       // There is a problem with resource management since the mat is being passed to another thread
       final CvMat omat = CvMat.shallowCopy(mat);

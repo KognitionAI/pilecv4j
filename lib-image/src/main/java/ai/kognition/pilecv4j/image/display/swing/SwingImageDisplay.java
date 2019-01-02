@@ -34,7 +34,7 @@ import org.opencv.core.Mat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
-public class SwingImageDisplay implements ImageDisplay {
+public class SwingImageDisplay extends ImageDisplay {
    private static class Guard implements AutoCloseable {
       final Object d;
 
