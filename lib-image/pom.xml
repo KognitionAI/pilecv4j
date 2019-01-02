@@ -25,7 +25,7 @@
     <!-- Third party deps -->
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-lib</artifactId>
+      <artifactId>native-image</artifactId>
       <classifier>${platform}</classifier>
     </dependency>
     <dependency> <!-- Needed for the NativeLibraryLoader -->
@@ -50,6 +50,11 @@
     <dependency> <!-- Used for the SwtImageDisplay -->
       <groupId>org.eclipse.swt</groupId>
       <artifactId>${swtartifact}</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency> <!-- This is only necessary if you're going to use TiffUtils -->
+      <groupId>mil.nga</groupId>
+      <artifactId>tiff</artifactId>
       <optional>true</optional>
     </dependency>
     

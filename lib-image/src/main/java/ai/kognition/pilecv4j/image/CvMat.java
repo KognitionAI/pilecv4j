@@ -25,7 +25,6 @@ public class CvMat extends Mat implements AutoCloseable {
    private boolean skipCloseOnceForReturn = false;
 
    static {
-      CvRasterAPI._init();
       ImageAPI._init();
    }
 
@@ -165,7 +164,7 @@ public class CvMat extends Mat implements AutoCloseable {
     * using {@link CvMat#deepCopy(Mat)}.
     */
    public static CvMat shallowCopy(final Mat mat) {
-      return new CvMat(CvRasterAPI.CvRaster_copy(mat.nativeObj));
+      return new CvMat(ImageAPI.CvRaster_copy(mat.nativeObj));
    }
 
    /**
@@ -192,7 +191,7 @@ public class CvMat extends Mat implements AutoCloseable {
     * life of the {@link CvMat} returnec, then consider using {@link CvMat#shallowCopy(Mat)}.
     */
    public static CvMat move(final Mat mat) {
-      final long defaultMatNativeObj = CvRasterAPI.CvRaster_defaultMat();
+      final long defaultMatNativeObj = ImageAPI.CvRaster_defaultMat();
       try {
          final long nativeObjToUse = mat.nativeObj;
          nativeObjField.set(mat, defaultMatNativeObj);
@@ -228,7 +227,7 @@ public class CvMat extends Mat implements AutoCloseable {
     * This implements {@code leftOp = rightOp}
     */
    public static void reassign(final Mat leftOp, final Mat rightOp) {
-      CvRasterAPI.CvRaster_assign(leftOp.nativeObj, rightOp.nativeObj);
+      ImageAPI.CvRaster_assign(leftOp.nativeObj, rightOp.nativeObj);
    }
 
    /**
@@ -239,7 +238,7 @@ public class CvMat extends Mat implements AutoCloseable {
     * data buffer outlives the CvRaster or you're pretty much guaranteed a core dump.
     */
    public static CvMat create(final int rows, final int cols, final int type, final long pointer) {
-      final long nativeObj = CvRasterAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+      final long nativeObj = ImageAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
       if(nativeObj == 0)
          throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
       return CvMat.wrapNative(nativeObj);

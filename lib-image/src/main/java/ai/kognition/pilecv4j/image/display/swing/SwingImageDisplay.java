@@ -20,14 +20,10 @@ import java.awt.Graphics;
  * http://www.eclipse.org/swt/snippets/
  */
 import java.awt.image.BufferedImage;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.concurrent.atomic.AtomicReference;
 
-import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.SwingUtilities;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Display;
@@ -37,8 +33,6 @@ import org.opencv.core.Mat;
 
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
-
-import net.dempsy.util.QuietCloseable;
 
 public class SwingImageDisplay implements ImageDisplay {
    private static class Guard implements AutoCloseable {
@@ -69,23 +63,24 @@ public class SwingImageDisplay implements ImageDisplay {
             iioimage = ImageFile.readBufferedImageFromFile(string);
       }
 
-      if(iioimage != null)
-         showImage(iioimage);
+      // if(iioimage != null)
+      // showImage(iioimage);
    }
 
-   public static QuietCloseable showImage(final BufferedImage iioimage) throws InvocationTargetException, InterruptedException {
-      final AtomicReference<JFrame> frame = new AtomicReference<JFrame>(null);
-      SwingUtilities.invokeAndWait(() -> {
-         final JPanel p = new ScrollImagePanel(iioimage);
-         final JFrame f = new JFrame();
-         f.setContentPane(p);
-         f.setSize(iioimage.getWidth(), iioimage.getHeight());
-         f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-         f.setVisible(true);
-         frame.set(f);
-      });
-      return () -> frame.get().dispose();
-   }
+   // public static QuietCloseable showImage(final BufferedImage iioimage) throws InvocationTargetException,
+   // InterruptedException {
+   // final AtomicReference<JFrame> frame = new AtomicReference<JFrame>(null);
+   // SwingUtilities.invokeAndWait(() -> {
+   // final JPanel p = new ScrollImagePanel(iioimage);
+   // final JFrame f = new JFrame();
+   // f.setContentPane(p);
+   // f.setSize(iioimage.getWidth(), iioimage.getHeight());
+   // f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+   // f.setVisible(true);
+   // frame.set(f);
+   // });
+   // return () -> frame.get().dispose();
+   // }
 
    public static class ScrollImagePanel extends JPanel {
       private static final long serialVersionUID = 1L;

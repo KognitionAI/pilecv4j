@@ -14,7 +14,7 @@
   <dependencies>
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-lib</artifactId>
+      <artifactId>native-util</artifactId>
       <classifier>${platform}</classifier>
     </dependency>
     <dependency>

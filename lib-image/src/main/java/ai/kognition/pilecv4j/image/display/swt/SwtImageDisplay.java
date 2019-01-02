@@ -16,8 +16,8 @@ public class SwtImageDisplay implements ImageDisplay {
 
    private final String name;
 
-   private Display display;
-   private Shell shell;
+   private Display display = null;
+   private Shell shell = null;
 
    private SwtCanvasImageDisplay canvasWriter = null;
 
@@ -28,9 +28,8 @@ public class SwtImageDisplay implements ImageDisplay {
    public SwtImageDisplay(final Mat mat, final String name, final Runnable closeCallback, final KeyPressCallback kpCallback,
          final SelectCallback selectCallback) {
       this.name = name;
-      // canvasHandlerMaker = s -> new ScrollableSwtCanvasImageDisplay(shell, closeCallback, kpCallback,
-      // selectCallback);
-      canvasHandlerMaker = s -> new ResizableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
+      canvasHandlerMaker = s -> new ScrollableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
+      // canvasHandlerMaker = s -> new ResizableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
       if(mat != null)
          update(mat);
    }
@@ -70,7 +69,16 @@ public class SwtImageDisplay implements ImageDisplay {
    }
 
    @Override
-   public void close() {}
+   public void close() {
+      if(display != null) {
+         display.syncExec(() -> {
+            if(canvasWriter != null)
+               canvasWriter.close();
+            if(shell != null)
+               shell.close();
+         });
+      }
+   }
 
    @Override
    public void waitUntilClosed() throws InterruptedException {

@@ -12,6 +12,11 @@
   <description>Simple utilities for Jiminger.com</description>
   
   <dependencies>
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>native-util</artifactId>
+      <classifier>${platform}</classifier>
+    </dependency>
     <dependency> <!-- Needed for the NativePointerWrap -->
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>

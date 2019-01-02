@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.4)
-project (ai.kognition.pilecv4j)
+project (ai.kognition.pilecv4j.image)
 
 include(CheckTypeSize)
 CHECK_TYPE_SIZE(float FLOAT_SIZE BUILTIN_TYPES_ONLY)
@@ -74,6 +74,7 @@ if ( NOT "${OpenCV_VERSION}" STREQUAL "$ENV{DEP_OPENCV_VERSION}")
 endif()
 
 include_directories(sources/include)
+include_directories($ENV{COMMON_INCLUDE})
 
 if(MSVC)
   # ===========================================================
@@ -99,17 +100,11 @@ if(MSVC)
   endforeach()
 endif()
 
-add_library(ai.kognition.pilecv4j
+add_library(ai.kognition.pilecv4j.image
   MODULE
   sources/opencv/CvRasterNative.cpp
   sources/houghspace/Transform.cpp
-  sources/mjpeg/jpegtoavi.cpp
-  sources/nr/minimizer.c
-  sources/nr/brent.cpp
-  sources/nr/dbrent.cpp
-  sources/nr/mnbrak.cpp
-  sources/nr/nrutil.cpp
-  sources/nr/powell.cpp)
+  sources/mjpeg/jpegtoavi.cpp)
 
-target_link_libraries(ai.kognition.pilecv4j
+target_link_libraries(ai.kognition.pilecv4j.image
   ${OPENCV_STATIC_LIB})

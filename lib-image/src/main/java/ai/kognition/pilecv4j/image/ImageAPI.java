@@ -1,32 +1,80 @@
 package ai.kognition.pilecv4j.image;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.sun.jna.Callback;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
+import com.sun.jna.Pointer;
 
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
 public class ImageAPI {
+   private static final Logger LOGGER = LoggerFactory.getLogger(ImageAPI.class);
 
-   public static final String LIBNAME = "ai.kognition.pilecv4j";
+   public static final String OCV_VERSION_PROPS = "opencv-info.version";
+   public static final String OCV_SHORT_VERSION_PROP_NAME = "opencv-short.version";
+   public static final String LIBNAME = "ai.kognition.pilecv4j.image";
 
-   static final AtomicBoolean inited = new AtomicBoolean(false);
-
-   public static void _init() {}
+   static void _init() {}
 
    static {
-      if(!inited.getAndSet(true)) {
-         NativeLibraryLoader.loader()
-               .library(LIBNAME)
-               .addCallback((dir, libname, oslibname) -> {
-                  NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
-               })
-               .load();
+      // read a properties file from the classpath.
+      final Properties ocvVersionProps = new Properties();
+      try (InputStream ocvVerIs = ImageAPI.class.getClassLoader().getResourceAsStream(OCV_VERSION_PROPS)) {
+         ocvVersionProps.load(ocvVerIs);
+      } catch(final IOException e) {
+         throw new IllegalStateException("Problem loading the properties file \"" + OCV_VERSION_PROPS + "\" from the classpath", e);
       }
+
+      final String ocvShortVersion = ocvVersionProps.getProperty(OCV_SHORT_VERSION_PROP_NAME);
+      if(ocvShortVersion == null)
+         throw new IllegalStateException("Problem reading the short version from the properties file \"" +
+               OCV_VERSION_PROPS + "\" from the classpath");
+
+      LOGGER.debug("Loading the library for opencv with a short version {}", ocvShortVersion);
+
+      NativeLibraryLoader.loader()
+            .optional("opencv_ffmpeg" + ocvShortVersion + "_64")
+            .library("opencv_java" + ocvShortVersion)
+            .library(LIBNAME)
+            .addCallback((dir, libname, oslibname) -> {
+               if(LIBNAME.equals(libname))
+                  NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
+            })
+            .load();
+
       Native.register(LIBNAME);
    }
+
+   public static native long CvRaster_copy(long nativeMatHandle);
+
+   public static native void CvRaster_assign(long nativeHandleDest, long nativeMatHandleSrc);
+
+   public static native Pointer CvRaster_getData(long nativeMatHandle);
+
+   public static native long CvRaster_makeMatFromRawDataReference(int rows, int cols, int type, long dataLong);
+
+   public static native long CvRaster_defaultMat();
+
+   // ==========================================================
+   // Wrapped OpenCv HighGUI API.
+   // ALL of these need to be called from a SINGLE common thread.
+   public static native void CvRaster_showImage(String name, long nativeMatHandle);
+
+   public static native void CvRaster_updateWindow(String name, long nativeMatHandle);
+
+   public static native int CvRaster_fetchEvent(int millisToSleep);
+
+   public static native void CvRaster_destroyWindow(String name);
+
+   public static native boolean CvRaster_isWindowClosed(String name);
+   // ==========================================================
 
    // =========================================================
    // MJPEGWriter functionality

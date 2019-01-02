@@ -11,12 +11,10 @@ import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
-import ai.kognition.pilecv4j.image.display.swing.SwingImageDisplay;
+import ai.kognition.pilecv4j.image.display.ImageDisplay.Implementation;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
-
-import net.dempsy.util.QuietCloseable;
 
 public class TestUtils {
 
@@ -56,8 +54,8 @@ public class TestUtils {
       try (CvMat mat = ImageFile.readMatFromFile(testImageFilename);) {
          final BufferedImage im = Utils.mat2Img(mat);
          if(SHOW) {
-            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).build();
-                  QuietCloseable c = SwingImageDisplay.showImage(im);) {
+            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).implementation(Implementation.HIGHGUI).build();
+                  final ImageDisplay id2 = new ImageDisplay.Builder().show(mat).implementation(Implementation.SWT).build();) {
                Thread.sleep(3000);
             }
          }
@@ -72,8 +70,8 @@ public class TestUtils {
          final BufferedImage im = Utils.mat2Img(mat);
          Imgproc.cvtColor(omat, mat, Imgproc.COLOR_BGR2GRAY);
          if(SHOW) {
-            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).build();
-                  QuietCloseable c = SwingImageDisplay.showImage(im);) {
+            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).implementation(Implementation.HIGHGUI).build();
+                  final ImageDisplay id2 = new ImageDisplay.Builder().show(mat).implementation(Implementation.SWT).build();) {
                Thread.sleep(3000);
             }
          }
@@ -90,8 +88,8 @@ public class TestUtils {
          final BufferedImage im = Utils.mat2Img(mat);
 
          if(SHOW) {
-            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).build();
-                  QuietCloseable c = SwingImageDisplay.showImage(im);) {
+            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).implementation(Implementation.HIGHGUI).build();
+                  final ImageDisplay id2 = new ImageDisplay.Builder().show(mat).implementation(Implementation.SWT).build();) {
                Thread.sleep(3000);
             }
          }
@@ -104,8 +102,8 @@ public class TestUtils {
       final BufferedImage im = ImageFile.readBufferedImageFromFile(testImageFilename);
       try (final CvMat mat = Utils.img2CvMat(im);) {
          if(SHOW) {
-            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).build();
-                  QuietCloseable c = SwingImageDisplay.showImage(im)) {
+            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).implementation(Implementation.HIGHGUI).build();
+                  final ImageDisplay id2 = new ImageDisplay.Builder().show(mat).implementation(Implementation.SWT).build();) {
                Thread.sleep(3000);
             }
          }
@@ -126,8 +124,8 @@ public class TestUtils {
 
       try (final CvMat mat = Utils.img2CvMat(im);) {
          if(SHOW) {
-            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).build();
-                  QuietCloseable c = SwingImageDisplay.showImage(im)) {
+            try (final ImageDisplay id = new ImageDisplay.Builder().show(mat).implementation(Implementation.HIGHGUI).build();
+                  final ImageDisplay id2 = new ImageDisplay.Builder().show(mat).implementation(Implementation.SWT).build();) {
                Thread.sleep(3000);
             }
          }

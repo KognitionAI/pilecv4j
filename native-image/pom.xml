@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <artifactId>pilecv4j-parent</artifactId>
+    <groupId>ai.kognition.pilecv4j</groupId>
+    <version>1.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>native-image</artifactId>
+  <packaging>pom</packaging>
+
+  <properties>
+    <common.include>${project.parent.basedir}/native-common-include/include</common.include>
+  </properties>
+
+
+  <!-- Using this library implies you'll need the following, so pull them in transitively -->
+  <dependencies>
+    <dependency>
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-utils</artifactId>
+    </dependency>
+    <dependency> <!-- Only used in the NativeLibraryLoader -->
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <directory>${basedir}/target/${platform}-${build.type}</directory>
+    <sourceDirectory>src/main/cpp</sourceDirectory>
+    <plugins>
+      <!-- Copies the dependencies so that javah can find them. -->
+      <!--   see the CMakeLists.txt file -->
+      <plugin>
+        <groupId>com.googlecode.cmake-maven-project</groupId>
+        <artifactId>cmake-maven-plugin</artifactId>
+        <version>3.7.2-b1</version>
+        <executions>
+          <execution>
+            <id>cmake-generate</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <sourcePath>${project.build.sourceDirectory}</sourcePath>
+              <targetPath>${project.build.directory}/build</targetPath>
+              <generator>${cmake.generator}</generator>
+              <classifier>${platform}</classifier>
+              <options>${cmake.options}</options>
+              <environmentVariables>
+                <CMAKE_CLASSIFIER>${platform}</CMAKE_CLASSIFIER>
+                <PROJECT_VERSION>${project.version}</PROJECT_VERSION>
+                <DEP_OPENCV_VERSION>${opencv-build.version}</DEP_OPENCV_VERSION>
+                <COMMON_INCLUDE>${common.include}</COMMON_INCLUDE>
+              </environmentVariables>
+              <downloadBinaries>${download.cmake}</downloadBinaries>
+            </configuration>
+          </execution>
+          <execution>
+            <id>cmake-compile</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <projectDirectory>${project.build.directory}/build</projectDirectory>
+              <classifier>${platform}</classifier>
+              <config>${build.type}</config>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.3</version>
+        <executions>
+          <execution>
+            <phase>process-resources</phase>
+            <configuration>
+              <tasks>
+                <checksum todir="${project.build.directory}/build" format="CHECKSUM">
+                  <fileset dir="${project.build.directory}/build">
+                    <include name="**/*.dll"/>
+                    <include name="**/*.pdb"/>
+                    <include name="**/*.so"/>
+                    <include name="**/*.dylib"/>
+                  </fileset>
+                </checksum>
+                <copy todir="${project.build.directory}/dll-staging">
+                  <fileset dir="${project.build.directory}/build">
+                    <include name="**/*.dll"/>
+                    <include name="**/*.pdb"/>
+                    <include name="**/*.so"/>
+                    <include name="**/*.dylib"/>
+                    <include name="**/*.MD5"/>
+                  </fileset>
+                  <flattenmapper/>
+                </copy>                
+              </tasks>
+            </configuration>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <configuration>
+          <descriptor>assembly.xml</descriptor>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

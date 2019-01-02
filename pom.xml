@@ -26,8 +26,9 @@
     <module>lib-nr</module>
     <module>lib-image</module>
     <module>lib-gstreamer</module>
-    <module>native</module>
-    <module>gst-breakout</module>
+    <module>native-image</module>
+    <module>native-util</module>
+    <module>native-gstreamer</module>
   </modules>
 
   <properties>
@@ -58,6 +59,7 @@
     <dempsy-commons.version>2.2.0-SNAPSHOT</dempsy-commons.version>
     
     <commons.cli.version>1.4</commons.cli.version>
+    <tiff-java.version>2.0.1</tiff-java.version>
   </properties>
 
   <profiles>
@@ -160,29 +162,35 @@
 
       <!-- Internal to the product -->
       <dependency>
-        <groupId>ai.kognition.pilecv4j</groupId>
+        <groupId>${project.groupId}</groupId>
         <artifactId>lib-util</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.kognition.pilecv4j</groupId>
+        <groupId>${project.groupId}</groupId>
         <artifactId>lib-nr</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.kognition.pilecv4j</groupId>
+        <groupId>${project.groupId}</groupId>
         <artifactId>lib-image</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.kognition.pilecv4j</groupId>
-        <artifactId>native-lib</artifactId>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>native-image</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
       <dependency>
-        <groupId>ai.kognition.pilecv4j</groupId>
-        <artifactId>gst-breakout</artifactId>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>native-util</artifactId>
+        <classifier>${platform}</classifier>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>native-gstreamer</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
@@ -211,11 +219,11 @@
         <artifactId>commons-io</artifactId>
         <version>2.6</version>
       </dependency>
-	    <dependency> <!-- Needed for the NativeLibraryLoader -->
-	      <groupId>org.apache.commons</groupId>
-	      <artifactId>commons-lang3</artifactId>
-	      <version>3.8.1</version>
-	    </dependency>
+      <dependency> <!-- Needed for the NativeLibraryLoader -->
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.8.1</version>
+      </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
         <artifactId>jna</artifactId>
@@ -226,12 +234,12 @@
         <artifactId>${swtartifact}</artifactId>
         <version>4.6</version>
       </dependency>
-      <dependency>
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>2.6</version>
+      <dependency> <!-- This is only necessary if you're going to use TiffUtils -->
+       <groupId>mil.nga</groupId>
+       <artifactId>tiff</artifactId>
+       <version>2.0.1</version>
       </dependency>
-            
+      
       <!-- Testing -->
       <dependency>
         <groupId>org.slf4j</groupId>

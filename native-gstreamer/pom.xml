@@ -10,7 +10,7 @@
     <version>1.0-SNAPSHOT</version>
   </parent>
 
-  <artifactId>gst-breakout</artifactId>
+  <artifactId>native-gstreamer</artifactId>
   <packaging>pom</packaging>
 
   <!-- Using this library implies you'll need the following, so pull them in transitively -->

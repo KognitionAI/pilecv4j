@@ -74,12 +74,12 @@ KAI_EXPORT float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t*
    oud.g_status=0;
    if (p_status) *p_status = 0;
 
-   for (int i = 0; i < n; i++)
+   for (uint32_t i = 0; i < n; i++)
    {
       pf[i + 1] = (float)pd[i];
 
       pos = (i * n);
-      for (int j = 0; j < n; j++)
+      for (uint32_t j = 0; j < n; j++)
          xif[i + 1][j + 1] = (float)xi[pos + j];
    }
 
@@ -109,7 +109,7 @@ KAI_EXPORT float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t*
 #endif
    
    // copy pf (the result) back into pd
-   for (int i = 1; i <= n; i++) {
+   for (uint32_t i = 1; i <= n; i++) {
      const float64_t val = (float64_t)pf[i];
      pd[i - 1] = val;
      minVal[i - 1] = val;

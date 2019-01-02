@@ -14,6 +14,7 @@ import org.opencv.imgcodecs.Imgcodecs;
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.GetChannelValueAsInt;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
+import ai.kognition.pilecv4j.image.display.ImageDisplay.Implementation;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
@@ -25,14 +26,14 @@ public class CvRasterTest {
 
    public final static boolean SHOW; /// can only set this to true when building on a machine with a display
 
-	static {
-		final String sysOpSHOW =System.getProperty("pilecv4j.SHOW");
-		boolean sysOpSet = sysOpSHOW != null;
-		boolean show = ("".equals(sysOpSHOW) || Boolean.parseBoolean(sysOpSHOW));
-		if (!sysOpSet)
-			show = Boolean.parseBoolean(System.getenv("PILECV4J_SHOW"));
-		SHOW = show;
-	}
+   static {
+      final String sysOpSHOW = System.getProperty("pilecv4j.SHOW");
+      final boolean sysOpSet = sysOpSHOW != null;
+      boolean show = ("".equals(sysOpSHOW) || Boolean.parseBoolean(sysOpSHOW));
+      if(!sysOpSet)
+         show = Boolean.parseBoolean(System.getenv("PILECV4J_SHOW"));
+      SHOW = show;
+   }
 
    static {
       CvMat.initOpenCv();
@@ -46,7 +47,7 @@ public class CvRasterTest {
 
    @Rule
    public TemporaryFolder tempDir = new TemporaryFolder();
-   
+
    @Test
    public void testMove() throws Exception {
       try (final CvMat cvmat = scopedGetAndMove();) {
@@ -80,9 +81,14 @@ public class CvRasterTest {
    public void testShow() throws Exception {
       if(SHOW) {
          try (final CvMat raster = ImageFile.readMatFromFile(testImagePath);
-               QuietCloseable c = new ImageDisplay.Builder()
-                     .show(raster).windowName("Test").build();) {
-            Thread.sleep(5000);
+               QuietCloseable c = new ImageDisplay.Builder().implementation(Implementation.SWT)
+                     .show(raster).windowName("Test").build();
+
+               QuietCloseable c2 = new ImageDisplay.Builder().implementation(Implementation.HIGHGUI)
+                     .show(raster).windowName("Test").build();
+
+         ) {
+            Thread.sleep(3000);
          }
       }
    }

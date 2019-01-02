@@ -25,7 +25,7 @@ import net.dempsy.util.Functional;
  * from java using a {@code DirectByteBuffer}. You can get access to an underlying
  * Mat's data buffer by passing a lambda to the appropriate CvMat method.
  * </p>
- * 
+ *
  * <pre>
  * <code>
  * CvMat.rasterAp(mat, raster -> {
@@ -35,11 +35,11 @@ import net.dempsy.util.Functional;
  * });
  * </code>
  * </pre>
- * 
+ *
  * Alternatively you can apply a lambda to the {@link CvRaster} using one of the available
  * methods. For example, this will add up all of the pixel values in grayscale byte image
  * and return the result
- * 
+ *
  * <pre>
  * <code>
  * GetChannelValueAsInt valueFetcher = CvRaster.channelValueFetcher(mat.type());
@@ -47,7 +47,7 @@ import net.dempsy.util.Functional;
  *   raster -> raster.reduce(Long.valueOf(0), (prev, pixel, row, col) -> Long.valueOf(prev.longValue() + valueFetcher.get(pixel, 0))));
  * </code>
  * </pre>
- * 
+ *
  */
 public abstract class CvRaster implements AutoCloseable {
 
@@ -193,7 +193,7 @@ public abstract class CvRaster implements AutoCloseable {
    public long getNativeAddressOfData() {
       if(!mat.isContinuous())
          throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      return Pointer.nativeValue(CvRasterAPI.CvRaster_getData(mat.nativeObj));
+      return Pointer.nativeValue(ImageAPI.CvRaster_getData(mat.nativeObj));
    }
 
    @Override
@@ -988,7 +988,7 @@ public abstract class CvRaster implements AutoCloseable {
    private static ByteBuffer _getData(final Mat mat) {
       if(!mat.isContinuous())
          throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
-      final Pointer dataPtr = CvRasterAPI.CvRaster_getData(mat.nativeObj);
+      final Pointer dataPtr = ImageAPI.CvRaster_getData(mat.nativeObj);
       if(Pointer.nativeValue(dataPtr) == 0)
          throw new IllegalArgumentException("Cannot access raw data in Mat. It may be uninitialized.");
       return dataPtr.getByteBuffer(0, mat.elemSize() * mat.total());

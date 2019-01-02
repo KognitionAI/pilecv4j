@@ -17,7 +17,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.CvRasterAPI;
+import ai.kognition.pilecv4j.image.ImageAPI;
 
 public class CvImageDisplay implements ImageDisplay {
    static {
@@ -59,19 +59,19 @@ public class CvImageDisplay implements ImageDisplay {
             try {
                if(state.windows.size() > 0) {
                   // then we can check for a key press.
-                  final int key = CvRasterAPI.CvRaster_fetchEvent(1);
+                  final int key = ImageAPI.CvRaster_fetchEvent(1);
                   final Set<String> toCloseUp = state.callbacks.values().stream()
                         .map(cb -> cb.keyPressed(key))
                         .filter(n -> n != null)
                         .collect(Collectors.toSet());
 
                   toCloseUp.addAll(state.windows.keySet().stream()
-                        .filter(CvRasterAPI::CvRaster_isWindowClosed)
+                        .filter(ImageAPI::CvRaster_isWindowClosed)
                         .collect(Collectors.toSet()));
 
                   toCloseUp.forEach(n -> {
                      // need to close the window and cleanup.
-                     CvRasterAPI.CvRaster_destroyWindow(n);
+                     ImageAPI.CvRaster_destroyWindow(n);
                      final CvImageDisplay id = state.windows.get(n);
                      if(id != null)
                         id.closeNow.set(true);
@@ -181,7 +181,7 @@ public class CvImageDisplay implements ImageDisplay {
       final CvMat omat = CvMat.shallowCopy(mat);
       uncheck(() -> commands.put(s -> {
          try (CvMat lmat = omat) {
-            CvRasterAPI.CvRaster_showImage(name, omat.nativeObj);
+            ImageAPI.CvRaster_showImage(name, omat.nativeObj);
             // if we got here, we're going to assume the windows was created.
             if(callback != null)
                s.callbacks.put(name, callback);
@@ -194,7 +194,7 @@ public class CvImageDisplay implements ImageDisplay {
    // a callback that ignores the keypress but polls the state of the closeNow
    private static class ShowKeyPressCallback implements CvKeyPressCallback {
       final AtomicBoolean shown = new AtomicBoolean(false);
-      final AtomicReference<CvMat> update = new AtomicReference<CvMat>(null);
+      final AtomicReference<CvMat> update = new AtomicReference<>(null);
       final KeyPressCallback keyPressCallback;
       final CvImageDisplay window;
 
@@ -215,7 +215,7 @@ public class CvImageDisplay implements ImageDisplay {
 
          try (final CvMat toUpdate = update.getAndSet(null);) {
             if(toUpdate != null)
-               CvRasterAPI.CvRaster_updateWindow(window.name, toUpdate.nativeObj);
+               ImageAPI.CvRaster_updateWindow(window.name, toUpdate.nativeObj);
          }
 
          if(keyPressCallback != null && kp >= 0) {
