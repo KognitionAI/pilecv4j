@@ -87,6 +87,11 @@ public class Utils {
       grayColorModel = new ComponentColorModel(cs, nBits, false, true, Transparency.OPAQUE, DataBuffer.TYPE_BYTE);
    }
 
+   /**
+    * The {@code undistort} method moved from {@code org.opencv.imgproc.Imgproc} to {@org.opencv.imgproc.Calib3d}
+    * between 3 and 4. This method defines a uniform means of accessing this function regardless of the underlying
+    * version of OpenCV
+    */
    public static void undistort(final Mat src, final Mat dst, final Mat cameraMatrix, final Mat distCoeffs) {
       try {
          OCV_UNDISTORT_METHOD.invoke(null, src, dst, cameraMatrix, distCoeffs);
@@ -97,6 +102,11 @@ public class Utils {
       }
    }
 
+   /**
+    * The {@code undistortPoints} method moved from {@code org.opencv.imgproc.Imgproc} to {@org.opencv.imgproc.Calib3d}
+    * between 3 and 4. This method defines a uniform means of accessing this function regardless of the underlying
+    * version of OpenCV
+    */
    public static void undistortPoints(final MatOfPoint2f src, final MatOfPoint2f dst, final Mat cameraMatrix, final Mat distCoeffs, final Mat R, final Mat P) {
       try {
          OCV_UNDISTORT_POINTS_METHOD.invoke(null, src, dst, cameraMatrix, distCoeffs, R, P);
@@ -107,6 +117,11 @@ public class Utils {
       }
    }
 
+   /**
+    * Convert an OpenCV {@code Mat} to a {@link BufferedImage}. Note, this call copies the
+    * raw data into the {@link BufferedImage} and assumes the format, if the image is a
+    * 3 channel image, is BGR.
+    */
    public static BufferedImage mat2Img(final Mat in) {
       final int inChannels = in.channels();
       if(inChannels == 1) { // assume gray
@@ -132,7 +147,7 @@ public class Utils {
       } else if(inChannels == 3) {
          final int cvDepth = CvType.depth(in.type());
          if(cvDepth != CV_8U && cvDepth != CV_8S)
-            throw new IllegalArgumentException("Cannot convert RGB Mats with elements larger than a byte yet.");
+            throw new IllegalArgumentException("Cannot convert BGR Mats with elements larger than a byte yet.");
 
          final BufferedImage out = new BufferedImage(in.width(), in.height(), BufferedImage.TYPE_3BYTE_BGR);
          CvRaster.copyToPrimitiveArray(in, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
@@ -144,6 +159,11 @@ public class Utils {
 
    }
 
+   /**
+    * Convert an OpenCV {@code org.opencv.core.Mat} to a {@link BufferedImage}. Note, this call copies the
+    * raw data into the {@link BufferedImage} and assumes the colors can be interpreted
+    * as indices into the {@link IndexColorModel}
+    */
    public static BufferedImage mat2Img(final Mat in, final IndexColorModel colorModel) {
       BufferedImage out;
 
@@ -156,33 +176,11 @@ public class Utils {
       return out;
    }
 
-   private static CvMat argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
-      try (final CvMat retMat = new CvMat(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);) {
-         final byte[] inpixels = bb.getData();
-         if(lookup == null) // indicates a pixel compatible format
-            retMat.put(0, 0, inpixels);
-         else {
-            final boolean hasAlpha = lookup[0] != -1;
-            final int alpha = lookup[0];
-            final int blue = lookup[3];
-            final int red = lookup[1];
-            final int green = lookup[2];
-            final byte[] outpixel = new byte[skip]; // pixel length
-            final int colsXchannels = retMat.cols() * retMat.channels();
-            retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
-               final int pos = (r * colsXchannels) + (c * skip);
-               outpixel[0] = inpixels[pos + blue];
-               outpixel[1] = inpixels[pos + green];
-               outpixel[2] = inpixels[pos + red];
-               if(hasAlpha)
-                  outpixel[3] = inpixels[pos + alpha];
-               return outpixel;
-            }));
-         }
-         return retMat.returnMe();
-      }
-   }
-
+   /**
+    * This will dump the contents of the {@link CvRaster} to the given {@link PrintStream} <em>AS TEXT</em>.
+    * You probably wouldn't want to do this on an actual image of any significant size but it can help
+    * determining the structure of various matrices.
+    */
    @SuppressWarnings("unchecked")
    public static void dump(final CvRaster raster, final PrintStream out) {
       out.println(raster.mat);
@@ -201,36 +199,36 @@ public class Utils {
       }
    }
 
+   /**
+    * This will dump the contents of the {@code org.opencv.core.Mat} to {@link System#out} <em>AS TEXT</em>.
+    * You probably wouldn't want to do this on an actual image of any significant size but it can help
+    * determining the structure of various matrices.
+    */
    public static void dump(final Mat mat) {
       dump(mat, System.out);
    }
 
+   /**
+    * This will dump the contents of the {@code org.opencv.core.Mat} to the given {@link PrintStream} <em>AS TEXT</em>.
+    * You probably wouldn't want to do this on an actual image of any significant size but it can help
+    * determining the structure of various matrices.
+    */
    public static void dump(final Mat mat, final PrintStream out) {
       CvMat.rasterAp(mat, raster -> dump(raster, out));
    }
 
-   private static CvMat argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
-      final boolean hasAlpha = mask[0] != 0x0;
-      final CvMat retMat = new CvMat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
-      final int[] inpixels = bi.getData();
-      final int blue = 3;
-      final int red = 1;
-      final int green = 2;
-      final int alpha = 0;
-      final byte[] outpixel = new byte[hasAlpha ? 4 : 3]; // pixel length
-      final int cols = retMat.cols();
-      retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
-         final int pixel = inpixels[(r * cols) + c];
-         outpixel[0] = (byte)((pixel & mask[blue]) >>> shift[blue]);
-         outpixel[1] = (byte)((pixel & mask[green]) >>> shift[green]);
-         outpixel[2] = (byte)((pixel & mask[red]) >>> shift[red]);
-         if(hasAlpha)
-            outpixel[3] = (byte)((pixel & mask[alpha]) >>> shift[alpha]);
-         return outpixel;
-      }));
-      return retMat;
-   }
-
+   /**
+    * Convert a {@link BufferedImage} to an OpenCV {@code org.opencv.core.Mat} . Note, this call copies the
+    * raw data into the {@code org.opencv.core.Mat} .
+    * 
+    * The method will:
+    * <ul>
+    * <li>copy a 3 channel color {@link BufferedImage} to a BGR {@code org.opencv.core.Mat}.</li>
+    * <li>copy a 4 channel color {@link BufferedImage} to a ABGR {@code org.opencv.core.Mat}.</li>
+    * <li>copy a 1 channel 8-bit {@link BufferedImage} to a CV_8UC1 {@code org.opencv.core.Mat}.</li>
+    * <li>copy a 1 channel 16-bit {@link BufferedImage} to a CV_16UC1 {@code org.opencv.core.Mat}.</li>
+    * </ul>
+    */
    public static CvMat img2CvMat(final BufferedImage crappyImage) {
       final int w = crappyImage.getWidth();
       final int h = crappyImage.getHeight();
@@ -338,36 +336,12 @@ public class Utils {
       }
    }
 
-   public static void print(final String prefix, final Mat im) {
-      System.out.println(prefix + " { depth=(" + CvType.ELEM_SIZE(im.type()) + "(" + CvType.typeToString(im.type()) + "), " + im.depth() + "), channels="
-            + im.channels() + " HxW=" + im.height() + "x" + im.width() + " }");
-   }
-
+   /**
+    * Find the point on the line defined by {@code perpRef} that's closest to the point {@code x}.
+    * Note, {@link PerpendicularLine} is poorly named.
+    */
    public static Point closest(final Point x, final PerpendicularLine perpRef) {
       return closest(x, perpRef.x(), perpRef.y());
-   }
-
-   static private Point closest(final Point x, final double perpRefX, final double perpRefY) {
-      // Here we use the description for the perpendicularDistance.
-      // if we translate X0 to the origin then Xi' (defined as
-      // Xi translated by X0) will be at |P| - (P.X0)/|P| (which
-      // is the signed magnitude of the X0 - Xi where the sign will
-      // be positive if X0 X polar(P) is positive and negative
-      // otherwise (that is, if X0 is on the "lower" side of the polar
-      // line described by P)) along P itself. So:
-      //
-      // Xi' = (|P| - (P.X0)/|P|) Pu = (|P| - (P.X0)/|P|) P/|P|
-      // = (1 - (P.X0)/|P|^2) P (where Pu is the unit vector in the P direction)
-      //
-      // then we can translate it back by X0 so that gives:
-      //
-      // Xi = (1 - (P.X0)/|P|^2) P + X0 = c P + X0
-      // where c = (1 - (P.X0)/|P|^2)
-      final double Pmagsq = (perpRefX * perpRefX) + (perpRefY * perpRefY);
-      final double PdotX0 = (x.y() * perpRefY) + (x.x() * perpRefX);
-
-      final double c = (1.0 - (PdotX0 / Pmagsq));
-      return new SimplePoint((c * perpRefY) + x.y(), (c * perpRefX) + x.x());
    }
 
    public static void drawCircle(final Point p, final Mat ti, final Color color) {
@@ -420,16 +394,16 @@ public class Utils {
       g.drawLine((int)(p1.getCol() + 0.5), (int)(p1.getRow() + 0.5), (int)(p2.getCol() + 0.5), (int)(p2.getRow() + 0.5));
    }
 
-   static public void drawPolarLine(final double r, final double c, final Mat ti, final Color color) {
+   public static void drawPolarLine(final double r, final double c, final Mat ti, final Color color) {
       drawPolarLine(r, c, ti, color, 0, 0, ti.rows() - 1, ti.cols() - 1);
    }
 
-   static public void drawPolarLine(final double r, final double c, final Mat ti, final Color color,
+   public static void drawPolarLine(final double r, final double c, final Mat ti, final Color color,
          final int boundingr1, final int boundingc1, final int boundingr2, final int boundingc2) {
       drawPolarLine(r, c, ti, color, boundingr1, boundingc1, boundingr2, boundingc2, 0, 0);
    }
 
-   static public void drawPolarLine(final double r, final double c, final Mat ti, final Color color,
+   public static void drawPolarLine(final double r, final double c, final Mat ti, final Color color,
          int boundingr1, int boundingc1, int boundingr2, int boundingc2,
          final int translater, final int translatec) {
       int tmpd;
@@ -702,6 +676,78 @@ public class Utils {
 
    }
 
+   private static CvMat argbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int[] lookup, final int skip) {
+      try (final CvMat retMat = new CvMat(h, w, skip == 4 ? CvType.CV_8UC4 : CvType.CV_8UC3);) {
+         final byte[] inpixels = bb.getData();
+         if(lookup == null) // indicates a pixel compatible format
+            retMat.put(0, 0, inpixels);
+         else {
+            final boolean hasAlpha = lookup[0] != -1;
+            final int alpha = lookup[0];
+            final int blue = lookup[3];
+            final int red = lookup[1];
+            final int green = lookup[2];
+            final byte[] outpixel = new byte[skip]; // pixel length
+            final int colsXchannels = retMat.cols() * retMat.channels();
+            retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
+               final int pos = (r * colsXchannels) + (c * skip);
+               outpixel[0] = inpixels[pos + blue];
+               outpixel[1] = inpixels[pos + green];
+               outpixel[2] = inpixels[pos + red];
+               if(hasAlpha)
+                  outpixel[3] = inpixels[pos + alpha];
+               return outpixel;
+            }));
+         }
+         return retMat.returnMe();
+      }
+   }
+
+   private static CvMat argbDataBufferByteToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
+      final boolean hasAlpha = mask[0] != 0x0;
+      final CvMat retMat = new CvMat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
+      final int[] inpixels = bi.getData();
+      final int blue = 3;
+      final int red = 1;
+      final int green = 2;
+      final int alpha = 0;
+      final byte[] outpixel = new byte[hasAlpha ? 4 : 3]; // pixel length
+      final int cols = retMat.cols();
+      retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
+         final int pixel = inpixels[(r * cols) + c];
+         outpixel[0] = (byte)((pixel & mask[blue]) >>> shift[blue]);
+         outpixel[1] = (byte)((pixel & mask[green]) >>> shift[green]);
+         outpixel[2] = (byte)((pixel & mask[red]) >>> shift[red]);
+         if(hasAlpha)
+            outpixel[3] = (byte)((pixel & mask[alpha]) >>> shift[alpha]);
+         return outpixel;
+      }));
+      return retMat;
+   }
+
+   private static Point closest(final Point x, final double perpRefX, final double perpRefY) {
+      // Here we use the description for the perpendicularDistance.
+      // if we translate X0 to the origin then Xi' (defined as
+      // Xi translated by X0) will be at |P| - (P.X0)/|P| (which
+      // is the signed magnitude of the X0 - Xi where the sign will
+      // be positive if X0 X polar(P) is positive and negative
+      // otherwise (that is, if X0 is on the "lower" side of the polar
+      // line described by P)) along P itself. So:
+      //
+      // Xi' = (|P| - (P.X0)/|P|) Pu = (|P| - (P.X0)/|P|) P/|P|
+      // = (1 - (P.X0)/|P|^2) P (where Pu is the unit vector in the P direction)
+      //
+      // then we can translate it back by X0 so that gives:
+      //
+      // Xi = (1 - (P.X0)/|P|^2) P + X0 = c P + X0
+      // where c = (1 - (P.X0)/|P|^2)
+      final double Pmagsq = (perpRefX * perpRefX) + (perpRefY * perpRefY);
+      final double PdotX0 = (x.y() * perpRefY) + (x.x() * perpRefX);
+
+      final double c = (1.0 - (PdotX0 / Pmagsq));
+      return new SimplePoint((c * perpRefY) + x.y(), (c * perpRefX) + x.x());
+   }
+
    private static Field getStaticField(final String fieldName, final Class<?>... classes) {
       final Field field = Arrays.stream(classes)
             .map(c -> {
@@ -739,5 +785,4 @@ public class Utils {
                + "  defined in any of these classes: " + Arrays.toString(classes));
       return method;
    }
-
 }
