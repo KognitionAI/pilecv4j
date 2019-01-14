@@ -473,7 +473,7 @@ public class Utils {
                         int mask = dcm.getMask(ch);
 
                         @SuppressWarnings("resource")
-                        Mat matToMask = rawMat;
+                        Mat matToMask = closer.add(CvMat.shallowCopy(rawMat));
                         if(rawMat.depth() == CvType.CV_32S && mask < 0) {
                            // this is a problem since there's no CV_32U so we need to to an extra mask and shift here.
                            try (CvMat tmpMat = new CvMat();) {
@@ -481,7 +481,7 @@ public class Utils {
                               scalarToMat(mask, rawMat.type(), maskMat);
                               Core.bitwise_and(rawMat, maskMat, tmpMat);
                               mask >>>= 1;
-                              matToMask = closer.addMat(new CvMat());
+                              matToMask = closer.add(new CvMat());
                               Core.multiply(tmpMat, new Scalar(0.5D), matToMask);
                            }
                         }
@@ -530,13 +530,20 @@ public class Utils {
                final int bpc = bitsPerChannel[0];
 
                // Now, do we have an 8-bit RGB or a 16-bit (per-channel) RGB
-               if(bpc == 16) {
+               if(bpc > 8 && bpc <= 16) {
                   final DataBuffer dataBuffer = bufferedImage.getRaster().getDataBuffer();
                   // make sure the DataBuffer type is a DataBufferUShort
                   if(!(dataBuffer instanceof DataBufferUShort))
                      throw new IllegalArgumentException("For a 16-bit per channel RGB image the DataBuffer type should be a DataBufferUShort but it's a "
                            + dataBuffer.getClass().getSimpleName());
-                  return rgbDataBufferUShortToMat((DataBufferUShort)dataBuffer, h, w);
+                  try (CvMat ret = rgbDataBufferUShortToMat((DataBufferUShort)dataBuffer, h, w);) {
+                     if(bpc != 16) {
+                        final double maxPixelValue = 65536.0D;
+                        double scale = ((maxPixelValue - 1) / ((1 << bpc) - 1));
+                        Core.multiply(ret, new Scalar(scale), ret);
+                     }
+                     return ret.returnMe();
+                  }
                } else if(bpc == 8) {
                   final DataBuffer dataBuffer = bufferedImage.getRaster().getDataBuffer();
                   // make sure the DataBuffer type is a DataBufferByte
@@ -544,7 +551,9 @@ public class Utils {
                      throw new IllegalArgumentException("For a 8-bit per channel RGB image the DataBuffer type should be a DataBufferByte but it's a "
                            + dataBuffer.getClass().getSimpleName());
                   return rgbDataBufferByteToMat((DataBufferByte)dataBuffer, h, w);
-               }
+               } else
+                  throw new IllegalArgumentException(
+                        "Cannot handle an image of type " + type + " with a ComponentColorModel that has " + bpc + " bits per channel.");
             }
          }
          case TYPE_INT_RGB: // 8-bit per channel packed into ints

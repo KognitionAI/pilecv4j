@@ -595,7 +595,9 @@ public abstract class CvRaster implements AutoCloseable {
       }
 
       public <T extends Mat> T addMat(final T mat) {
-         if(mat != null)
+         if(mat instanceof AutoCloseable)
+            add((AutoCloseable)mat);
+         else if(mat != null)
             rawMats.add(0, mat);
          return mat;
       }

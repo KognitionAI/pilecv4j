@@ -285,7 +285,16 @@ public class ImageFile {
                   final BufferedImage image = reader.read(imageNumber);
                   return image;
                } catch(final IndexOutOfBoundsException ioob) {
-                  throw ioob;
+                   // TODO: distinguish between IndexOutOfBoundsException because imageNumber is too high
+                   // and IndexOutOfBoundsException for some other reason.
+                   if (imageNumber == 0) { // then this is certainly NOT because the imageNumber is too hight
+                      LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioob);
+                      lastException = ioob;
+                   } else {
+                       throw ioob; // for now, assume the reason this happened is because the imageNumber is too hight
+                                   // but there needs to be a better solution. Perhaps distinguish between
+                                   // IndexOutOfBoundsException and ArrayIndexOutOfBoundsException for example
+                   }
                } catch(final IOException | RuntimeException ioe) {
                   LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioe);
                   lastException = ioe;

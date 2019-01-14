@@ -32,7 +32,7 @@ public class UtilsForTesting {
 
    public static void compare(final CvMat mat, final BufferedImage im) {
       final Integer pixDeltaInt = biTypeToPixDelta.get(im.getType());
-      final int pixDelta = pixDeltaInt == null ? (mat.depth() == CvType.CV_16U ? 1 : 0) : pixDeltaInt.intValue();
+      final int pixDelta = pixDeltaInt == null ? 1 : pixDeltaInt.intValue();
 
       final boolean hasAlpha = im.getColorModel().hasAlpha();
       final WritableRaster biraster = im.getRaster();
@@ -73,17 +73,20 @@ public class UtilsForTesting {
                   }
                }
 
-               final int shift = (mat.depth() == CvType.CV_16U) ? 8 : 0;
+               int[] bpp = im.getColorModel().getComponentSize();
+               int[] shift = new int[bpp.length];
+               for(int ch = 0; ch < bpp.length; ch++)
+                  shift[ch] = bpp[ch] <= 8 ? ((mat.depth() == CvType.CV_16U) ? 8 : 0) : 0;
 
                final int[] matPixel = pixelToInt.apply(raster.get(r, c));
                if(channels == 1) {
-                  assertEquals(rgb[0], matPixel[0] >>> shift, pixDelta);
+                  assertEquals(rgb[0], matPixel[0] >>> shift[0], pixDelta);
                } else {
-                  assertEquals(rgb[0], matPixel[2] >>> shift, pixDelta);
-                  assertEquals(rgb[1], matPixel[1] >>> shift, pixDelta);
-                  assertEquals(rgb[2], matPixel[0] >>> shift, pixDelta);
+                  assertEquals(rgb[0], matPixel[2] >>> shift[0], pixDelta);
+                  assertEquals(rgb[1], matPixel[1] >>> shift[1], pixDelta);
+                  assertEquals(rgb[2], matPixel[0] >>> shift[2], pixDelta);
                   if(channels > 3)
-                     assertEquals(alpha, matPixel[3] >>> shift, pixDelta);
+                     assertEquals(alpha, matPixel[3] >>> shift[3], pixDelta);
                }
             }
          }

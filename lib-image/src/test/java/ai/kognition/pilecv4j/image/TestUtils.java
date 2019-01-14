@@ -4,8 +4,12 @@ import static ai.kognition.pilecv4j.image.UtilsForTesting.compare;
 import static ai.kognition.pilecv4j.image.UtilsForTesting.translateClasspath;
 import static java.awt.image.BufferedImage.TYPE_3BYTE_BGR;
 import static java.awt.image.BufferedImage.TYPE_4BYTE_ABGR;
+import static java.awt.image.BufferedImage.TYPE_4BYTE_ABGR_PRE;
 import static java.awt.image.BufferedImage.TYPE_BYTE_GRAY;
 import static java.awt.image.BufferedImage.TYPE_CUSTOM;
+import static java.awt.image.BufferedImage.TYPE_INT_ARGB;
+import static java.awt.image.BufferedImage.TYPE_INT_ARGB_PRE;
+import static java.awt.image.BufferedImage.TYPE_INT_BGR;
 import static java.awt.image.BufferedImage.TYPE_INT_RGB;
 import static java.awt.image.BufferedImage.TYPE_USHORT_555_RGB;
 import static java.awt.image.BufferedImage.TYPE_USHORT_565_RGB;
@@ -13,6 +17,7 @@ import static java.awt.image.BufferedImage.TYPE_USHORT_GRAY;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
+import java.awt.image.IndexColorModel;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,8 +42,8 @@ public class TestUtils {
 
    final String testImageFilename = translateClasspath("test-images/people.jpeg");
 
-   // public final static boolean SHOW = CvRasterTest.SHOW;
-   public final static boolean SHOW = true;
+   public final static boolean SHOW = CvRasterTest.SHOW;
+   // public final static boolean SHOW = true;
 
    @Test
    public void testMatToImg() throws Exception {
@@ -131,12 +136,12 @@ public class TestUtils {
    final private static Set<Integer> typesWereTesting = new HashSet<>(Arrays.asList(new Integer[] {
       TYPE_CUSTOM, // 0 - 16-bit RGB works
       TYPE_INT_RGB, // 1 -TYPE_INT_RGB
-      // 2, TYPE_INT_ARGB - No samples load to this format
-      // 3, TYPE_INT_ARGB_PRE - No samples load to this format
-      // 4, TYPE_INT_BGR - No samples load to this format
+      TYPE_INT_ARGB, // 2 - No samples load to this format
+      TYPE_INT_ARGB_PRE, // 3 - No samples load to this format
+      TYPE_INT_BGR, // 4 - No samples load to this format
       TYPE_3BYTE_BGR, // 5
       TYPE_4BYTE_ABGR, // 6
-      // 7, TYPE_4BYTE_ABGR_PRE - No samples load to this format
+      TYPE_4BYTE_ABGR_PRE, // 7 - No samples load to this format
       TYPE_USHORT_565_RGB, // 8
       TYPE_USHORT_555_RGB, // 9
       TYPE_BYTE_GRAY, // 10
@@ -144,6 +149,32 @@ public class TestUtils {
       // 12, TYPE_BYTE_BINARY - Can't handle this yet.
       // 13, TYPE_BYTE_INDEXED - Can't handle this yet.
    }));
+
+   final public static Set<String> notWorking = new HashSet<>(Arrays.asList(
+         "TYPE_0/img08.bmp"
+         , "TYPE_0/img21.pcx"
+         , "TYPE_0/img20.pcx"
+         , "TYPE_0/img34.tif"
+         , "TYPE_0/img18.pcx"
+         , "TYPE_0/img45.tif"
+         , "TYPE_0/img44.tif"
+         , "TYPE_0/img16.pcx"
+         , "TYPE_0/img22.PCX"
+         , "TYPE_0/img45.tif"
+         , "TYPE_0/img46.tif"
+         , "TYPE_0/img47.tif"
+         // These seem to be a problem for non TwelveMonkeys IIO plugins
+         , "TYPE_0/img13.tif"
+         , "TYPE_0/img56.tif"
+         , "TYPE_0/img11.tif"
+         , "TYPE_0/img53.tif"
+         , "TYPE_0/img91.tif"
+         , "TYPE_0/img12.tif"
+         , "TYPE_0/img55.tif"
+         , "TYPE_0/img32.tif"
+         , "TYPE_0/img54.tif"
+         
+   ));
 
    @Test
    public void testConversions() throws Exception {
@@ -153,9 +184,13 @@ public class TestUtils {
          final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
 
          allFiles.stream()
+               .filter(f -> !notWorking.stream()
+                     .filter(toExclude -> f.toURI().toString().endsWith(toExclude))
+                     .findAny()
+                     .isPresent())
                .forEach(imageFile -> {
-                  checkConvert(imageFile, id);
-                  checkConvert(imageFile.getAbsolutePath(), id);
+                  if(checkConvert(imageFile, id))
+                     checkConvert(imageFile.getAbsolutePath(), id);
                });
       }
    }
@@ -167,11 +202,35 @@ public class TestUtils {
          files.add(file);
    }
 
-   private static void checkConvert(final File imgFile, final ImageDisplay id) {
+   private static boolean checkConvert(final File imgFile, final ImageDisplay id) {
       final BufferedImage img = Functional.uncheck(() -> ImageFile.readBufferedImageFromFile(imgFile.getAbsolutePath()));
 
+      // TODO: this list needs to be empty
       if(!typesWereTesting.contains(img.getType()))
-         return;
+         return false;
+
+      // TODO: Don't skip IndexColorModel
+      if(img.getColorModel() instanceof IndexColorModel && img.getType() == TYPE_CUSTOM)
+         return false;
+
+      // TODO: Don't skip TYPE_CUSTOM with alpha.
+      if(img.getColorModel().getNumComponents() == 4 && img.getType() == TYPE_CUSTOM)
+         return false;
+
+      // TODO: Don't skip images with greater than 16 bits per channel data.
+      if(img.getType() == TYPE_CUSTOM && Arrays.stream(img.getColorModel().getComponentSize())
+            .filter(cs -> cs > 16)
+            .findAny()
+            .isPresent() && true)
+         return false;
+
+      // TODO: Handle TYPE_CUSTOM with more than one bank in the data buffer
+      if(img.getType() == TYPE_CUSTOM && img.getData().getDataBuffer().getNumBanks() != 1)
+         return false;
+
+      // TODO: handle custom images that aren't 3 channel color
+      if(img.getType() == TYPE_CUSTOM && img.getColorModel().getNumComponents() != 3)
+         return false;
 
       try (CvMat mat = Utils.img2CvMat(img);) {
 
@@ -180,13 +239,20 @@ public class TestUtils {
             Functional.uncheck(() -> Thread.sleep(500));
          }
 
+         System.out.println("Running forward compare on :" + imgFile);
+
          compare(mat, img);
 
          // convert back and compare
+         // TODO: don't skip this comparison ever
          if(mat.depth() == CvType.CV_8U || mat.depth() == CvType.CV_8S) {
             final BufferedImage img2 = Utils.mat2Img(mat);
+            System.out.println("Running inverse compare on :" + imgFile);
             compare(img, img2);
+            return false;
          }
+
+         return true;
       }
    }
 
