@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -444,6 +445,19 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
+   private static String arrayToHexString(final Function<Integer, Long> valueGetter, final int length, final long mask) {
+      final StringBuilder sb = new StringBuilder("[");
+      IntStream.range(0, length - 1)
+            .forEach(i -> {
+               sb.append(Long.toHexString(valueGetter.apply(i) & mask));
+               sb.append(", ");
+            });
+      if(length > 0)
+         sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
+      sb.append("]");
+      return sb.toString();
+   }
+
    public static PixelConsumer<?> makePixelPrinter(final PrintStream stream, final int type) {
       switch(CvType.depth(type)) {
          case CvType.CV_8S:
@@ -451,9 +465,11 @@ public abstract class CvRaster implements AutoCloseable {
             return (BytePixelConsumer)(final int r, final int c, final byte[] pixel) -> stream.print(Arrays.toString(pixel));
          case CvType.CV_16S:
          case CvType.CV_16U:
-            return (ShortPixelConsumer)(final int r, final int c, final short[] pixel) -> stream.print(Arrays.toString(pixel));
+            return (ShortPixelConsumer)(final int r, final int c, final short[] pixel) -> stream
+                  .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffL));
          case CvType.CV_32S:
-            return (IntPixelConsumer)(final int r, final int c, final int[] pixel) -> stream.print(Arrays.toString(pixel));
+            return (IntPixelConsumer)(final int r, final int c, final int[] pixel) -> stream
+                  .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffffffL));
          case CvType.CV_32F:
             return (FloatPixelConsumer)(final int r, final int c, final float[] pixel) -> stream.print(Arrays.toString(pixel));
          case CvType.CV_64F:

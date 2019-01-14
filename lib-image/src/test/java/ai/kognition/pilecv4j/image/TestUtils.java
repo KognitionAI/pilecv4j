@@ -1,9 +1,24 @@
 package ai.kognition.pilecv4j.image;
 
+import static ai.kognition.pilecv4j.image.UtilsForTesting.compare;
+import static ai.kognition.pilecv4j.image.UtilsForTesting.translateClasspath;
+import static java.awt.image.BufferedImage.TYPE_3BYTE_BGR;
+import static java.awt.image.BufferedImage.TYPE_4BYTE_ABGR;
+import static java.awt.image.BufferedImage.TYPE_BYTE_GRAY;
+import static java.awt.image.BufferedImage.TYPE_CUSTOM;
+import static java.awt.image.BufferedImage.TYPE_INT_RGB;
+import static java.awt.image.BufferedImage.TYPE_USHORT_555_RGB;
+import static java.awt.image.BufferedImage.TYPE_USHORT_565_RGB;
+import static java.awt.image.BufferedImage.TYPE_USHORT_GRAY;
+
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.awt.image.WritableRaster;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import org.junit.Test;
 import org.opencv.core.CvType;
@@ -13,41 +28,17 @@ import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.image.display.ImageDisplay.Implementation;
 
-import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import net.dempsy.util.Functional;
 
 public class TestUtils {
 
-   final String testImageFilename = new File(
-         getClass().getClassLoader().getResource("test-images/people.jpeg").getFile()).getAbsolutePath();
+   final String testImageFilename = translateClasspath("test-images/people.jpeg");
 
-   public final static boolean SHOW = CvRasterTest.SHOW;
-
-   public static void compare(final CvMat mat, final BufferedImage im) {
-      final boolean oneChannel = mat.channels() == 1;
-      final WritableRaster biraster = im.getRaster();
-      mat.rasterAp(raster -> {
-         for(int r = 0; r < mat.rows(); r++) {
-            for(int c = 0; c < mat.cols(); c++) {
-               if(!oneChannel) {
-                  final byte[] bipix = new byte[3];
-                  bipix[0] = (byte)biraster.getSample(c, r, 2);
-                  bipix[1] = (byte)biraster.getSample(c, r, 1);
-                  bipix[2] = (byte)biraster.getSample(c, r, 0);
-
-                  final byte[] pix = (byte[])raster.get(r, c);
-                  assertArrayEquals(pix, bipix);
-               } else {
-                  final byte[] bipix = new byte[1];
-                  bipix[0] = (byte)biraster.getSample(c, r, 0);
-
-                  final byte[] pix = (byte[])raster.get(r, c);
-                  assertArrayEquals(pix, bipix);
-               }
-            }
-         }
-      });
-   }
+   // public final static boolean SHOW = CvRasterTest.SHOW;
+   public final static boolean SHOW = true;
 
    @Test
    public void testMatToImg() throws Exception {
@@ -131,6 +122,98 @@ public class TestUtils {
          }
          assertEquals(1, mat.channels());
          compare(mat, im);
+      }
+   }
+
+   /**
+    * This is the list of types we can handle
+    */
+   final private static Set<Integer> typesWereTesting = new HashSet<>(Arrays.asList(new Integer[] {
+      TYPE_CUSTOM, // 0 - 16-bit RGB works
+      TYPE_INT_RGB, // 1 -TYPE_INT_RGB
+      // 2, TYPE_INT_ARGB - No samples load to this format
+      // 3, TYPE_INT_ARGB_PRE - No samples load to this format
+      // 4, TYPE_INT_BGR - No samples load to this format
+      TYPE_3BYTE_BGR, // 5
+      TYPE_4BYTE_ABGR, // 6
+      // 7, TYPE_4BYTE_ABGR_PRE - No samples load to this format
+      TYPE_USHORT_565_RGB, // 8
+      TYPE_USHORT_555_RGB, // 9
+      TYPE_BYTE_GRAY, // 10
+      TYPE_USHORT_GRAY // 11
+      // 12, TYPE_BYTE_BINARY - Can't handle this yet.
+      // 13, TYPE_BYTE_INDEXED - Can't handle this yet.
+   }));
+
+   @Test
+   public void testConversions() throws Exception {
+      final String testImg = translateClasspath("test-images/types");
+
+      try (final ImageDisplay id = SHOW ? new ImageDisplay.Builder().implementation(Implementation.SWT).build() : null;) {
+         final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
+
+         allFiles.stream()
+               .forEach(imageFile -> {
+                  checkConvert(imageFile, id);
+                  checkConvert(imageFile.getAbsolutePath(), id);
+               });
+      }
+   }
+
+   private static void findAll(final File file, final List<File> files) {
+      if(file.isDirectory())
+         Arrays.stream(file.list()).forEach(f -> findAll(new File(file, f), files));
+      else
+         files.add(file);
+   }
+
+   private static void checkConvert(final File imgFile, final ImageDisplay id) {
+      final BufferedImage img = Functional.uncheck(() -> ImageFile.readBufferedImageFromFile(imgFile.getAbsolutePath()));
+
+      if(!typesWereTesting.contains(img.getType()))
+         return;
+
+      try (CvMat mat = Utils.img2CvMat(img);) {
+
+         if(id != null) {
+            id.update(mat);
+            Functional.uncheck(() -> Thread.sleep(500));
+         }
+
+         compare(mat, img);
+
+         // convert back and compare
+         if(mat.depth() == CvType.CV_8U || mat.depth() == CvType.CV_8S) {
+            final BufferedImage img2 = Utils.mat2Img(mat);
+            compare(img, img2);
+         }
+      }
+   }
+
+   private static void checkConvert(final String imgFile, final ImageDisplay id) {
+      try (final CvMat mat = Functional.uncheck(() -> ImageFile.readMatFromFile(imgFile));) {
+
+         if(mat == null) // we couldn't read it yet.
+            return;
+
+         if(id != null) {
+            id.update(mat);
+            Functional.uncheck(() -> Thread.sleep(500));
+         }
+
+         // can't convert mat2Img (a)RGB images with components larger than 8-bits.
+         if(((mat.channels() == 1 && mat.depth() != CvType.CV_32F && mat.depth() != CvType.CV_64F)
+               || mat.depth() == CvType.CV_8U
+               || mat.depth() == CvType.CV_8S)
+               && mat.channels() != 2) {
+            final BufferedImage img = Utils.mat2Img(mat);
+            compare(mat, img);
+
+            // convert back and compare
+            try (final CvMat img2 = Utils.img2CvMat(img);) {
+               assertTrue(CvRaster.pixelsIdentical(mat, img2));
+            }
+         }
       }
    }
 }

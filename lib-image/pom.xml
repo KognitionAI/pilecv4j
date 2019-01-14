@@ -53,25 +53,49 @@
       <optional>true</optional>
     </dependency>
     <!-- This is only necessary if you're going to use TiffUtils -->
-<!--    <dependency> 
+    <dependency> 
       <groupId>mil.nga</groupId>
       <artifactId>tiff</artifactId>
       <optional>true</optional>
-    </dependency> -->
+    </dependency>
     
     <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
     <dependency>
       <groupId>com.github.jai-imageio</groupId>
       <artifactId>jai-imageio-core</artifactId>
-      <scope>runtime</scope>
-      <version>1.3.0</version>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>com.github.jai-imageio</groupId>
       <artifactId>jai-imageio-jpeg2000</artifactId>
-      <scope>runtime</scope>
-      <version>1.3.0</version>
+      <optional>true</optional>
     </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-tiff</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-bmp</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-pcx</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-pict</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-tiff</artifactId>
+      <optional>true</optional>
+    </dependency>
+
   </dependencies>
 
   <!-- At this level the profile just selects which tensorflow dependency to include -->

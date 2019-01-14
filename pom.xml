@@ -239,6 +239,24 @@
        <artifactId>tiff</artifactId>
        <version>2.0.1</version>
       </dependency>
+      <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
+      <dependency>
+        <groupId>com.github.jai-imageio</groupId>
+        <artifactId>jai-imageio-core</artifactId>
+        <version>1.4.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jai-imageio</groupId>
+        <artifactId>jai-imageio-jpeg2000</artifactId>
+        <version>1.3.0</version>
+      </dependency>
+      <dependency> <!-- These are redundant and so optional but make the system more robust -->
+        <groupId>com.twelvemonkeys.bom</groupId>
+        <artifactId>bom</artifactId>
+        <version>3.4.1</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
       
       <!-- Testing -->
       <dependency>
