@@ -17,7 +17,6 @@ import static java.awt.image.BufferedImage.TYPE_USHORT_GRAY;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.awt.image.DirectColorModel;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +42,7 @@ public class TestUtils {
    final String testImageFilename = translateClasspath("test-images/people.jpeg");
 
    public final static boolean SHOW = CvRasterTest.SHOW;
-   //public final static boolean SHOW = true;
+   // public final static boolean SHOW = true;
 
    @Test
    public void testMatToImg() throws Exception {
@@ -151,30 +150,45 @@ public class TestUtils {
    }));
 
    final public static Set<String> notWorking = new HashSet<>(Arrays.asList(
-//         "TYPE_0/img08.bmp"
-//         , "TYPE_0/img21.pcx"
-//         , "TYPE_0/img20.pcx"
-//         , "TYPE_0/img34.tif"
-//         , "TYPE_0/img18.pcx"
-//         , "TYPE_0/img45.tif"
-//         , "TYPE_0/img44.tif"
-//         , "TYPE_0/img16.pcx"
-//         , "TYPE_0/img22.PCX"
-//         , "TYPE_0/img45.tif"
-//         , "TYPE_0/img46.tif"
-//         , "TYPE_0/img47.tif"
-//         // These seem to be a problem for non TwelveMonkeys IIO plugins
-//         , "TYPE_0/img13.tif"
-//         , "TYPE_0/img56.tif"
-//         , "TYPE_0/img11.tif"
-//         , "TYPE_0/img53.tif"
-//         , "TYPE_0/img91.tif"
-//         , "TYPE_0/img12.tif"
-//         , "TYPE_0/img55.tif"
-//         , "TYPE_0/img32.tif"
-//         , "TYPE_0/img54.tif"
+   // "TYPE_0/img08.bmp"
+   // , "TYPE_0/img21.pcx"
+   // , "TYPE_0/img20.pcx"
+   // , "TYPE_0/img34.tif"
+   // , "TYPE_0/img18.pcx"
+   // , "TYPE_0/img45.tif"
+   // , "TYPE_0/img44.tif"
+   // , "TYPE_0/img16.pcx"
+   // , "TYPE_0/img22.PCX"
+   // , "TYPE_0/img45.tif"
+   // , "TYPE_0/img46.tif"
+   // , "TYPE_0/img47.tif"
+   // // These seem to be a problem for non TwelveMonkeys IIO plugins
+   // , "TYPE_0/img13.tif"
+   // , "TYPE_0/img56.tif"
+   // , "TYPE_0/img11.tif"
+   // , "TYPE_0/img53.tif"
+   // , "TYPE_0/img91.tif"
+   // , "TYPE_0/img12.tif"
+   // , "TYPE_0/img55.tif"
+   // , "TYPE_0/img32.tif"
+   // , "TYPE_0/img54.tif"
 
    ));
+
+   @Test
+   public void testAgain() throws Exception {
+      final String testImg = translateClasspath("test-images/types");
+      final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
+
+      allFiles.forEach(imgFile -> {
+         final BufferedImage img = Functional.uncheck(() -> ImageFile.readBufferedImageFromFile(imgFile.getAbsolutePath()));
+         System.out.println(img.getColorModel().getColorSpace().isCS_sRGB());
+
+         System.out.println(img);
+         System.out.println(img.getColorModel().getClass().getSimpleName());
+         System.out.println(img.getColorModel());
+      });
+   }
 
    @Test
    public void testConversions() throws Exception {
@@ -182,22 +196,34 @@ public class TestUtils {
 
       try (final ImageDisplay id = SHOW ? new ImageDisplay.Builder().implementation(Implementation.SWT).build() : null;) {
          final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
-
+         System.out.println(allFiles);
          allFiles.stream()
                .filter(f -> !notWorking.stream()
                      .filter(toExclude -> f.toURI().toString().endsWith(toExclude))
                      .findAny()
                      .isPresent())
                .forEach(imageFile -> {
-                  if(checkConvert(imageFile, id))
-                     checkConvert(imageFile.getAbsolutePath(), id);
+                  // if(checkConvert(imageFile, id))
+                  // checkConvert(imageFile.getAbsolutePath(), id);
+                  checkConvert(imageFile, id);
                });
       }
    }
 
+   // private static void findAll(final File file, final List<File> files) {
+   // if(file.isDirectory())
+   // Arrays.stream(file.list()).forEach(f -> findAll(new File(file, f), files));
+   // else
+   // files.add(file);
+   // }
+
    private static void findAll(final File file, final List<File> files) {
       if(file.isDirectory())
-         Arrays.stream(file.list()).forEach(f -> findAll(new File(file, f), files));
+         Arrays.stream(file.list()).forEach(f -> {
+            final File nf = new File(file, f);
+            if(nf.isFile())
+               files.add(new File(file, f));
+         });
       else
          files.add(file);
    }
@@ -210,8 +236,8 @@ public class TestUtils {
       // return false;
 
       // TODO: Don't skip IndexColorModel
-      if(!(img.getColorModel() instanceof DirectColorModel))
-         return false;
+      // if(!(img.getColorModel() instanceof DirectColorModel))
+      // return false;
 
       // // TODO: Don't skip TYPE_CUSTOM with alpha.
       // if(img.getColorModel().getNumComponents() == 4 && img.getType() == TYPE_CUSTOM)

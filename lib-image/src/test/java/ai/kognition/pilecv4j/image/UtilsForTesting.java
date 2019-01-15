@@ -33,7 +33,7 @@ public class UtilsForTesting {
 
    public static void compare(final CvMat mat, final BufferedImage im) {
       final Integer pixDeltaInt = biTypeToPixDelta.get(im.getType());
-      final int pixDelta = pixDeltaInt == null ? 1 : pixDeltaInt.intValue();
+      final int pixDelta = pixDeltaInt == null ? 5 : pixDeltaInt.intValue();
 
       final boolean hasAlpha = im.getColorModel().hasAlpha();
       final WritableRaster biraster = im.getRaster();
@@ -42,8 +42,11 @@ public class UtilsForTesting {
 
          for(int r = 0; r < mat.rows(); r++) {
             for(int c = 0; c < mat.cols(); c++) {
+               if(r == 104 && c == 760)
+                  System.out.println("HERE");
                // check that the number of bands equals
                final int matChannels = raster.channels();
+               // These wont always match if the colorspace is custom
                final int channels = biraster.getNumBands();
                assertEquals(channels, matChannels);
 
@@ -78,7 +81,7 @@ public class UtilsForTesting {
                // int[] shift = new int[bpp.length];
                // for(int ch = 0; ch < bpp.length; ch++)
                // shift[ch] = bpp[ch] <= 8 ? ((mat.depth() == CvType.CV_16U) ? 8 : 0) : 0;
-               int shift = (mat.depth() == CvType.CV_16U || mat.depth() == CvType.CV_16S) ? 8 : 0;
+               final int shift = (mat.depth() == CvType.CV_16U || mat.depth() == CvType.CV_16S) ? 8 : 0;
 
                final int[] matPixel = pixelToInt.apply(raster.get(r, c));
                if(channels == 1) {

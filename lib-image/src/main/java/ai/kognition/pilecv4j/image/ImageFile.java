@@ -34,6 +34,7 @@ import java.util.List;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
@@ -240,7 +241,7 @@ public class ImageFile {
       public ReaderAndStream(final ImageReader reader, final ImageInputStream stream) {
          this.reader = reader;
          this.stream = stream;
-         reader.setInput(stream);
+         reader.setInput(stream, true, true);
       }
 
       @Override
@@ -280,24 +281,28 @@ public class ImageFile {
          try (ReaderAndStream ras = getNextReaderAndStream(f, cur)) {
             if(ras != null) {
                final ImageReader reader = ras.reader;
+               final ImageReadParam param = reader.getDefaultReadParam();
                try {
+                  System.out.println(reader);
                   LOGGER.trace("IIO attempt {}. Trying to read {} using reader {}", cur, filename, reader);
-                  final BufferedImage image = reader.read(imageNumber);
+                  final BufferedImage image = reader.read(imageNumber, param);
                   return image;
                } catch(final IndexOutOfBoundsException ioob) {
-                   // TODO: distinguish between IndexOutOfBoundsException because imageNumber is too high
-                   // and IndexOutOfBoundsException for some other reason.
-                   if (imageNumber == 0) { // then this is certainly NOT because the imageNumber is too hight
-                      LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioob);
-                      lastException = ioob;
-                   } else {
-                       throw ioob; // for now, assume the reason this happened is because the imageNumber is too hight
-                                   // but there needs to be a better solution. Perhaps distinguish between
-                                   // IndexOutOfBoundsException and ArrayIndexOutOfBoundsException for example
-                   }
+                  // TODO: distinguish between IndexOutOfBoundsException because imageNumber is too high
+                  // and IndexOutOfBoundsException for some other reason.
+                  if(imageNumber == 0) { // then this is certainly NOT because the imageNumber is too hight
+                     LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioob);
+                     lastException = ioob;
+                  } else {
+                     throw ioob; // for now, assume the reason this happened is because the imageNumber is too hight
+                                 // but there needs to be a better solution. Perhaps distinguish between
+                                 // IndexOutOfBoundsException and ArrayIndexOutOfBoundsException for example
+                  }
                } catch(final IOException | RuntimeException ioe) {
                   LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioe);
                   lastException = ioe;
+               } finally {
+                  reader.dispose();
                }
             } else
                break;
