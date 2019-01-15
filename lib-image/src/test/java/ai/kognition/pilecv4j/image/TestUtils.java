@@ -17,7 +17,7 @@ import static java.awt.image.BufferedImage.TYPE_USHORT_GRAY;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
-import java.awt.image.IndexColorModel;
+import java.awt.image.DirectColorModel;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,7 +43,7 @@ public class TestUtils {
    final String testImageFilename = translateClasspath("test-images/people.jpeg");
 
    public final static boolean SHOW = CvRasterTest.SHOW;
-   // public final static boolean SHOW = true;
+   //public final static boolean SHOW = true;
 
    @Test
    public void testMatToImg() throws Exception {
@@ -151,29 +151,29 @@ public class TestUtils {
    }));
 
    final public static Set<String> notWorking = new HashSet<>(Arrays.asList(
-         "TYPE_0/img08.bmp"
-         , "TYPE_0/img21.pcx"
-         , "TYPE_0/img20.pcx"
-         , "TYPE_0/img34.tif"
-         , "TYPE_0/img18.pcx"
-         , "TYPE_0/img45.tif"
-         , "TYPE_0/img44.tif"
-         , "TYPE_0/img16.pcx"
-         , "TYPE_0/img22.PCX"
-         , "TYPE_0/img45.tif"
-         , "TYPE_0/img46.tif"
-         , "TYPE_0/img47.tif"
-         // These seem to be a problem for non TwelveMonkeys IIO plugins
-         , "TYPE_0/img13.tif"
-         , "TYPE_0/img56.tif"
-         , "TYPE_0/img11.tif"
-         , "TYPE_0/img53.tif"
-         , "TYPE_0/img91.tif"
-         , "TYPE_0/img12.tif"
-         , "TYPE_0/img55.tif"
-         , "TYPE_0/img32.tif"
-         , "TYPE_0/img54.tif"
-         
+//         "TYPE_0/img08.bmp"
+//         , "TYPE_0/img21.pcx"
+//         , "TYPE_0/img20.pcx"
+//         , "TYPE_0/img34.tif"
+//         , "TYPE_0/img18.pcx"
+//         , "TYPE_0/img45.tif"
+//         , "TYPE_0/img44.tif"
+//         , "TYPE_0/img16.pcx"
+//         , "TYPE_0/img22.PCX"
+//         , "TYPE_0/img45.tif"
+//         , "TYPE_0/img46.tif"
+//         , "TYPE_0/img47.tif"
+//         // These seem to be a problem for non TwelveMonkeys IIO plugins
+//         , "TYPE_0/img13.tif"
+//         , "TYPE_0/img56.tif"
+//         , "TYPE_0/img11.tif"
+//         , "TYPE_0/img53.tif"
+//         , "TYPE_0/img91.tif"
+//         , "TYPE_0/img12.tif"
+//         , "TYPE_0/img55.tif"
+//         , "TYPE_0/img32.tif"
+//         , "TYPE_0/img54.tif"
+
    ));
 
    @Test
@@ -205,32 +205,32 @@ public class TestUtils {
    private static boolean checkConvert(final File imgFile, final ImageDisplay id) {
       final BufferedImage img = Functional.uncheck(() -> ImageFile.readBufferedImageFromFile(imgFile.getAbsolutePath()));
 
-      // TODO: this list needs to be empty
-      if(!typesWereTesting.contains(img.getType()))
-         return false;
+      // // TODO: this list needs to be empty
+      // if(!typesWereTesting.contains(img.getType()))
+      // return false;
 
       // TODO: Don't skip IndexColorModel
-      if(img.getColorModel() instanceof IndexColorModel && img.getType() == TYPE_CUSTOM)
+      if(!(img.getColorModel() instanceof DirectColorModel))
          return false;
 
-      // TODO: Don't skip TYPE_CUSTOM with alpha.
-      if(img.getColorModel().getNumComponents() == 4 && img.getType() == TYPE_CUSTOM)
-         return false;
+      // // TODO: Don't skip TYPE_CUSTOM with alpha.
+      // if(img.getColorModel().getNumComponents() == 4 && img.getType() == TYPE_CUSTOM)
+      // return false;
 
-      // TODO: Don't skip images with greater than 16 bits per channel data.
-      if(img.getType() == TYPE_CUSTOM && Arrays.stream(img.getColorModel().getComponentSize())
-            .filter(cs -> cs > 16)
-            .findAny()
-            .isPresent() && true)
-         return false;
+      // // TODO: Don't skip images with greater than 16 bits per channel data.
+      // if(img.getType() == TYPE_CUSTOM && Arrays.stream(img.getColorModel().getComponentSize())
+      // .filter(cs -> cs > 16)
+      // .findAny()
+      // .isPresent() && true)
+      // return false;
 
       // TODO: Handle TYPE_CUSTOM with more than one bank in the data buffer
-      if(img.getType() == TYPE_CUSTOM && img.getData().getDataBuffer().getNumBanks() != 1)
-         return false;
+      // if(img.getType() == TYPE_CUSTOM && img.getData().getDataBuffer().getNumBanks() != 1)
+      // return false;
 
       // TODO: handle custom images that aren't 3 channel color
-      if(img.getType() == TYPE_CUSTOM && img.getColorModel().getNumComponents() != 3)
-         return false;
+      // if(img.getType() == TYPE_CUSTOM && img.getColorModel().getNumComponents() != 3)
+      // return false;
 
       try (CvMat mat = Utils.img2CvMat(img);) {
 

@@ -1,17 +1,14 @@
 package ai.kognition.pilecv4j.image;
 
-import java.io.PrintStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -45,7 +42,10 @@ import net.dempsy.util.Functional;
  * <code>
  * GetChannelValueAsInt valueFetcher = CvRaster.channelValueFetcher(mat.type());
  * final long sum = CvMat.rasterOp(mat,
- *   raster -> raster.reduce(Long.valueOf(0), (prev, pixel, row, col) -> Long.valueOf(prev.longValue() + valueFetcher.get(pixel, 0))));
+ *   raster -> raster.reduce(Long.valueOf(0), 
+ *     (prev, pixel, row, col) -> Long.valueOf(prev.longValue() + valueFetcher.get(pixel, 0))
+ *   )
+ * );
  * </code>
  * </pre>
  *
@@ -362,7 +362,10 @@ public abstract class CvRaster implements AutoCloseable {
    }
 
    /**
-    * Create the appropriate {@link PutChannelValueAsInt} instance for the given type.
+    * Create the appropriate {@link PutChannelValueFromInt} instance for the given type.
+    * 
+    * @throws
+    * IllegalArgumentException if the type isn't an integer type.
     */
    public static PutChannelValueFromInt channelValuePutter(final int type) {
       switch(CvType.depth(type)) {
@@ -383,6 +386,9 @@ public abstract class CvRaster implements AutoCloseable {
 
    /**
     * Create the appropriate {@link GetChannelValueAsInt} instance for the given type.
+    * 
+    * @throws
+    * IllegalArgumentException if the type isn't an integer type.
     */
    public static GetChannelValueAsInt channelValueFetcher(final int type) {
       switch(CvType.depth(type)) {
@@ -401,6 +407,14 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
+   /**
+    * Retrieves a function that will convert any *integer* based pixel to an array of int's
+    * that corresponds to the pixel's channel values.
+    * 
+    * @param type - the CvType of the Mat you will be using to converter on
+    * @throws
+    * IllegalArgumentException if the type isn't an integer type.
+    */
    public static Function<Object, int[]> pixelToIntsConverter(final int type) {
       final GetChannelValueAsInt fetcher = channelValueFetcher(type);
       final int numChannels = CvType.channels(type);
@@ -412,20 +426,12 @@ public abstract class CvRaster implements AutoCloseable {
       });
    }
 
-   public static int numChannelElementValues(final int type) {
-      switch(CvType.depth(type)) {
-         case CvType.CV_8S:
-         case CvType.CV_8U:
-            return 256;
-         case CvType.CV_16S:
-         case CvType.CV_16U:
-            return 65536;
-         default:
-            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
-      }
-   }
-
-   public static Object makePixel(final int type) {
+   /**
+    * Given the type, this method will create an empty pixel in the form of
+    * a primitive array of the appropriate type with a length that corresponds
+    * to the number of channels.
+    */
+   public static Object makeEmptyPixel(final int type) {
       final int channels = CvType.channels(type);
       switch(CvType.depth(type)) {
          case CvType.CV_8S:
@@ -445,44 +451,10 @@ public abstract class CvRaster implements AutoCloseable {
       }
    }
 
-   private static String arrayToHexString(final Function<Integer, Long> valueGetter, final int length, final long mask) {
-      final StringBuilder sb = new StringBuilder("[");
-      IntStream.range(0, length - 1)
-            .forEach(i -> {
-               sb.append(Long.toHexString(valueGetter.apply(i) & mask));
-               sb.append(", ");
-            });
-      if(length > 0)
-         sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
-      sb.append("]");
-      return sb.toString();
-   }
-
-   public static PixelConsumer<?> makePixelPrinter(final PrintStream stream, final int type) {
-      switch(CvType.depth(type)) {
-         case CvType.CV_8S:
-         case CvType.CV_8U:
-            return (BytePixelConsumer)(final int r, final int c, final byte[] pixel) -> stream.print(Arrays.toString(pixel));
-         case CvType.CV_16S:
-         case CvType.CV_16U:
-            return (ShortPixelConsumer)(final int r, final int c, final short[] pixel) -> stream
-                  .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffL));
-         case CvType.CV_32S:
-            return (IntPixelConsumer)(final int r, final int c, final int[] pixel) -> stream
-                  .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffffffL));
-         case CvType.CV_32F:
-            return (FloatPixelConsumer)(final int r, final int c, final float[] pixel) -> stream.print(Arrays.toString(pixel));
-         case CvType.CV_64F:
-            return (DoublePixelConsumer)(final int r, final int c, final double[] pixel) -> stream.print(Arrays.toString(pixel));
-         default:
-            throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
-      }
-   }
-
    public static Function<int[], Object> intsToPixelConverter(final int type) {
       final PutChannelValueFromInt putter = channelValuePutter(type);
       final int numChannels = CvType.channels(type);
-      final Object pixel = makePixel(type);
+      final Object pixel = makeEmptyPixel(type);
       return ints -> {
          for(int i = 0; i < numChannels; i++)
             putter.put(pixel, i, ints[i]);

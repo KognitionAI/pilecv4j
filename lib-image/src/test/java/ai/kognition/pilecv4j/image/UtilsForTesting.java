@@ -11,6 +11,7 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
 
@@ -73,20 +74,21 @@ public class UtilsForTesting {
                   }
                }
 
-               int[] bpp = im.getColorModel().getComponentSize();
-               int[] shift = new int[bpp.length];
-               for(int ch = 0; ch < bpp.length; ch++)
-                  shift[ch] = bpp[ch] <= 8 ? ((mat.depth() == CvType.CV_16U) ? 8 : 0) : 0;
+               // int[] bpp = im.getColorModel().getComponentSize();
+               // int[] shift = new int[bpp.length];
+               // for(int ch = 0; ch < bpp.length; ch++)
+               // shift[ch] = bpp[ch] <= 8 ? ((mat.depth() == CvType.CV_16U) ? 8 : 0) : 0;
+               int shift = (mat.depth() == CvType.CV_16U || mat.depth() == CvType.CV_16S) ? 8 : 0;
 
                final int[] matPixel = pixelToInt.apply(raster.get(r, c));
                if(channels == 1) {
-                  assertEquals(rgb[0], matPixel[0] >>> shift[0], pixDelta);
+                  assertEquals(rgb[0], matPixel[0] >>> shift, pixDelta);
                } else {
-                  assertEquals(rgb[0], matPixel[2] >>> shift[0], pixDelta);
-                  assertEquals(rgb[1], matPixel[1] >>> shift[1], pixDelta);
-                  assertEquals(rgb[2], matPixel[0] >>> shift[2], pixDelta);
+                  assertEquals(rgb[0], matPixel[2] >>> shift, pixDelta);
+                  assertEquals(rgb[1], matPixel[1] >>> shift, pixDelta);
+                  assertEquals(rgb[2], matPixel[0] >>> shift, pixDelta);
                   if(channels > 3)
-                     assertEquals(alpha, matPixel[3] >>> shift[3], pixDelta);
+                     assertEquals(alpha, matPixel[3] >>> shift, pixDelta);
                }
             }
          }
@@ -105,8 +107,13 @@ public class UtilsForTesting {
 
       final int[] pixelsA = biA.getRGB(0, 0, w, h, null, 0, w);
       final int[] pixelsB = biB.getRGB(0, 0, w, h, null, 0, w);
+
       assertEquals(pixelsA.length, pixelsB.length);
       assertEquals(w * h, pixelsA.length);
+
+      // ignore the LSb of each
+      IntStream.range(0, pixelsA.length).forEach(i -> pixelsA[i] = pixelsA[i] & 0xfefefefe);
+      IntStream.range(0, pixelsB.length).forEach(i -> pixelsB[i] = pixelsB[i] & 0xfefefefe);
 
       assertArrayEquals(pixelsA, pixelsB);
    }

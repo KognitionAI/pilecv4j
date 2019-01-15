@@ -16,7 +16,7 @@ import org.slf4j.LoggerFactory;
  * <p>
  * This class is an easier (perhaps) and more efficient interface to an OpenCV
  * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
- * Than the one available through the Java wrapper. It includes more efficient resource
+ * than the one available through the offical Java wrapper. It includes more efficient resource
  * management as an {@link AutoCloseable} and the ability to do more <em>"zero-copy"</em>
  * image manipulations than is typically available in OpenCVs default Java API.
  * </p>
@@ -24,51 +24,47 @@ import org.slf4j.LoggerFactory;
  * <h2>Memory management</h2>
  *
  * <p>
- * In OpenCV's C/C++ API, you're responsible for managing the resources. For example, the
+ * In OpenCV's C/C++ API, the developer is responsible for managing the resources. The
  * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> class in C++
- * manages the underlying resources for the image through its lifecycle which contains, among
- * other things, a destructor. The main resources for a
- * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> is the memory that
- * contains the raw image data. When all of the
- * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s referencing the same
- * image memory are {@code delete}d (that is, the
- * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s
- * destructor is called), the memory containing the raw image data is {@code free}d. This gives the
- * developer fine grained control over the compute resources.
+ * references the underlying memory resources for the image data. When a C++ Mat is deleted,
+ * this memory is freed (that is, as long as other Mat's aren't referring to the same
+ * memory, in which case when the last one is deleted, the memeory is freed). This gives the
+ * developer using the C++ API fine grained control over the compute resources.
  * </p>
  *
  * <p>
- * However, for Java developers, it's not typical for the developer to manage memory. Instead, they typically
- * rely on garbage collection. The problem with doing that in OpenCV's Java API is that the Java VM and it's garbage
- * collector <em>can't see</em> the memory managed by the
+ * However, for Java developers, it's not typical for the developer to manage memory or explicitly
+ * delete objects or free resources. Instead, they typically rely on garbage collection. The
+ * problem with doing that in OpenCV's Java API is that the Java VM and it's garbage
+ * collector <em>can't see</em> the image memory referred to by the
  * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>. This memory is
  * <a href="https://stackoverflow.com/questions/6091615/difference-between-on-heap-and-off-heap"><em>off-heap</em></a>
  * from the perspective of the Java VM.
  * </p>
  *
  * <p>
- * This is why, as you may have experienced if you've used OpenCV's Java API in a larger video system,
- * that you can rapidly run out of memory as you create
- * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s for video frames since the
- * garbage collector is unaware of how much of the computer's memory is actually being utilized by these
- * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s since most of it
- * (the raw frame data) is outside of the garbage collector's purview.
+ * This is why, as you may have experienced if you've used OpenCV's Java API in a larger
+ * video system, you can rapidly run out of memory. Creating a Mat for each high resolution
+ * video frame but lettingthe JVM garbage collector decide when to delete these objects as
+ * you create will eventually (usually rapidly) fill the available system memory since the
+ * garbage collector is unaware of how much of that computer memory is actually being
+ * utilized by these <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s.
  * </p>
  *
  * <p>
- * This class allows OpenCV's <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s to be managed
- * the same way you would any other {@link AutoCloseable} in Java (since 1.7). That is, using a
- * <em>"try-with-resource"</em>.
+ * This class allows OpenCV's <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s
+ * to be managed the same way you would any other {@link AutoCloseable} in Java (since 1.7).
+ * That is, using a <em>"try-with-resource"</em>.
  * </p>
  *
  * <h3>Tracking memory leaks</h3>
  *
- * You can track leaks in your use of {@link CvMat} by setting the environment variable
+ * Additionally, you can track leaks in your use of {@link CvMat} by setting the environment variable
  * {@code PILECV4J_TRACK_MEMORY_LEAKS="true"} or by using the system property
- * {@code -Dpilecv4j.TRACK_MEMORY_LEAKS=true}. This will tell {@link CvMat} to track the locations in the code where
- * it's been instantiated so that if it's eventually deleted by the garbage collector, rather than {@code CvMat#close}d
- * by the developer, a {@code debug} level log message will be emitted identifying where the leaked {@link CvMat} was
- * initially instantiated.
+ * {@code -Dpilecv4j.TRACK_MEMORY_LEAKS=true}. This will tell {@link CvMat} to track the locations in
+ * the code where it's been instantiated so that if it's eventually deleted by the garbage collector,
+ * rather than {@code CvMat#close}d by the developer, a {@code debug} level log message will be emitted
+ * identifying where the leaked {@link CvMat} was initially instantiated.
  */
 public class CvMat extends Mat implements AutoCloseable {
    private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
@@ -307,8 +303,10 @@ public class CvMat extends Mat implements AutoCloseable {
 
    /**
     * <p>
-    * This call can be made to hand management of a Mat over to a {@link CvMat}.
-    * The <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> passed
+    * This call can be made to hand management of a
+    * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>'s resources
+    * over to a new {@link CvMat}. The
+    * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> passed
     * in <em>SOULD NOT</em> be used after this call or, at least, it shouldn't be assumed
     * to still be pointing to the same image data. When the {@link CvMat} is closed, it will
     * release the data that was originally associated with the {@code Mat}. If you want
@@ -316,9 +314,10 @@ public class CvMat extends Mat implements AutoCloseable {
     * {@link CvMat#shallowCopy(Mat)} instead of {@link CvMat#move(Mat)}.
     * </p>
     *
-    * @param mat - <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to take control of with
-    *           the new {@link CvMat}. After this call the
-    *           <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> passed should not be used.
+    * @param mat - <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+    *           to take control of with the new {@link CvMat}. After this call the
+    *           <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+    *           passed should not be used.
     * @return a new {@link CvMat} that now managed the internal resources of the origin. <b>Note: The caller owns the
     *         CvMat returned</b>
     */
@@ -376,8 +375,9 @@ public class CvMat extends Mat implements AutoCloseable {
    }
 
    /**
-    * This method allows the developer to return a {@link CvMat} that's being managed by a <em>"try-with-resource"</em>
-    * without worrying about the {@link CvMat}'s resources being freed. As an example:
+    * This method allows the developer to return a {@link CvMat} that's being managed by
+    * a <em>"try-with-resource"</em> without worrying about the {@link CvMat}'s resources
+    * being freed. As an example:
     *
     * <pre>
     * <code>
@@ -389,10 +389,16 @@ public class CvMat extends Mat implements AutoCloseable {
     * </code>
     * </pre>
     *
-    * While it's possible to simply not use a try-with-resource and leave the {@link CvMat} unmanaged and just return
-    * it, you run the possibility of leaking the {@link CvMat}.
-    *
-    * @return
+    * <p>
+    * While it's possible to simply not use a try-with-resource and leave the {@link CvMat} unmanaged,
+    * you run the possibility of leaking the {@link CvMat} if an exception is thrown prior to returning
+    * it.
+    * </p>
+    * 
+    * <p>
+    * Note: if you call {@link CvMat#returnMe()} and don't actuall reassign the result to another managed
+    * {@link CvMat}, you will leak the CvMat.
+    * </p>
     */
    public CvMat returnMe() {
       // hacky, yet efficient.
@@ -401,12 +407,24 @@ public class CvMat extends Mat implements AutoCloseable {
    }
 
    /**
-    * Creates a {@link CvMat} given nativeObj needs to be a native pointer to a C++ cv::Mat object.
+    * <p>
+    * Creates a {@link CvMat} given a handle to a native C++
+    * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> instance.
+    * nativeObj needs to be a native pointer to a C++ cv::Mat object or you're likely to
+    * get a core dump. The management of that Mat will now be the responsibility
+    * of the CvMat. If something else ends up invoking the destructor on the native
+    * cv::Mat then there will likely be a core dump when subsequently using the {@link CvMat}
+    * returned. This includes even the deletion of the {@link CvMat} by the garbage collector.
+    * </p>
+    * 
+    * <p>
+    * <em>With great power, comes great responsibility.</em>
+    * </p>
     *
-    * @param nativeObj
-    * @return
+    * @param nativeObj - pointer to a C++ cv::Mat instance. You're on your own as to how to
+    *           obtain one of these but you will likely need to write C++ code to do it.
     */
-   private static CvMat wrapNative(final long nativeObj) {
+   public static CvMat wrapNative(final long nativeObj) {
       return new CvMat(nativeObj);
    }
 
