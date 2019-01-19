@@ -655,7 +655,6 @@ public abstract class CvRaster implements AutoCloseable {
                     public <T> void forEach(final FlatPixelConsumer<T> pc) {
                         final FlatBytePixelConsumer bpc = (FlatBytePixelConsumer)pc;
                         final byte[] pixel = new byte[channels()];
-                        final int channels = channels();
                         iterateOver((pos) -> {
                             bb.position(pos);
                             bb.get(pixel);
@@ -725,7 +724,6 @@ public abstract class CvRaster implements AutoCloseable {
                     public <T> void forEach(final FlatPixelConsumer<T> pc) {
                         final FlatShortPixelConsumer bpc = (FlatShortPixelConsumer)pc;
                         final short[] pixel = new short[channels()];
-                        final int channels = channels();
                         iterateOver((pos) -> {
                             sb.position(pos);
                             sb.get(pixel);
@@ -793,7 +791,6 @@ public abstract class CvRaster implements AutoCloseable {
                     public <T> void forEach(final FlatPixelConsumer<T> pc) {
                         final FlatIntPixelConsumer bpc = (FlatIntPixelConsumer)pc;
                         final int[] pixel = new int[channels()];
-                        final int channels = channels();
                         iterateOver((pos) -> {
                             ib.position(pos);
                             ib.get(pixel);
@@ -861,7 +858,6 @@ public abstract class CvRaster implements AutoCloseable {
                     public <T> void forEach(final FlatPixelConsumer<T> pc) {
                         final FlatFloatPixelConsumer bpc = (FlatFloatPixelConsumer)pc;
                         final float[] pixel = new float[channels()];
-                        final int channels = channels();
                         iterateOver((pos) -> {
                             fb.position(pos);
                             fb.get(pixel);
@@ -929,7 +925,6 @@ public abstract class CvRaster implements AutoCloseable {
                     public <T> void forEach(final FlatPixelConsumer<T> pc) {
                         final FlatDoublePixelConsumer bpc = (FlatDoublePixelConsumer)pc;
                         final double[] pixel = new double[channels()];
-                        final int channels = channels();
                         iterateOver((pos) -> {
                             db.position(pos);
                             db.get(pixel);

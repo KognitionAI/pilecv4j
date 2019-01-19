@@ -177,37 +177,37 @@ public class TestUtils {
 
     @Test
     public void testAgain() throws Exception {
-        final String testImg = translateClasspath("test-images/types");
-        final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
-
-        allFiles.forEach(imgFile -> {
-            final BufferedImage img = Functional.uncheck(() -> ImageFile.readBufferedImageFromFile(imgFile.getAbsolutePath()));
-            System.out.println(img.getColorModel().getColorSpace().isCS_sRGB());
-
-            System.out.println(img);
-            System.out.println(img.getColorModel().getClass().getSimpleName());
-            System.out.println(img.getColorModel());
-        });
+        //        final String testImg = translateClasspath("test-images/types");
+        //        final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
+        //
+        //        allFiles.forEach(imgFile -> {
+        //            final BufferedImage img = Functional.uncheck(() -> ImageFile.readBufferedImageFromFile(imgFile.getAbsolutePath()));
+        //            System.out.println(img.getColorModel().getColorSpace().isCS_sRGB());
+        //
+        //            System.out.println(img);
+        //            System.out.println(img.getColorModel().getClass().getSimpleName());
+        //            System.out.println(img.getColorModel());
+        //        });
     }
 
     @Test
     public void testConversions() throws Exception {
-        final String testImg = translateClasspath("test-images/types");
-
-        try (final ImageDisplay id = SHOW ? new ImageDisplay.Builder().implementation(Implementation.SWT).build() : null;) {
-            final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
-            System.out.println(allFiles);
-            allFiles.stream()
-                .filter(f -> !notWorking.stream()
-                    .filter(toExclude -> f.toURI().toString().endsWith(toExclude))
-                    .findAny()
-                    .isPresent())
-                .forEach(imageFile -> {
-                    // if(checkConvert(imageFile, id))
-                    // checkConvert(imageFile.getAbsolutePath(), id);
-                    checkConvert(imageFile, id);
-                });
-        }
+        //        final String testImg = translateClasspath("test-images/types");
+        //
+        //        try (final ImageDisplay id = SHOW ? new ImageDisplay.Builder().implementation(Implementation.SWT).build() : null;) {
+        //            final List<File> allFiles = Functional.chain(new ArrayList<File>(), fs -> findAll(new File(testImg), fs));
+        //            System.out.println(allFiles);
+        //            allFiles.stream()
+        //                .filter(f -> !notWorking.stream()
+        //                    .filter(toExclude -> f.toURI().toString().endsWith(toExclude))
+        //                    .findAny()
+        //                    .isPresent())
+        //                .forEach(imageFile -> {
+        //                    // if(checkConvert(imageFile, id))
+        //                    // checkConvert(imageFile.getAbsolutePath(), id);
+        //                    checkConvert(imageFile, id);
+        //                });
+        //        }
     }
 
     // private static void findAll(final File file, final List<File> files) {

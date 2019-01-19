@@ -50,7 +50,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelConsumer;
-import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelSetter;
@@ -174,9 +173,8 @@ public class Utils {
      * <p>
      * Convert an OpenCV
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     * (or a
-     * {@link CvMat}) to a {@link BufferedImage} that can be used in java swing and
-     * awt. Currently this can handle:
+     * (or a {@link CvMat}) to a {@link BufferedImage} that can be used in java
+     * swing and awt. Currently this can handle:
      * </p>
      * <ul>
      * <li>A single channel grayscale image of 8 or 16 bits.</li>
@@ -193,20 +191,16 @@ public class Utils {
      *
      * <p>
      * 8-bit per channel color images will be transformed to {@link BufferedImage}s
-     * of type
-     * {@link BufferedImage#TYPE_3BYTE_BGR} for 3 channel images and
-     * {@link BufferedImage#TYPE_4BYTE_ABGR} for 4 channel
-     * images.
+     * of type {@link BufferedImage#TYPE_3BYTE_BGR} for 3 channel images and
+     * {@link BufferedImage#TYPE_4BYTE_ABGR} for 4 channel images.
      * </p>
      *
      * TODO: 16-bit per channel color images
      *
      * @param in <a href=
      *            "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *            to
-     *            be converted
-     * @return new {@link BufferedImage} from the
-     *         <a href=
+     *            to be converted
+     * @return new {@link BufferedImage} from the <a href=
      *         "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
      */
     public static BufferedImage mat2Img(final Mat in) {
@@ -270,21 +264,17 @@ public class Utils {
      * <p>
      * Convert an OpenCV
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     * (or a
-     * {@link CvMat}) to a {@link BufferedImage} that can be used in java swing and
-     * awt using a specific index
-     * color model (see {@link IndexColorModel}).
+     * (or a {@link CvMat}) to a {@link BufferedImage} that can be used in java
+     * swing and awt using a specific index color model (see
+     * {@link IndexColorModel}).
      * </p>
      *
      * <p>
      * This is a much simpler implementation that {@link Utils#mat2Img(Mat)} in that
-     * it only handles a
-     * 1-channel, 8-bit image but allows you to assign colors to each of the 256
-     * values. This is primarily
-     * used to generated overlays on other images and represents a "poor-man's"
-     * alpha channel manipulation
-     * in OpenCV which doesn't really have much in the way of alpha channel handling
-     * natively.
+     * it only handles a 1-channel, 8-bit image but allows you to assign colors to
+     * each of the 256 values. This is primarily used to generated overlays on other
+     * images and represents a "poor-man's" alpha channel manipulation in OpenCV
+     * which doesn't really have much in the way of alpha channel handling natively.
      * </p>
      */
     public static BufferedImage mat2Img(final Mat in, final IndexColorModel colorModel) {
@@ -300,48 +290,30 @@ public class Utils {
     }
 
     /**
-     * You can use this method to dump the contents of a
-     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to
-     * the {@link PrintStream}.
-     * Please note this is a really bad idea for large images but can help with
-     * debugging problems when
-     * you're using OpenCV for it's linear-algebra/matrix capabilities.
-     *
-     * @param raster to dump print to the {@link PrintStream}
-     * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
-     * @param numRows limit the number of rows to the given number. Supply -1 for
-     *            the all rows.
-     * @param numCols limit the number of columns to the given number. Supply -1 for
-     *            the all columns.
-     */
-    @SuppressWarnings("unchecked")
-    public static void dump(final CvRaster raster, final PrintStream out, int numRows, int numCols) {
-        if(numRows < 0) numRows = raster.rows();
-        if(numCols < 0) numCols = raster.cols();
-
-        out.println(raster.mat);
-        @SuppressWarnings("rawtypes")
-        final PixelConsumer pp = makePixelPrinter(out, raster.type());
-        for(int r = 0; r < numRows; r++) {
-            out.print("[");
-            for(int c = 0; c < numCols - 1; c++) {
-                out.print(" ");
-                pp.accept(r, c, raster.get(r, c));
-                out.print(",");
-            }
-            out.print(" ");
-            pp.accept(r, numCols - 1, raster.get(r, numCols - 1));
-            out.println("]");
-        }
-    }
-
-    /**
      * This is a convenience method for {@link Utils#dump(Mat, PrintStream)} that
-     * uses {@link System#out} as the
-     * {@link PrintStream}
+     * uses {@link System#out} as the {@link PrintStream}
      */
     public static void dump(final Mat mat, final int numRows, final int numCols) {
         dump(mat, System.out, numRows, numCols);
+    }
+
+    /**
+     * This is a convenience method for
+     * {@link Utils#dump(Mat, PrintStream, int, int)} that uses {@link System#out}
+     * as the {@link PrintStream} and dumps all elements of the
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     */
+    public static void dump(final Mat mat) {
+        dump(mat, System.out, -1, -1);
+    }
+
+    /**
+     * This is a convenience method for {@link Utils#dump(Mat, PrintStream,int,int)}
+     * that dumps all elements of the
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     */
+    public static void dump(final Mat mat, final PrintStream out) {
+        dump(mat, out, -1, -1);
     }
 
     /**
@@ -351,7 +323,7 @@ public class Utils {
      * debugging problems when
      * you're using OpenCV for it's linear-algebra/matrix capabilities.
      *
-     * @param raster to dump print to the {@link PrintStream}
+     * @param mat to dump print to the {@link PrintStream}
      * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
      * @param numRows limit the number of rows to the given number. Supply -1 for
      *            the all rows.
@@ -394,6 +366,47 @@ public class Utils {
                 return (DoublePixelConsumer)(final int r, final int c, final double[] pixel) -> stream.print(Arrays.toString(pixel));
             default:
                 throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
+        }
+    }
+
+    /**
+     * You can use this method to dump the contents of a
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to
+     * the {@link PrintStream}.
+     * Please note this is a really bad idea for large images but can help with
+     * debugging problems when
+     * you're using OpenCV for it's linear-algebra/matrix capabilities.
+     *
+     * @param raster to dump print to the {@link PrintStream}
+     * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
+     * @param numRows limit the number of rows to the given number. Supply -1 for
+     *            the all rows.
+     * @param numCols limit the number of columns to the given number. Supply -1 for
+     *            the all columns.
+     */
+    @SuppressWarnings("unchecked")
+    private static void dump(final CvRaster raster, final PrintStream out, int numRows, int numCols) {
+        if(numRows < 0) numRows = raster.rows();
+        if(numCols < 0) numCols = raster.cols();
+
+        if(raster.rows() < numRows)
+            numRows = raster.rows();
+        if(raster.cols() < numCols)
+            numCols = raster.cols();
+
+        out.println(raster.mat);
+        @SuppressWarnings("rawtypes")
+        final PixelConsumer pp = makePixelPrinter(out, raster.type());
+        for(int r = 0; r < numRows; r++) {
+            out.print("[");
+            for(int c = 0; c < numCols - 1; c++) {
+                out.print(" ");
+                pp.accept(r, c, raster.get(r, c));
+                out.print(",");
+            }
+            out.print(" ");
+            pp.accept(r, numCols - 1, raster.get(r, numCols - 1));
+            out.println("]");
         }
     }
 
@@ -493,9 +506,8 @@ public class Utils {
     }
 
     /**
-     * determine the number of bits for each channel.
-     * and set the flag that indicates whether or not
-     * they're all the same.
+     * determine the number of bits for each channel. and set the flag that
+     * indicates whether or not they're all the same.
      */
     private static int[] ccmCeckBitsPerChannel(final ComponentColorModel cm) {
         final int[] bitsPerChannel = cm.getComponentSize();
@@ -780,8 +792,7 @@ public class Utils {
 
     /**
      * Find the point on the line defined by {@code perpRef} that's closest to the
-     * point {@code x}.
-     * Note, {@link PerpendicularLine} is poorly named.
+     * point {@code x}. Note, {@link PerpendicularLine} is poorly named.
      */
     public static Point closest(final Point x, final PerpendicularLine perpRef) {
         return closest(x, perpRef.x(), perpRef.y());
@@ -968,10 +979,8 @@ public class Utils {
 
     /**
      * This method will overlay the {@code overlay} image onto the {@code original}
-     * image by
-     * having the original image show through the overlay, everywhere the overlay
-     * has a pixel
-     * value of zero (or zero in all channels).
+     * image by having the original image show through the overlay, everywhere the
+     * overlay has a pixel value of zero (or zero in all channels).
      */
     public static void overlay(final CvMat original, final CvMat dst, final CvMat overlay) {
         try (final CvMat gray = new CvMat();
@@ -1187,32 +1196,6 @@ public class Utils {
             throw new IllegalStateException("The version of OpenCV defined as a dependency doesn't seem to have the method " + methodName
                 + "  defined in any of these classes: " + Arrays.toString(classes));
         return method;
-    }
-
-    private static CvMat flatArgbIntArrayToCvMat(final int[] inpixels, final int h, final int w, final int[] mask, final int[] shift) {
-        final boolean hasAlpha = mask[0] != 0x0;
-        final CvMat retMat = new CvMat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);
-        final int blue = 3;
-        final int red = 1;
-        final int green = 2;
-        final int alpha = 0;
-        final byte[] outpixel = new byte[hasAlpha ? 4 : 3]; // pixel length
-        final int cols = retMat.cols();
-        retMat.rasterAp(raster -> raster.apply((BytePixelSetter)(r, c) -> {
-            final int pixel = inpixels[(r * cols) + c];
-            outpixel[0] = (byte)((pixel & mask[blue]) >>> shift[blue]);
-            outpixel[1] = (byte)((pixel & mask[green]) >>> shift[green]);
-            outpixel[2] = (byte)((pixel & mask[red]) >>> shift[red]);
-            if(hasAlpha)
-                outpixel[3] = (byte)((pixel & mask[alpha]) >>> shift[alpha]);
-            return outpixel;
-        }));
-        return retMat;
-
-    }
-
-    private static CvMat argbDataBufferIntToMat(final DataBufferInt bi, final int h, final int w, final int[] mask, final int[] shift) {
-        return flatArgbIntArrayToCvMat(bi.getData(), h, w, mask, shift);
     }
 
     private static CvMat abgrDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final boolean hasAlpha) {
