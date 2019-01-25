@@ -13,11 +13,16 @@
   
   <dependencies>
     <dependency>
-      <groupId>${project.groupId}</groupId>
-      <artifactId>native-util</artifactId>
-      <classifier>${platform}</classifier>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
     </dependency>
-    <dependency> <!-- Needed for the NativePointerWrap -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency> <!-- Needed for the NativePointerWrap and native-util -->
       <groupId>net.java.dev.jna</groupId>
       <artifactId>jna</artifactId>
       <optional>true</optional>

@@ -13,8 +13,18 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <dependency> <!-- Needed for the native-nr -->
+      <groupId>net.java.dev.jna</groupId>
+      <artifactId>jna</artifactId>
+    </dependency>
+    
+    <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-util</artifactId>
+      <artifactId>native-nr</artifactId>
       <classifier>${platform}</classifier>
     </dependency>
     <dependency>
@@ -25,10 +35,16 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
-    <dependency> <!-- this can be removed when the HackLoadLibrary is removed -->
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>opencv-lib-jar</artifactId>
-      <classifier>withlib</classifier>
+    <dependency> <!-- Needed for the NativeLibraryLoader -->
+      <groupId>commons-io</groupId>
+      <artifactId>commons-io</artifactId>
+    </dependency>
+
+    <!-- Testing -->
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>

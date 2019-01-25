@@ -7,56 +7,27 @@
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>1.0-SNAPSHOT</version>
   </parent>
-  <artifactId>lib-gstreamer</artifactId>
-  <name>lib-gstreamer (${project.version})</name>
+  <artifactId>lib-ffmpeg</artifactId>
+  <name>lib-ffmpeg (${project.version})</name>
   <description></description>
   <dependencies>
-    <!-- Internal deps -->
-    <dependency>
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>lib-image</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-gstreamer</artifactId>
-      <classifier>${platform}</classifier>
-    </dependency>
-  
-    <!-- Sister project -->
-    <dependency>
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>opencv-lib-jar</artifactId>
-      <classifier>withlib</classifier>
-    </dependency>
-  
-    <!-- 3rd party deps -->
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency> <!-- Only used in the NativeLibraryLoader -->
-      <groupId>commons-io</groupId>
-      <artifactId>commons-io</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.freedesktop.gstreamer</groupId>
-      <artifactId>gst1-java-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>jul-to-slf4j</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>net.dempsy</groupId>
-      <artifactId>dempsy-utils</artifactId>
-    </dependency>
-    
-    <!-- 3rd party test deps -->
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
+    <!-- Internal deps -->
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>lib-image</artifactId>
+    </dependency>
+  
+    <!-- 3rd party test deps -->
     <dependency>
       <groupId>net.dempsy</groupId>
       <artifactId>dempsy-test-utils</artifactId>

@@ -8,26 +8,13 @@
   <modelVersion>4.0.0</modelVersion>
   <artifactId>pilecv4j-parent</artifactId>
 
-  <!-- These are global dependencies -->
-  <dependencies>
-    <dependency>
-      <groupId>junit</groupId>
-      <artifactId>junit</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-  </dependencies>
-
   <modules>
     <module>lib-util</module>
     <module>lib-nr</module>
     <module>lib-image</module>
     <module>lib-gstreamer</module>
     <module>native-image</module>
-    <module>native-util</module>
+    <module>native-nr</module>
     <module>native-gstreamer</module>
   </modules>
 
@@ -49,7 +36,7 @@
     <!-- The artifact version -->
     <opencv.version>${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
-    <tensorflow.version>1.11.0</tensorflow.version>    
+    <tensorflow.version>1.12.0</tensorflow.version>    
     <slf4j.version>1.7.25</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
@@ -184,7 +171,7 @@
       </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>native-util</artifactId>
+        <artifactId>native-nr</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
@@ -207,7 +194,7 @@
       <dependency>
         <groupId>org.freedesktop.gstreamer</groupId>
         <artifactId>gst1-java-core</artifactId>
-        <version>0.9.3</version>
+        <version>0.9.4</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>

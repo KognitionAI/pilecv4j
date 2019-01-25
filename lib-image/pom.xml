@@ -10,7 +10,17 @@
   <artifactId>lib-image</artifactId>
   <name>lib-image (${project.version})</name>
   <description></description>
-  <dependencies>
+  <dependencies> 
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
+
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-util</artifactId>
@@ -37,6 +47,10 @@
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>opencv-lib-jar</artifactId>
       <classifier>withlib</classifier>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-utils</artifactId>
     </dependency>
 
     <!-- Tensorflow is selected by profile -->

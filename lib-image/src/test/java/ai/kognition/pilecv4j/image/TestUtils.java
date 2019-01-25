@@ -41,8 +41,7 @@ public class TestUtils {
 
     final String testImageFilename = translateClasspath("test-images/people.jpeg");
 
-    // public final static boolean SHOW = CvRasterTest.SHOW;
-    public final static boolean SHOW = true;
+    public final static boolean SHOW = CvRasterTest.SHOW;
 
     @Test
     public void testMatToImg() throws Exception {
