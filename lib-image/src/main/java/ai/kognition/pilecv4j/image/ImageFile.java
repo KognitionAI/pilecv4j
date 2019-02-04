@@ -177,7 +177,7 @@ public class ImageFile {
     public static String infile = null;
 
     public static void main(final String[] args)
-        throws IOException {
+            throws IOException {
         final List<ImageDestinationDefinition> dests = commandLine(args);
         if(dests == null || dests.size() == 0) {
             usage();
@@ -284,17 +284,23 @@ public class ImageFile {
         return reader == null ? null : new ReaderAndStream(reader, input);
     }
 
+    public static String readerClassPrefix = null;
+
     private static BufferedImage doReadBufferedImageFromFile(final String filename, final boolean tryOther, final int imageNumber) throws IOException {
         final File f = new File(filename);
         if(!f.exists())
             throw new FileNotFoundException(filename);
 
         Exception lastException = null;
-        int cur = 1;
+        int cur = 0;
         while(true) {
             try (ReaderAndStream ras = getNextReaderAndStream(f, cur)) {
                 if(ras != null) {
                     final ImageReader reader = ras.reader;
+                    if(readerClassPrefix != null && !reader.getClass().getName().startsWith(readerClassPrefix)) {
+                        cur++;
+                        continue;
+                    }
                     final ImageReadParam param = reader.getDefaultReadParam();
                     try {
                         System.out.println(reader);
@@ -303,8 +309,7 @@ public class ImageFile {
                         return image;
                     } catch(final IndexOutOfBoundsException ioob) {
                         // TODO: distinguish between IndexOutOfBoundsException because imageNumber is
-                        // too high
-                        // and IndexOutOfBoundsException for some other reason.
+                        // too high and IndexOutOfBoundsException for some other reason.
                         if(imageNumber == 0) { // then this is certainly NOT because the imageNumber is too hight
                             LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioob);
                             lastException = ioob;
@@ -409,7 +414,7 @@ public class ImageFile {
 
         if(dest.maxe != -1) {
             final int adjedge = width > height ? (scale >= 0.0 ? (int)Math.round(scale * width) : width)
-                : (scale >= 0.0 ? (int)Math.round(scale * height) : height);
+                    : (scale >= 0.0 ? (int)Math.round(scale * height) : height);
             if(adjedge > dest.maxe) {
                 scale = ((double)(dest.maxe)) / ((double)adjedge);
             }
@@ -425,7 +430,7 @@ public class ImageFile {
             final String optionArg = args[i];
             // see if we are asking for help
             if("help".equalsIgnoreCase(optionArg) ||
-                "-help".equalsIgnoreCase(optionArg)) {
+                    "-help".equalsIgnoreCase(optionArg)) {
                 usage();
                 return null;
             }
@@ -484,7 +489,7 @@ public class ImageFile {
     }
 
     private static ImageDestinationDefinition push(final ImageDestinationDefinition cur,
-        final List<ImageDestinationDefinition> ret) {
+            final List<ImageDestinationDefinition> ret) {
         ret.add(cur);
         cur.set();
         return new ImageDestinationDefinition();

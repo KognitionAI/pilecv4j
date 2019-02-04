@@ -35,6 +35,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.opencv.calib3d.Calib3d;
@@ -53,8 +54,8 @@ import ai.kognition.pilecv4j.image.CvRaster.BytePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelSetter;
-import ai.kognition.pilecv4j.image.CvRaster.FlatBytePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.FlatDoublePixelSetter;
+import ai.kognition.pilecv4j.image.CvRaster.FlatFloatPixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.FloatPixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.FloatPixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.IntPixelConsumer;
@@ -65,7 +66,6 @@ import ai.kognition.pilecv4j.image.geometry.Point;
 import ai.kognition.pilecv4j.image.geometry.SimplePoint;
 
 import net.dempsy.util.Functional;
-import net.dempsy.util.MutableInt;
 import net.dempsy.util.QuietCloseable;
 
 public class Utils {
@@ -103,9 +103,8 @@ public class Utils {
         OCV_FONT_HERSHEY_SIMPLEX = uncheck(() -> Integer.valueOf(getStaticField("FONT_HERSHEY_SIMPLEX", Core.class, Imgproc.class).getInt(null))).intValue();
         OCV_UNDISTORT_METHOD = getStaticMethod("undistort", new Class<?>[] {Mat.class,Mat.class,Mat.class,Mat.class}, Imgproc.class, Calib3d.class);
         OCV_UNDISTORT_POINTS_METHOD = getStaticMethod("undistortPoints",
-            new Class<?>[] {MatOfPoint2f.class,MatOfPoint2f.class,Mat.class,Mat.class,Mat.class,Mat.class},
-            Imgproc.class, Calib3d.class);
-
+                new Class<?>[] {MatOfPoint2f.class,MatOfPoint2f.class,Mat.class,Mat.class,Mat.class,Mat.class},
+                Imgproc.class, Calib3d.class);
         BITS_PER_CHANNEL_LOOKUP[CvType.CV_8S] = 8;
         BITS_PER_CHANNEL_LOOKUP[CvType.CV_8U] = 8;
         BITS_PER_CHANNEL_LOOKUP[CvType.CV_16S] = 16;
@@ -124,12 +123,14 @@ public class Utils {
         final int depth = CvType.depth(type);
         if(depth > (NUM_DEPTH_CONSTS - 1))
             throw new IllegalStateException(
-                "Something in OpenCV is no longer what it used to be. Depth constants are 3 bits and so should never be greater than " + (NUM_DEPTH_CONSTS - 1)
-                    + ". However, for type " + CvType.typeToString(type) + " it seems to be " + depth);
+                    "Something in OpenCV is no longer what it used to be. Depth constants are 3 bits and so should never be greater than "
+                            + (NUM_DEPTH_CONSTS - 1)
+                            + ". However, for type " + CvType.typeToString(type) + " it seems to be " + depth);
         final int ret = BITS_PER_CHANNEL_LOOKUP[depth];
         if(ret <= 0)
             throw new IllegalArgumentException(
-                "The type " + CvType.typeToString(type) + ", resulting in a depth constant of " + depth + " has no corresponding bit-per-channel value");
+                    "The type " + CvType.typeToString(type) + ", resulting in a depth constant of " + depth
+                            + " has no corresponding bit-per-channel value");
         return ret;
     }
 
@@ -159,7 +160,8 @@ public class Utils {
      * it was moved from
      * {@code Imgproc} to {@code Calib3d}.
      */
-    public static void undistortPoints(final MatOfPoint2f src, final MatOfPoint2f dst, final Mat cameraMatrix, final Mat distCoeffs, final Mat R, final Mat P) {
+    public static void undistortPoints(final MatOfPoint2f src, final MatOfPoint2f dst, final Mat cameraMatrix, final Mat distCoeffs, final Mat R,
+            final Mat P) {
         try {
             OCV_UNDISTORT_POINTS_METHOD.invoke(null, src, dst, cameraMatrix, distCoeffs, R, P);
         } catch(final IllegalAccessException e) {
@@ -223,7 +225,7 @@ public class Utils {
                     break;
                 default:
                     throw new IllegalArgumentException(
-                        "Cannot convert a Mat with a type of " + CvType.typeToString(in.type()) + " to a BufferedImage");
+                            "Cannot convert a Mat with a type of " + CvType.typeToString(in.type()) + " to a BufferedImage");
             }
 
             final BufferedImage out = new BufferedImage(in.width(), in.height(), type);
@@ -247,12 +249,12 @@ public class Utils {
 
             // flatten so every pixel is a separate row
             try (final CvMat reshaped = CvMat.move(in.reshape(1, height * width));
-                // type to 32F
-                final CvMat typed = Functional.chain(new CvMat(), m -> reshaped.convertTo(m, CvType.CV_32F));
-                // color transform which just reorganizes the pixels.
-                final CvMat xformed = typed.mm(bgra2abgr);
-                final CvMat xformedAndShaped = CvMat.move(xformed.reshape(4, height));
-                final CvMat it = Functional.chain(new CvMat(), m -> xformedAndShaped.convertTo(m, cvDepth));) {
+                    // type to 32F
+                    final CvMat typed = Functional.chain(new CvMat(), m -> reshaped.convertTo(m, CvType.CV_32F));
+                    // color transform which just reorganizes the pixels.
+                    final CvMat xformed = typed.mm(bgra2abgr);
+                    final CvMat xformedAndShaped = CvMat.move(xformed.reshape(4, height));
+                    final CvMat it = Functional.chain(new CvMat(), m -> xformedAndShaped.convertTo(m, cvDepth));) {
                 CvRaster.copyToPrimitiveArray(it, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
                 return out;
             }
@@ -337,10 +339,11 @@ public class Utils {
     private static String arrayToHexString(final Function<Integer, Long> valueGetter, final int length, final long mask) {
         final StringBuilder sb = new StringBuilder("[");
         IntStream.range(0, length - 1)
-            .forEach(i -> {
-                sb.append(Long.toHexString(valueGetter.apply(i) & mask));
-                sb.append(", ");
-            });
+                .forEach(i -> {
+                    sb.append(Long.toHexString(valueGetter.apply(i) & mask));
+                    sb.append(", ");
+                });
+
         if(length > 0)
             sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
         sb.append("]");
@@ -352,14 +355,14 @@ public class Utils {
             case CvType.CV_8S:
             case CvType.CV_8U:
                 return (BytePixelConsumer)(final int r, final int c, final byte[] pixel) -> stream
-                    .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffL));
+                        .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffL));
             case CvType.CV_16S:
             case CvType.CV_16U:
                 return (ShortPixelConsumer)(final int r, final int c, final short[] pixel) -> stream
-                    .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffL));
+                        .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffL));
             case CvType.CV_32S:
                 return (IntPixelConsumer)(final int r, final int c, final int[] pixel) -> stream
-                    .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffffffL));
+                        .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffffffL));
             case CvType.CV_32F:
                 return (FloatPixelConsumer)(final int r, final int c, final float[] pixel) -> stream.print(Arrays.toString(pixel));
             case CvType.CV_64F:
@@ -410,18 +413,18 @@ public class Utils {
         }
     }
 
-    private static int[] determineDivisors(final int[] masks) {
+    private static int[] determineShifts(final int[] masks) {
         final int[] ret = new int[masks.length];
         for(int i = 0; i < masks.length; i++) {
             int mask = masks[i];
-            int divisor = 1;
+            int shift = 0;
             if(mask != 0) {
                 while((mask & 1) == 0) {
                     mask >>>= 1;
-                    divisor <<= 1;
+                    shift++;
                 }
             }
-            ret[i] = divisor;
+            ret[i] = shift;
         }
         return ret;
     }
@@ -429,7 +432,8 @@ public class Utils {
     /**
      * set the mask to a scalar = 1 channel 1x1 Mat the same type as the rawMat
      */
-    private static void scalarToMat(final int mask, final int type, final CvMat toSet) {
+    private static void makeScalarMat(final int mask, final int type, final CvMat toSet) {
+        CvMat.reassign(toSet, new CvMat(1, 1, type));
         final Object maskPixel = CvRaster.intsToPixelConverter(type).apply(new int[] {mask});
         toSet.rasterAp(r -> r.set(0, maskPixel));
     }
@@ -444,10 +448,11 @@ public class Utils {
             case TYPE_3BYTE_BGR:
             case TYPE_4BYTE_ABGR:
             case TYPE_4BYTE_ABGR_PRE: {
+                System.out.println("NORMAL COPY");
                 final DataBuffer dataBuffer = bufferedImage.getRaster().getDataBuffer();
                 if(!(dataBuffer instanceof DataBufferByte))
                     throw new IllegalArgumentException("BufferedImage of type \"" + type + "\" should have a " + DataBufferByte.class.getSimpleName()
-                        + " but instead has a " + dataBuffer.getClass().getSimpleName());
+                            + " but instead has a " + dataBuffer.getClass().getSimpleName());
                 final DataBufferByte bb = (DataBufferByte)dataBuffer;
                 switch(type) {
                     case TYPE_3BYTE_BGR:
@@ -459,10 +464,11 @@ public class Utils {
 
             }
             case TYPE_BYTE_GRAY: {
+                System.out.println("GRAY");
                 final DataBuffer dataBuffer = bufferedImage.getRaster().getDataBuffer();
                 if(!(dataBuffer instanceof DataBufferByte))
                     throw new IllegalArgumentException("BufferedImage should have a " + DataBufferByte.class.getSimpleName() + " but instead has a "
-                        + dataBuffer.getClass().getSimpleName());
+                            + dataBuffer.getClass().getSimpleName());
                 final DataBufferByte bb = (DataBufferByte)dataBuffer;
                 final byte[] srcdata = bb.getData();
                 try (final CvMat ret = new CvMat(h, w, CvType.CV_8UC1);) {
@@ -471,10 +477,11 @@ public class Utils {
                 }
             }
             case TYPE_USHORT_GRAY: {
+                System.out.println("GRAY 16");
                 final DataBuffer dataBuffer = bufferedImage.getRaster().getDataBuffer();
                 if(!(dataBuffer instanceof DataBufferUShort))
                     throw new IllegalArgumentException("BufferedImage should have a " + DataBufferUShort.class.getSimpleName() + " but instead has a "
-                        + dataBuffer.getClass().getSimpleName());
+                            + dataBuffer.getClass().getSimpleName());
                 final DataBufferUShort bb = (DataBufferUShort)dataBuffer;
                 final short[] srcdata = bb.getData();
                 try (final CvMat ret = new CvMat(h, w, CvType.CV_16UC1);) {
@@ -489,21 +496,22 @@ public class Utils {
     }
 
     // The packed pixels are ARGB. But the transform expects the masks ordered RGBA
-    private static final int[] stdARGBMasks = {0x00ff0000,0x0000ff00,0x000000ff,0xff000000};
-    private static final int[] stdRGBMasks = {0x00ff0000,0x0000ff00,0x000000ff};
+    // private static final int[] stdARGBMasks = {0x00ff0000,0x0000ff00,0x000000ff,0xff000000};
+    // private static final int[] stdRGBMasks = {0x00ff0000,0x0000ff00,0x000000ff};
 
-    private static CvMat fallback(final BufferedImage bufferedImage, final ColorModel cm) {
-        LOGGER.trace("Needed to fall back. This will be much slower");
-        final int w = bufferedImage.getWidth();
-        final int h = bufferedImage.getHeight();
-
-        final int[] rgbs = bufferedImage.getRGB(0, 0, w, h, null, 0, w);
-        try (CvMat mat = new CvMat(h, w, CvType.CV_32SC1);) {
-            mat.put(0, 0, rgbs);
-            final boolean hasAlpha = cm.hasAlpha();
-            return transformDirect(mat, hasAlpha, cm.isAlphaPremultiplied(), hasAlpha ? stdARGBMasks : stdRGBMasks);
-        }
-    }
+    // private static CvMat fallback(final BufferedImage bufferedImage, final ColorModel cm) {
+    // System.out.println("FALLBACK!!!!!");
+    // LOGGER.trace("Needed to fall back. This will be much slower");
+    // final int w = bufferedImage.getWidth();
+    // final int h = bufferedImage.getHeight();
+    //
+    // final int[] rgbs = bufferedImage.getRGB(0, 0, w, h, null, 0, w);
+    // try (CvMat mat = new CvMat(h, w, CvType.CV_32SC1);) {
+    // mat.put(0, 0, rgbs);
+    // final boolean hasAlpha = cm.hasAlpha();
+    // return transformDirect(mat, hasAlpha, cm.isAlphaPremultiplied(), hasAlpha ? stdARGBMasks : stdRGBMasks);
+    // }
+    // }
 
     /**
      * determine the number of bits for each channel. and set the flag that
@@ -513,71 +521,160 @@ public class Utils {
         final int[] bitsPerChannel = cm.getComponentSize();
         final int bpc = bitsPerChannel[0];
         if(IntStream.range(1, bitsPerChannel.length)
-            .filter(i -> bitsPerChannel[i] != bpc)
-            .findAny()
-            .isPresent())
+                .filter(i -> bitsPerChannel[i] != bpc)
+                .findAny()
+                .isPresent())
             throw new IllegalArgumentException(
-                "Cannot handle an image with ComponentColorModel where the channels have a different number of bits per channel. They are currently: "
-                    + Arrays.toString(bitsPerChannel));
+                    "Cannot handle an image with ComponentColorModel where the channels have a different number of bits per channel. They are currently: "
+                            + Arrays.toString(bitsPerChannel));
         return bitsPerChannel;
     }
 
     private static CvMat handleCMYKColorSpace(final BufferedImage bufferedImage, final ComponentColorModel cm, final boolean kchannel) {
         final int w = bufferedImage.getWidth();
         final int h = bufferedImage.getHeight();
-        final int numChannels = cm.getNumComponents();
-
-        if((kchannel && numChannels != 4) || (!kchannel && numChannels != 3)) {
-            // this makes no sense. CMYK should be 4 channel unless I miscounted the letters
-            // in CMYK
-            LOGGER.warn("Image has a CMYK color space but has " + numChannels + " channels");
-            return fallback(bufferedImage, cm);
-        }
+        // final int numChannels = cm.getNumComponents();
+        //
+        // if((kchannel && numChannels != 4) || (!kchannel && numChannels != 3)) {
+        // // this makes no sense. CMYK should be 4 channel unless I miscounted the letters
+        // // in CMYK
+        // LOGGER.warn("Image has a CMYK color space but has " + numChannels + " channels");
+        // return fallback(bufferedImage, cm);
+        // }
 
         final int[] bitsPerChannel = ccmCeckBitsPerChannel(cm);
         try (final CvMat cmykMat = putDataBufferIntoMat(bufferedImage.getData().getDataBuffer(), h, w, bitsPerChannel.length);
-            final Closer closer = new Closer();) {
+                final Closer closer = new Closer();) {
 
-            final MutableInt mcmy = new MutableInt(0);
-            final MutableInt mk = new MutableInt(0);
-            cmykMat.rasterAp(r -> {
-                r.forEach((FlatBytePixelConsumer)(final int pix, final byte[] p) -> {
-                    int cMcmy = (int)mcmy.val;
-                    for(int i = 0; i < 3; i++) {
-                        final int c = (p[i] & 0xff);
-                        if(cMcmy < c) {
-                            cMcmy = c;
-                            mcmy.val = c;
-                        }
-                    }
-                    if(mk.val < (p[3] & 0xff))
-                        mk.val = (p[3] & 0xff);
-                });
-            });
+            // do the inversion first
+            Core.bitwise_not(cmykMat, cmykMat);
 
-            System.out.println();
-
-            final CvMat cmy;
-            // pull out the K channel
             if(kchannel) {
-                try (final Closer c2 = new Closer();) {
+                try (final Closer c2 = new Closer();
+                        final CvMat cmykInt = new CvMat()) {
+
+                    // R = 255 x (1-C) x (1-K)
+                    // R = (255 - C') x (1-K)
+                    // R = (255 - C') x (255 - K')/255
+                    //
+                    // Our image is C'Y'M'K'
+                    //
+                    // so:
+                    //
+                    // 255 R = ~C' x ~K'
+                    //
+                    // R = (~C' x ~K') / 255
+
+                    final CvMat cmyk32 = chain(new CvMat(), c -> c2.add(c), c -> cmykMat.convertTo(c, CvType.CV_32S));
                     final List<Mat> channels = new ArrayList<>(4);
-                    Core.split(cmykMat, channels);
+                    Core.split(cmyk32, channels);
+
                     channels.forEach(m -> c2.addMat(m));
-                    final List<Mat> cmyL = channels.subList(0, 3);
-                    cmy = chain(new CvMat(), m -> Core.merge(cmyL, m));
+                    final List<Mat> bgrL = new ArrayList<>(3);
+                    bgrL.add(channels.get(2));
+                    bgrL.add(channels.get(1));
+                    bgrL.add(channels.get(0));
+
+                    final Mat k = channels.get(3);
+
+                    final List<Mat> bgrXk = bgrL.stream()
+                            .map(c -> c2.addMat(c.mul(k)))
+                            // .map(c -> {
+                            // System.out.println("CxK:");
+                            // dump(c, 5, 5);
+                            // return c;
+                            // })
+                            // TODO, change 255 to the right number depending on the size.
+                            .map(c -> chain(c, m -> Core.multiply(m, new Scalar(1.0D / 255.0), m)))
+                            // .map(c -> {
+                            // System.out.println("CxK/255:");
+                            // dump(c, 5, 5);
+                            // return c;
+                            // })
+                            // TODO, change CvType.CV_8U to the right number depending on the size.
+                            .map(c -> chain(c, m -> m.convertTo(c, CvType.CV_8U)))
+                            // .map(c -> {
+                            // System.out.println("CxK/255 -> 8U:");
+                            // dump(c, 5, 5);
+                            // return c;
+                            // })
+                            .collect(Collectors.toList());
+
+                    final CvMat bgr = chain(new CvMat(), m -> Core.merge(bgrXk, m), m -> c2.add(m));
+                    return bgr.returnMe();
                 }
-            } else
-                cmy = cmykMat;
+            } else {
+                Imgproc.cvtColor(cmykMat, cmykMat, Imgproc.COLOR_RGB2BGR);
+                return cmykMat;
+            }
+        }
+    }
 
-            Core.bitwise_not(cmy, cmy);
-            Imgproc.cvtColor(cmy, cmy, Imgproc.COLOR_RGB2BGR);
+    private static boolean doFallback(final ComponentColorModel cm) {
+        final ColorSpace colorSpace = cm.getColorSpace();
+        return !(CvMatWithColorInformation.isLinearRGBspace(colorSpace)
+                || colorSpace.getType() == ColorSpace.TYPE_GRAY
+                || colorSpace.isCS_sRGB());
+    }
 
-            return cmy;
+    private static CvMat fallback(final BufferedImage bufferedImage, final ComponentColorModel cm) {
+        final int w = bufferedImage.getWidth();
+        final int h = bufferedImage.getHeight();
+        try (final CvMat floatMat = new CvMat();
+                final CvMat rawMat = putDataBufferIntoMat(bufferedImage.getRaster().getDataBuffer(), h, w, cm.getNumComponents());) {
+            final int bpc = bitsPerChannel(rawMat.depth());
+
+            double maxValue = 255.0D;
+            if(bpc == 16)
+                maxValue = 65535.0;
+            else if(bpc != 8)
+                throw new IllegalStateException("Can only handle 8 or 16 bit channels.");
+
+            // normalize, convert to float first
+            rawMat.convertTo(floatMat, CvType.CV_32F, 1.0D / maxValue);
+
+            // floatMat is now normalized.
+            final ColorSpace colorSpace = cm.getColorSpace();
+
+            try (final CvMat mappedFloatMat = new CvMat(h, w, CvType.CV_32FC3);) {
+                floatMat.rasterAp(flRas -> {
+                    mappedFloatMat.rasterAp(mappedFloatRas -> {
+                        flRas.forEach((FlatFloatPixelConsumer)(pos, pixel) -> {
+                            final float[] result = colorSpace.toRGB(pixel);
+                            // need bgr.
+                            final float resZero = result[0];
+                            result[0] = result[2];
+                            result[2] = resZero;
+
+                            mappedFloatRas.set(pos, result);
+                        });
+                    });
+                });
+
+                // okay. Now we need to scale out and convert
+                try (CvMat ret = new CvMat()) {
+                    mappedFloatMat.convertTo(ret, CvType.makeType(rawMat.depth(), 3), maxValue);
+                    return ret.returnMe();
+                }
+            }
         }
     }
 
     private static CvMat handleCustomComponentColorModel(final BufferedImage bufferedImage, final ComponentColorModel cm) {
+        // If the bufferedImage isn't sRGB, or Gray, or LinearRGB then
+        // and it's an ICC color space, we should fallback to normalizing
+        // the image and then using ColorSpace.getRGB(float[] pixel) for
+        // each normalized pixel.
+        if(doFallback(cm))
+            return fallback(bufferedImage, cm);
+
+        // if the ColorSpace includes profiles we simply use the fallback
+        // final ColorSpace colorSpace = cm.getColorSpace();
+        // if(ICC_ColorSpace.class.isAssignableFrom(colorSpace.getClass())) {
+        // return fallback(bufferedImage, cm);
+        // } else
+        // System.out.println("NOT USING FALLBACK!!!!");
+
         // Check the ColorSpace type. If it's TYPE_CMYK then we can handle it
         // without the fallback.
         if(ColorSpace.TYPE_CMYK == cm.getColorSpace().getType())
@@ -585,17 +682,16 @@ public class Utils {
         else if(ColorSpace.TYPE_CMY == cm.getColorSpace().getType())
             return handleCMYKColorSpace(bufferedImage, cm, false);
 
-        // check the colorspace. If it's not CS_sRGB then we need
-        // to fall back to the slow means of getting the data an
-        // let the ImageIO plugin convert to 8-bits/channel (A)RGB
-        if(!cm.getColorSpace().isCS_sRGB())
-            return fallback(bufferedImage, cm);
+        // // Check the colorspace. If it's not CS_sRGB then we need
+        // // to fall back to the slow means of getting the data an
+        // // let the ImageIO plugin convert to 8-bits/channel (A)RGB
+        // if(!cm.getColorSpace().isCS_sRGB())
+        // return fallback(bufferedImage, cm);
 
         final int w = bufferedImage.getWidth();
         final int h = bufferedImage.getHeight();
 
         final int[] bitsPerChannel = ccmCeckBitsPerChannel(cm);
-
         final int bpc = bitsPerChannel[0];
 
         // Now, do we have an 8-bit RGB or a 16-bit (per-channel) RGB
@@ -604,8 +700,8 @@ public class Utils {
             // make sure the DataBuffer type is a DataBufferUShort
             if(!(dataBuffer instanceof DataBufferUShort))
                 throw new IllegalArgumentException("For a 16-bit per channel RGB image the DataBuffer type should be a DataBufferUShort but it's a "
-                    + dataBuffer.getClass().getSimpleName());
-            try (CvMat ret = rgbDataBufferUShortToMat((DataBufferUShort)dataBuffer, h, w);) {
+                        + dataBuffer.getClass().getSimpleName());
+            try (CvMat ret = dataBufferUShortToMat((DataBufferUShort)dataBuffer, h, w, cm.getNumComponents());) {
                 if(bpc != 16) {
                     final double maxPixelValue = 65536.0D;
                     final double scale = ((maxPixelValue - 1) / ((1 << bpc) - 1));
@@ -618,29 +714,11 @@ public class Utils {
             // make sure the DataBuffer type is a DataBufferByte
             if(!(dataBuffer instanceof DataBufferByte))
                 throw new IllegalArgumentException("For a 8-bit per channel RGB image the DataBuffer type should be a DataBufferByte but it's a "
-                    + dataBuffer.getClass().getSimpleName());
-            return rgbDataBufferByteToMat((DataBufferByte)dataBuffer, h, w);
+                        + dataBuffer.getClass().getSimpleName());
+            return dataBufferByteToMat((DataBufferByte)dataBuffer, h, w, cm.getNumComponents(), cm.getColorSpace().getType() == ColorSpace.TYPE_RGB);
         } else
             throw new IllegalArgumentException(
-                "Cannot handle an image with a ComponentColorModel that has " + bpc + " bits per channel.");
-    }
-
-    private static void applyScaling(final Mat cur, int divisor, final boolean hacked, final int bitsInChannel, final double maxPixelValue,
-        final int componentDepth,
-        final double additionalScaling) {
-        // The divisor will be the divisor unless this is a hacked channel. In this
-        // case where this is a hacked channel then we already divided by 2 once
-        // so we want to take into account that in the divisor.
-        divisor = hacked ? (divisor >> 1) : divisor;
-        // This formula stretches the range of the source channel values over the range
-        // of the entire
-        // destination channel (either 8-bits or 16-bits).
-        final double numerator = (bitsInChannel == 0) ? maxPixelValue : ((maxPixelValue - 1) / ((1 << bitsInChannel) - 1));
-        // The denominator is basically the right-shift of the mased values so that the
-        // actual channel value ends up in the LSbs of the pixel channel value
-        final double factor = (numerator * additionalScaling) / divisor;
-        // Convert to the correct depth and apply the adjustment
-        cur.convertTo(cur, componentDepth, factor);
+                    "Cannot handle an image with a ComponentColorModel that has " + bpc + " bits per channel.");
     }
 
     private static CvMat handleDirectColorModel(final BufferedImage bufferedImage, final DirectColorModel cm) {
@@ -648,8 +726,87 @@ public class Utils {
         final int h = bufferedImage.getHeight();
         final boolean hasAlpha = cm.hasAlpha();
         try (final CvMat rawMat = putDataBufferIntoMat(bufferedImage.getRaster().getDataBuffer(), h, w, 1);
-            CvMat ret = transformDirect(rawMat, hasAlpha, cm.isAlphaPremultiplied(), cm.getMasks());) {
+                CvMat ret = transformDirect(rawMat, hasAlpha, cm.isAlphaPremultiplied(), cm.getMasks());) {
             return ret.returnMe();
+        }
+    }
+
+    /**
+     * This will right shift and mask. Let's take an example. Suppose you have an CV_32S (32-bit signed int) Mat
+     * with a
+     * ARGB 8-bit per channel layout. You can extract the 'R' channel using the following call:
+     * {@code bitwiseUnsignedRightShiftAndMask( src, dst, 16, 8 );}.
+     *
+     * A more complicated example might be: you have an 16-bit 565/RGB layout. Here the most-significant 5 bits
+     * are Red, The next 6 bits are the unsigned Green value, the least-significant 5 bits are the Blue value. You
+     * can
+     * extract the Red using the following call: {@code bitwiseUnsignedRightShiftAndMask( src, dst, 11, 5 );}.
+     * Extracting each channel would be:
+     *
+     * <pre>
+     * <code>
+     *    bitwiseUnsignedRightShiftAndMask(src, red, 11, 5);
+     *    bitwiseUnsignedRightShiftAndMask(src, green, 5, 6);
+     *    bitwiseUnsignedRightShiftAndMask(src, blue, 0, 5);
+     * </code>
+     * </pre>
+     *
+     * The destination {@link CvMat} will be the same {@code type} as the source so, continuing with the above
+     * example,
+     * if you want the final image to be CV_8UC3 you need to {@code convert} and {@code merge} the separate
+     * channels.
+     * For example:
+     *
+     * <pre>
+     * <code>
+     *    red.convertTo(red, CvType.CV8U);
+     *    green.convertTo(green, CvType.CV8U);
+     *    blue.convertTo(blue, CvType.CV8U);
+     *    Core.merge(Arrays.asList(blue, green, red), finalMat);
+     * </code>
+     * </pre>
+     *
+     * @param toShift is the source Mat to shift
+     * @param dst is the destination Mat
+     * @param shift is the number of bits to shift
+     * @param numBitsInField is the number of bits in the entire number being shifted.
+     */
+    public static void bitwiseUnsignedRightShiftAndMask(final Mat toShift, final Mat dst, final int shift, final int numBitsInField) {
+        final int divisor = 1 << shift; // e.g. if shift is 8, divisor is 256
+        final int maskLsb = divisor - 1; // e.g. if shift is 8, mask = 255 = 0x000000ff
+        final int type = toShift.type();
+        final int bitsInSrcField = bitsPerChannel(type);
+
+        if(numBitsInField + shift > bitsInSrcField)
+            throw new IllegalArgumentException(
+                    "The number of bits in the field being shifted (" + numBitsInField + ") along with the amount to shift (" + shift
+                            + ") is greater than the size of the field itself (" + bitsInSrcField + ")");
+
+        final int msbMask = (1 << numBitsInField) - 1;
+
+        try (final CvMat maskMat = new CvMat();
+                final CvMat msbMaskMat = new CvMat();) {
+
+            // Filter chop lower bits
+            if(shift > 0) {
+                // maskLsb is a mask that when ANDED with, KEEPS the LS bits. We need
+                // to CUT the LSB prior to shifting, so we negate maskLsb.
+                makeScalarMat(~maskLsb, type, maskMat);
+                // System.out.println("mask scalar mat:");
+                // dump(maskMat);
+                Core.bitwise_and(toShift, maskMat, dst); // mask out LSBs that are where we're going to shift into
+                // System.out.println("Mat & mask");
+                // dump(dst, 13, 13);
+                Core.multiply(dst, new Scalar(1.0D / divisor), dst); // shift all of values in the channel >> shift.
+            } else {
+                try (CvMat tmp = CvMat.deepCopy(toShift)) {
+                    CvMat.reassign(dst, tmp);
+                }
+            }
+            makeScalarMat(msbMask, type, msbMaskMat);
+            // System.out.println("msbMask mat");
+            // dump(msbMaskMat);
+            Core.bitwise_and(dst, msbMaskMat, dst);
         }
     }
 
@@ -659,18 +816,12 @@ public class Utils {
     // The DirectColorModel mask array is returned as R,G,B,A. This method expects
     // it in that order.
     private static CvMat transformDirect(final CvMat rawMat, final boolean hasAlpha, final boolean isAlphaPremultiplied, final int[] rgbaMasks) {
+        if(LOGGER.isTraceEnabled())
+            LOGGER.trace("transformDirect: {} and has alpha", rawMat, hasAlpha);
         final int numChannels = rgbaMasks.length;
 
-        // if(rgbaBitsPerChannel.length != numChannels)
-        // throw new IllegalArgumentException("Invalid bitsPerChannel or ARGB masks
-        // arrays. The lengths need to match.
-        // bitsPerChannel:"
-        // + Arrays.toString(rgbaBitsPerChannel) + ", rgbaMasks:" +
-        // Arrays.toString(rgbaMasks));
-
         // According to the docs on DirectColorModel the type MUST be TYPE_RGB which
-        // means
-        // 3 channels or 4 if there's an alpha.
+        // means 3 channels or 4 if there's an alpha.
         final int expectedNumberOfChannels = hasAlpha ? 4 : 3;
         if(expectedNumberOfChannels != numChannels)
             throw new IllegalArgumentException("The DirectColorModel doesn't seem to contain either 3 or 4 channels. It has " + numChannels);
@@ -683,76 +834,57 @@ public class Utils {
             bgraMasks[bgraOrderDcm[rgbch]] = mask;
             bitsPerChannel[bgraOrderDcm[rgbch]] = Integer.bitCount(mask);
         }
+        final int[] shifts = determineShifts(bgraMasks);
 
         // check if any channel has a bits-per-channel > 16
         if(Arrays.stream(bitsPerChannel)
-            .filter(v -> v > 16)
-            .findAny()
-            .isPresent())
+                .filter(v -> v > 16)
+                .findAny()
+                .isPresent())
             throw new IllegalArgumentException("The image with the DirectColorModel has a channel with more than 16 bits " + bitsPerChannel);
 
+        double maxValue = 255.0D;
         int componentDepth = CV_8U;
-        double maxPixelValue = 256.0D;
         for(int i = 0; i < bitsPerChannel.length; i++) {
             final int n = bitsPerChannel[i];
             if(n > 8) {
                 componentDepth = CV_16U;
-                maxPixelValue = 65536.0D;
+                maxValue = 65535.0D;
                 break;
             }
         }
 
-        try (final CvMat maskMat = new CvMat(1, 1, CvType.makeType(rawMat.depth(), 1));
-            final CvMat remergedMat = new CvMat();
-            Closer closer = new Closer()) {
+        // System.out.println("Raw Mat");
+        // dump(rawMat, 5, 5);
+
+        try (final CvMat remergedMat = new CvMat();
+                Closer closer = new Closer()) {
 
             // we're going to separate the channels into separate Mat's by masking
             final List<Mat> channels = new ArrayList<>(numChannels);
 
-            // If the image is 32bits and the MSb is touched by the mask then
-            // These operations don't work right since OpenCV thinks that a
-            // convertTo should handle a sign change by a means other than simply
-            // truncating and at the same time I can't use a CV_32U
-            final boolean[] hacked = new boolean[numChannels];
-
             for(int ch = 0; ch < numChannels; ch++) {
-                int mask = bgraMasks[ch];
+                try (CvMat tmpCurChannel = new CvMat();) {
+                    bitwiseUnsignedRightShiftAndMask(rawMat, tmpCurChannel, shifts[ch], bitsPerChannel[ch]);
+                    // if the bits don't take up the entire channel then we need to scale them.
+                    // for example, if we have a 4/4/4 image we need to scale the results to 8 bits.
 
-                // This is the mat we're going to move forward with.
-                Mat matToMask = closer.add(CvMat.shallowCopy(rawMat));
-                if(rawMat.depth() == CvType.CV_32S && mask < 0) {
-                    // this is a problem since there's no CV_32U so we need to to an extra mask and
-                    // shift here.
-                    try (CvMat tmpMat = new CvMat();) {
-                        hacked[ch] = true; // mark this channel as hacked.
-                        scalarToMat(mask, rawMat.type(), maskMat); // embed the scalar into maskMat
-                        Core.bitwise_and(rawMat, maskMat, tmpMat); // ... to do a bitwise_and
-                        mask >>>= 1; // shift the mask over to remove it from the sign bit
-                        matToMask = closer.add(new CvMat()); // new mat to move forward with
-                        Core.multiply(tmpMat, new Scalar(0.5D), matToMask); // shift all of values in the channel >> 1. That
-                                                                            // is, divide by 2.
-                    }
+                    final CvMat curChannel = closer.add(new CvMat());
+                    tmpCurChannel.convertTo(curChannel, componentDepth);
+
+                    // System.out.println("Channel " + ch + " pre scaled:");
+                    // dump(curChannel, 5, 5);
+
+                    // This will scale the maximum value given the field to the maximum value
+                    // of the final field.
+                    final double scale = maxValue / ((1 << bitsPerChannel[ch]) - 1);
+                    Core.multiply(curChannel, new Scalar(scale), curChannel);
+
+                    // System.out.println("Channel " + ch + " scaled by " + scale);
+                    // dump(curChannel, 5, 5);
+
+                    channels.add(curChannel);
                 }
-
-                // embed the scalar into maskMat
-                scalarToMat(mask, rawMat.type(), maskMat);
-
-                // The masked off mat will be placed in maskedMat and then placed in the list of
-                // channels.
-                final CvMat maskedMat = closer.add(new CvMat());
-                Core.bitwise_and(matToMask, maskMat, maskedMat);
-                channels.add(maskedMat);
-            }
-
-            // channels should now be set to the R, G, B masked mats but without the bit's
-            // shifted.
-            final int[] divisors = determineDivisors(bgraMasks);
-
-            for(int ch = 0; ch < numChannels; ch++) {
-                final double scaling = isAlphaPremultiplied ? (ch == 3 ? 1.0 : (maxPixelValue - 1)) : 1.0;
-                applyScaling(channels.get(ch), divisors[ch], hacked[ch], bitsPerChannel[ch], maxPixelValue,
-                    isAlphaPremultiplied ? CvType.CV_32S : componentDepth,
-                    scaling);
             }
 
             if(isAlphaPremultiplied) {
@@ -767,27 +899,31 @@ public class Utils {
 
             // now merge the channels
             Core.merge(channels, remergedMat);
+
+            // System.out.println("Remerged Mat: ");
+            // dump(remergedMat, 5, 5);
+
             return remergedMat.returnMe();
         }
     }
 
-    public static CvMat img2CvMat(final BufferedImage bufferedImage) {
+    public static CvMatWithColorInformation img2CvMat(final BufferedImage bufferedImage) {
         final ColorModel colorModel = bufferedImage.getColorModel();
 
-        if(colorModel instanceof DirectColorModel) {
-            return handleDirectColorModel(bufferedImage, (DirectColorModel)colorModel);
-        } else if(colorModel instanceof ComponentColorModel) {
-            return handleComponentColorModel(bufferedImage, (ComponentColorModel)colorModel);
-        } else
-            throw new IllegalArgumentException("Can't handle a BufferedImage with a " + colorModel.getClass().getSimpleName() + " color model.");
-
+        try (Closer closer = new Closer()) {
+            if(colorModel instanceof DirectColorModel) {
+                return new CvMatWithColorInformation(closer.add(handleDirectColorModel(bufferedImage, (DirectColorModel)colorModel)), bufferedImage);
+            } else if(colorModel instanceof ComponentColorModel) {
+                return new CvMatWithColorInformation(handleComponentColorModel(bufferedImage, (ComponentColorModel)colorModel), bufferedImage);
+            } else
+                throw new IllegalArgumentException("Can't handle a BufferedImage with a " + colorModel.getClass().getSimpleName() + " color model.");
+        }
     }
 
-    public static void print(final String prefix,
-        final Mat im) {
+    public static void print(final String prefix, final Mat im) {
         System.out
-            .println(prefix + " { depth=(" + CvType.ELEM_SIZE(im.type()) + "(" + CvType.typeToString(im.type()) + "), " + im.depth() + "), channels="
-                + im.channels() + " HxW=" + im.height() + "x" + im.width() + " }");
+                .println(prefix + " { depth=(" + CvType.ELEM_SIZE(im.type()) + "(" + CvType.typeToString(im.type()) + "), " + im.depth() + "), channels="
+                        + im.channels() + " HxW=" + im.height() + "x" + im.width() + " }");
     }
 
     /**
@@ -808,20 +944,20 @@ public class Utils {
 
     public static void drawCircle(final Point p, final Mat ti, final Color color, final int radius) {
         Imgproc.circle(ti, new org.opencv.core.Point(((int)(p.getCol() + 0.5)) - radius, ((int)(p.getRow() + 0.5)) - radius),
-            radius, new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
+                radius, new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
     }
 
     public static void drawCircle(final int row, final int col, final Mat ti, final Color color, final int radius) {
         Imgproc.circle(ti, new org.opencv.core.Point(((int)(col + 0.5)) - radius, ((int)(row + 0.5)) - radius),
-            radius, new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
+                radius, new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
     }
 
     public static void drawCircle(final int row, final int col, final Graphics2D g, final Color color, final int radius) {
         g.setColor(color);
 
         g.drawOval(((int)(col + 0.5)) - radius,
-            ((int)(row + 0.5)) - radius,
-            2 * radius, 2 * radius);
+                ((int)(row + 0.5)) - radius,
+                2 * radius, 2 * radius);
     }
 
     public static void drawCircle(final int row, final int col, final Graphics2D g, final Color color) {
@@ -838,8 +974,8 @@ public class Utils {
 
     public static void drawLine(final Point p1, final Point p2, final Mat ti, final Color color) {
         Imgproc.line(ti, new org.opencv.core.Point(p1.getCol(), p1.getRow()),
-            new org.opencv.core.Point(p2.getCol(), p2.getRow()),
-            new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
+                new org.opencv.core.Point(p2.getCol(), p2.getRow()),
+                new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
     }
 
     public static void drawLine(final Point p1, final Point p2, final Graphics2D g, final Color color) {
@@ -852,13 +988,13 @@ public class Utils {
     }
 
     public static void drawPolarLine(final double r, final double c, final Mat ti, final Color color,
-        final int boundingr1, final int boundingc1, final int boundingr2, final int boundingc2) {
+            final int boundingr1, final int boundingc1, final int boundingr2, final int boundingc2) {
         drawPolarLine(r, c, ti, color, boundingr1, boundingc1, boundingr2, boundingc2, 0, 0);
     }
 
     public static void drawPolarLine(final double r, final double c, final Mat ti, final Color color,
-        int boundingr1, int boundingc1, int boundingr2, int boundingc2,
-        final int translater, final int translatec) {
+            int boundingr1, int boundingc1, int boundingr2, int boundingc2,
+            final int translater, final int translatec) {
         int tmpd;
         if(boundingr1 > boundingr2) {
             tmpd = boundingr1;
@@ -973,8 +1109,8 @@ public class Utils {
         }
 
         Imgproc.line(ti, new org.opencv.core.Point(c1 + translatec, r1 + translater),
-            new org.opencv.core.Point(c2 + translatec, r2 + translater),
-            new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
+                new org.opencv.core.Point(c2 + translatec, r2 + translater),
+                new Scalar(color.getBlue(), color.getGreen(), color.getRed()));
     }
 
     /**
@@ -984,8 +1120,8 @@ public class Utils {
      */
     public static void overlay(final CvMat original, final CvMat dst, final CvMat overlay) {
         try (final CvMat gray = new CvMat();
-            final CvMat invMask = new CvMat();
-            CvMat maskedOrig = new CvMat()) {
+                final CvMat invMask = new CvMat();
+                CvMat maskedOrig = new CvMat()) {
             Imgproc.cvtColor(overlay, gray, Imgproc.COLOR_BGR2GRAY);
             Imgproc.threshold(gray, invMask, 1, 255, Imgproc.THRESH_BINARY_INV);
             Core.bitwise_and(original, original, maskedOrig, invMask);
@@ -1042,7 +1178,7 @@ public class Utils {
     public static double[] toDoubleArray(final Mat mat) {
         if(mat.type() != CvType.CV_64FC1)
             throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
-                + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
+                    + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
         // we're going to flatten it.
         final int r = mat.rows();
         final int c = mat.cols();
@@ -1059,7 +1195,7 @@ public class Utils {
     public static double[][] to2dDoubleArray(final Mat mat) {
         if(mat.type() != CvType.CV_64FC1)
             throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
-                + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
+                    + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
         // we're going to flatten it.
         final int r = mat.rows();
         final int c = mat.cols();
@@ -1104,8 +1240,8 @@ public class Utils {
         final MatOfPoint2f matOfPoints = new MatOfPoint2f(undistoredPoint);
         try (final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
             final double[][] points = matOfPoints.toList().stream()
-                .map(p -> new double[] {p.x,p.y})
-                .toArray(double[][]::new);
+                    .map(p -> new double[] {p.x,p.y})
+                    .toArray(double[][]::new);
             try (CvMat pointsAsMat = Utils.toMat(points);) {
                 return CvMat.move(pointsAsMat.t());
             }
@@ -1116,8 +1252,8 @@ public class Utils {
         final MatOfPoint3f matOfPoints = new MatOfPoint3f(undistoredPoint);
         try (final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
             final double[][] points = matOfPoints.toList().stream()
-                .map(p -> new double[] {p.x,p.y,p.z})
-                .toArray(double[][]::new);
+                    .map(p -> new double[] {p.x,p.y,p.z})
+                    .toArray(double[][]::new);
             try (CvMat pointsAsMat = Utils.toMat(points);) {
                 return CvMat.move(pointsAsMat.t());
             }
@@ -1134,7 +1270,7 @@ public class Utils {
         final double fw = newSize.width / originalMatSize.width;
         final double scale = fw < fh ? fw : fh;
         return (scale >= 1.0) ? new Size(originalMatSize.width, originalMatSize.height)
-            : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+                : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
     }
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {
@@ -1162,39 +1298,39 @@ public class Utils {
 
     private static Field getStaticField(final String fieldName, final Class<?>... classes) {
         final Field field = Arrays.stream(classes)
-            .map(c -> {
-                try {
-                    return c.getDeclaredField(fieldName);
-                } catch(final NoSuchFieldException nsfe) {
-                    return null;
-                }
-            })
-            .filter(f -> f != null)
-            .findFirst()
-            .orElse(null);
+                .map(c -> {
+                    try {
+                        return c.getDeclaredField(fieldName);
+                    } catch(final NoSuchFieldException nsfe) {
+                        return null;
+                    }
+                })
+                .filter(f -> f != null)
+                .findFirst()
+                .orElse(null);
 
         if(field == null)
             throw new IllegalStateException("The version of OpenCV defined as a dependency doesn't seem to have " + fieldName
-                + "  defined in any of these classes: " + Arrays.toString(classes));
+                    + "  defined in any of these classes: " + Arrays.toString(classes));
         return field;
     }
 
     private static Method getStaticMethod(final String methodName, final Class<?>[] parameters, final Class<?>... classes) {
         final Method method = Arrays.stream(classes)
-            .map(c -> {
-                try {
-                    return c.getDeclaredMethod(methodName, parameters);
-                } catch(final NoSuchMethodException nsfe) {
-                    return null;
-                }
-            })
-            .filter(f -> f != null)
-            .findFirst()
-            .orElse(null);
+                .map(c -> {
+                    try {
+                        return c.getDeclaredMethod(methodName, parameters);
+                    } catch(final NoSuchMethodException nsfe) {
+                        return null;
+                    }
+                })
+                .filter(f -> f != null)
+                .findFirst()
+                .orElse(null);
 
         if(method == null)
             throw new IllegalStateException("The version of OpenCV defined as a dependency doesn't seem to have the method " + methodName
-                + "  defined in any of these classes: " + Arrays.toString(classes));
+                    + "  defined in any of these classes: " + Arrays.toString(classes));
         return method;
     }
 
@@ -1206,16 +1342,16 @@ public class Utils {
                 return retMat.returnMe();
             } else { // then it's ABGR -> BGRA
                 try (final CvMat reshaped = CvMat.move(retMat.reshape(1, h * w));
-                    // type to 32F so we can multiple it by the matrix. It would be nice of there
-                    // was an integer 'gemm'
-                    // call on Imgproc
-                    final CvMat typed = Functional.chain(new CvMat(), m -> reshaped.convertTo(m, CvType.CV_32F));
-                    // color transform which just reorganizes the pixels.
-                    final CvMat xformed = typed.mm(abgr2bgra);
-                    // reshape it back to a 4 channel image
-                    final CvMat xformedAndShaped = CvMat.move(xformed.reshape(4, h));
-                    // convert the type back to CV_8UC4
-                    final CvMat it = Functional.chain(new CvMat(), m -> xformedAndShaped.convertTo(m, CvType.depth(retMat.type())));) {
+                        // type to 32F so we can multiple it by the matrix. It would be nice of there
+                        // was an integer 'gemm'
+                        // call on Imgproc
+                        final CvMat typed = Functional.chain(new CvMat(), m -> reshaped.convertTo(m, CvType.CV_32F));
+                        // color transform which just reorganizes the pixels.
+                        final CvMat xformed = typed.mm(abgr2bgra);
+                        // reshape it back to a 4 channel image
+                        final CvMat xformedAndShaped = CvMat.move(xformed.reshape(4, h));
+                        // convert the type back to CV_8UC4
+                        final CvMat it = Functional.chain(new CvMat(), m -> xformedAndShaped.convertTo(m, CvType.depth(retMat.type())));) {
                     return it.returnMe();
                 }
             }
@@ -1257,21 +1393,44 @@ public class Utils {
         }
     }
 
-    private static CvMat rgbDataBufferUShortToMat(final DataBufferUShort bb, final int h, final int w) {
-        try (final CvMat mat = new CvMat(h, w, CvType.CV_16UC3);) {
+    private static CvMat dataBufferUShortToMat(final DataBufferUShort bb, final int h, final int w, final int numChannels) {
+        try (final CvMat mat = new CvMat(h, w, CvType.makeType(CvType.CV_16U, numChannels));) {
             final short[] inpixels = bb.getData();
             mat.put(0, 0, inpixels);
-            try (CvMat ret = Functional.chain(new CvMat(), m -> Imgproc.cvtColor(mat, m, Imgproc.COLOR_RGB2BGR));) {
-                return ret.returnMe();
-            }
+            return mat.returnMe();
         }
     }
 
-    private static CvMat rgbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w) {
-        try (final CvMat mat = new CvMat(h, w, CvType.CV_8UC3);) {
-            final byte[] inpixels = bb.getData();
-            mat.put(0, 0, inpixels);
-            try (CvMat ret = Functional.chain(new CvMat(), m -> Imgproc.cvtColor(mat, m, Imgproc.COLOR_RGB2BGR));) {
+    private final static int[] rgb2bgr = {2,1,0};
+    private final static int[] argb2bgra = {3,2,1,0};
+
+    private static CvMat dataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int numChannels, final boolean rgbType) {
+        final byte[][] bankdata = bb.getBankData();
+        if(bankdata.length == 1) {
+            try (final CvMat mat = new CvMat(h, w, CvType.makeType(CvType.CV_8U, numChannels));) {
+                final byte[] inpixels = bankdata[0];
+                mat.put(0, 0, inpixels);
+                return mat.returnMe();
+            }
+        } else {
+            // bank data must corespond to the channels.
+            final int[] lookup = rgbType ? (numChannels == 4 ? argb2bgra : (numChannels == 3 ? rgb2bgr : null)) : null;
+            if(numChannels != bankdata.length)
+                throw new IllegalStateException("Can't handle a BufferedImage where the data is in banks but it's not 1 per channel. The number of channels is "
+                        + numChannels + " while the number of banks is " + bankdata.length);
+
+            try (Closer closer = new Closer();
+                    CvMat ret = new CvMat();) {
+                final List<Mat> channels = new ArrayList<>(numChannels);
+                for(int ch = 0; ch < numChannels; ch++) {
+                    final CvMat cur = closer.add(new CvMat(h, w, CvType.CV_8UC1));
+                    if(lookup == null)
+                        cur.put(0, 0, bankdata[ch]);
+                    else
+                        cur.put(0, 0, bankdata[lookup[ch]]);
+                    channels.add(cur);
+                }
+                Core.merge(channels, ret);
                 return ret.returnMe();
             }
         }
