@@ -324,9 +324,9 @@ public class BreakoutFilter extends BaseTransform {
                             processor.accept(frame);
                         } catch(final Exception exc) {
                             if(LOGGER.isDebugEnabled())
-                                LOGGER.info("User supplied from processor threw exception: {}", exc.getLocalizedMessage(), exc);
+                                LOGGER.info("User supplied processor threw exception: {}", exc.getLocalizedMessage(), exc);
                             else
-                                LOGGER.info("User supplied from processor threw exception: {} (to see stack trace enable debug logging for {})",
+                                LOGGER.info("User supplied processor threw exception: {} (to see stack trace enable debug logging for {})",
                                     exc.getLocalizedMessage(), BreakoutFilter.class.getName());
                         }
                         dispose(result.getAndSet(frame));
