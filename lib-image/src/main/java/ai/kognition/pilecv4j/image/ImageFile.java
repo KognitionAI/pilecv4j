@@ -21,6 +21,15 @@ package ai.kognition.pilecv4j.image;
 
 import static org.opencv.imgcodecs.Imgcodecs.IMREAD_UNCHANGED;
 
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
+import javax.imageio.ImageReader;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageInputStream;
+import javax.imageio.stream.ImageOutputStream;
+
 import java.awt.Graphics;
 import java.awt.Image;
 import java.awt.image.BufferedImage;
@@ -31,15 +40,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-
-import javax.imageio.IIOImage;
-import javax.imageio.ImageIO;
-import javax.imageio.ImageReadParam;
-import javax.imageio.ImageReader;
-import javax.imageio.ImageWriteParam;
-import javax.imageio.ImageWriter;
-import javax.imageio.stream.ImageInputStream;
-import javax.imageio.stream.ImageOutputStream;
 
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
@@ -99,28 +99,26 @@ public class ImageFile {
 
     /**
      * <p>
-     * Read a {@link CvMat} from a file. You should make sure this is assigned in a
-     * try-with-resource
+     * Read a {@link CvMat} from a file. You should make sure this is assigned in a try-with-resource
      * or the CvMat will leak.
      * </p>
      *
      * <p>
-     * This read method is much more robust than the one supplied with OpenCv since
-     * it will couple
-     * ImageIO codecs with OpenCV's codecs to provide a much wider set of formats
-     * that can be handled.
-     * It should be noted that, if the routing falls back to using ImageIO to open
-     * the file, then
-     * a the data will be copied into the {@link CvMat} after it's loaded into a
-     * {@link BufferedImage}.
+     * This read method is much more robust than the one supplied with OpenCv since it will couple
+     * ImageIO codecs with OpenCV's codecs to provide a much wider set of formats that can be handled.
+     * It should be noted that, if the routing falls back to using ImageIO to open the file, then
+     * a the data will be copied into the {@link CvMat} after it's loaded into a {@link BufferedImage}.
      * </p>
      *
      * @return a new {@link CvMat} constructed from the decoded file contents.
-     *         <b>Note: The caller owns the
-     *         CvMat returned</b>
+     *         <b>Note: The caller owns the CvMat returned</b>
      */
+    public static CvMat readMatFromFile(final String filename, final int mode) throws IOException {
+        return doReadMatFromFile(filename, true, mode);
+    }
+
     public static CvMat readMatFromFile(final String filename) throws IOException {
-        return doReadMatFromFile(filename, true);
+        return readMatFromFile(filename, IMREAD_UNCHANGED);
     }
 
     public static void writeImageFile(final BufferedImage ri, final String filename) throws IOException {
@@ -219,13 +217,13 @@ public class ImageFile {
         return bi;
     }
 
-    private static CvMat doReadMatFromFile(final String filename, final boolean tryOther) throws IOException {
+    private static CvMat doReadMatFromFile(final String filename, final boolean tryOther, final int mode) throws IOException {
         LOGGER.trace("OCV Reading CvMat from {}", filename);
         final File f = new File(filename);
         if(!f.exists())
             throw new FileNotFoundException(filename);
 
-        try (final CvMat mat = CvMat.move(Imgcodecs.imread(filename, IMREAD_UNCHANGED));) {
+        try (final CvMat mat = CvMat.move(Imgcodecs.imread(filename, mode));) {
             if(tryOther && (mat == null || (mat.rows() == 0 && mat.cols() == 0))) {
                 LOGGER.debug("OCV Failed to read '" + filename + "' using OpenCV");
                 try {
@@ -336,7 +334,7 @@ public class ImageFile {
             throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in ImageIO");
 
         BufferedImage ret = null;
-        try (final CvMat mat = doReadMatFromFile(filename, false);) {
+        try (final CvMat mat = doReadMatFromFile(filename, false, IMREAD_UNCHANGED);) {
             if(mat == null) {
                 if(lastException != null)
                     throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in either ImageIO or OpenCv", lastException);
