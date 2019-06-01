@@ -1,9 +1,9 @@
 package ai.kognition.pilecv4j.gstreamer;
 
 import static ai.kognition.pilecv4j.gstreamer.util.GstUtils.printDetails;
-import static ai.kognition.pilecv4j.image.TensorUtils.getMatrix;
-import static ai.kognition.pilecv4j.image.TensorUtils.getScalar;
-import static ai.kognition.pilecv4j.image.TensorUtils.getVector;
+import static ai.kognition.pilecv4j.tf.TensorUtils.getMatrix;
+import static ai.kognition.pilecv4j.tf.TensorUtils.getScalar;
+import static ai.kognition.pilecv4j.tf.TensorUtils.getVector;
 
 import java.io.File;
 import java.io.PrintStream;
@@ -34,7 +34,7 @@ import org.tensorflow.types.UInt8;
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.od.ObjectDetection;
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.TensorUtils;
+import ai.kognition.pilecv4j.tf.TensorUtils;
 import ai.kognition.pilecv4j.image.Utils;
 
 public class TestBedTensorFlow extends BaseTest {
