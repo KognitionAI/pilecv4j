@@ -1,6 +1,5 @@
 package ai.kognition.pilecv4j.image.geometry;
 
-import static ai.kognition.maths.Maths.EPSILON;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.opencv.core.Core.BORDER_DEFAULT;
@@ -59,7 +58,7 @@ public class GaussianBlurTest {
     }
 
     public GaussianBlurTest(final URL imageToTransform, final URL expectedImageResult, final Size size, final double sigmaX, final double sigmaY,
-        final int borderType) throws IOException {
+        final int borderType) {
         this.imageToTransform = imageToTransform;
         this.expectedImageResult = expectedImageResult;
         this.size = size;
@@ -90,10 +89,11 @@ public class GaussianBlurTest {
                         .forEach(col -> {
                             IntStream.range(0, matExpectedResult.channels())
                                 .forEach(channel -> {
-                                    assertEquals(matExpectedResult.get(row, col)[channel], transformedMat.get(row, col)[channel], EPSILON);
+                                    assertEquals(matExpectedResult.get(row, col)[channel], transformedMat.get(row, col)[channel], 1.0E-8D);
                                 });
                         });
                 });
         }
     }
 }
+//
