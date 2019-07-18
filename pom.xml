@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <groupId>ai.kognition.pilecv4j</groupId>
-  <version>0.5</version>
+  <version>0.6-SNAPSHOT</version>
   <name>Jiminger utilities (${project.version})</name>
   <description>Various Utilities for coding support</description>
   <packaging>pom</packaging>
@@ -194,6 +194,7 @@
       <dependency>
         <groupId>org.freedesktop.gstreamer</groupId>
         <artifactId>gst1-java-core</artifactId>
+        <!-- This needs to move to the official release but it will take a lot of work. -->
         <version>0.9.4</version>
       </dependency>
       <dependency>
