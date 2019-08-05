@@ -102,14 +102,14 @@ public class CvMat extends Mat implements AutoCloseable {
 
             nativeObjField = org.opencv.core.Mat.class.getDeclaredField("nativeObj");
             nativeObjField.setAccessible(true);
-        } catch(NoSuchMethodException | NoSuchFieldException | SecurityException e) {
+        } catch(final NoSuchMethodException | NoSuchFieldException | SecurityException e) {
             throw new RuntimeException(
                 "Got an exception trying to access Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
                 e);
         }
     }
 
-    private CvMat(final long nativeObj) {
+    protected CvMat(final long nativeObj) {
         super(nativeObj);
         stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
@@ -221,7 +221,7 @@ public class CvMat extends Mat implements AutoCloseable {
             if(!deletedAlready) {
                 try {
                     nDelete.invoke(this, super.nativeObj);
-                } catch(IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                } catch(final IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
                     throw new RuntimeException(
                         "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
                         e);
@@ -251,7 +251,7 @@ public class CvMat extends Mat implements AutoCloseable {
         if(mat instanceof CvMat)
             return ((CvMat)mat).rasterOp(function);
         else {
-            try (CvRaster raster = CvRaster.makeInstance(mat)) {
+            try (final CvRaster raster = CvRaster.makeInstance(mat)) {
                 return function.apply(raster);
             }
         }
@@ -270,7 +270,7 @@ public class CvMat extends Mat implements AutoCloseable {
         if(mat instanceof CvMat)
             ((CvMat)mat).rasterAp(function);
         else {
-            try (CvRaster raster = CvRaster.makeInstance(mat)) {
+            try (final CvRaster raster = CvRaster.makeInstance(mat)) {
                 function.accept(raster);
             }
         }
