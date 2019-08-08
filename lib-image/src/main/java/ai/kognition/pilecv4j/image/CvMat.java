@@ -129,7 +129,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * @param rows number of rows
      * @param cols number of columns
      * @param type type of the {@link CvMat}. See
-     *            <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
+     *     <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
      */
     public CvMat(final int rows, final int cols, final int type) {
         super(rows, cols, type);
@@ -143,7 +143,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * @param rows number of rows
      * @param cols number of columns
      * @param type type of the {@link CvMat}. See
-     *            <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
+     *     <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
      * @param data the {@link ByteBuffer} with the image date.
      */
     public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
@@ -157,7 +157,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * @return a new {@link CvMat} resulting from the operation. <b>Note: The caller owns the CvMat returned</b>
      *
      * @see <a href=
-     *      "https://docs.opencv.org/4.0.1/d2/de8/group__core__array.html#gacb6e64071dffe36434e1e7ee79e7cb35">cv::gemm()</a>
+     * "https://docs.opencv.org/4.0.1/d2/de8/group__core__array.html#gacb6e64071dffe36434e1e7ee79e7cb35">cv::gemm()</a>
      */
     public CvMat mm(final Mat other) {
         return mm(other, 1.0D);
@@ -171,7 +171,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * @return a new {@link CvMat} resulting from the operation. <b>Note: The caller owns the CvMat returned</b>
      *
      * @see <a href=
-     *      "https://docs.opencv.org/4.0.1/d2/de8/group__core__array.html#gacb6e64071dffe36434e1e7ee79e7cb35">cv::gemm()</a>
+     * "https://docs.opencv.org/4.0.1/d2/de8/group__core__array.html#gacb6e64071dffe36434e1e7ee79e7cb35">cv::gemm()</a>
      */
     public CvMat mm(final Mat other, final double scale) {
         final Mat ret = new Mat();
@@ -242,7 +242,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
      *
      * @param mat <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to build the
-     *            {@link CvRaster} from.
+     *     {@link CvRaster} from.
      * @param function is the {@link Function} to pass the {@link CvRaster} to.
      * @return the return value of the provided {@code function}
      * @see CvRaster
@@ -262,7 +262,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
      *
      * @param mat <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to build the
-     *            {@link CvRaster} from.
+     *     {@link CvRaster} from.
      * @param function is the {@link Consumer} to pass the {@link CvRaster} to.
      * @see CvRaster
      */
@@ -315,26 +315,14 @@ public class CvMat extends Mat implements AutoCloseable {
      * </p>
      *
      * @param mat - <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *            to take control of with the new {@link CvMat}. After this call the
-     *            <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *            passed should not be used.
+     *     to take control of with the new {@link CvMat}. After this call the
+     *     <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     *     passed should not be used.
      * @return a new {@link CvMat} that now managed the internal resources of the origin. <b>Note: The caller owns the
-     *         CvMat returned</b>
+     * CvMat returned</b>
      */
     public static CvMat move(final Mat mat) {
-        if(mat == null)
-            return null;
-
-        final long defaultMatNativeObj = ImageAPI.CvRaster_defaultMat();
-        try {
-            final long nativeObjToUse = mat.nativeObj;
-            nativeObjField.set(mat, defaultMatNativeObj);
-            return new CvMat(nativeObjToUse);
-        } catch(final IllegalAccessException e) {
-            throw new RuntimeException(
-                "Got an exception trying to set Mat.nativeObj. Either the security model is too restrictive or the version of OpenCv can't be supported.",
-                e);
-        }
+        return new CvMat(hijack(mat));
     }
 
     /**
@@ -345,9 +333,9 @@ public class CvMat extends Mat implements AutoCloseable {
      * @param rows number of rows of in the resulting {@link CvMat}
      * @param cols number of columns of in the resulting {@link CvMat}
      * @param type type of the resulting {@link CvMat}. See
-     *            <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
+     *     <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
      * @return a new {@link CvMat} with all zeros of the given proportions and type. <b>Note: The caller owns the CvMat
-     *         returned</b>
+     * returned</b>
      */
     public static CvMat zeros(final int rows, final int cols, final int type) {
         return CvMat.move(Mat.zeros(rows, cols, type));
@@ -394,7 +382,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * you run the possibility of leaking the {@link CvMat} if an exception is thrown prior to returning
      * it.
      * </p>
-     * 
+     *
      * <p>
      * Note: if you call {@link CvMat#returnMe()} and don't actually reassign the result to another managed
      * {@link CvMat}, you will leak the CvMat.
@@ -416,16 +404,48 @@ public class CvMat extends Mat implements AutoCloseable {
      * cv::Mat then there will likely be a core dump when subsequently using the {@link CvMat}
      * returned. This includes even the deletion of the {@link CvMat} by the garbage collector.
      * </p>
-     * 
+     *
      * <p>
      * <em>With great power, comes great responsibility.</em>
      * </p>
      *
      * @param nativeObj - pointer to a C++ cv::Mat instance. You're on your own as to how to
-     *            obtain one of these but you will likely need to write C++ code to do it.
+     *     obtain one of these but you will likely need to write C++ code to do it.
      */
     public static CvMat wrapNative(final long nativeObj) {
         return new CvMat(nativeObj);
+    }
+
+    /**
+     * <p>
+     * This call can be made to decouple the management of a
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>'s resources
+     * from the <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>. The
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> passed
+     * in <em>SOULD NOT</em> be used after this call or, at least, it shouldn't be assumed
+     * to still be pointing to the same image data.
+     * </p>
+     *
+     * @param mat - <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     *     to take control of with the new {@link CvMat}. After this call the
+     *     <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     *     passed should not be used.
+     * @return the native reference to the underlying decoupled Mat</b>
+     */
+    protected static long hijack(final Mat mat) {
+        if(mat == null)
+            throw new NullPointerException("Can't pass a null Mat to ");
+
+        final long defaultMatNativeObj = ImageAPI.CvRaster_defaultMat();
+        try {
+            final long nativeObjToUse = mat.nativeObj;
+            nativeObjField.set(mat, defaultMatNativeObj);
+            return nativeObjToUse;
+        } catch(final IllegalAccessException e) {
+            throw new RuntimeException(
+                "Got an exception trying to set Mat.nativeObj. Either the security model is too restrictive or the version of OpenCv can't be supported.",
+                e);
+        }
     }
 
     // Prevent Mat finalize from being called
