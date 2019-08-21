@@ -298,9 +298,10 @@ public class Branch {
             if(prev != null) {
                 if(prev.delayed) {
                     prev.element.connect(getPadAddedFromDynamicLink(e.element, prev.padAddedCallback));
-                    prev.element.connect((Element.PAD_REMOVED)(element, pad) -> {
-                        System.out.println("REMOVING PAD: " + element + " pad:" + pad);
-                    });
+                    if(LOGGER.isDebugEnabled())
+                        prev.element.connect((Element.PAD_REMOVED)(element, pad) -> {
+                            LOGGER.debug("REMOVING PAD: {} pad: {} ", element, pad);
+                        });
                     // // TODO: I don't think this is right
                     // last = null;
                 } else {
@@ -320,9 +321,10 @@ public class Branch {
             if(prev != null) { // tee might be first.
                 if(prev.delayed) {
                     prev.element.connect(getPadAddedFromDynamicLink(tee, defaultDelayedCallback));
-                    prev.element.connect((Element.PAD_REMOVED)(element, pad) -> {
-                        System.out.println("REMOVING PAD: " + element + " pad:" + pad);
-                    });
+                    if(LOGGER.isDebugEnabled())
+                        prev.element.connect((Element.PAD_REMOVED)(element, pad) -> {
+                            LOGGER.debug("REMOVING PAD: {} pad: {} ", element, pad);
+                        });
                 } else {
                     if(prev.linker != null)
                         prev.linker.link(prev.element, tee);
