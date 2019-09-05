@@ -342,6 +342,22 @@ public class CvMat extends Mat implements AutoCloseable {
     }
 
     /**
+     * Convenience method that wraps the return value of <a href=
+     * "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html#a69ae0402d116fc9c71908d8508dc2f09">{@code Mat.ones}</a>
+     * in a {@link CvMat}.
+     *
+     * @param rows number of rows of in the resulting {@link CvMat}
+     * @param cols number of columns of in the resulting {@link CvMat}
+     * @param type type of the resulting {@link CvMat}. See
+     *     <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
+     * @return a new {@link CvMat} with all ones of the given proportions and type. <b>Note: The caller owns the CvMat
+     * returned</b>
+     */
+    public static CvMat ones(final int rows, final int cols, final int type) {
+        return CvMat.move(Mat.ones(rows, cols, type));
+    }
+
+    /**
      * This implements {@code leftOp = rightOp}
      */
     public static void reassign(final Mat leftOp, final Mat rightOp) {
