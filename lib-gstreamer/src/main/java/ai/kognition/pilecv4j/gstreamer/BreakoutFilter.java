@@ -36,7 +36,7 @@ public class BreakoutFilter extends BaseTransform {
 
     private static final AtomicBoolean inited = new AtomicBoolean(false);
 
-    private ProxyFilter proxyFilter = null;
+    private final List<ProxyFilter> proxyFilterStack = new ArrayList<>();
 
     private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
 
@@ -173,7 +173,7 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public BreakoutFilter connectSlowFilter(final int numThreads, final Consumer<CvMatAndCaps> filter) {
-        final BreakoutFilter ret = connect(proxyFilter = new SlowFilterSlippage(numThreads, filter));
+        final BreakoutFilter ret = connect(push(new SlowFilterSlippage(numThreads, filter)));
         return ret;
     }
 
@@ -183,7 +183,7 @@ public class BreakoutFilter extends BaseTransform {
      * {@link CvMat} will not be put back into the pipeline.
      */
     public BreakoutFilter connectStreamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> watcherSupplier) {
-        final BreakoutFilter ret = connect(proxyFilter = new StreamWatcher(numThreads, watcherSupplier));
+        final BreakoutFilter ret = connect(push(new StreamWatcher(numThreads, watcherSupplier)));
         return ret;
     }
 
@@ -217,18 +217,21 @@ public class BreakoutFilter extends BaseTransform {
 
     @Override
     public void dispose() {
-        if(proxyFilter != null) {
-            proxyFilter.stop();
-            try {
-                Functional.<InterruptedException>recheck(() -> proxyFilter.threads.forEach(t -> uncheck(() -> t.join(1000))));
-            } catch(final InterruptedException ie) {
-                LOGGER.info("Interrupted while waiting for slow filter slippage thread for " + this.getName() + " to exit.");
-            }
+        for(int i = proxyFilterStack.size() - 1; i >= 0; i--) {
+            final ProxyFilter proxyFilter = proxyFilterStack.get(i);
+            if(proxyFilter != null) {
+                proxyFilter.stop();
+                try {
+                    Functional.<InterruptedException>recheck(() -> proxyFilter.threads.forEach(t -> uncheck(() -> t.join(1000))));
+                } catch(final InterruptedException ie) {
+                    LOGGER.info("Interrupted while waiting for slow filter slippage thread for " + this.getName() + " to exit.");
+                }
 
-            proxyFilter.threads.forEach(t -> {
-                if(t.isAlive())
-                    LOGGER.warn("The slow filter slippage thread for " + this.getName() + " never exited. Moving on.");
-            });
+                proxyFilter.threads.forEach(t -> {
+                    if(t.isAlive())
+                        LOGGER.warn("The slow filter slippage thread for " + this.getName() + " never exited. Moving on.");
+                });
+            }
         }
 
         super.dispose();
@@ -289,6 +292,11 @@ public class BreakoutFilter extends BaseTransform {
             stop.set(true);
         }
 
+    }
+
+    private ProxyFilter push(final ProxyFilter pf) {
+        proxyFilterStack.add(pf);
+        return pf;
     }
 
     private static class SlowFilterSlippage extends ProxyFilter {
@@ -457,7 +465,5 @@ public class BreakoutFilter extends BaseTransform {
             }
             return FlowReturn.OK;
         }
-
     }
-
 }
