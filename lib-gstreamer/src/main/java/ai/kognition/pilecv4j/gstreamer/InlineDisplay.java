@@ -3,7 +3,6 @@ package ai.kognition.pilecv4j.gstreamer;
 import static net.dempsy.util.Functional.chain;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.function.Consumer;
 
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Pipeline;
@@ -17,13 +16,12 @@ import net.dempsy.util.MutableRef;
 
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
-import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.Utils;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.image.display.ImageDisplay.KeyPressCallback;
 
-public class InlineDisplay implements Consumer<CvMatAndCaps> {
+public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
     private static final Logger LOGGER = LoggerFactory.getLogger(InlineDisplay.class);
 
     public static String DEFAULT_WINDOW_NAME = "inline-display";
@@ -125,23 +123,27 @@ public class InlineDisplay implements Consumer<CvMatAndCaps> {
 
     @Override
     public void accept(final CvMatAndCaps rac) {
-        final CvMat mx = rac.mat;
+        final VideoFrame mx = rac.mat;
         final Caps caps = rac.caps;
 
         final boolean convertToBgr = caps != null && !caps.intersect(rgbFormatCaps).isEmpty();
 
-        try (Closer closer = new Closer();) {
+        try (final Closer closer = new Closer();) {
             if(screenDim != null) {
                 if(adjustedSize.ref == null) {
                     adjustedSize.ref = Utils.preserveAspectRatio(mx, screenDim);
                 }
 
-                final CvMat lmat = chain(closer.add(new CvMat()), m -> Imgproc.resize(mx, m, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST));
-                final CvMat lmat2 = convertToBgr ? chain(closer.add(new CvMat()), m -> Imgproc.cvtColor(lmat, m, Imgproc.COLOR_RGB2BGR)) : lmat;
+                final VideoFrame lmat = chain(closer.add(new VideoFrame(mx.pts, mx.dts, mx.duration, mx.decodeTimeMillis)),
+                    m -> Imgproc.resize(mx, m, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST));
+                final VideoFrame lmat2 = convertToBgr
+                    ? chain(closer.add(new VideoFrame(mx.pts, mx.dts, mx.duration, mx.decodeTimeMillis)), m -> Imgproc.cvtColor(lmat, m, Imgproc.COLOR_RGB2BGR))
+                    : lmat;
                 process(lmat2);
             } else {
-                final CvMat lmat = convertToBgr ? chain(closer.add(new CvMat()), m -> Imgproc.cvtColor(mx, m, Imgproc.COLOR_RGB2BGR))
-                    : (deepCopy ? CvMat.deepCopy(mx) : CvMat.shallowCopy(mx));
+                final VideoFrame lmat = convertToBgr
+                    ? chain(closer.add(new VideoFrame(mx.pts, mx.dts, mx.duration, mx.decodeTimeMillis)), m -> Imgproc.cvtColor(mx, m, Imgproc.COLOR_RGB2BGR))
+                    : (deepCopy ? mx.deepCopy() : mx.shallowCopy());
                 process(lmat);
             }
         }
@@ -152,7 +154,7 @@ public class InlineDisplay implements Consumer<CvMatAndCaps> {
         this.stopLatch = stopLatch;
     }
 
-    private void process(final CvMat lmat) {
+    private void process(final VideoFrame lmat) {
         window.update(lmat);
     }
 }

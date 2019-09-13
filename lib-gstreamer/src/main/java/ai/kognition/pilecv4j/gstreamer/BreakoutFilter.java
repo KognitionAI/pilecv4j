@@ -3,7 +3,6 @@ package ai.kognition.pilecv4j.gstreamer;
 import static net.dempsy.util.Functional.chain;
 import static net.dempsy.util.Functional.uncheck;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -13,7 +12,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
-import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.FlowReturn;
 import org.freedesktop.gstreamer.Gst;
@@ -24,9 +22,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.Functional;
+import net.dempsy.util.QuietCloseable;
 
+import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
 import ai.kognition.pilecv4j.gstreamer.guard.BufferWrap;
-import ai.kognition.pilecv4j.image.CvMat;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
@@ -36,7 +35,7 @@ public class BreakoutFilter extends BaseTransform {
 
     private static final AtomicBoolean inited = new AtomicBoolean(false);
 
-    private final List<ProxyFilter> proxyFilterStack = new ArrayList<>();
+    private final List<VideoFrameFilter> filterStack = new ArrayList<>();
 
     private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
 
@@ -48,10 +47,6 @@ public class BreakoutFilter extends BaseTransform {
 
     static {
         init();
-    }
-
-    public static final BreakoutAPI gst() {
-        return FILTER_API;
     }
 
     public BreakoutFilter(final Initializer init) {
@@ -66,6 +61,56 @@ public class BreakoutFilter extends BaseTransform {
     public void setCaps(final Caps caps) {
         throw new UnsupportedOperationException(
             "gstreamer element \"" + GST_NAME + "\" doesn't support the \"caps\" property. Please use a caps filter.");
+    }
+
+    public static class VideoFrameFilterException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+        public final FlowReturn flowReturn;
+
+        public VideoFrameFilterException(final FlowReturn flowReturn) {
+            this.flowReturn = flowReturn;
+        }
+    }
+
+    @FunctionalInterface
+    public static interface VideoFrameFilter extends Consumer<CvMatAndCaps>, QuietCloseable {
+
+        @Override
+        default void close() {}
+    }
+
+    private static abstract class ProxyFilter implements VideoFrameFilter {
+        protected final List<Thread> threads = new ArrayList<>();
+        protected final AtomicBoolean stop = new AtomicBoolean(false);
+        private final AtomicReference<VideoFrame.Pool> storedBuffers = new AtomicReference<>();
+
+        @Override
+        public void close() {
+            stop.set(true);
+
+            try {
+                Functional.<InterruptedException>recheck(() -> threads.forEach(t -> uncheck(() -> t.join(1000))));
+            } catch(final InterruptedException ie) {
+                LOGGER.info("Interrupted while waiting for asynchronous filter slippage thread to exit.");
+            }
+
+            threads.forEach(t -> {
+                if(t.isAlive())
+                    LOGGER.warn("The asynchronous filter slippage thread never exited. Moving on.");
+            });
+
+            final Pool pool = storedBuffers.getAndSet(null);
+            if(pool != null)
+                pool.close();
+        }
+
+        VideoFrame.Pool getPool(final VideoFrame frame) {
+            return storedBuffers.updateAndGet(p -> {
+                if(p == null)
+                    return VideoFrame.getPool(frame.rows(), frame.cols(), frame.type());
+                return p;
+            });
+        }
     }
 
     public static class CapsInfo implements AutoCloseable {
@@ -92,46 +137,18 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public static class CvMatAndCaps extends CapsInfo {
-        public final CvMat mat;
-        private boolean rasterDisowned = false;
+        public final VideoFrame mat;
+        public final boolean iOwnMat;
 
-        private CvMatAndCaps(final CvMat frameData, final Caps caps, final int w, final int h) {
-            super(caps, w, h);
+        private CvMatAndCaps(final VideoFrame frameData, final Caps caps, final boolean youOwnMat) {
+            super(caps, frameData.width(), frameData.height());
             this.mat = frameData;
-        }
-
-        /**
-         * Create a BufferAndCaps using a separate ByteBuffer to store the frame data. The
-         * ByteBuffer that ends up as {@code buffer} will not be the ByteBuffer associated
-         * with {@code frameBuffer} but will contain a copy of the data.
-         *
-         * This is primarily used to pool ByteBuffers that will outlive the scope of the call
-         * back in the SlowFilterSlippage.
-         */
-        private CvMatAndCaps(final Buffer frameBuffer, final CvMat tmp, final Caps caps, final int w, final int h, final int type) {
-            super(caps, w, h);
-            try (BufferWrap bw = new BufferWrap(frameBuffer, false);) {
-                final ByteBuffer bb = bw.map(false);
-                final int capacity = bb.remaining();
-
-                if(tmp != null && tmp.numBytes() == capacity)
-                    mat = tmp;
-                else
-                    mat = new CvMat(h, w, type);
-
-                mat.rasterAp(r -> {
-                    final ByteBuffer buffer = r.underlying();
-
-                    // copy the data
-                    buffer.rewind();
-                    buffer.put(bb);
-                });
-            }
+            this.iOwnMat = youOwnMat;
         }
 
         @Override
         public void close() {
-            if(mat != null && !rasterDisowned)
+            if(iOwnMat && mat != null)
                 mat.close();
 
             super.close();
@@ -139,77 +156,48 @@ public class BreakoutFilter extends BaseTransform {
 
         @Override
         public String toString() {
-            return "CvRasterAndCaps [raster=" + mat + ", rasterDisowned=" + rasterDisowned + ", caps=" + caps + ", width=" + width
+            return "CvRasterAndCaps [raster=" + mat + /* ", rasterDisowned=" + rasterDisowned + */ ", caps=" + caps + ", width=" + width
                 + ", height=" + height + "]";
         }
-
-        private CvMat disownRaster() {
-            rasterDisowned = true;
-            return mat;
-        }
     }
 
-    public BreakoutFilter connect(final Consumer<CvMatAndCaps> filter) {
-        return connect((Function<CvMatAndCaps, FlowReturn>)rac -> {
-            filter.accept(rac);
-            return FlowReturn.OK;
-        });
+    public BreakoutFilter filter(final VideoFrameFilter filter) {
+        return doConnect(filter);
     }
 
-    public BreakoutFilter connect(final Function<CvMatAndCaps, FlowReturn> filter) {
-        return connect((NEW_SAMPLE)elem -> {
-            final int h = elem.getCurrentFrameHeight();
-            final int w = elem.getCurrentFrameWidth();
-            try (BufferWrap buffer = elem.getCurrentBuffer();
-                CvMat raster = buffer.mapToCvMat(h, w, CvType.CV_8UC3, true);
-                CvMatAndCaps bac = new CvMatAndCaps(raster, elem.getCurrentCaps(), w, h)) {
-                return (raster == null) ? FlowReturn.OK : filter.apply(bac);
-            }
-        });
+    public BreakoutFilter slowFilter(final Consumer<CvMatAndCaps> filter) {
+        return slowFilter(1, filter);
     }
 
-    public BreakoutFilter connectSlowFilter(final Consumer<CvMatAndCaps> filter) {
-        return connectSlowFilter(1, filter);
-    }
-
-    public BreakoutFilter connectSlowFilter(final int numThreads, final Consumer<CvMatAndCaps> filter) {
-        final BreakoutFilter ret = connect(push(new SlowFilterSlippage(numThreads, filter)));
+    public BreakoutFilter slowFilter(final int numThreads, final Consumer<CvMatAndCaps> filter) {
+        final BreakoutFilter ret = doConnect(new SlowFilterSlippage(numThreads, filter));
         return ret;
     }
 
     /**
      * A "stream watcher" as opposed to a "filter" can have no affect on the frames flowing through the
      * pipeline. It receives frames in the form of a {@link CvMatAndCaps} but any changes to the
-     * {@link CvMat} will not be put back into the pipeline.
+     * {@link VideoFrame} will not be put back into the pipeline.
      */
-    public BreakoutFilter connectStreamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> watcherSupplier) {
-        final BreakoutFilter ret = connect(push(new StreamWatcher(numThreads, watcherSupplier)));
+    public BreakoutFilter streamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> watcherSupplier) {
+        final BreakoutFilter ret = doConnect(new StreamWatcher(numThreads, watcherSupplier));
         return ret;
     }
 
     /**
-     * This is the an alternate means of supplying a "stream watcher" (see {@link #connectStreamWatcher} for an
+     * This is the an alternate means of supplying a "stream watcher" (see {@link #streamWatcher} for an
      * explanation of the difference between a "stream watcher" and a "filter"). In this case the {@code watcherSupplier}
      * will be invoked on the first frame allowing initialization of the stream watcher to be done separate from the
      * {@code Consumer<CvMatAndCaps>}.
      */
-    public BreakoutFilter connectDelayedStreamWatcher(final int numThreads,
+    public BreakoutFilter delayedStreamWatcher(final int numThreads,
         final Function<CvMatAndCaps, Supplier<Consumer<CvMatAndCaps>>> watcherSupplier) {
-        connect(new NEW_SAMPLE() {
+        doConnect(new VideoFrameFilter() {
 
             @Override
-            public FlowReturn new_sample(final BreakoutFilter elem) {
-                final int h = elem.getCurrentFrameHeight();
-                final int w = elem.getCurrentFrameWidth();
-                try (final BufferWrap buffer = elem.getCurrentBuffer();
-                    final CvMat raster = buffer.mapToCvMat(h, w, CvType.CV_8UC3, true);
-                    final CvMatAndCaps bac = new CvMatAndCaps(raster, elem.getCurrentCaps(), w, h)) {
-
-                    disconnect(this);
-                    connectStreamWatcher(numThreads, watcherSupplier.apply(bac));
-
-                    return FlowReturn.OK;
-                }
+            public void accept(final CvMatAndCaps mac) {
+                doDisconnect(this);
+                streamWatcher(numThreads, watcherSupplier.apply(mac));
             }
         });
         return this;
@@ -217,23 +205,11 @@ public class BreakoutFilter extends BaseTransform {
 
     @Override
     public void dispose() {
-        for(int i = proxyFilterStack.size() - 1; i >= 0; i--) {
-            final ProxyFilter proxyFilter = proxyFilterStack.get(i);
-            if(proxyFilter != null) {
-                proxyFilter.stop();
-                try {
-                    Functional.<InterruptedException>recheck(() -> proxyFilter.threads.forEach(t -> uncheck(() -> t.join(1000))));
-                } catch(final InterruptedException ie) {
-                    LOGGER.info("Interrupted while waiting for slow filter slippage thread for " + this.getName() + " to exit.");
-                }
-
-                proxyFilter.threads.forEach(t -> {
-                    if(t.isAlive())
-                        LOGGER.warn("The slow filter slippage thread for " + this.getName() + " never exited. Moving on.");
-                });
-            }
+        for(int i = filterStack.size() - 1; i >= 0; i--) {
+            final VideoFrameFilter proxyFilter = filterStack.get(i);
+            if(proxyFilter != null)
+                proxyFilter.close();
         }
-
         super.dispose();
     }
 
@@ -243,22 +219,48 @@ public class BreakoutFilter extends BaseTransform {
     /**
      * This callback is the main filter callback.
      */
-    public static interface NEW_SAMPLE {
+    private static interface NEW_SAMPLE {
         public FlowReturn new_sample(BreakoutFilter elem);
     }
 
-    public BreakoutFilter connect(final NEW_SAMPLE listener) {
-        connect(NEW_SAMPLE.class, listener, new GstCallback() {
-            @SuppressWarnings("unused")
-            public FlowReturn callback(final BreakoutFilter elem) {
-                return listener.new_sample(elem);
+    private final NEW_SAMPLE actualFilter = new NEW_SAMPLE() {
+        @Override
+        public FlowReturn new_sample(final BreakoutFilter elem) {
+            try (final BufferWrap buffer = elem.getCurrentBuffer();
+                BufferWrap bw = new BufferWrap(buffer.obj, true);
+                final VideoFrame mat = bw.mapToVideoFrameDecodeNow(elem.getCurrentFrameHeight(), elem.getCurrentFrameWidth(), CvType.CV_8UC3, true);) {
+                final CvMatAndCaps ctx = new CvMatAndCaps(mat, elem.getCurrentCaps(), false);
+                filterStack.forEach(f -> f.accept(ctx));
+                return FlowReturn.OK;
+            } catch(final VideoFrameFilterException vffe) {
+                LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
+                return vffe.flowReturn;
+            } catch(final Exception e) {
+                LOGGER.error("Unexpected processing exception:", e);
+                return FlowReturn.ERROR;
             }
-        });
+        }
+    };
+
+    private synchronized BreakoutFilter doConnect(final VideoFrameFilter listener) {
+        if(filterStack.size() == 0)
+            connect(NEW_SAMPLE.class, actualFilter, new GstCallback() {
+                @SuppressWarnings("unused")
+                public FlowReturn callback(final BreakoutFilter elem) {
+                    return actualFilter.new_sample(elem);
+                }
+            });
+        push(listener);
         return this;
     }
 
-    public BreakoutFilter disconnect(final NEW_SAMPLE listener) {
-        disconnect(NEW_SAMPLE.class, listener);
+    private synchronized BreakoutFilter doDisconnect(final VideoFrameFilter listener) {
+        if(filterStack.removeIf(l -> l == listener)) {
+            if(listener instanceof ProxyFilter)
+                ((ProxyFilter)listener).close();
+        }
+        if(filterStack.size() == 0)
+            disconnect(NEW_SAMPLE.class, actualFilter);
         return this;
     }
     // =================================================
@@ -284,18 +286,12 @@ public class BreakoutFilter extends BaseTransform {
     }
     // =================================================
 
-    private static abstract class ProxyFilter implements NEW_SAMPLE {
-        protected final List<Thread> threads = new ArrayList<>();
-        protected final AtomicBoolean stop = new AtomicBoolean(false);
-
-        public void stop() {
-            stop.set(true);
-        }
-
+    private static final BreakoutAPI gst() {
+        return FILTER_API;
     }
 
-    private ProxyFilter push(final ProxyFilter pf) {
-        proxyFilterStack.add(pf);
+    private synchronized VideoFrameFilter push(final VideoFrameFilter pf) {
+        filterStack.add(pf);
         return pf;
     }
 
@@ -305,16 +301,10 @@ public class BreakoutFilter extends BaseTransform {
         private CvMatAndCaps current = null;
         private boolean firstOne = true;
 
-        private final AtomicReference<CvMat> storedBuffer = new AtomicReference<>();
         private static AtomicLong threadSequence = new AtomicLong(0);
 
         private void dispose(final CvMatAndCaps bac) {
             if(bac != null) {
-                final CvMat old = storedBuffer.getAndSet(bac.disownRaster());
-                if(old != null) {
-                    old.close();
-                    LOGGER.warn("Throwing away a ByteBuffer");
-                }
                 bac.close();
             }
         }
@@ -357,64 +347,54 @@ public class BreakoutFilter extends BaseTransform {
         private CvMatAndCaps prevCurrent = null;
 
         @Override
-        public FlowReturn new_sample(final BreakoutFilter elem) {
-            try (final BufferWrap buffer = elem.getCurrentBuffer();) {
+        public void accept(final CvMatAndCaps frameAndCaps) {
+            final VideoFrame frame = frameAndCaps.mat;
+            // ========================================================
+            // The goal here is to set 'current' with the result from
+            // the other thread. Otherwise, if we have no result yet,
+            // leave it alone to indicate that.
+            //
+            // At first 'current' will be null indicating no results
+            // have been sent back from the 'processor' yet.
+            //
+            // ========================================================
+            // see if there's a result ready from the other thread
+            final CvMatAndCaps res = result.getAndSet(null);
+            if(res != null || firstOne) { // yes. we can pass the current frame over.
+                dispose(to.getAndSet(
+                    new CvMatAndCaps(frame.pooledDeepCopy(getPool(frame)), frameAndCaps.caps, true)));
 
-                // ========================================================
-                // The goal here is to set 'current' with the result from
-                // the other thread. Otherwise, if we have no result yet,
-                // leave it alone to indicate that.
-                //
-                // At first 'current' will be null indicating no results
-                // have been sent back from the 'processor' yet.
-                //
-                // ========================================================
-
-                // see if there's a result ready from the other thread
-                final CvMatAndCaps res = result.getAndSet(null);
-                if(res != null || firstOne) { // yes. we can pass the current frame over.
-                    dispose(to.getAndSet(
-                        new CvMatAndCaps(buffer.obj, storedBuffer.getAndSet(null), elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
-                            elem.getCurrentFrameHeight(), CvType.CV_8UC3)));
-
-                    if(res != null) {
-                        dispose(current); // and set the current spinner on the latest result
-                        current = res;
-                    }
-                    firstOne = false;
+                if(res != null) {
+                    dispose(current); // and set the current spinner on the latest result
+                    current = res;
                 }
-                // ========================================================
-
-                // Have we seen ANY results from the processor yet?
-                if(current == null) { // no, we haven't seen results from the processor
-                    if(!fromSlow && LOGGER.isDebugEnabled()) {
-                        fromSlow = true;
-                        LOGGER.debug("Playing unprocessed stream");
-                    }
-                } else { // yes, we've seen results from the processor
-                    if(fromSlow && LOGGER.isDebugEnabled()) {
-                        fromSlow = false;
-                        LOGGER.debug("Playing processed stream");
-                    }
-
-                    if(LOGGER.isTraceEnabled()) {
-                        if(current == prevCurrent) {
-                            LOGGER.trace("Slipping. Sending same frame.");
-                        }
-                        prevCurrent = current;
-                    }
-
-                    current.mat.rasterAp(r -> {
-                        final ByteBuffer bb = buffer.map(true);
-                        final ByteBuffer curBB = r.underlying();
-                        curBB.rewind();
-                        bb.put(curBB);
-                        // cur stays current until it's replaced, then it's disposed.
-                    });
-                }
+                firstOne = false;
             }
-            return FlowReturn.OK;
+            // ========================================================
+
+            // Have we seen ANY results from the processor yet?
+            if(current == null) { // no, we haven't seen results from the processor
+                if(!fromSlow && LOGGER.isDebugEnabled()) {
+                    fromSlow = true;
+                    LOGGER.debug("Playing unprocessed stream");
+                }
+            } else { // yes, we've seen results from the processor
+                if(fromSlow && LOGGER.isDebugEnabled()) {
+                    fromSlow = false;
+                    LOGGER.debug("Playing processed stream");
+                }
+
+                if(LOGGER.isTraceEnabled()) {
+                    if(current == prevCurrent) {
+                        LOGGER.trace("Slipping. Sending same frame.");
+                    }
+                    prevCurrent = current;
+                }
+
+                current.mat.copyTo(frame);
+            }
         }
+
     }
 
     private static class StreamWatcher extends ProxyFilter {
@@ -457,13 +437,9 @@ public class BreakoutFilter extends BaseTransform {
         }
 
         @Override
-        public FlowReturn new_sample(final BreakoutFilter elem) {
-            try (final BufferWrap buffer = elem.getCurrentBuffer();) {
-                dispose(to.getAndSet(
-                    new CvMatAndCaps(buffer.obj, null, elem.getCurrentCaps(), elem.getCurrentFrameWidth(),
-                        elem.getCurrentFrameHeight(), CvType.CV_8UC3)));
-            }
-            return FlowReturn.OK;
+        public void accept(final CvMatAndCaps frameAndCaps) {
+            final VideoFrame frame = frameAndCaps.mat;
+            dispose(to.updateAndGet(mac -> (mac == null) ? new CvMatAndCaps(frame.pooledDeepCopy(getPool(frame)), frameAndCaps.caps, true) : mac));
         }
     }
 }
