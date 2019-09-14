@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
+import java.util.stream.IntStream;
 
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.FlowReturn;
@@ -79,40 +79,6 @@ public class BreakoutFilter extends BaseTransform {
         default void close() {}
     }
 
-    private static abstract class ProxyFilter implements VideoFrameFilter {
-        protected final List<Thread> threads = new ArrayList<>();
-        protected final AtomicBoolean stop = new AtomicBoolean(false);
-        private final AtomicReference<VideoFrame.Pool> storedBuffers = new AtomicReference<>();
-
-        @Override
-        public void close() {
-            stop.set(true);
-
-            try {
-                Functional.<InterruptedException>recheck(() -> threads.forEach(t -> uncheck(() -> t.join(1000))));
-            } catch(final InterruptedException ie) {
-                LOGGER.info("Interrupted while waiting for asynchronous filter slippage thread to exit.");
-            }
-
-            threads.forEach(t -> {
-                if(t.isAlive())
-                    LOGGER.warn("The asynchronous filter slippage thread never exited. Moving on.");
-            });
-
-            final Pool pool = storedBuffers.getAndSet(null);
-            if(pool != null)
-                pool.close();
-        }
-
-        VideoFrame.Pool getPool(final VideoFrame frame) {
-            return storedBuffers.updateAndGet(p -> {
-                if(p == null)
-                    return VideoFrame.getPool(frame.rows(), frame.cols(), frame.type());
-                return p;
-            });
-        }
-    }
-
     public static class CapsInfo implements AutoCloseable {
         public final Caps caps;
         public final int width;
@@ -165,23 +131,16 @@ public class BreakoutFilter extends BaseTransform {
         return doConnect(filter);
     }
 
-    public BreakoutFilter slowFilter(final Consumer<CvMatAndCaps> filter) {
+    public BreakoutFilter delayedFilter(final Function<CvMatAndCaps, VideoFrameFilter> filterSupplier) {
+        return doDelayedConnect(mac -> filterSupplier.apply(mac));
+    }
+
+    public BreakoutFilter slowFilter(final VideoFrameFilter filter) {
         return slowFilter(1, filter);
     }
 
-    public BreakoutFilter slowFilter(final int numThreads, final Consumer<CvMatAndCaps> filter) {
-        final BreakoutFilter ret = doConnect(new SlowFilterSlippage(numThreads, filter));
-        return ret;
-    }
-
-    /**
-     * A "stream watcher" as opposed to a "filter" can have no affect on the frames flowing through the
-     * pipeline. It receives frames in the form of a {@link CvMatAndCaps} but any changes to the
-     * {@link VideoFrame} will not be put back into the pipeline.
-     */
-    public BreakoutFilter streamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> watcherSupplier) {
-        final BreakoutFilter ret = doConnect(new StreamWatcher(numThreads, watcherSupplier));
-        return ret;
+    public BreakoutFilter slowFilter(final int numThreads, final VideoFrameFilter filter) {
+        return doDelayedConnect(mac -> new SlowFilterSlippage(mac.mat, numThreads, filter));
     }
 
     /**
@@ -190,21 +149,40 @@ public class BreakoutFilter extends BaseTransform {
      * will be invoked on the first frame allowing initialization of the stream watcher to be done separate from the
      * {@code Consumer<CvMatAndCaps>}.
      */
-    public BreakoutFilter delayedStreamWatcher(final int numThreads,
-        final Function<CvMatAndCaps, Supplier<Consumer<CvMatAndCaps>>> watcherSupplier) {
-        doConnect(new VideoFrameFilter() {
+    public BreakoutFilter delayedSlowFilter(final int numThreads, final Function<CvMatAndCaps, VideoFrameFilter> watcherSupplier) {
+        return doDelayedConnect(mac -> new SlowFilterSlippage(mac.mat, numThreads, watcherSupplier.apply(mac)));
+    }
 
-            @Override
-            public void accept(final CvMatAndCaps mac) {
-                doDisconnect(this);
-                streamWatcher(numThreads, watcherSupplier.apply(mac));
-            }
-        });
-        return this;
+    /**
+     * A "stream watcher" as opposed to a "filter" can have no affect on the frames flowing through the
+     * pipeline. It receives frames in the form of a {@link CvMatAndCaps} but any changes to the
+     * {@link VideoFrame} will not be put back into the pipeline.
+     */
+    public BreakoutFilter streamWatcher(final VideoFrameFilter watcher) {
+        return streamWatcher(1, watcher);
+    }
+
+    /**
+     * A "stream watcher" as opposed to a "filter" can have no affect on the frames flowing through the
+     * pipeline. It receives frames in the form of a {@link CvMatAndCaps} but any changes to the
+     * {@link VideoFrame} will not be put back into the pipeline.
+     */
+    public BreakoutFilter streamWatcher(final int numThreads, final VideoFrameFilter watcher) {
+        return doDelayedConnect(mac -> new StreamWatcher(mac.mat, numThreads, watcher));
+    }
+
+    /**
+     * This is the an alternate means of supplying a "stream watcher" (see {@link #streamWatcher} for an
+     * explanation of the difference between a "stream watcher" and a "filter"). In this case the {@code watcherSupplier}
+     * will be invoked on the first frame allowing initialization of the stream watcher to be done separate from the
+     * {@code Consumer<CvMatAndCaps>}.
+     */
+    public BreakoutFilter delayedStreamWatcher(final int numThreads, final Function<CvMatAndCaps, VideoFrameFilter> watcherSupplier) {
+        return doDelayedConnect(mac -> new StreamWatcher(mac.mat, numThreads, watcherSupplier.apply(mac)));
     }
 
     @Override
-    public void dispose() {
+    public synchronized void dispose() {
         for(int i = filterStack.size() - 1; i >= 0; i--) {
             final VideoFrameFilter proxyFilter = filterStack.get(i);
             if(proxyFilter != null)
@@ -213,48 +191,7 @@ public class BreakoutFilter extends BaseTransform {
         super.dispose();
     }
 
-    // =================================================
-    // Signals.
-    // =================================================
-    /**
-     * This callback is the main filter callback.
-     */
-    private static interface NEW_SAMPLE {
-        public FlowReturn new_sample(BreakoutFilter elem);
-    }
-
-    private final NEW_SAMPLE actualFilter = new NEW_SAMPLE() {
-        @Override
-        public FlowReturn new_sample(final BreakoutFilter elem) {
-            try (final BufferWrap buffer = elem.getCurrentBuffer();
-                BufferWrap bw = new BufferWrap(buffer.obj, true);
-                final VideoFrame mat = bw.mapToVideoFrameDecodeNow(elem.getCurrentFrameHeight(), elem.getCurrentFrameWidth(), CvType.CV_8UC3, true);) {
-                final CvMatAndCaps ctx = new CvMatAndCaps(mat, elem.getCurrentCaps(), false);
-                filterStack.forEach(f -> f.accept(ctx));
-                return FlowReturn.OK;
-            } catch(final VideoFrameFilterException vffe) {
-                LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
-                return vffe.flowReturn;
-            } catch(final Exception e) {
-                LOGGER.error("Unexpected processing exception:", e);
-                return FlowReturn.ERROR;
-            }
-        }
-    };
-
-    private synchronized BreakoutFilter doConnect(final VideoFrameFilter listener) {
-        if(filterStack.size() == 0)
-            connect(NEW_SAMPLE.class, actualFilter, new GstCallback() {
-                @SuppressWarnings("unused")
-                public FlowReturn callback(final BreakoutFilter elem) {
-                    return actualFilter.new_sample(elem);
-                }
-            });
-        push(listener);
-        return this;
-    }
-
-    private synchronized BreakoutFilter doDisconnect(final VideoFrameFilter listener) {
+    public synchronized BreakoutFilter disconnect(final VideoFrameFilter listener) {
         if(filterStack.removeIf(l -> l == listener)) {
             if(listener instanceof ProxyFilter)
                 ((ProxyFilter)listener).close();
@@ -263,7 +200,6 @@ public class BreakoutFilter extends BaseTransform {
             disconnect(NEW_SAMPLE.class, actualFilter);
         return this;
     }
-    // =================================================
 
     // =================================================
     // These calls should only be made from within the
@@ -293,6 +229,40 @@ public class BreakoutFilter extends BaseTransform {
     private synchronized VideoFrameFilter push(final VideoFrameFilter pf) {
         filterStack.add(pf);
         return pf;
+    }
+
+    private static abstract class ProxyFilter implements VideoFrameFilter {
+        protected final List<Thread> threads = new ArrayList<>();
+        protected final AtomicBoolean stop = new AtomicBoolean(false);
+        private final AtomicReference<VideoFrame.Pool> storedBuffers = new AtomicReference<>();
+
+        @Override
+        public void close() {
+            stop.set(true);
+
+            try {
+                Functional.<InterruptedException>recheck(() -> threads.forEach(t -> uncheck(() -> t.join(1000))));
+            } catch(final InterruptedException ie) {
+                LOGGER.info("Interrupted while waiting for asynchronous filter slippage thread to exit.");
+            }
+
+            threads.forEach(t -> {
+                if(t.isAlive())
+                    LOGGER.warn("The asynchronous filter slippage thread never exited. Moving on.");
+            });
+
+            final Pool pool = storedBuffers.getAndSet(null);
+            if(pool != null)
+                pool.close();
+        }
+
+        private void initPool(final VideoFrame frame) {
+            storedBuffers.set(VideoFrame.getPool(frame.rows(), frame.cols(), frame.type()));
+        }
+
+        VideoFrame.Pool getPoolX(final VideoFrame frame) {
+            return storedBuffers.get();
+        }
     }
 
     private static class SlowFilterSlippage extends ProxyFilter {
@@ -333,7 +303,8 @@ public class BreakoutFilter extends BaseTransform {
             };
         }
 
-        public SlowFilterSlippage(final int numThreads, final Consumer<CvMatAndCaps> processor) {
+        private SlowFilterSlippage(final VideoFrame frame, final int numThreads, final VideoFrameFilter processor) {
+            super.initPool(frame);
             for(int i = 0; i < numThreads; i++)
                 threads.add(chain(new Thread(fromProcessor(processor), nextThreadName()), t -> t.setDaemon(true), t -> t.start()));
         }
@@ -362,7 +333,7 @@ public class BreakoutFilter extends BaseTransform {
             final CvMatAndCaps res = result.getAndSet(null);
             if(res != null || firstOne) { // yes. we can pass the current frame over.
                 dispose(to.getAndSet(
-                    new CvMatAndCaps(frame.pooledDeepCopy(getPool(frame)), frameAndCaps.caps, true)));
+                    new CvMatAndCaps(frame.pooledDeepCopy(getPoolX(frame)), frameAndCaps.caps, true)));
 
                 if(res != null) {
                     dispose(current); // and set the current spinner on the latest result
@@ -430,16 +401,80 @@ public class BreakoutFilter extends BaseTransform {
             };
         }
 
-        public StreamWatcher(final int numThreads, final Supplier<Consumer<CvMatAndCaps>> processorSupplier) {
+        private StreamWatcher(final VideoFrame mat, final int numThreads, final VideoFrameFilter processor) {
+            super.initPool(mat);
             for(int i = 0; i < numThreads; i++)
-                threads.add(chain(new Thread(fromProcessor(processorSupplier.get()), "Stream Watcher " + sequence.getAndIncrement()), t -> t.setDaemon(true),
+                threads.add(chain(new Thread(fromProcessor(processor), "Stream Watcher " + sequence.getAndIncrement()), t -> t.setDaemon(true),
                     t -> t.start()));
         }
 
         @Override
         public void accept(final CvMatAndCaps frameAndCaps) {
             final VideoFrame frame = frameAndCaps.mat;
-            dispose(to.updateAndGet(mac -> (mac == null) ? new CvMatAndCaps(frame.pooledDeepCopy(getPool(frame)), frameAndCaps.caps, true) : mac));
+            dispose(to.updateAndGet(mac -> (mac == null) ? new CvMatAndCaps(frame.pooledDeepCopy(getPoolX(frame)), frameAndCaps.caps, true) : mac));
         }
+    }
+
+    // =================================================
+    // Signals.
+    // =================================================
+    /**
+     * This callback is the main filter callback.
+     */
+    private static interface NEW_SAMPLE {
+        public FlowReturn new_sample(BreakoutFilter elem);
+    }
+
+    private final NEW_SAMPLE actualFilter = new NEW_SAMPLE() {
+        @Override
+        public FlowReturn new_sample(final BreakoutFilter elem) {
+            try (final BufferWrap buffer = elem.getCurrentBuffer();
+                BufferWrap bw = new BufferWrap(buffer.obj, true);
+                final VideoFrame mat = bw.mapToVideoFrameDecodeNow(elem.getCurrentFrameHeight(), elem.getCurrentFrameWidth(), CvType.CV_8UC3, true);) {
+                final CvMatAndCaps ctx = new CvMatAndCaps(mat, elem.getCurrentCaps(), false);
+                // we need to copy the list because any one of these filters can change it
+                final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
+                curFilters.forEach(f -> f.accept(ctx));
+                return FlowReturn.OK;
+            } catch(final VideoFrameFilterException vffe) {
+                LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
+                return vffe.flowReturn;
+            } catch(final Exception e) {
+                LOGGER.error("Unexpected processing exception:", e);
+                return FlowReturn.ERROR;
+            }
+        }
+    };
+    // =================================================
+
+    private synchronized void swap(final VideoFrameFilter currentFilter, final VideoFrameFilter newFilter) {
+        final int index = IntStream.range(0, filterStack.size())
+            .filter(i -> filterStack.get(i) == currentFilter)
+            .findAny()
+            .orElseThrow(() -> new VideoFrameFilterException(FlowReturn.WRONG_STATE));
+        filterStack.set(index, newFilter);
+    }
+
+    private BreakoutFilter doDelayedConnect(final Function<CvMatAndCaps, VideoFrameFilter> watcherSupplier) {
+        doConnect(new VideoFrameFilter() {
+
+            @Override
+            public void accept(final CvMatAndCaps mac) {
+                swap(this, watcherSupplier.apply(mac));
+            }
+        });
+        return this;
+    }
+
+    private synchronized BreakoutFilter doConnect(final VideoFrameFilter listener) {
+        if(filterStack.size() == 0)
+            connect(NEW_SAMPLE.class, actualFilter, new GstCallback() {
+                @SuppressWarnings("unused")
+                public FlowReturn callback(final BreakoutFilter elem) {
+                    return actualFilter.new_sample(elem);
+                }
+            });
+        push(listener);
+        return this;
     }
 }

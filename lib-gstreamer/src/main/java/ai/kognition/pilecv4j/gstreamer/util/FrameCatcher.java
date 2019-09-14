@@ -13,11 +13,13 @@ import org.freedesktop.gstreamer.elements.AppSink;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.dempsy.util.QuietCloseable;
+
 import ai.kognition.pilecv4j.gstreamer.CapsBuilder;
 import ai.kognition.pilecv4j.gstreamer.guard.BufferWrap;
 import ai.kognition.pilecv4j.gstreamer.guard.GstWrap;
 
-public class FrameCatcher implements AutoCloseable {
+public class FrameCatcher implements QuietCloseable {
     private static Logger LOGGER = LoggerFactory.getLogger(FrameCatcher.class);
     private AppSink sink;
     public final List<Frame> frames = new LinkedList<>();
@@ -37,10 +39,10 @@ public class FrameCatcher implements AutoCloseable {
     }
 
     public FrameCatcher(final String name) {
-        sink = (AppSink) ElementFactory.make("appsink", name);
+        sink = (AppSink)ElementFactory.make("appsink", name);
         sink.setCaps(new CapsBuilder("video/x-raw")
-                .addFormatConsideringEndian()
-                .build());
+            .addFormatConsideringEndian()
+            .build());
         sink.set("emit-signals", true);
 
         sink.connect(NewSample.preroller(handler));
@@ -55,7 +57,7 @@ public class FrameCatcher implements AutoCloseable {
 
     @Override
     public void close() {
-        if (sink != null) {
+        if(sink != null) {
             sink.dispose();
             disown();
         }
@@ -71,14 +73,14 @@ public class FrameCatcher implements AutoCloseable {
                 final byte[] frameData = new byte[bb.remaining()];
                 bb.get(frameData);
 
-                if (!elem.preroll || handledPreroll)
+                if(!elem.preroll || handledPreroll)
                     frames.add(new Frame(frameData, w, h));
 
-                if (elem.preroll) {
-                    if (FrameEmitter.HACK_FRAME)
+                if(elem.preroll) {
+                    if(FrameEmitter.HACK_FRAME)
                         LOGGER.trace("byte0 (" + frameData[0] + ")");
                     handledPreroll = true;
-                } else if (FrameEmitter.HACK_FRAME)
+                } else if(FrameEmitter.HACK_FRAME)
                     LOGGER.trace("byte0 " + frameData[0]);
             }
         }
