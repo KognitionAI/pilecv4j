@@ -93,7 +93,7 @@ public class VideoFrame extends CvMat {
                     return new VideoFrame(this, h, w, type, pts, dts, duration, decodeTimeMillis);
                 } else
                     resident.decrementAndGet();
-                return ret;
+                return ret.setTiming(pts, dts, duration, decodeTimeMillis);
             }
         }
 
