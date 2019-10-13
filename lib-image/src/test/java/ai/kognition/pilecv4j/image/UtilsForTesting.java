@@ -8,6 +8,7 @@ import java.awt.color.ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.io.File;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
@@ -31,9 +32,14 @@ public class UtilsForTesting {
         return new File(TestUtils.class.getClassLoader().getResource(classpathPath).getFile()).getAbsolutePath();
     }
 
+    private static int divideRound(final int num, final double divisor) {
+        final int ret = (int)Math.round(num / divisor);
+        return ret > 255 ? 255 : ret;
+    }
+
     public static void compare(final CvMat mat, final BufferedImage im) {
         final Integer pixDeltaInt = biTypeToPixDelta.get(im.getType());
-        final int pixDelta = pixDeltaInt == null ? 5 : pixDeltaInt.intValue();
+        final int pixDelta = pixDeltaInt == null ? 1 : pixDeltaInt.intValue();
 
         final boolean hasAlpha = im.getColorModel().hasAlpha();
         final WritableRaster biraster = im.getRaster();
@@ -44,9 +50,10 @@ public class UtilsForTesting {
                 for(int c = 0; c < mat.cols(); c++) {
                     // check that the number of bands equals
                     final int channels = raster.channels();
-                    // These wont always match if the colorspace is custom
-                    if(im.getColorModel().getColorSpace().getType() != ColorSpace.TYPE_CMYK)
+                    // These wont always match if the ColorSpace is custom
+                    if(im.getColorModel().getColorSpace().getType() != ColorSpace.TYPE_CMYK) {
                         assertEquals(biraster.getNumBands(), channels);
+                    }
 
                     final int[] rgb = new int[3];
                     int alpha = -1;
@@ -63,8 +70,11 @@ public class UtilsForTesting {
                                 final short[] pix = (short[])arr;
                                 rgb[0] = pix[0] & 0xffff;
                             }
-                        } else
+                        } else {
+                            // if(r == 5)
+                            // System.out.println("HERE!!!");
                             biPixel = new Color(im.getRGB(c, r), hasAlpha);
+                        }
 
                         if(biPixel != null) {
                             rgb[0] = biPixel.getRed();
@@ -79,17 +89,18 @@ public class UtilsForTesting {
                     // int[] shift = new int[bpp.length];
                     // for(int ch = 0; ch < bpp.length; ch++)
                     // shift[ch] = bpp[ch] <= 8 ? ((mat.depth() == CvType.CV_16U) ? 8 : 0) : 0;
-                    final int shift = (mat.depth() == CvType.CV_16U || mat.depth() == CvType.CV_16S) ? 8 : 0;
+                    final double shift = (mat.depth() == CvType.CV_16U || mat.depth() == CvType.CV_16S) ? 256.0 : 1.0;
 
                     final int[] matPixel = pixelToInt.apply(raster.get(r, c));
                     if(channels == 1) {
-                        assertEquals(rgb[0], matPixel[0] >>> shift, pixDelta);
+                        assertEquals(rgb[0], (int)Math.round(matPixel[0] / shift), pixDelta);
                     } else {
-                        assertEquals(rgb[0], matPixel[2] >>> shift, pixDelta);
-                        assertEquals(rgb[1], matPixel[1] >>> shift, pixDelta);
-                        assertEquals(rgb[2], matPixel[0] >>> shift, pixDelta);
+                        final String msg = "Failed compare " + Arrays.toString(rgb) + " != " + Arrays.toString(matPixel) + " at [" + r + "," + c + "]";
+                        assertEquals(msg + " red", rgb[0], divideRound(matPixel[2], shift), pixDelta);
+                        assertEquals(msg + " green", rgb[1], divideRound(matPixel[1], shift), pixDelta);
+                        assertEquals(msg + " blue", rgb[2], divideRound(matPixel[0], shift), pixDelta);
                         if(channels > 3)
-                            assertEquals(alpha, matPixel[3] >>> shift, pixDelta);
+                            assertEquals(msg + " alpha", alpha, divideRound(matPixel[3], shift), pixDelta);
                     }
                 }
             }
