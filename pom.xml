@@ -25,8 +25,9 @@
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv-build.version>4.0.1</opencv-build.version>
-    <opencv-short.version>401</opencv-short.version>
+    <opencv-build.version>4.1.2</opencv-build.version>
+    <opencv-short.version>412</opencv-short.version>
+    <cuda.version>10.1</cuda.version>
 
     <!-- Normally the opencv-base version is the same as the opencv-build version   -->
     <!--  however, the build version needs to be unadulterated by version suffixes -->
@@ -79,7 +80,7 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
-        <opencv-gpu.version-extention>-cuda9.2</opencv-gpu.version-extention>
+        <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention>
         <platform.option></platform.option>
       </properties>
     </profile>
