@@ -1,5 +1,6 @@
 package ai.kognition.pilecv4j.gstreamer;
 
+import static net.dempsy.util.Functional.ignore;
 import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -13,7 +14,6 @@ import org.junit.Test;
 import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.FrameEmitter;
-import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
 public class TestWatchdog extends BaseTest {
 
@@ -29,6 +29,9 @@ public class TestWatchdog extends BaseTest {
                     // prevent the EOS from being sent.
                     @Override
                     public boolean isDone() {
+                        boolean ret = super.isDone();
+                        if(ret)
+                            ignore(() -> Thread.sleep(2000));
                         return false;
                     }
                 };) {
@@ -48,19 +51,16 @@ public class TestWatchdog extends BaseTest {
                     .buildPipeline();
 
                 pipe.play();
-                Thread.sleep(1000);
-                GstUtils.printDetails(pipe);
 
                 assertTrue(poll(o -> fc.frames.size() == 40));
                 Thread.sleep(10);
                 assertEquals(40, fc.frames.size());
 
-                Thread.sleep(1000);
-                assertTrue(hit.get());
+                assertTrue(poll(o -> hit.get()));
 
-                pipe.stop();
+                if(pipe.isPlaying())
+                    pipe.stop();
                 assertTrue(poll(o -> !pipe.isPlaying()));
-                Thread.sleep(100);
             }
         }
     }
