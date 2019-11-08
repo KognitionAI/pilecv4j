@@ -5,6 +5,7 @@ import static net.dempsy.util.Functional.uncheck;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -23,6 +24,8 @@ import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.Functional;
 import net.dempsy.util.QuietCloseable;
+import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler;
+import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler.Cancelable;
 
 import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
 import ai.kognition.pilecv4j.gstreamer.guard.BufferWrap;
@@ -141,6 +144,58 @@ public class BreakoutFilter extends BaseTransform {
 
     public BreakoutFilter slowFilter(final int numThreads, final VideoFrameFilter filter) {
         return doDelayedConnect(mac -> new SlowFilterSlippage(mac.mat, numThreads, filter));
+    }
+
+    private final static AutoDisposeSingleThreadScheduler dataWatcher = new AutoDisposeSingleThreadScheduler("Frame Watchdog");
+
+    public BreakoutFilter addWatchdog(final long noDataTimeoutMillis, final Runnable timeoutAction) {
+        final AtomicLong timeOfLastFrame = new AtomicLong(0L);
+
+        final AtomicReference<Cancelable> cancelable = new AtomicReference<>(null);
+        cancelable.set(
+            dataWatcher.schedule(
+                // This is an anonymous class rather than a lambda because it reschedules itself
+                new Runnable() {
+                    boolean tookAction = false;
+
+                    @Override
+                    public void run() {
+                        final long curTime = System.currentTimeMillis();
+                        final long last = timeOfLastFrame.get();
+                        try {
+                            if((curTime - last) > noDataTimeoutMillis) {
+                                LOGGER.error("No Data received for {} milliseconds. EXITING!", curTime - last);
+                                tookAction = true; // in case timeoutAction.run throws we do this first
+                                timeoutAction.run();
+                            }
+                        } catch(final Throwable th) {
+                            LOGGER.error("Unepxected error", th);
+                        }
+                        synchronized(cancelable) {
+                            if(cancelable.get() != null && !tookAction) // otherwise it's an indication we're done. It's set to null after all frames have
+                                                                        // been processed.
+                                cancelable.set(
+                                    // wake me up before you go go ...
+                                    dataWatcher.schedule(this, noDataTimeoutMillis - (curTime - last) + 10, TimeUnit.MILLISECONDS));
+                        }
+                    }
+                }, noDataTimeoutMillis, TimeUnit.MILLISECONDS));
+
+        filter(new VideoFrameFilter() {
+            @Override
+            public void accept(final CvMatAndCaps cv) {
+                timeOfLastFrame.set(System.currentTimeMillis());
+            }
+
+            @Override
+            public void close() {
+                synchronized(cancelable) {
+                    final Cancelable toCancel = cancelable.getAndSet(null);
+                    toCancel.cancel();
+                }
+            }
+        });
+        return this;
     }
 
     /**
