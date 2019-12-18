@@ -103,6 +103,7 @@ endif()
 add_library(ai.kognition.pilecv4j.image
   MODULE
   sources/opencv/CvRasterNative.cpp
+#  sources/opencv/gpumat.cpp
   sources/houghspace/Transform.cpp
   sources/mjpeg/jpegtoavi.cpp)
 

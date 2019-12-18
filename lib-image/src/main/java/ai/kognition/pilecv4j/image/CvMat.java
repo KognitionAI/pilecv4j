@@ -211,6 +211,10 @@ public class CvMat extends Mat implements AutoCloseable {
         return elemSize() * rows() * cols();
     }
 
+    // public GpuMat upload() {
+    // return new GpuMat(nativeObj);
+    // }
+
     /**
      * Free the resources for this {@link CvMat}. Once the {@link CvMat} is closed, it shouldn't be used and certainly
      * wont contain the image data any longer.

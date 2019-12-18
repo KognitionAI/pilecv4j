@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.IntStream;
 
 import org.freedesktop.gstreamer.Caps;
@@ -295,10 +296,19 @@ public class BreakoutFilter extends BaseTransform {
         public void close() {
             stop.set(true);
 
-            try {
-                Functional.<InterruptedException>recheck(() -> threads.forEach(t -> uncheck(() -> t.join(1000))));
-            } catch(final InterruptedException ie) {
-                LOGGER.info("Interrupted while waiting for asynchronous filter slippage thread to exit.");
+            boolean done = false;
+            for(int i = 0; i < 1000 && !done; i++) {
+                // interrupt each thread.
+                threads.stream().forEach(t -> t.interrupt());
+                done = !threads.stream().anyMatch(t -> t.isAlive());
+
+                if(!done) {
+                    try {
+                        Functional.<InterruptedException>recheck(() -> uncheck(() -> Thread.sleep(1)));
+                    } catch(final InterruptedException ie) {
+                        LOGGER.info("Interrupted while waiting for asynchronous filter slippage thread to exit.");
+                    }
+                }
             }
 
             threads.forEach(t -> {
@@ -423,8 +433,42 @@ public class BreakoutFilter extends BaseTransform {
 
     }
 
+    private static class PseudoAtomicReference<T> {
+        public T ref;
+
+        public PseudoAtomicReference(final T o) {
+            ref = o;
+        }
+
+        public T updateAndGet(final UnaryOperator<T> updateFunction) {
+            synchronized(this) {
+                ref = updateFunction.apply(ref);
+                notify();
+                return ref;
+            }
+        }
+
+        public T getNonNullAndSetToNull(final AtomicBoolean stopCondition) {
+            synchronized(this) {
+                // handle spurious wakes
+                while(ref == null && !stopCondition.get()) {
+                    try {
+                        wait();
+                    } catch(final InterruptedException ie) {
+                        final T ret = ref;
+                        ref = null;
+                        return ret;
+                    }
+                }
+                final T ret = ref;
+                ref = null;
+                return ret;
+            }
+        }
+    }
+
     private static class StreamWatcher extends ProxyFilter {
-        private final AtomicReference<CvMatAndCaps> to = new AtomicReference<>(null);
+        private final PseudoAtomicReference<CvMatAndCaps> to = new PseudoAtomicReference<>(null);
         private final AtomicLong sequence = new AtomicLong(0);
 
         private void dispose(final CvMatAndCaps toDispose) {
@@ -435,11 +479,7 @@ public class BreakoutFilter extends BaseTransform {
         private Runnable fromProcessor(final Consumer<CvMatAndCaps> processor) {
             return () -> {
                 while(!stop.get()) {
-                    CvMatAndCaps frame = to.getAndSet(null);
-                    while(frame == null && !stop.get()) {
-                        Thread.yield();
-                        frame = to.getAndSet(null);
-                    }
+                    final CvMatAndCaps frame = to.getNonNullAndSetToNull(stop);
                     if(frame != null && !stop.get()) {
                         try {
                             processor.accept(frame);
@@ -466,6 +506,7 @@ public class BreakoutFilter extends BaseTransform {
         @Override
         public void accept(final CvMatAndCaps frameAndCaps) {
             final VideoFrame frame = frameAndCaps.mat;
+
             dispose(to.updateAndGet(mac -> (mac == null) ? new CvMatAndCaps(frame.pooledDeepCopy(getPoolX(frame)), frameAndCaps.caps, true) : mac));
         }
     }

@@ -2,8 +2,6 @@ package ai.kognition.pilecv4j.gstreamer;
 
 import static net.dempsy.util.Functional.chain;
 
-import java.util.concurrent.CountDownLatch;
-
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.event.EOSEvent;
@@ -30,7 +28,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
     private final boolean deepCopy;
     private ImageDisplay window = null;
     private Pipeline stopOnClose = null;
-    private CountDownLatch stopLatch = null;
+    private Runnable exitNotification = null;
     private final Size screenDim;
 
     private final MutableRef<Size> adjustedSize = new MutableRef<>();
@@ -45,7 +43,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
         this.deepCopy = deepCopy;
         this.window.setCloseCallback(() -> {
             if(stopOnClose != null) {
-                GstUtils.stopBinOnEOS(stopOnClose, stopLatch);
+                GstUtils.stopBinOnEOS(stopOnClose, exitNotification);
                 LOGGER.debug("Emitting EOS");
                 stopOnClose.sendEvent(new EOSEvent());
             }
@@ -65,7 +63,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
             .implementation(impl)
             .closeCallback(() -> {
                 if(stopOnClose != null) {
-                    GstUtils.stopBinOnEOS(stopOnClose, stopLatch);
+                    GstUtils.stopBinOnEOS(stopOnClose, exitNotification);
                     LOGGER.debug("Emitting EOS");
                     stopOnClose.sendEvent(new EOSEvent());
                 }
@@ -149,9 +147,9 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
         }
     }
 
-    public void stopOnClose(final Pipeline pipe, final CountDownLatch stopLatch) {
+    public void stopOnClose(final Pipeline pipe, final Runnable exitNotification) {
         this.stopOnClose = pipe;
-        this.stopLatch = stopLatch;
+        this.exitNotification = exitNotification;
     }
 
     private void process(final VideoFrame lmat) {

@@ -42,7 +42,7 @@ void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle) {
 	cv::Mat* dst = (cv::Mat*) destHandle;
 	cv::Mat* src = (cv::Mat*) srcHandle;
 
-        *dst = *src;
+	*dst = *src;
 }
 
 
