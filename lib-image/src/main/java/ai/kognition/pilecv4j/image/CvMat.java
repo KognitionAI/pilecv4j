@@ -238,7 +238,7 @@ public class CvMat extends Mat implements AutoCloseable {
 
     @Override
     public String toString() {
-        return "CvMat: (" + getClass().getName() + "@" + Integer.toHexString(hashCode()) + ") " + super.toString();
+        return "CvMat: (" + getClass().getName() + "@" + Integer.toHexString(hashCode()) + ") " + (deletedAlready ? "" : super.toString());
     }
 
     /**
