@@ -14,74 +14,86 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 public class SwtImageDisplay extends ImageDisplay {
 
-   private final String name;
+    public static enum CanvasType {
+        SCROLLABLE, RESIZABLE
+    }
 
-   private Display display = null;
-   private Shell shell = null;
+    private final String name;
 
-   private SwtCanvasImageDisplay canvasWriter = null;
+    private Display display = null;
+    private Shell shell = null;
 
-   private boolean setupCalled = false;
+    private SwtCanvasImageDisplay canvasWriter = null;
 
-   private final Function<Shell, SwtCanvasImageDisplay> canvasHandlerMaker;
+    private boolean setupCalled = false;
 
-   public SwtImageDisplay(final Mat mat, final String name, final Runnable closeCallback, final KeyPressCallback kpCallback,
-         final SelectCallback selectCallback) {
-      this.name = name;
-      canvasHandlerMaker = s -> new ScrollableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
-      // canvasHandlerMaker = s -> new ResizableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
-      if(mat != null)
-         update(mat);
-   }
+    private final Function<Shell, SwtCanvasImageDisplay> canvasHandlerMaker;
 
-   @Override
-   public void setCloseCallback(final Runnable closeCallback) {
-      canvasWriter.setCloseCallback(closeCallback);
-   }
+    public SwtImageDisplay(final Mat mat, final String name, final Runnable closeCallback, final KeyPressCallback kpCallback,
+        final SelectCallback selectCallback, final CanvasType canvasType) {
+        this.name = name;
+        switch(canvasType) {
+            case SCROLLABLE:
+                canvasHandlerMaker = s -> new ScrollableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
+                break;
+            case RESIZABLE:
+                canvasHandlerMaker = s -> new ResizableSwtCanvasImageDisplay(shell, closeCallback, kpCallback, selectCallback);
+                break;
+            default:
+                throw new IllegalArgumentException("Cannot create an swt canvas of type " + canvasType);
+        }
+        if(mat != null)
+            update(mat);
+    }
 
-   private void setup() {
-      setupCalled = true;
-      display = SwtUtils.getDisplay();
-      ImageDisplay.syncExec(() -> {
-         shell = new Shell(display);
-         if(name != null) shell.setText(name);
+    @Override
+    public void setCloseCallback(final Runnable closeCallback) {
+        canvasWriter.setCloseCallback(closeCallback);
+    }
 
-         // set the GridLayout on the shell
-         chain(new GridLayout(), l -> l.numColumns = 1, shell::setLayout);
+    private void setup() {
+        setupCalled = true;
+        display = SwtUtils.getDisplay();
+        ImageDisplay.syncExec(() -> {
+            shell = new Shell(display);
+            if(name != null) shell.setText(name);
 
-         canvasWriter = canvasHandlerMaker.apply(shell);
+            // set the GridLayout on the shell
+            chain(new GridLayout(), l -> l.numColumns = 1, shell::setLayout);
 
-         shell.addListener(SWT.Close, e -> {
-            if(!shell.isDisposed())
-               shell.dispose();
-         });
+            canvasWriter = canvasHandlerMaker.apply(shell);
 
-         shell.open();
-      });
-   }
+            shell.addListener(SWT.Close, e -> {
+                if(!shell.isDisposed())
+                    shell.dispose();
+            });
 
-   @Override
-   public synchronized void update(final Mat image) {
-      if(!setupCalled)
-         setup();
+            shell.open();
+        });
+    }
 
-      canvasWriter.update(image);
-   }
+    @Override
+    public synchronized void update(final Mat image) {
+        if(!setupCalled)
+            setup();
 
-   @Override
-   public void close() {
-      if(display != null) {
-         ImageDisplay.syncExec(() -> {
-            if(canvasWriter != null)
-               canvasWriter.close();
-            if(shell != null)
-               shell.close();
-         });
-      }
-   }
+        canvasWriter.update(image);
+    }
 
-   @Override
-   public void waitUntilClosed() throws InterruptedException {
-      canvasWriter.waitUntilClosed();
-   }
+    @Override
+    public void close() {
+        if(display != null) {
+            ImageDisplay.syncExec(() -> {
+                if(canvasWriter != null)
+                    canvasWriter.close();
+                if(shell != null)
+                    shell.close();
+            });
+        }
+    }
+
+    @Override
+    public void waitUntilClosed() throws InterruptedException {
+        canvasWriter.waitUntilClosed();
+    }
 }

@@ -24,6 +24,7 @@ import net.dempsy.util.QuietCloseable;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.swt.SwtImageDisplay;
+import ai.kognition.pilecv4j.image.display.swt.SwtImageDisplay.CanvasType;
 
 public abstract class ImageDisplay implements QuietCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageDisplay.class);
@@ -116,8 +117,11 @@ public abstract class ImageDisplay implements QuietCloseable {
         public boolean select(Point pointClicked);
     }
 
+    /**
+     * SWT defaults to SWT_SCROLLABLE
+     */
     public static enum Implementation {
-        HIGHGUI, SWT
+        HIGHGUI, SWT, SWT_SCROLLABLE, SWT_RESIZABLE
     }
 
     public static class Builder {
@@ -166,7 +170,10 @@ public abstract class ImageDisplay implements QuietCloseable {
                     return new CvImageDisplay(toShow, windowName, closeCallback, keyPressHandler);
                 }
                 case SWT:
-                    return new SwtImageDisplay(toShow, windowName, closeCallback, keyPressHandler, selectCallback);
+                case SWT_SCROLLABLE:
+                    return new SwtImageDisplay(toShow, windowName, closeCallback, keyPressHandler, selectCallback, CanvasType.SCROLLABLE);
+                case SWT_RESIZABLE:
+                    return new SwtImageDisplay(toShow, windowName, closeCallback, keyPressHandler, selectCallback, CanvasType.RESIZABLE);
                 default:
                     throw new IllegalStateException();
             }
