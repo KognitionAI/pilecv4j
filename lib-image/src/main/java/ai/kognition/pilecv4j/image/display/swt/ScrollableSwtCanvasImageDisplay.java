@@ -8,9 +8,9 @@ import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.widgets.Canvas;
+import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.ScrollBar;
-import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.Mat;
 
 import net.dempsy.util.Functional;
@@ -23,7 +23,7 @@ public class ScrollableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
     private final Point origin = new Point(0, 0);
 
-    public ScrollableSwtCanvasImageDisplay(final Shell parent, final Runnable closeCallback, final KeyPressCallback kpCallback,
+    public ScrollableSwtCanvasImageDisplay(final Composite parent, final Runnable closeCallback, final KeyPressCallback kpCallback,
         final SelectCallback selectCallback) {
 
         super.setup(new Canvas(parent, SWT.NO_BACKGROUND | SWT.NO_REDRAW_RESIZE | SWT.V_SCROLL | SWT.H_SCROLL), closeCallback, kpCallback, selectCallback);
