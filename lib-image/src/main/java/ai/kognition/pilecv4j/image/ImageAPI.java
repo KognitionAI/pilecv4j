@@ -54,6 +54,8 @@ public class ImageAPI {
 
     public static native long CvRaster_copy(long nativeMatHandle);
 
+    public static native long CvRaster_move(long nativeMatHandle);
+
     public static native void CvRaster_assign(long nativeHandleDest, long nativeMatHandleSrc);
 
     public static native Pointer CvRaster_getData(long nativeMatHandle);

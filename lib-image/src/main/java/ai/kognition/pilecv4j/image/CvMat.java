@@ -1,6 +1,5 @@
 package ai.kognition.pilecv4j.image;
 
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
@@ -89,7 +88,6 @@ public class CvMat extends Mat implements AutoCloseable {
     public static final Mat nullMat = new Mat();
 
     private static final Method nDelete;
-    private static final Field nativeObjField;
 
     private boolean deletedAlready = false;
 
@@ -99,10 +97,7 @@ public class CvMat extends Mat implements AutoCloseable {
         try {
             nDelete = org.opencv.core.Mat.class.getDeclaredMethod("n_delete", long.class);
             nDelete.setAccessible(true);
-
-            nativeObjField = org.opencv.core.Mat.class.getDeclaredField("nativeObj");
-            nativeObjField.setAccessible(true);
-        } catch(final NoSuchMethodException | NoSuchFieldException | SecurityException e) {
+        } catch(final NoSuchMethodException | SecurityException e) {
             throw new RuntimeException(
                 "Got an exception trying to access Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
                 e);
@@ -326,7 +321,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * CvMat returned</b>
      */
     public static CvMat move(final Mat mat) {
-        return new CvMat(hijack(mat));
+        return new CvMat(ImageAPI.CvRaster_move(mat.nativeObj));
     }
 
     /**
@@ -434,38 +429,6 @@ public class CvMat extends Mat implements AutoCloseable {
      */
     public static CvMat wrapNative(final long nativeObj) {
         return new CvMat(nativeObj);
-    }
-
-    /**
-     * <p>
-     * This call can be made to decouple the management of a
-     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>'s resources
-     * from the <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>. The
-     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> passed
-     * in <em>SOULD NOT</em> be used after this call or, at least, it shouldn't be assumed
-     * to still be pointing to the same image data.
-     * </p>
-     *
-     * @param mat - <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *     to take control of with the new {@link CvMat}. After this call the
-     *     <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *     passed should not be used.
-     * @return the native reference to the underlying decoupled Mat</b>
-     */
-    protected static long hijack(final Mat mat) {
-        if(mat == null)
-            throw new NullPointerException("Can't pass a null Mat to ");
-
-        final long defaultMatNativeObj = ImageAPI.CvRaster_defaultMat();
-        try {
-            final long nativeObjToUse = mat.nativeObj;
-            nativeObjField.set(mat, defaultMatNativeObj);
-            return nativeObjToUse;
-        } catch(final IllegalAccessException e) {
-            throw new RuntimeException(
-                "Got an exception trying to set Mat.nativeObj. Either the security model is too restrictive or the version of OpenCv can't be supported.",
-                e);
-        }
     }
 
     // Prevent Mat finalize from being called

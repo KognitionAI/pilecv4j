@@ -10,12 +10,13 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.function.Function;
 
+import com.sun.jna.Pointer;
+
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import com.sun.jna.Pointer;
-
 import net.dempsy.util.Functional;
+import net.dempsy.util.QuietCloseable;
 
 /**
  * <p>
@@ -575,31 +576,27 @@ public abstract class CvRaster implements AutoCloseable {
     // ==================================================================
 
     public static class Closer implements AutoCloseable {
-        private final List<AutoCloseable> rastersToClose = new LinkedList<>();
-        private final List<Mat> rawMats = new LinkedList<>();
+        private final List<AutoCloseable> toClose = new LinkedList<>();
 
         public <T extends AutoCloseable> T add(final T mat) {
             if(mat != null)
-                rastersToClose.add(0, mat);
+                toClose.add(0, mat);
             return mat;
         }
 
         public <T extends Mat> T addMat(final T mat) {
+            if(mat == null)
+                return null;
             if(mat instanceof AutoCloseable)
                 add((AutoCloseable)mat);
-            else if(mat != null)
-                rawMats.add(0, mat);
+            else
+                toClose.add(0, (QuietCloseable)() -> CvMat.move(mat).close());
             return mat;
         }
 
         @Override
         public void close() {
-            rastersToClose.stream().forEach(r -> Functional.uncheck(() -> r.close()));
-            rawMats.stream().forEach(r -> CvMat.move(r).close());
-        }
-
-        public void release() {
-            rastersToClose.clear();
+            toClose.stream().forEach(r -> Functional.uncheck(() -> r.close()));
         }
     }
 
