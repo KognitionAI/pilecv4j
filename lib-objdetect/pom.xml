@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>pilecv4j-parent</artifactId>
+        <groupId>ai.kognition.pilecv4j</groupId>
+        <version>0.7-SNAPSHOT</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>lib-objdetect</artifactId>
+    <name>lib-objdetect (${project.version})</name>
+
+    <dependencies>
+        <dependency>
+            <groupId>ai.kognition.pilecv4j</groupId>
+            <artifactId>lib-image</artifactId>
+        </dependency>
+        <dependency> <!-- needed for CascadeClassifier -->
+            <groupId>ai.kognition.pilecv4j</groupId>
+            <artifactId>opencv-lib-jar</artifactId>
+            <classifier>withlib</classifier>
+        </dependency>
+        <!-- Third party deps -->
+        <dependency>
+            <groupId>ai.kognition.pilecv4j</groupId>
+            <artifactId>native-image</artifactId>
+            <classifier>${platform}</classifier>
+        </dependency>
+        <dependency>
+            <groupId>net.java.dev.jna</groupId>
+            <artifactId>jna</artifactId>
+        </dependency>
+        <dependency> <!-- Logging -->
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency> <!-- Needed for the NativeLibraryLoader -->
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+        </dependency>
+
+        <!-- Testing -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>
