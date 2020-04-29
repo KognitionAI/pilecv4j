@@ -67,7 +67,8 @@ import org.slf4j.LoggerFactory;
  */
 public class CvMat extends Mat implements AutoCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
-    private static final boolean TRACK_MEMORY_LEAKS;
+    public static final boolean TRACK_MEMORY_LEAKS;
+
     private boolean skipCloseOnceForReturn = false;
 
     static {
@@ -91,7 +92,8 @@ public class CvMat extends Mat implements AutoCloseable {
 
     private boolean deletedAlready = false;
 
-    private final RuntimeException stackTrace;
+    protected final RuntimeException stackTrace;
+    protected RuntimeException delStackTrace = null;
 
     static {
         try {
@@ -226,6 +228,13 @@ public class CvMat extends Mat implements AutoCloseable {
                         e);
                 }
                 deletedAlready = true;
+                if(TRACK_MEMORY_LEAKS) {
+                    delStackTrace = new RuntimeException("Here's where I was closed");
+                }
+            } else if(TRACK_MEMORY_LEAKS) {
+                LOGGER.warn("TRACKING: Deleting {} again at:", this.getClass().getSimpleName(), new RuntimeException());
+                LOGGER.warn("TRACKING: originally closed at:", delStackTrace);
+                LOGGER.warn("TRACKING: create at: ", stackTrace);
             }
         } else
             skipCloseOnceForReturn = false; // next close counts.
@@ -437,7 +446,7 @@ public class CvMat extends Mat implements AutoCloseable {
         if(!deletedAlready) {
             LOGGER.debug("Finalizing a {} that hasn't been closed.", CvMat.class.getSimpleName());
             if(TRACK_MEMORY_LEAKS)
-                LOGGER.debug("Here's where I was instantiated: ", stackTrace);
+                LOGGER.debug("TRACKING: Here's where I was instantiated: ", stackTrace);
             close();
         }
     }

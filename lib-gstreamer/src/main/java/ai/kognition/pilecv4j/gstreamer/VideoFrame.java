@@ -4,12 +4,16 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
 
 public class VideoFrame extends CvMat {
+    private static final Logger LOGGER = LoggerFactory.getLogger(VideoFrame.class);
 
     public long pts;
     public long dts;
@@ -17,8 +21,10 @@ public class VideoFrame extends CvMat {
     public long decodeTimeMillis;
 
     private final Pool pool;
+    private boolean isInPool = false;
+    private RuntimeException rtpStackTrace = null;
 
-    protected VideoFrame(final long nativeObj, final long pts, final long dts, final long duration, final long decodeTimeMillis) {
+    private VideoFrame(final long nativeObj, final long pts, final long dts, final long duration, final long decodeTimeMillis) {
         super(nativeObj);
         this.pts = pts;
         this.dts = dts;
@@ -58,11 +64,15 @@ public class VideoFrame extends CvMat {
         return VideoFrame.wrapNativeVideoFrame(nativeObj, pts, dts, duration, decodeTimeMillis);
     }
 
-    public VideoFrame setTiming(final long pts, final long dts, final long duration, final long decodeTimeMillis) {
+    private VideoFrame leavingPool(final long pts, final long dts, final long duration, final long decodeTimeMillis) {
         this.pts = pts;
         this.dts = dts;
         this.duration = duration;
         this.decodeTimeMillis = decodeTimeMillis;
+        if(TRACK_MEMORY_LEAKS) {
+            rtpStackTrace = null;
+        }
+        isInPool = false;
         return this;
     }
 
@@ -93,17 +103,19 @@ public class VideoFrame extends CvMat {
                     return new VideoFrame(this, h, w, type, pts, dts, duration, decodeTimeMillis);
                 } else
                     resident.decrementAndGet();
-                return ret.setTiming(pts, dts, duration, decodeTimeMillis);
+                return ret.leavingPool(pts, dts, duration, decodeTimeMillis);
             }
         }
 
-        public void returnToPool(final VideoFrame vf) {
+        // called from VF close
+        private void returnToPool(final VideoFrame vf) {
             final ConcurrentLinkedQueue<VideoFrame> lpool = getPool();
             if(lpool == null) // we're closed
                 vf.reallyClose();
             else {
                 try (final QuietCloseable qc = () -> resources.set(lpool);) {
                     lpool.add(vf);
+                    vf.isInPool = true;
                     resident.incrementAndGet();
                 }
             }
@@ -152,10 +164,19 @@ public class VideoFrame extends CvMat {
 
     @Override
     public void close() {
-        if(pool == null) {
-            reallyClose();
+        if(isInPool) {
+            LOGGER.warn("VideoFrame being closed twice at ", new RuntimeException());
+            if(TRACK_MEMORY_LEAKS) {
+                LOGGER.warn("TRACKING: originally returned to pool at:", rtpStackTrace);
+                LOGGER.warn("TRACKING: create at: ", stackTrace);
+            }
         } else {
-            pool.returnToPool(this);
+            rtpStackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("VideoFrame Returned to pool here") : null;
+            if(pool == null) {
+                reallyClose();
+            } else {
+                pool.returnToPool(this);
+            }
         }
     }
 
@@ -178,7 +199,7 @@ public class VideoFrame extends CvMat {
     }
 
     public VideoFrame shallowCopy() {
-        return new VideoFrame(ImageAPI.CvRaster_copy(nativeObj), pts, dts, duration);
+        return new VideoFrame(ImageAPI.CvRaster_copy(nativeObj), pts, dts, duration, decodeTimeMillis);
     }
 
     private static VideoFrame wrapNativeVideoFrame(final long nativeObj, final long pts, final long dts, final long duration, final long decodeTimeMillis) {

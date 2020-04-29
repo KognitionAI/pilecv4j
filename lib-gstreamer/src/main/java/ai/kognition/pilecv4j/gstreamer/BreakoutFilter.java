@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.UnaryOperator;
+import java.util.function.Supplier;
 import java.util.stream.IntStream;
 
 import org.freedesktop.gstreamer.Caps;
@@ -325,7 +325,7 @@ public class BreakoutFilter extends BaseTransform {
             storedBuffers.set(VideoFrame.getPool(frame.rows(), frame.cols(), frame.type()));
         }
 
-        VideoFrame.Pool getPoolX(final VideoFrame frame) {
+        VideoFrame.Pool getPool(final VideoFrame frame) {
             return storedBuffers.get();
         }
     }
@@ -398,7 +398,7 @@ public class BreakoutFilter extends BaseTransform {
             final CvMatAndCaps res = result.getAndSet(null);
             if(res != null || firstOne) { // yes. we can pass the current frame over.
                 dispose(to.getAndSet(
-                    new CvMatAndCaps(frame.pooledDeepCopy(getPoolX(frame)), frameAndCaps.caps, true)));
+                    new CvMatAndCaps(frame.pooledDeepCopy(getPool(frame)), frameAndCaps.caps, true)));
 
                 if(res != null) {
                     dispose(current); // and set the current spinner on the latest result
@@ -430,21 +430,30 @@ public class BreakoutFilter extends BaseTransform {
                 current.mat.copyTo(frame);
             }
         }
-
     }
 
-    private static class PseudoAtomicReference<T> {
+    static class PseudoAtomicReference<T> {
         public T ref;
 
         public PseudoAtomicReference(final T o) {
             ref = o;
         }
 
-        public T updateAndGet(final UnaryOperator<T> updateFunction) {
+        public void computeIfAbsent(final Supplier<T> updateFunction) {
             synchronized(this) {
-                ref = updateFunction.apply(ref);
+                if(ref == null) {
+                    ref = updateFunction.get();
+                    notify();
+                }
+            }
+        }
+
+        public T getAndSet(final T newVal) {
+            synchronized(this) {
+                final T ret = ref;
+                ref = newVal;
                 notify();
-                return ref;
+                return ret;
             }
         }
 
@@ -507,7 +516,32 @@ public class BreakoutFilter extends BaseTransform {
         public void accept(final CvMatAndCaps frameAndCaps) {
             final VideoFrame frame = frameAndCaps.mat;
 
-            dispose(to.updateAndGet(mac -> (mac == null) ? new CvMatAndCaps(frame.pooledDeepCopy(getPoolX(frame)), frameAndCaps.caps, true) : mac));
+            // This works but will leave the OLDEST frame
+            // for the other side of the `to` queue to
+            // work with. However, it will be slightly more
+            // cpu friendly when frames are missed.
+            //
+            // to.computeIfAbsent(() -> new CvMatAndCaps(
+            // frame.pooledDeepCopy(getPool(frame)),
+            // frameAndCaps.caps,
+            // true));
+
+            dispose(to.getAndSet(new CvMatAndCaps(
+                frame.pooledDeepCopy(getPool(frame)),
+                frameAndCaps.caps,
+                true)));
+
+            // TODO:
+            // This uses the original gstreamer data buffer but
+            // unfortunately gstreamer owns it so this can crash
+            // unexpectedly. Changing to ffmpeg and allocating
+            // out own frame space will allow us to move the data
+            // using a zero-copy technique
+            //
+            // dispose(to.getAndSet(new CvMatAndCaps(
+            // frame.shallowCopy(),
+            // frameAndCaps.caps,
+            // true)));
         }
     }
 
