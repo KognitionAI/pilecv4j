@@ -73,7 +73,7 @@ public class ImageFile {
      * </p>
      *
      * @return a new {@link BufferedImage} constructed from the decoded file
-     *         contents.
+     * contents.
      */
     public static BufferedImage readBufferedImageFromFile(final String filename) throws IOException {
         return readBufferedImageFromFile(filename, 0);
@@ -111,7 +111,7 @@ public class ImageFile {
      * </p>
      *
      * @return a new {@link CvMat} constructed from the decoded file contents.
-     *         <b>Note: The caller owns the CvMat returned</b>
+     * <b>Note: The caller owns the CvMat returned</b>
      */
     public static CvMat readMatFromFile(final String filename, final int mode) throws IOException {
         return doReadMatFromFile(filename, true, mode);
@@ -124,7 +124,7 @@ public class ImageFile {
     public static void writeImageFile(final BufferedImage ri, final String filename) throws IOException {
         if(!doWrite(ri, filename)) {
             LOGGER.debug("Failed to write '" + filename + "' using ImageIO");
-            try (CvMat mat = Utils.img2CvMat(ri);) {
+            try(CvMat mat = Utils.img2CvMat(ri);) {
                 if(!doWrite(mat, filename, true))
                     throw new IllegalArgumentException("Failed to write");
             }
@@ -217,15 +217,15 @@ public class ImageFile {
         return bi;
     }
 
-    private static CvMat doReadMatFromFile(final String filename, final boolean tryOther, final int mode) throws IOException {
+    private synchronized static CvMat doReadMatFromFile(final String filename, final boolean tryOther, final int mode) throws IOException {
         LOGGER.trace("OCV Reading CvMat from {}", filename);
         final File f = new File(filename);
         if(!f.exists())
             throw new FileNotFoundException(filename);
 
-        try (final CvMat mat = CvMat.move(Imgcodecs.imread(filename, mode));) {
+        try(final CvMat mat = CvMat.move(Imgcodecs.imread(filename, mode));) {
             if(tryOther && (mat == null || (mat.rows() == 0 && mat.cols() == 0))) {
-                LOGGER.debug("OCV Failed to read '" + filename + "' using OpenCV");
+                LOGGER.warn("OCV Failed to read '" + filename + "' using OpenCV");
                 try {
                     return Utils.img2CvMat(doReadBufferedImageFromFile(filename, false, 0));
                 } catch(final IllegalArgumentException iae) { //
@@ -290,7 +290,7 @@ public class ImageFile {
         Exception lastException = null;
         int cur = 1;
         while(true) {
-            try (ReaderAndStream ras = getNextReaderAndStream(f, cur)) {
+            try(ReaderAndStream ras = getNextReaderAndStream(f, cur)) {
                 if(ras != null) {
                     final ImageReader reader = ras.reader;
                     final ImageReadParam param = reader.getDefaultReadParam();
@@ -334,7 +334,7 @@ public class ImageFile {
             throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in ImageIO");
 
         BufferedImage ret = null;
-        try (final CvMat mat = doReadMatFromFile(filename, false, IMREAD_UNCHANGED);) {
+        try(final CvMat mat = doReadMatFromFile(filename, false, IMREAD_UNCHANGED);) {
             if(mat == null) {
                 if(lastException != null)
                     throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in either ImageIO or OpenCv", lastException);
@@ -364,7 +364,7 @@ public class ImageFile {
         boolean wrote = false;
         while(iter.hasNext()) {
             final ImageWriter writer = iter.next(); // grab the first one
-            try (final ImageOutputStream ios = ImageIO.createImageOutputStream(f);) {
+            try(final ImageOutputStream ios = ImageIO.createImageOutputStream(f);) {
                 final ImageWriteParam param = writer.getDefaultWriteParam();
 
                 writer.setOutput(ios);
@@ -378,7 +378,7 @@ public class ImageFile {
 
     private static boolean doWrite(final Mat ri, final String filename, final boolean canOverwrite) throws IOException {
         LOGGER.trace("Writing image {} to {}", ri, filename);
-        try (final CvMat newMat = new CvMat();) {
+        try(final CvMat newMat = new CvMat();) {
             final Mat toWrite;
             if(filename.endsWith(".jp2")) {
                 toWrite = (canOverwrite) ? ri : newMat;
