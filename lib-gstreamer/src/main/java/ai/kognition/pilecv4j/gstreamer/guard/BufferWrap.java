@@ -40,11 +40,11 @@ public class BufferWrap extends GstWrap<Buffer> {
         mapInfo = new MapInfoStruct();
         final boolean ok = GSTBUFFER_API.gst_buffer_map(obj, mapInfo,
             writeable ? GstBufferAPI.GST_MAP_WRITE : GstBufferAPI.GST_MAP_READ);
+        System.out.println(ok);
         if(ok && mapInfo.data != null) {
-            return VideoFrame.create(rows, cols, type, Pointer.nativeValue(mapInfo.data), obj.getPresentationTimestamp().toNanos(),
-                obj.getDecodeTimestamp().toNanos(), obj.getDuration().toNanos(), System.currentTimeMillis());
+            return VideoFrame.create(rows, cols, type, Pointer.nativeValue(mapInfo.data), System.currentTimeMillis());
         }
-        LOGGER.error("Failed to create extract a frame from the buffer.");
+        LOGGER.error("Failed to extract a frame from the buffer.");
         return null;
     }
 

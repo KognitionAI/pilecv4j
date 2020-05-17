@@ -184,7 +184,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * @see CvRaster
      */
     public <T> T rasterOp(final Function<CvRaster, T> function) {
-        try (final CvRaster raster = CvRaster.makeInstance(this)) {
+        try(final CvRaster raster = CvRaster.makeInstance(this)) {
             return function.apply(raster);
         }
     }
@@ -196,7 +196,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * @see CvRaster
      */
     public void rasterAp(final Consumer<CvRaster> function) {
-        try (final CvRaster raster = CvRaster.makeInstance(this)) {
+        try(final CvRaster raster = CvRaster.makeInstance(this)) {
             function.accept(raster);
         }
     }
@@ -259,7 +259,7 @@ public class CvMat extends Mat implements AutoCloseable {
         if(mat instanceof CvMat)
             return ((CvMat)mat).rasterOp(function);
         else {
-            try (final CvRaster raster = CvRaster.makeInstance(mat)) {
+            try(final CvRaster raster = CvRaster.makeInstance(mat)) {
                 return function.apply(raster);
             }
         }
@@ -278,7 +278,7 @@ public class CvMat extends Mat implements AutoCloseable {
         if(mat instanceof CvMat)
             ((CvMat)mat).rasterAp(function);
         else {
-            try (final CvRaster raster = CvRaster.makeInstance(mat)) {
+            try(final CvRaster raster = CvRaster.makeInstance(mat)) {
                 function.accept(raster);
             }
         }
@@ -444,7 +444,7 @@ public class CvMat extends Mat implements AutoCloseable {
     @Override
     protected void finalize() throws Throwable {
         if(!deletedAlready) {
-            LOGGER.debug("Finalizing a {} that hasn't been closed.", CvMat.class.getSimpleName());
+            LOGGER.debug("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
             if(TRACK_MEMORY_LEAKS)
                 LOGGER.debug("TRACKING: Here's where I was instantiated: ", stackTrace);
             close();

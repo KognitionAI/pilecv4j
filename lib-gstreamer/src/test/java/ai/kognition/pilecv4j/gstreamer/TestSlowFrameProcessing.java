@@ -10,11 +10,11 @@ import java.net.URI;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.freedesktop.gstreamer.Pipeline;
+import org.junit.After;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.FrameEmitter;
@@ -29,10 +29,19 @@ public class TestSlowFrameProcessing {
     final static URI STREAM = new File(
         TestFrameCatcherUnusedCleansUp.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile()).toURI();
 
+    @After
+    public void after() {
+        for(int i = 0; i < 100; i++) {
+            System.gc();
+            uncheck(() -> Thread.sleep(10));
+        }
+        LOGGER.info("Done!");
+    }
+
     @Test
     public void testSlowFrameProcessing() throws Exception {
         final AtomicLong slowFramesProcessed = new AtomicLong(0);
-        try (final GstScope m = new GstScope(TestSlowFrameProcessing.class);
+        try(final GstScope m = new GstScope(TestSlowFrameProcessing.class);
             final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 60);
             final FrameCatcher fc = new FrameCatcher("framecatcher");) {
 
@@ -42,10 +51,10 @@ public class TestSlowFrameProcessing {
                 .make("videoconvert")
                 .caps("video/x-raw")
                 .add(new BreakoutFilter("filter1")
-                    .slowFilter((final CvMatAndCaps bac) -> {
+                    .slowFilter((final VideoFrame bac) -> {
                         if(FrameEmitter.HACK_FRAME)
-                            LOGGER.trace("byte0 " + bac.mat.rasterOp(r -> r.underlying().get(0)));
-                        System.out.println("" + bac.mat);
+                            LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
+                        System.out.println("" + bac);
                         uncheck(() -> Thread.sleep(100)); // ~10 frame/second
                         slowFramesProcessed.incrementAndGet();
                     }))

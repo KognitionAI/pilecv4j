@@ -31,7 +31,6 @@ import org.tensorflow.Session.Runner;
 import org.tensorflow.Tensor;
 import org.tensorflow.types.UInt8;
 
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.od.ObjectDetection;
 import ai.kognition.pilecv4j.image.Utils;
 import ai.kognition.pilecv4j.tf.TensorUtils;
@@ -66,18 +65,18 @@ public class TestBedTensorFlow extends BaseTest {
 
         // ====================================================================
         final List<String> labels = Files.readAllLines(Paths.get(labelUri), Charset.forName("UTF-8"));
-        try (final Session session = new Session(graph);) {
+        try(final Session session = new Session(graph);) {
 
             final BreakoutFilter bin = new BreakoutFilter("od")
-                .slowFilter((final CvMatAndCaps bac) -> {
-                    final VideoFrame mat = bac.mat;
+                .slowFilter((final VideoFrame bac) -> {
+                    final VideoFrame mat = bac;
                     final List<ObjectDetection> det = mat.rasterOp(r -> {
                         final ByteBuffer bb = r.underlying();
                         bb.rewind();
-                        final int w = bac.width;
-                        final int h = bac.height;
+                        final int w = mat.width();
+                        final int h = mat.height();
 
-                        try (final Tensor<UInt8> tensor = Tensor.create(UInt8.class, new long[] {1,h,w,3}, bb);) {
+                        try(final Tensor<UInt8> tensor = Tensor.create(UInt8.class, new long[] {1,h,w,3}, bb);) {
                             bb.rewind(); // need to rewind after being passed to create
                             return executeGraph(graph, tensor, session);
                         }
@@ -147,7 +146,7 @@ public class TestBedTensorFlow extends BaseTest {
 
             Thread.sleep(5000);
 
-            try (final PrintStream ps = new PrintStream(new File("/tmp/pipeline.txt"))) {
+            try(final PrintStream ps = new PrintStream(new File("/tmp/pipeline.txt"))) {
                 printDetails(pipe, ps);
             }
 

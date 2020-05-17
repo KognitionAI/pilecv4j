@@ -15,59 +15,43 @@ import ai.kognition.pilecv4j.image.ImageAPI;
 public class VideoFrame extends CvMat {
     private static final Logger LOGGER = LoggerFactory.getLogger(VideoFrame.class);
 
-    public long pts;
-    public long dts;
-    public long duration;
     public long decodeTimeMillis;
 
     private final Pool pool;
     private boolean isInPool = false;
     private RuntimeException rtpStackTrace = null;
+    private boolean skipCloseOnceForReturn = false;
 
-    private VideoFrame(final long nativeObj, final long pts, final long dts, final long duration, final long decodeTimeMillis) {
+    protected VideoFrame(final long nativeObj, final long decodeTimeMillis) {
         super(nativeObj);
-        this.pts = pts;
-        this.dts = dts;
-        this.duration = duration;
         this.pool = null;
         this.decodeTimeMillis = decodeTimeMillis;
     }
 
-    public VideoFrame(final long pts, final long dts, final long duration, final long decodeTimeMillis) {
+    public VideoFrame(final long decodeTimeMillis) {
         super();
-        this.pts = pts;
-        this.dts = dts;
-        this.duration = duration;
         this.pool = null;
         this.decodeTimeMillis = decodeTimeMillis;
     }
 
-    public VideoFrame(final int h, final int w, final int type, final long pts, final long dts, final long duration, final long decodeTimeMillis) {
-        this(null, h, w, type, pts, dts, duration, decodeTimeMillis);
+    public VideoFrame(final int h, final int w, final int type, final long decodeTimeMillis) {
+        this(null, h, w, type, decodeTimeMillis);
     }
 
-    private VideoFrame(final Pool pool, final int h, final int w, final int type, final long pts, final long dts, final long duration,
-        final long decodeTimeMillis) {
+    private VideoFrame(final Pool pool, final int h, final int w, final int type, final long decodeTimeMillis) {
         super(h, w, type);
-        this.pts = pts;
-        this.dts = dts;
-        this.duration = duration;
         this.pool = pool;
         this.decodeTimeMillis = decodeTimeMillis;
     }
 
-    public static VideoFrame create(final int rows, final int cols, final int type, final long pointer, final long pts, final long dts, final long duration,
-        final long decodeTimeMillis) {
+    public static VideoFrame create(final int rows, final int cols, final int type, final long pointer, final long decodeTimeMillis) {
         final long nativeObj = ImageAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
         if(nativeObj == 0)
             throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
-        return VideoFrame.wrapNativeVideoFrame(nativeObj, pts, dts, duration, decodeTimeMillis);
+        return VideoFrame.wrapNativeVideoFrame(nativeObj, decodeTimeMillis);
     }
 
-    private VideoFrame leavingPool(final long pts, final long dts, final long duration, final long decodeTimeMillis) {
-        this.pts = pts;
-        this.dts = dts;
-        this.duration = duration;
+    private VideoFrame leavingPool(final long decodeTimeMillis) {
         this.decodeTimeMillis = decodeTimeMillis;
         if(TRACK_MEMORY_LEAKS) {
             rtpStackTrace = null;
@@ -92,18 +76,18 @@ public class VideoFrame extends CvMat {
             this.type = type;
         }
 
-        public VideoFrame get(final long pts, final long dts, final long duration, final long decodeTimeMillis) {
+        public VideoFrame get(final long decodeTimeMillis) {
             final ConcurrentLinkedQueue<VideoFrame> lpool = getPool();
             if(lpool == null) // we're closed
                 throw new IllegalStateException("VideoFrame Pool is shut down");
-            try (QuietCloseable qc = () -> resources.set(lpool)) {
+            try(QuietCloseable qc = () -> resources.set(lpool)) {
                 final VideoFrame ret = lpool.poll();
                 if(ret == null) {
                     totalSize.incrementAndGet();
-                    return new VideoFrame(this, h, w, type, pts, dts, duration, decodeTimeMillis);
+                    return new VideoFrame(this, h, w, type, decodeTimeMillis);
                 } else
                     resident.decrementAndGet();
-                return ret.leavingPool(pts, dts, duration, decodeTimeMillis);
+                return ret.leavingPool(decodeTimeMillis);
             }
         }
 
@@ -113,7 +97,7 @@ public class VideoFrame extends CvMat {
             if(lpool == null) // we're closed
                 vf.reallyClose();
             else {
-                try (final QuietCloseable qc = () -> resources.set(lpool);) {
+                try(final QuietCloseable qc = () -> resources.set(lpool);) {
                     lpool.add(vf);
                     vf.isInPool = true;
                     resident.incrementAndGet();
@@ -156,14 +140,22 @@ public class VideoFrame extends CvMat {
     @Override
     public String toString() {
         return VideoFrame.class.getSimpleName() + ": (" + getClass().getName() + "@" + Integer.toHexString(hashCode()) + ")"
-            + ", pts: " + pts
-            + ", dts: " + dts
-            + ", duration: " + duration
             + super.toString();
     }
 
     @Override
+    public VideoFrame returnMe() {
+        // hacky, yet efficient.
+        skipCloseOnceForReturn = true;
+        return this;
+    }
+
+    @Override
     public void close() {
+        if(skipCloseOnceForReturn) {
+            skipCloseOnceForReturn = false;
+            return;
+        }
         if(isInPool) {
             LOGGER.warn("VideoFrame being closed twice at ", new RuntimeException());
             if(TRACK_MEMORY_LEAKS) {
@@ -185,24 +177,24 @@ public class VideoFrame extends CvMat {
     }
 
     public VideoFrame pooledDeepCopy(final Pool ppool) {
-        final VideoFrame newMat = ppool.get(pts, dts, duration, decodeTimeMillis);
+        final VideoFrame newMat = ppool.get(decodeTimeMillis);
         if(rows() != 0)
             copyTo(newMat);
         return newMat;
     }
 
     public VideoFrame deepCopy() {
-        final VideoFrame newMat = pool == null ? new VideoFrame(pts, dts, duration, decodeTimeMillis) : pool.get(pts, dts, duration, decodeTimeMillis);
+        final VideoFrame newMat = pool == null ? new VideoFrame(decodeTimeMillis) : pool.get(decodeTimeMillis);
         if(rows() != 0)
             copyTo(newMat);
         return newMat;
     }
 
     public VideoFrame shallowCopy() {
-        return new VideoFrame(ImageAPI.CvRaster_copy(nativeObj), pts, dts, duration, decodeTimeMillis);
+        return new VideoFrame(ImageAPI.CvRaster_copy(nativeObj), decodeTimeMillis);
     }
 
-    private static VideoFrame wrapNativeVideoFrame(final long nativeObj, final long pts, final long dts, final long duration, final long decodeTimeMillis) {
-        return new VideoFrame(nativeObj, pts, dts, duration, decodeTimeMillis);
+    private static VideoFrame wrapNativeVideoFrame(final long nativeObj, final long decodeTimeMillis) {
+        return new VideoFrame(nativeObj, decodeTimeMillis);
     }
 }

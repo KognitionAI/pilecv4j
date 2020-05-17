@@ -10,8 +10,8 @@ import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.gstreamer.BinManager;
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.CapsBuilder;
+import ai.kognition.pilecv4j.gstreamer.VideoFrame;
 import ai.kognition.pilecv4j.gstreamer.guard.ElementWrap;
 
 /**
@@ -31,9 +31,9 @@ public class FrameEmitter implements AutoCloseable {
     public FrameEmitter(final String sourceUri, final int numFrames) {
         final int seq = sequence.getAndIncrement();
         breakout = new BreakoutFilter("emitter" + seq)
-            .filter((final CvMatAndCaps bac) -> {
+            .filter((final VideoFrame bac) -> {
                 if(HACK_FRAME)
-                    bac.mat.rasterAp(r -> r.underlying().put(0, (byte)curFrames));
+                    bac.rasterAp(r -> r.underlying().put(0, (byte)curFrames));
                 if(isDone()) {
                     if(!emitted) {
                         breakout.sendEvent(new EOSEvent());

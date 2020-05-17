@@ -40,7 +40,7 @@
 #include <gst/video/video-frame.h>
 #include <gst/video/gstvideofilter.h>
 #include "gstbreakout.h"
-
+#include <stdint.h>
 #include <stdio.h>
 #include "gstbreakout-marshal.h"
 
@@ -83,8 +83,6 @@ typedef struct {
   guint32 width;
   guint32 height;
 } FrameDetails;
-
-void gst_breakout_current_frame_details(GstBreakout* breakout, FrameDetails* details);
 
 enum
 {
@@ -282,6 +280,11 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
   return GST_FLOW_OK;
 }
 
+uint64_t who_am_i(GstBreakout* breakout) {
+  return (uint64_t)breakout;
+}
+
+
 GstBuffer *
 gst_breakout_current_frame_buffer (GstBreakout * breakout)
 {
@@ -303,38 +306,6 @@ gst_breakout_current_frame_buffer (GstBreakout * breakout)
   }
 }
 
-guint32 gst_breakout_current_frame_width(GstBreakout* breakout) {
-  GstVideoFrame* current;
-
-  current = breakout->cur;
-  if (current == NULL)
-    goto nothing;
-
-  return GST_VIDEO_FRAME_WIDTH(current);
-
-  nothing:
-  {
-    GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
-    return -1;
-  }
-}
-
-guint32 gst_breakout_current_frame_height(GstBreakout* breakout) {
-  GstVideoFrame* current;
-
-  current = breakout->cur;
-  if (current == NULL)
-    goto nothing;
-
-  return GST_VIDEO_FRAME_HEIGHT(current);
-
-  nothing:
-  {
-    GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
-    return -1;
-  }
-}
-
 GstCaps* gst_breakout_current_frame_caps(GstBreakout* breakout) {
   GstVideoFrame* current;
 
@@ -351,31 +322,6 @@ GstCaps* gst_breakout_current_frame_caps(GstBreakout* breakout) {
   }
 }
 
-void gst_breakout_current_frame_details(GstBreakout* breakout, FrameDetails* details) {
-  GstVideoFrame* current;
-
-  current = breakout->cur;
-  if (current == NULL)
-    goto nothing;
-
-  details->buffer = current->buffer;
-  details->caps = gst_video_info_to_caps(&(current->info));
-  details->width = GST_VIDEO_FRAME_WIDTH(current);
-  details->height = GST_VIDEO_FRAME_HEIGHT(current);
-
-  nothing:
-  {
-    GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
-  }
-}
-
-
-
-//static GstFlowReturn gst_breakout_prepare_output_buffer (GstBaseTransform * trans,
-//    GstBuffer *input, GstBuffer **output) {
-//  *output = gst_buffer_make_writable(input);
-//  return GST_FLOW_OK;
-//}
 
 static gboolean plugin_init (GstPlugin * plugin) {
   // Since this is not meant to be used from a decodebin the rank is NONE

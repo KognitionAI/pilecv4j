@@ -2,7 +2,6 @@ package ai.kognition.pilecv4j.gstreamer;
 
 import static net.dempsy.util.Functional.chain;
 
-import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Pipeline;
 import org.freedesktop.gstreamer.event.EOSEvent;
 import org.opencv.core.Size;
@@ -12,7 +11,6 @@ import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.MutableRef;
 
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter.CvMatAndCaps;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.Utils;
@@ -117,31 +115,21 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
         }
     }
 
-    private static final Caps rgbFormatCaps = new Caps("video/x-raw,format=RGB");
-
     @Override
-    public void accept(final CvMatAndCaps rac) {
-        final VideoFrame mx = rac.mat;
-        final Caps caps = rac.caps;
+    public void accept(final VideoFrame rac) {
+        final VideoFrame mx = rac;
 
-        final boolean convertToBgr = caps != null && !caps.intersect(rgbFormatCaps).isEmpty();
-
-        try (final Closer closer = new Closer();) {
+        try(final Closer closer = new Closer();) {
             if(screenDim != null) {
                 if(adjustedSize.ref == null) {
                     adjustedSize.ref = Utils.preserveAspectRatio(mx, screenDim);
                 }
 
-                final VideoFrame lmat = chain(closer.add(new VideoFrame(mx.pts, mx.dts, mx.duration, mx.decodeTimeMillis)),
+                final VideoFrame lmat = chain(closer.add(new VideoFrame(mx.decodeTimeMillis)),
                     m -> Imgproc.resize(mx, m, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST));
-                final VideoFrame lmat2 = convertToBgr
-                    ? chain(closer.add(new VideoFrame(mx.pts, mx.dts, mx.duration, mx.decodeTimeMillis)), m -> Imgproc.cvtColor(lmat, m, Imgproc.COLOR_RGB2BGR))
-                    : lmat;
-                process(lmat2);
+                process(lmat);
             } else {
-                final VideoFrame lmat = convertToBgr
-                    ? chain(closer.add(new VideoFrame(mx.pts, mx.dts, mx.duration, mx.decodeTimeMillis)), m -> Imgproc.cvtColor(mx, m, Imgproc.COLOR_RGB2BGR))
-                    : (deepCopy ? mx.deepCopy() : mx.shallowCopy());
+                final VideoFrame lmat = (deepCopy ? mx.deepCopy() : mx.shallowCopy());
                 process(lmat);
             }
         }

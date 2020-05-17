@@ -271,12 +271,17 @@ public class BinManager {
      */
     public Pipeline buildPipeline() {
         final Pipeline pipe = new Pipeline() {
+            boolean alreadyDisposed = false;
+
             @Override
             public void dispose() {
-                if(LOGGER.isTraceEnabled())
-                    LOGGER.trace("disposing {} with a ref count of {}", this, this.getRefCount());
-                super.dispose();
-                disposeAll(primary);
+                if(!alreadyDisposed) {
+                    if(LOGGER.isTraceEnabled())
+                        LOGGER.trace("disposing {} with a ref count of {}", this, this.getRefCount());
+                    super.dispose();
+                    disposeAll(primary);
+                }
+                alreadyDisposed = true;
             }
         };
         final Pipeline ret = postPocess(build(pipe, false));

@@ -24,10 +24,10 @@ public class TestBreakoutFilter extends BaseTest {
 
     @Test
     public void testBreakoutFilterLoad() throws Exception {
-        try (final GstScope main = new GstScope();) {
+        try(final GstScope main = new GstScope();) {
             final BreakoutFilter breakout = (BreakoutFilter)ElementFactory.make("breakout", "breakout");
             breakout.filter(mac -> {
-                final VideoFrame mat = mac.mat;
+                final VideoFrame mat = mac;
                 final int thickness = 5;
                 Imgproc.rectangle(mat, new Point(0.9 * mat.width(), 0.9 * mat.height()),
                     new Point(0.1 * mat.width(), 0.1 * mat.height()),
@@ -36,7 +36,7 @@ public class TestBreakoutFilter extends BaseTest {
 
             List<Frame> frames = null;
 
-            try (final FrameCatcher fc = new FrameCatcher("framecatcher");
+            try(final FrameCatcher fc = new FrameCatcher("framecatcher");
                 final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);) {
 
                 final Pipeline pipe = new BinManager()
