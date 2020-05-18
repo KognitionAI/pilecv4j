@@ -49,6 +49,10 @@ import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.dempsy.util.Functional;
+import net.dempsy.util.MutableInt;
+import net.dempsy.util.QuietCloseable;
+
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelConsumer;
@@ -63,10 +67,6 @@ import ai.kognition.pilecv4j.image.CvRaster.ShortPixelConsumer;
 import ai.kognition.pilecv4j.image.geometry.PerpendicularLine;
 import ai.kognition.pilecv4j.image.geometry.Point;
 import ai.kognition.pilecv4j.image.geometry.SimplePoint;
-
-import net.dempsy.util.Functional;
-import net.dempsy.util.MutableInt;
-import net.dempsy.util.QuietCloseable;
 
 public class Utils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
@@ -198,10 +198,10 @@ public class Utils {
      * TODO: 16-bit per channel color images
      *
      * @param in <a href=
-     *            "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *            to be converted
+     *     "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     *     to be converted
      * @return new {@link BufferedImage} from the <a href=
-     *         "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     * "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
      */
     public static BufferedImage mat2Img(final Mat in) {
         final int inChannels = in.channels();
@@ -246,7 +246,7 @@ public class Utils {
             final int width = in.cols();
 
             // flatten so every pixel is a separate row
-            try (final CvMat reshaped = CvMat.move(in.reshape(1, height * width));
+            try(final CvMat reshaped = CvMat.move(in.reshape(1, height * width));
                 // type to 32F
                 final CvMat typed = Functional.chain(new CvMat(), m -> reshaped.convertTo(m, CvType.CV_32F));
                 // color transform which just reorganizes the pixels.
@@ -326,9 +326,9 @@ public class Utils {
      * @param mat to dump print to the {@link PrintStream}
      * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
      * @param numRows limit the number of rows to the given number. Supply -1 for
-     *            the all rows.
+     *     the all rows.
      * @param numCols limit the number of columns to the given number. Supply -1 for
-     *            the all columns.
+     *     the all columns.
      */
     public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
         CvMat.rasterAp(mat, raster -> dump(raster, out, numRows, numCols));
@@ -380,9 +380,9 @@ public class Utils {
      * @param raster to dump print to the {@link PrintStream}
      * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
      * @param numRows limit the number of rows to the given number. Supply -1 for
-     *            the all rows.
+     *     the all rows.
      * @param numCols limit the number of columns to the given number. Supply -1 for
-     *            the all columns.
+     *     the all columns.
      */
     @SuppressWarnings("unchecked")
     private static void dump(final CvRaster raster, final PrintStream out, int numRows, int numCols) {
@@ -465,7 +465,7 @@ public class Utils {
                         + dataBuffer.getClass().getSimpleName());
                 final DataBufferByte bb = (DataBufferByte)dataBuffer;
                 final byte[] srcdata = bb.getData();
-                try (final CvMat ret = new CvMat(h, w, CvType.CV_8UC1);) {
+                try(final CvMat ret = new CvMat(h, w, CvType.CV_8UC1);) {
                     ret.put(0, 0, srcdata);
                     return ret.returnMe();
                 }
@@ -477,7 +477,7 @@ public class Utils {
                         + dataBuffer.getClass().getSimpleName());
                 final DataBufferUShort bb = (DataBufferUShort)dataBuffer;
                 final short[] srcdata = bb.getData();
-                try (final CvMat ret = new CvMat(h, w, CvType.CV_16UC1);) {
+                try(final CvMat ret = new CvMat(h, w, CvType.CV_16UC1);) {
                     ret.put(0, 0, srcdata);
                     return ret.returnMe();
                 }
@@ -498,7 +498,7 @@ public class Utils {
         final int h = bufferedImage.getHeight();
 
         final int[] rgbs = bufferedImage.getRGB(0, 0, w, h, null, 0, w);
-        try (CvMat mat = new CvMat(h, w, CvType.CV_32SC1);) {
+        try(CvMat mat = new CvMat(h, w, CvType.CV_32SC1);) {
             mat.put(0, 0, rgbs);
             final boolean hasAlpha = cm.hasAlpha();
             return transformDirect(mat, hasAlpha, cm.isAlphaPremultiplied(), hasAlpha ? stdARGBMasks : stdRGBMasks);
@@ -535,7 +535,7 @@ public class Utils {
         }
 
         final int[] bitsPerChannel = ccmCeckBitsPerChannel(cm);
-        try (final CvMat cmykMat = putDataBufferIntoMat(bufferedImage.getData().getDataBuffer(), h, w, bitsPerChannel.length);
+        try(final CvMat cmykMat = putDataBufferIntoMat(bufferedImage.getData().getDataBuffer(), h, w, bitsPerChannel.length);
             final Closer closer = new Closer();) {
 
             final MutableInt mcmy = new MutableInt(0);
@@ -560,7 +560,7 @@ public class Utils {
             final CvMat cmy;
             // pull out the K channel
             if(kchannel) {
-                try (final Closer c2 = new Closer();) {
+                try(final Closer c2 = new Closer();) {
                     final List<Mat> channels = new ArrayList<>(4);
                     Core.split(cmykMat, channels);
                     channels.forEach(m -> c2.addMat(m));
@@ -605,7 +605,7 @@ public class Utils {
             if(!(dataBuffer instanceof DataBufferUShort))
                 throw new IllegalArgumentException("For a 16-bit per channel RGB image the DataBuffer type should be a DataBufferUShort but it's a "
                     + dataBuffer.getClass().getSimpleName());
-            try (CvMat ret = rgbDataBufferUShortToMat((DataBufferUShort)dataBuffer, h, w);) {
+            try(CvMat ret = rgbDataBufferUShortToMat((DataBufferUShort)dataBuffer, h, w);) {
                 if(bpc != 16) {
                     final double maxPixelValue = 65536.0D;
                     final double scale = ((maxPixelValue - 1) / ((1 << bpc) - 1));
@@ -647,7 +647,7 @@ public class Utils {
         final int w = bufferedImage.getWidth();
         final int h = bufferedImage.getHeight();
         final boolean hasAlpha = cm.hasAlpha();
-        try (final CvMat rawMat = putDataBufferIntoMat(bufferedImage.getRaster().getDataBuffer(), h, w, 1);
+        try(final CvMat rawMat = putDataBufferIntoMat(bufferedImage.getRaster().getDataBuffer(), h, w, 1);
             CvMat ret = transformDirect(rawMat, hasAlpha, cm.isAlphaPremultiplied(), cm.getMasks());) {
             return ret.returnMe();
         }
@@ -702,7 +702,7 @@ public class Utils {
             }
         }
 
-        try (final CvMat maskMat = new CvMat(1, 1, CvType.makeType(rawMat.depth(), 1));
+        try(final CvMat maskMat = new CvMat(1, 1, CvType.makeType(rawMat.depth(), 1));
             final CvMat remergedMat = new CvMat();
             Closer closer = new Closer()) {
 
@@ -723,7 +723,7 @@ public class Utils {
                 if(rawMat.depth() == CvType.CV_32S && mask < 0) {
                     // this is a problem since there's no CV_32U so we need to to an extra mask and
                     // shift here.
-                    try (CvMat tmpMat = new CvMat();) {
+                    try(CvMat tmpMat = new CvMat();) {
                         hacked[ch] = true; // mark this channel as hacked.
                         scalarToMat(mask, rawMat.type(), maskMat); // embed the scalar into maskMat
                         Core.bitwise_and(rawMat, maskMat, tmpMat); // ... to do a bitwise_and
@@ -983,7 +983,7 @@ public class Utils {
      * overlay has a pixel value of zero (or zero in all channels).
      */
     public static void overlay(final CvMat original, final CvMat dst, final CvMat overlay) {
-        try (final CvMat gray = new CvMat();
+        try(final CvMat gray = new CvMat();
             final CvMat invMask = new CvMat();
             CvMat maskedOrig = new CvMat()) {
             Imgproc.cvtColor(overlay, gray, Imgproc.COLOR_BGR2GRAY);
@@ -1049,7 +1049,7 @@ public class Utils {
         final int len = r * c;
         final double[] ret = new double[len];
 
-        try (final CvMat toCvrt = CvMat.move(mat.reshape(0, len));) {
+        try(final CvMat toCvrt = CvMat.move(mat.reshape(0, len));) {
             for(int i = 0; i < len; i++)
                 ret[i] = toCvrt.get(i, 0)[0];
         }
@@ -1074,7 +1074,7 @@ public class Utils {
 
     public static CvMat toMat(final double[] a, final boolean row) {
         final int len = a.length;
-        try (final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);) {
+        try(final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);) {
             ret.rasterAp(raster -> raster.apply((FlatDoublePixelSetter)i -> new double[] {a[i]}));
             return ret.returnMe();
         }
@@ -1084,7 +1084,7 @@ public class Utils {
         final int rows = a.length;
         final int cols = a[0].length;
 
-        try (final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);) {
+        try(final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);) {
             ret.rasterAp(raster -> raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]}));
             return ret.returnMe();
         }
@@ -1094,7 +1094,7 @@ public class Utils {
         final int rows = a.length;
         final int cols = a[0].length;
 
-        try (final CvMat ret = new CvMat(rows, cols, CvType.CV_32FC1);) {
+        try(final CvMat ret = new CvMat(rows, cols, CvType.CV_32FC1);) {
             ret.rasterAp(raster -> raster.apply((FloatPixelSetter)(r, c) -> new float[] {a[r][c]}));
             return ret.returnMe();
         }
@@ -1102,11 +1102,11 @@ public class Utils {
 
     public static CvMat pointsToColumns2D(final Mat undistoredPoint) {
         final MatOfPoint2f matOfPoints = new MatOfPoint2f(undistoredPoint);
-        try (final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
+        try(final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
             final double[][] points = matOfPoints.toList().stream()
                 .map(p -> new double[] {p.x,p.y})
                 .toArray(double[][]::new);
-            try (CvMat pointsAsMat = Utils.toMat(points);) {
+            try(CvMat pointsAsMat = Utils.toMat(points);) {
                 return CvMat.move(pointsAsMat.t());
             }
         }
@@ -1114,11 +1114,11 @@ public class Utils {
 
     public static CvMat pointsToColumns3D(final Mat undistoredPoint) {
         final MatOfPoint3f matOfPoints = new MatOfPoint3f(undistoredPoint);
-        try (final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
+        try(final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
             final double[][] points = matOfPoints.toList().stream()
                 .map(p -> new double[] {p.x,p.y,p.z})
                 .toArray(double[][]::new);
-            try (CvMat pointsAsMat = Utils.toMat(points);) {
+            try(CvMat pointsAsMat = Utils.toMat(points);) {
                 return CvMat.move(pointsAsMat.t());
             }
         }
@@ -1199,13 +1199,13 @@ public class Utils {
     }
 
     private static CvMat abgrDataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final boolean hasAlpha) {
-        try (final CvMat retMat = new CvMat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);) {
+        try(final CvMat retMat = new CvMat(h, w, hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);) {
             final byte[] inpixels = bb.getData();
             retMat.put(0, 0, inpixels);
             if(!hasAlpha) { // indicates a pixel compatible format since the only option is TYPE_3BYTE_BGR
                 return retMat.returnMe();
             } else { // then it's ABGR -> BGRA
-                try (final CvMat reshaped = CvMat.move(retMat.reshape(1, h * w));
+                try(final CvMat reshaped = CvMat.move(retMat.reshape(1, h * w));
                     // type to 32F so we can multiple it by the matrix. It would be nice of there
                     // was an integer 'gemm'
                     // call on Imgproc
@@ -1234,7 +1234,7 @@ public class Utils {
     }
 
     private static CvMat putDataBufferIntIntoMat(final DataBufferInt bb, final int h, final int w, final int numChannels) {
-        try (final CvMat ret = new CvMat(h, w, CvType.makeType(CV_32S, numChannels));) {
+        try(final CvMat ret = new CvMat(h, w, CvType.makeType(CV_32S, numChannels));) {
             final int[] inpixels = bb.getData();
             ret.put(0, 0, inpixels);
             return ret.returnMe();
@@ -1242,7 +1242,7 @@ public class Utils {
     }
 
     private static CvMat putDataBufferUShortIntoMat(final DataBufferUShort bb, final int h, final int w, final int numChannels) {
-        try (final CvMat ret = new CvMat(h, w, CvType.makeType(CV_16U, numChannels));) {
+        try(final CvMat ret = new CvMat(h, w, CvType.makeType(CV_16U, numChannels));) {
             final short[] inpixels = bb.getData();
             ret.put(0, 0, inpixels);
             return ret.returnMe();
@@ -1250,7 +1250,7 @@ public class Utils {
     }
 
     private static CvMat putDataBufferByteIntoMat(final DataBufferByte bb, final int h, final int w, final int numChannels) {
-        try (final CvMat ret = new CvMat(h, w, CvType.makeType(CV_8U, numChannels));) {
+        try(final CvMat ret = new CvMat(h, w, CvType.makeType(CV_8U, numChannels));) {
             final byte[] inpixels = bb.getData();
             ret.put(0, 0, inpixels);
             return ret.returnMe();
@@ -1258,20 +1258,20 @@ public class Utils {
     }
 
     private static CvMat rgbDataBufferUShortToMat(final DataBufferUShort bb, final int h, final int w) {
-        try (final CvMat mat = new CvMat(h, w, CvType.CV_16UC3);) {
+        try(final CvMat mat = new CvMat(h, w, CvType.CV_16UC3);) {
             final short[] inpixels = bb.getData();
             mat.put(0, 0, inpixels);
-            try (CvMat ret = Functional.chain(new CvMat(), m -> Imgproc.cvtColor(mat, m, Imgproc.COLOR_RGB2BGR));) {
+            try(CvMat ret = Functional.chain(new CvMat(), m -> Imgproc.cvtColor(mat, m, Imgproc.COLOR_RGB2BGR));) {
                 return ret.returnMe();
             }
         }
     }
 
     private static CvMat rgbDataBufferByteToMat(final DataBufferByte bb, final int h, final int w) {
-        try (final CvMat mat = new CvMat(h, w, CvType.CV_8UC3);) {
+        try(final CvMat mat = new CvMat(h, w, CvType.CV_8UC3);) {
             final byte[] inpixels = bb.getData();
             mat.put(0, 0, inpixels);
-            try (CvMat ret = Functional.chain(new CvMat(), m -> Imgproc.cvtColor(mat, m, Imgproc.COLOR_RGB2BGR));) {
+            try(CvMat ret = Functional.chain(new CvMat(), m -> Imgproc.cvtColor(mat, m, Imgproc.COLOR_RGB2BGR));) {
                 return ret.returnMe();
             }
         }
