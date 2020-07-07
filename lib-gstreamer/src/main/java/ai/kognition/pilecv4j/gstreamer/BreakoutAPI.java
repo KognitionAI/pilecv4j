@@ -1,5 +1,6 @@
 package ai.kognition.pilecv4j.gstreamer;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -17,11 +18,14 @@ import org.freedesktop.gstreamer.Registry;
 import org.freedesktop.gstreamer.lowlevel.GFunctionMapper;
 import org.freedesktop.gstreamer.lowlevel.GTypeMapper;
 import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
 public interface BreakoutAPI extends Library {
+    public static final Logger LOGGER = LoggerFactory.getLogger(BreakoutAPI.class);
 
     public static final String LIBNAME = "gstbreakout";
 
@@ -33,7 +37,9 @@ public interface BreakoutAPI extends Library {
         if(!inited.getAndSet(true)) {
             NativeLibraryLoader.loader()
                 .library(LIBNAME)
+                .destinationDir(new File(System.getProperty("java.io.tmpdir"), LIBNAME).getAbsolutePath())
                 .addCallback((dir, libname, oslibname) -> {
+                    LOGGER.info("scanning dir:{}, libname:{}, oslibname:{}", dir, libname, oslibname);
                     NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
                     Registry.get().scanPath(dir.getAbsolutePath());
                 })
