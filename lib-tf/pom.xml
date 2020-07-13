@@ -8,8 +8,6 @@
     <version>0.8-SNAPSHOT</version>
   </parent>
   <artifactId>lib-tf</artifactId>
-  <name>lib-tf (${project.version})</name>
-  <description></description>
   <dependencies> 
     <dependency>
       <groupId>junit</groupId>

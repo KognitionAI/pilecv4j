@@ -8,8 +8,6 @@
     <version>0.8-SNAPSHOT</version>
   </parent>
   <artifactId>lib-util</artifactId>
-  <name>lib-util (${project.version})</name>
-  <description>Simple utilities for Jiminger.com</description>
   
   <dependencies>
     <dependency>

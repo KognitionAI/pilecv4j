@@ -8,8 +8,6 @@
     <version>0.8-SNAPSHOT</version>
   </parent>
   <artifactId>lib-gstreamer</artifactId>
-  <name>lib-gstreamer (${project.version})</name>
-  <description></description>
   <dependencies>
     <!-- Internal deps -->
     <dependency>

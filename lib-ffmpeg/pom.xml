@@ -5,11 +5,9 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.6</version>
+    <version>0.8-SNAPSHOT</version>
   </parent>
   <artifactId>lib-ffmpeg</artifactId>
-  <name>lib-ffmpeg (${project.version})</name>
-  <description></description>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>

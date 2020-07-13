@@ -8,8 +8,6 @@
     <version>0.8-SNAPSHOT</version>
   </parent>
   <artifactId>lib-nr</artifactId>
-  <name>lib-nr (${project.version})</name>
-  <description>Numerical Recipies in C support (${project.version}) </description>
 
   <dependencies>
     <dependency>
