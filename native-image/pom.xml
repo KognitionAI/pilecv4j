@@ -7,7 +7,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.8</version>
+    <version>0.9-SNAPSHOT</version>
   </parent>
 
   <artifactId>native-image</artifactId>
