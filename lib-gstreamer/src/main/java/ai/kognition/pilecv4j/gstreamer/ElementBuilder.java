@@ -3,10 +3,8 @@ package ai.kognition.pilecv4j.gstreamer;
 import org.freedesktop.gstreamer.Element;
 import org.freedesktop.gstreamer.ElementFactory;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-
 /**
- *  This class can be used to build an {@link Element} using a builder pattern.
+ * This class can be used to build an {@link Element} using a builder pattern.
  */
 public class ElementBuilder {
     private Element currentElement;
@@ -22,14 +20,14 @@ public class ElementBuilder {
     public ElementBuilder() {}
 
     /**
-     * Add an element that has static pads. 
+     * Add an element that has static pads.
      */
     public ElementBuilder make(final String element) {
         return make(element, nextName(element));
     }
 
     /**
-     * Add an element that has static pads. 
+     * Add an element that has static pads.
      */
     public ElementBuilder make(final String element, final String name) {
         currentElement = ElementFactory.make(element, name);
@@ -47,10 +45,6 @@ public class ElementBuilder {
 
     public Element build() {
         return currentElement;
-    }
-
-    public Element build(final GstScope scope) {
-        return scope.manage(currentElement);
     }
 
     static String nextName(final String basename) {

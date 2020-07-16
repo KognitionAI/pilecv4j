@@ -28,12 +28,12 @@ public class TestBreakoutPassthrough {
 
     @Test
     public void testBreakoutWithPassthrough() throws Exception {
-        try(final GstScope m = new GstScope(TestBreakoutPassthrough.class);
+        try(GstScope scope = new GstScope();
             final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
-            final FrameCatcher fc = new FrameCatcher("framecatcher");) {
+            final FrameCatcher fc = new FrameCatcher("framecatcher");
 
+            @SuppressWarnings("resource")
             final Pipeline pipe = new BinManager()
-                .scope(m)
                 .add(fe.disown())
                 .make("videoconvert")
                 .caps("video/x-raw")
@@ -53,7 +53,7 @@ public class TestBreakoutPassthrough {
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                     }))
                 .add(fc.disown())
-                .buildPipeline();
+                .buildPipeline();) {
 
             // instrument(pipe);
             pipe.play();

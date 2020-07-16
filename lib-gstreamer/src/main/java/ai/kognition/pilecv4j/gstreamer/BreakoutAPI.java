@@ -14,6 +14,7 @@ import com.sun.jna.Pointer;
 
 import org.freedesktop.gstreamer.Buffer;
 import org.freedesktop.gstreamer.Caps;
+import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Registry;
 import org.freedesktop.gstreamer.lowlevel.GFunctionMapper;
 import org.freedesktop.gstreamer.lowlevel.GTypeMapper;
@@ -21,6 +22,7 @@ import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
@@ -32,6 +34,16 @@ public interface BreakoutAPI extends Library {
     public static final AtomicBoolean inited = new AtomicBoolean(false);
 
     public static BreakoutAPI _init() {
+        if(inited.get())
+            throw new IllegalStateException("Cannot initialize the Gstreamer Breakout filter twice.");
+
+        // If we get here but we haven't already initialized Gst itself, then the
+        // setting of the Registry path will be ignored and we wont be able
+        // to find our plugin.
+        if(!Gst.isInitialized())
+            throw new IllegalStateException("You must inititialize Gst prior to referencing the " + BreakoutFilter.class.getSimpleName() + ". You can use "
+                + GstScope.class.getSimpleName() + " to do this.");
+
         CvMat.initOpenCv();
 
         if(!inited.getAndSet(true)) {

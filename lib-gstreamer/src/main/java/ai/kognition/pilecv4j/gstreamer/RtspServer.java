@@ -7,6 +7,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -14,258 +16,268 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 
-import org.freedesktop.gstreamer.Gst;
-import org.freedesktop.gstreamer.GstObject;
-import org.freedesktop.gstreamer.lowlevel.GMainContext;
-import org.freedesktop.gstreamer.lowlevel.GlibAPI;
-import org.freedesktop.gstreamer.lowlevel.MainLoop;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import com.sun.jna.Callback;
 import com.sun.jna.Library;
 import com.sun.jna.Native;
 import com.sun.jna.Pointer;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-import ai.kognition.pilecv4j.gstreamer.guard.GstWrap;
+import org.freedesktop.gstreamer.Gst;
+import org.freedesktop.gstreamer.GstObject;
+import org.freedesktop.gstreamer.glib.GMainContext;
+import org.freedesktop.gstreamer.glib.Natives;
+import org.freedesktop.gstreamer.lowlevel.GlibAPI;
+import org.freedesktop.gstreamer.lowlevel.MainLoop;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class RtspServer implements AutoCloseable {
 
-   // matches the enum GstRTSPFilterResult defined in rtsp-session.h
-   public static final int GST_RTSP_FILTER_REMOVE = 0;
+    // matches the enum GstRTSPFilterResult defined in rtsp-session.h
+    public static final int GST_RTSP_FILTER_REMOVE = 0;
 
-   /**
-    * using DEFAULT_PORT in the startServer command tells the underlying gstreamer
-    * rtsp server to use its default port. That's currently 8554.
-    */
-   public static final int USE_DEFAULT_PORT = -1;
+    /**
+     * using DEFAULT_PORT in the startServer command tells the underlying gstreamer
+     * rtsp server to use its default port. That's currently 8554.
+     */
+    public static final int USE_DEFAULT_PORT = -1;
 
-   /**
-    * Passing EPHEMERAL_PORT to startServer will allow the underlying rtsp server
-    * to bind to an ephemeral port. You can find out what port was chosen by uing
-    * getPort.
-    */
-   public static final int USE_EPHEMERAL_PORT = 0;
+    /**
+     * Passing EPHEMERAL_PORT to startServer will allow the underlying rtsp server
+     * to bind to an ephemeral port. You can find out what port was chosen by uing
+     * getPort.
+     */
+    public static final int USE_EPHEMERAL_PORT = 0;
 
-   private static final Logger LOGGER = LoggerFactory.getLogger(RtspServer.class);
-   private static final API API;
+    private static final Logger LOGGER = LoggerFactory.getLogger(RtspServer.class);
+    private static final API API;
 
-   private final GMainContext mainCtx;
-   private MainLoop mainLoop = null;
-   private RtspServerObject theServer = null;
-   private Thread mainLoopThread = null;
-   private int attachId = -1;
+    private final GMainContext mainCtx;
+    private MainLoop mainLoop = null;
+    private RtspServerObject theServer = null;
+    private Thread mainLoopThread = null;
+    private int attachId = -1;
 
-   private final List<String> mountPoints = new ArrayList<>();
+    private final List<String> mountPoints = new ArrayList<>();
 
-   static {
-      API = Native.loadLibrary("gstrtspserver-1.0", API.class);
-   }
+    static {
+        API = Native.loadLibrary("gstrtspserver-1.0", API.class);
+    }
 
-   private static class RtspServerObject extends GstObject {
-      public RtspServerObject(final Pointer ptr) {
-         super(initializer(ptr));
-      }
-   }
+    private static class RtspServerObject extends GstObject {
+        public RtspServerObject(final Pointer ptr) {
+            super(Natives.initializer(ptr));
+        }
 
-   public RtspServer() {
-      this(Gst.getMainContext());
-   }
+        @Override
+        public Pointer getRawPointer() {
+            return super.getRawPointer();
+        }
+    }
 
-   public RtspServer(final GMainContext context) {
-      this.mainCtx = context;
-   }
+    public RtspServer() {
+        this(Gst.getMainContext());
+    }
 
-   private static class FeedDef {
-      @SuppressWarnings("unused") // this is potentially serialized to a file.
-      public final String name;
-      public String rtspPath = null;
-      public String filePath = null;
+    public RtspServer(final GMainContext context) {
+        this.mainCtx = context;
+    }
 
-      public FeedDef(final String name) {
-         this.name = name;
-      }
-   }
+    private static class FeedDef {
+        @SuppressWarnings("unused") // this is potentially serialized to a file.
+        public final String name;
+        public String rtspPath = null;
+        public String filePath = null;
 
-   private static enum EntryType {
-      feed, path
-   }
+        public FeedDef(final String name) {
+            this.name = name;
+        }
+    }
 
-   private static RtspServer mainServer = null;
+    private static enum EntryType {
+        feed, path
+    }
 
-   public static void main(final String[] args) throws IOException {
-      System.out.println(Arrays.toString(args));
+    private static RtspServer mainServer = null;
 
-      if(args.length != 1) {
-         System.out.println("usage: java -cp [] " + RtspServer.class.getName() + " /path/to/rtsp-server.properties");
-         System.exit(1);
-      }
+    public static void main(final String[] args) throws IOException {
 
-      final Properties props = new Properties();
-      try (final InputStream is = new BufferedInputStream(new FileInputStream(args[0]))) {
-         props.load(is);
-      }
+        System.out.println(Arrays.toString(args));
 
-      final Map<String, FeedDef> feeds = new HashMap<>();
-      props.forEach((k, v) -> {
-         final String key = (String)k;
-         final String value = (String)v;
+        if(args.length != 1) {
+            System.out.println("usage: java -cp [] " + RtspServer.class.getName() + " /path/to/rtsp-server.properties");
+            System.exit(1);
+        }
 
-         // they key needs to be of the form name.[feed|path]=value
-         final int dotIndex = key.indexOf('.');
-         if(dotIndex <= 0)
-            throw new IllegalArgumentException("The form of the entries in the properties file need to be \"[name].feed|path=[value]\". The entry \"" + key
-                  + "=" + value + "\" doesn't match this form.");
-         final String name = key.substring(0, dotIndex);
-         final EntryType type = EntryType.valueOf(key.substring(dotIndex + 1));
+        final Properties props = new Properties();
+        try(final InputStream is = new BufferedInputStream(new FileInputStream(args[0]))) {
+            props.load(is);
+        }
 
-         final FeedDef fd = feeds.computeIfAbsent(name, n -> new FeedDef(n));
-         if(type == EntryType.feed)
-            fd.rtspPath = value;
-         else
-            fd.filePath = value;
-      });
+        final Map<String, FeedDef> feeds = new HashMap<>();
+        props.forEach((k, v) -> {
+            final String key = (String)k;
+            final String value = (String)v;
 
-      try (final GstScope main = new GstScope();) {
-         mainServer = new RtspServer();
-         feeds.values().forEach(fd -> {
+            // they key needs to be of the form name.[feed|path]=value
+            final int dotIndex = key.indexOf('.');
+            if(dotIndex <= 0)
+                throw new IllegalArgumentException("The form of the entries in the properties file need to be \"[name].feed|path=[value]\". The entry \"" + key
+                    + "=" + value + "\" doesn't match this form.");
+            final String name = key.substring(0, dotIndex);
+            final EntryType type = EntryType.valueOf(key.substring(dotIndex + 1));
+
+            final FeedDef fd = feeds.computeIfAbsent(name, n -> new FeedDef(n));
+            if(type == EntryType.feed)
+                fd.rtspPath = value;
+            else
+                fd.filePath = value;
+        });
+
+        mainServer = new RtspServer();
+        feeds.values().forEach(fd -> {
             // if the file is a relative path then we need to construct the
             // absolute path uri. Relative path file uris don't seem to be
             // interpreted as I expected by gstreamer.
             final String filePath;
             if(fd.filePath.startsWith("/"))
-               filePath = "file://" + fd.filePath;
+                filePath = "file://" + fd.filePath;
             else
-               filePath = "file://" + new File(fd.filePath).getAbsolutePath();
+                filePath = "file://" + new File(fd.filePath).getAbsolutePath();
 
             mainServer.play(filePath, fd.rtspPath);
-         });
-         mainServer.startServer(USE_DEFAULT_PORT);
-         Gst.main();
-      }
-   }
+        });
+        mainServer.startServer(USE_DEFAULT_PORT);
+        Gst.main();
 
-   public static void stopMain() {
-      mainServer.close();
-      Gst.quit();
-   }
+    }
 
-   public int getPort() {
-      return API.gst_rtsp_server_get_bound_port(getServer().getNativeAddress());
-   }
+    public static void stopMain() {
+        mainServer.close();
+        Gst.quit();
+    }
 
-   public void startServer(final int port) {
-      if(!isRunning()) {
-         mainLoop = new MainLoop(mainCtx);
-         final RtspServerObject server = getServer();
-         if(port >= 0)
-            API.gst_rtsp_server_set_service(server.getNativeAddress(), Integer.toString(port));
+    public int getPort() {
+        return API.gst_rtsp_server_get_bound_port(getServer().getRawPointer());
+    }
 
-         attachId = API.gst_rtsp_server_attach(server.getNativeAddress(), mainCtx.getNativeAddress());
+    public void startServer(final int port) {
+        if(!isRunning()) {
+            mainLoop = new MainLoop(mainCtx);
+            final RtspServerObject server = getServer();
+            if(port >= 0)
+                API.gst_rtsp_server_set_service(server.getRawPointer(), Integer.toString(port));
 
-         mainLoopThread = new Thread(() -> {
+            // this class is dead until this is fixed.
+            Method getRawPointerMethod;
             try {
-               LOGGER.debug("Starting RtspServer MainLoop.");
-               mainLoop.run();
-            } catch(final RuntimeException rte) {
-               LOGGER.error("Exception thrown in main loop.", rte);
-               throw rte;
+                getRawPointerMethod = mainCtx.getClass().getMethod("getRawPointer");
+                getRawPointerMethod.setAccessible(true);
+                attachId = API.gst_rtsp_server_attach(server.getRawPointer(), (Pointer)getRawPointerMethod.invoke(mainCtx));
+            } catch(NoSuchMethodException | SecurityException | IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                throw new RuntimeException("Failed to call stupidly protected method", e);
             }
-         }, "RtspServer-MainLoop");
-         mainLoopThread.start();
-      } else
-         throw new IllegalStateException("RtspServer is already running.");
-   }
 
-   public void play(final String uriToSource, final String rtspPath) {
-      LOGGER.trace("Will attempt to play \"{}\" at the rtsp path \"{}\"", uriToSource, rtspPath);
-      try (final GstWrap<RtspServerObject> mounts = new GstWrap<>(new RtspServerObject(API.gst_rtsp_server_get_mount_points(getServer().getNativeAddress())));
-            final GstWrap<RtspServerObject> factory = new GstWrap<>(new RtspServerObject(API.gst_rtsp_media_factory_new()));) {
-         API.gst_rtsp_media_factory_set_launch(factory.obj.getNativeAddress(),
-               "( uridecodebin uri=\"" + uriToSource + "\" ! videoconvert ! video/x-raw,format=I420 ! x264enc ! rtph264pay pt=96 name=pay0 )");
-         API.gst_rtsp_media_factory_set_shared(factory.obj.getNativeAddress(), true);
+            mainLoopThread = new Thread(() -> {
+                try {
+                    LOGGER.debug("Starting RtspServer MainLoop.");
+                    mainLoop.run();
+                } catch(final RuntimeException rte) {
+                    LOGGER.error("Exception thrown in main loop.", rte);
+                    throw rte;
+                }
+            }, "RtspServer-MainLoop");
+            mainLoopThread.start();
+        } else
+            throw new IllegalStateException("RtspServer is already running.");
+    }
 
-         // slashify pathGLIB_EX_API
-         final String apath = rtspPath.startsWith("/") ? rtspPath : ("/" + rtspPath);
-         API.gst_rtsp_mount_points_add_factory(mounts.obj.getNativeAddress(),
-               apath, factory.obj.getNativeAddress());
+    public void play(final String uriToSource, final String rtspPath) {
+        LOGGER.trace("Will attempt to play \"{}\" at the rtsp path \"{}\"", uriToSource, rtspPath);
+        try(final RtspServerObject mounts = new RtspServerObject(API.gst_rtsp_server_get_mount_points(getServer().getRawPointer()));
+            final RtspServerObject factory = new RtspServerObject(API.gst_rtsp_media_factory_new());) {
+            API.gst_rtsp_media_factory_set_launch(factory.getRawPointer(),
+                "( uridecodebin uri=\"" + uriToSource + "\" ! videoconvert ! video/x-raw,format=I420 ! x264enc ! rtph264pay pt=96 name=pay0 )");
+            API.gst_rtsp_media_factory_set_shared(factory.getRawPointer(), true);
 
-         mountPoints.add(apath);
-      }
-   }
+            // slashify pathGLIB_EX_API
+            final String apath = rtspPath.startsWith("/") ? rtspPath : ("/" + rtspPath);
+            API.gst_rtsp_mount_points_add_factory(mounts.getRawPointer(),
+                apath, factory.getRawPointer());
 
-   public boolean isRunning() {
-      return mainLoopThread != null && mainLoopThread.isAlive();
-   }
+            mountPoints.add(apath);
+        }
+    }
 
-   @Override
-   public void close() {
-      if(mainLoop.isRunning())
-         mainLoop.quit();
+    public boolean isRunning() {
+        return mainLoopThread != null && mainLoopThread.isAlive();
+    }
 
-      ignore(() -> mainLoopThread.join(1000)); // wait a full second
+    @Override
+    public void close() {
+        if(mainLoop.isRunning())
+            mainLoop.quit();
 
-      if(mainLoopThread.isAlive())
-         LOGGER.warn("Never shut down main loop for RtspServer.");
+        ignore(() -> mainLoopThread.join(1000)); // wait a full second
 
-      // shut down the media factory to prevent new connections
-      try (final GstWrap<RtspServerObject> mounts = new GstWrap<>(
-            new RtspServerObject(API.gst_rtsp_server_get_mount_points(getServer().getNativeAddress())));) {
-         mountPoints.forEach(m -> API.gst_rtsp_mount_points_remove_factory(mounts.obj.getNativeAddress(), m));
-      }
+        if(mainLoopThread.isAlive())
+            LOGGER.warn("Never shut down main loop for RtspServer.");
 
-      API.gst_rtsp_server_client_filter(theServer.getNativeAddress(), (server, client, userData) -> {
-         LOGGER.trace("Stopping :{}", client);
-         return GST_RTSP_FILTER_REMOVE;
-      }, Pointer.NULL);
+        // shut down the media factory to prevent new connections
+        try(RtspServerObject mounts = new RtspServerObject(API.gst_rtsp_server_get_mount_points(getServer().getRawPointer()));) {
+            mountPoints.forEach(m -> API.gst_rtsp_mount_points_remove_factory(mounts.getRawPointer(), m));
+        }
 
-      GlibAPI.GLIB_API.g_source_remove(attachId);
-   }
+        API.gst_rtsp_server_client_filter(theServer.getRawPointer(), (server, client, userData) -> {
+            LOGGER.trace("Stopping :{}", client);
+            return GST_RTSP_FILTER_REMOVE;
+        }, Pointer.NULL);
 
-   private synchronized RtspServerObject getServer() {
-      if(theServer == null)
-         theServer = new RtspServerObject(API.gst_rtsp_server_new());
-      return theServer;
-   }
+        GlibAPI.GLIB_API.g_source_remove(attachId);
+    }
 
-   private static interface API extends Library {
-      // GstRTSPServer functions
-      Pointer gst_rtsp_server_new();
+    private synchronized RtspServerObject getServer() {
+        if(theServer == null)
+            theServer = new RtspServerObject(API.gst_rtsp_server_new());
+        return theServer;
+    }
 
-      int gst_rtsp_server_attach(Pointer server, Pointer context);
+    private static interface API extends Library {
+        // GstRTSPServer functions
+        Pointer gst_rtsp_server_new();
 
-      void gst_rtsp_server_set_service(Pointer server, String address);
+        int gst_rtsp_server_attach(Pointer server, Pointer context);
 
-      int gst_rtsp_server_get_bound_port(Pointer server);
+        void gst_rtsp_server_set_service(Pointer server, String address);
 
-      @FunctionalInterface
-      static public interface GstRTSPServerClientFilterFunc extends Callback {
-         public int client_filter(Pointer server, Pointer client, Pointer userData);
-      }
+        int gst_rtsp_server_get_bound_port(Pointer server);
 
-      Pointer gst_rtsp_server_client_filter(Pointer server, GstRTSPServerClientFilterFunc filter, Pointer userData);
+        @FunctionalInterface
+        static public interface GstRTSPServerClientFilterFunc extends Callback {
+            public int client_filter(Pointer server, Pointer client, Pointer userData);
+        }
 
-      // GstRTSPMediaFactory functions
-      Pointer gst_rtsp_media_factory_new();
+        Pointer gst_rtsp_server_client_filter(Pointer server, GstRTSPServerClientFilterFunc filter, Pointer userData);
 
-      void gst_rtsp_media_factory_set_shared(Pointer factory, boolean val);
+        // GstRTSPMediaFactory functions
+        Pointer gst_rtsp_media_factory_new();
 
-      boolean gst_rtsp_media_factory_is_shared(Pointer factory);
+        void gst_rtsp_media_factory_set_shared(Pointer factory, boolean val);
 
-      void gst_rtsp_media_factory_set_launch(Pointer factory, String launch);
+        boolean gst_rtsp_media_factory_is_shared(Pointer factory);
 
-      // GstRTSPMountPoints functions
-      Pointer gst_rtsp_server_get_mount_points(Pointer server);
+        void gst_rtsp_media_factory_set_launch(Pointer factory, String launch);
 
-      void gst_rtsp_mount_points_add_factory(final Pointer mounts, final String path, Pointer factory);
+        // GstRTSPMountPoints functions
+        Pointer gst_rtsp_server_get_mount_points(Pointer server);
 
-      void gst_rtsp_mount_points_remove_factory(Pointer mounts, String path);
-   }
+        void gst_rtsp_mount_points_add_factory(final Pointer mounts, final String path, Pointer factory);
 
-   public static interface GlibExtentionAPI extends GlibAPI {
+        void gst_rtsp_mount_points_remove_factory(Pointer mounts, String path);
+    }
 
-      boolean g_socket_close(Pointer socket, Pointer ptrError);
+    public static interface GlibExtentionAPI extends GlibAPI {
 
-   }
+        boolean g_socket_close(Pointer socket, Pointer ptrError);
+
+    }
 }

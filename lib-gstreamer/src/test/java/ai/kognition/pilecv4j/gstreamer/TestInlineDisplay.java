@@ -8,7 +8,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-import ai.kognition.pilecv4j.gstreamer.guard.GstWrap;
 
 // This only works when there's a display
 public class TestInlineDisplay extends BaseTest {
@@ -17,20 +16,21 @@ public class TestInlineDisplay extends BaseTest {
     @Test
     public void testInlineDisplay() throws Exception {
         if(SHOW) {
-            try (final GstScope main = new GstScope();
-                final GstWrap<Caps> capsw = new GstWrap<>(new CapsBuilder("video/x-raw")
+            try(GstScope scope = new GstScope();
+                final Caps capsw = new CapsBuilder("video/x-raw")
                     .addFormatConsideringEndian()
                     .add("width", "640")
                     .add("height", "480")
-                    .build());) {
+                    .build();
+
+                BreakoutFilter breakout = new BreakoutFilter("inline-display").filter(new InlineDisplay.Builder().build());) {
 
                 final Pipeline pipe = new BinManager()
-                    .scope(main)
                     .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
                     .make("videoscale")
                     .make("videoconvert")
-                    .caps(capsw.disown())
-                    .add(new BreakoutFilter("inline-display").filter(new InlineDisplay.Builder().build()))
+                    .caps(capsw)
+                    .add(breakout)
                     .make("fakesink").with("sync", true)
                     .buildPipeline();
 

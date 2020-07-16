@@ -15,17 +15,16 @@ public class TestBuildersSimplePipeline extends BaseTest {
 
     @Test
     public void testSimplePipeline() throws Exception {
-        try(final GstScope m = new GstScope(TestBuildersSimplePipeline.class);
-            final FrameCatcher fc = new FrameCatcher("framecatcher");) {
+        try(GstScope scope = new GstScope();
+            final FrameCatcher fc = new FrameCatcher("framecatcher");
 
             final Pipeline pipe = new BinManager()
-                .scope(m)
                 .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
                 .make("videoscale")
                 .make("videoconvert")
                 .caps("video/x-raw,width=640,height=480")
                 .add(fc.disown())
-                .buildPipeline();
+                .buildPipeline();) {
 
             pipe.play();
             // wait until at least 1 frame goes through.

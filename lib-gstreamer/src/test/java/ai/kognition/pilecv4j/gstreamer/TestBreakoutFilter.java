@@ -24,7 +24,7 @@ public class TestBreakoutFilter extends BaseTest {
 
     @Test
     public void testBreakoutFilterLoad() throws Exception {
-        try(final GstScope main = new GstScope();) {
+        try(GstScope scope = new GstScope();) {
             final BreakoutFilter breakout = (BreakoutFilter)ElementFactory.make("breakout", "breakout");
             breakout.filter(mac -> {
                 final VideoFrame mat = mac;
@@ -37,10 +37,9 @@ public class TestBreakoutFilter extends BaseTest {
             List<Frame> frames = null;
 
             try(final FrameCatcher fc = new FrameCatcher("framecatcher");
-                final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);) {
+                final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);
 
                 final Pipeline pipe = new BinManager()
-                    .scope(main)
                     .add(fe.disown())
                     .make("videoconvert")
                     .caps(new CapsBuilder("video/x-raw")
@@ -51,7 +50,7 @@ public class TestBreakoutFilter extends BaseTest {
                     .make("videoconvert")
                     .add(fc.disown())
                     .stopOnEndOfStream()
-                    .buildPipeline();
+                    .buildPipeline();) {
 
                 pipe.play();
                 Thread.sleep(1000);

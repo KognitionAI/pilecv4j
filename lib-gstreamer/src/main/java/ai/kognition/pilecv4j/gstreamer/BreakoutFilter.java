@@ -13,11 +13,13 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.FlowReturn;
-import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.elements.BaseTransform;
+import org.freedesktop.gstreamer.glib.NativeObject;
+import org.freedesktop.gstreamer.glib.Natives;
 import org.freedesktop.gstreamer.lowlevel.GstAPI.GstCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,7 +30,6 @@ import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler;
 import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler.Cancelable;
 
 import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
-import ai.kognition.pilecv4j.gstreamer.guard.BufferWrap;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
@@ -36,21 +37,20 @@ public class BreakoutFilter extends BaseTransform {
     public static final String GST_NAME = "breakout";
     public static final String GTYPE_NAME = "GstBreakout";
 
-    private static final AtomicBoolean inited = new AtomicBoolean(false);
-
     private final List<VideoFrameFilter> filterStack = new ArrayList<>();
 
     private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
 
-    public static void init() {
-        if(!inited.getAndSet(true)) {
-            Gst.registerClass(BreakoutFilter.class);
+    public static class BreakoutFilterTypeProvider implements NativeObject.TypeProvider {
+
+        @Override
+        public Stream<TypeRegistration<?>> types() {
+            return Stream.of(Natives.registration(BreakoutFilter.class, GTYPE_NAME, BreakoutFilter::new));
         }
+
     }
 
-    static {
-        init();
-    }
+    protected static void initFromScope() {}
 
     private final long me;
 
@@ -210,20 +210,6 @@ public class BreakoutFilter extends BaseTransform {
             disconnect(NEW_SAMPLE.class, actualFilter);
         return this;
     }
-
-    // =================================================
-    // These calls should only be made from within the
-    // context of the NEW_SAMPLE callback.
-    // =================================================
-    public BufferWrap getCurrentBuffer() {
-        return new BufferWrap(gst().gst_breakout_current_frame_buffer(this), false);
-    }
-
-    public Caps getCurrentCaps() {
-        return gst().gst_breakout_current_frame_caps(this);
-    }
-
-    // =================================================
 
     private static final BreakoutAPI gst() {
         return FILTER_API;
@@ -547,7 +533,7 @@ public class BreakoutFilter extends BaseTransform {
         final int index = IntStream.range(0, filterStack.size())
             .filter(i -> filterStack.get(i) == currentFilter)
             .findAny()
-            .orElseThrow(() -> new VideoFrameFilterException(FlowReturn.WRONG_STATE));
+            .orElseThrow(() -> new VideoFrameFilterException(FlowReturn.ERROR));
         filterStack.set(index, newFilter);
     }
 

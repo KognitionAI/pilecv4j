@@ -20,7 +20,6 @@ import org.freedesktop.gstreamer.Pipeline;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
 /**
@@ -34,7 +33,6 @@ public class BinManager {
     private Branch current = new Branch();
     private final Branch primary = current;
 
-    private GstScope scope = null;
     private Bin managed = null;
 
     private int ghostPadNum = 0;
@@ -218,14 +216,6 @@ public class BinManager {
     }
 
     /**
-     * Manage any generated Bin in the given scope.
-     */
-    public BinManager scope(final GstScope scope) {
-        this.scope = scope;
-        return this;
-    }
-
-    /**
      * Set the Bin to stop/shutdown when it reaches the end of the stream.
      */
     public BinManager stopOnEndOfStream(final Runnable exitNotification) {
@@ -285,8 +275,6 @@ public class BinManager {
             }
         };
         final Pipeline ret = postPocess(build(pipe, false));
-        if(scope != null)
-            scope.manage(ret);
         return ret;
     }
 
@@ -324,7 +312,7 @@ public class BinManager {
                 disposeAll(primary);
             }
         };
-        final Bin ret = scope == null ? build(bin, ghostPads) : scope.manage(build(bin, ghostPads));
+        final Bin ret = build(bin, ghostPads);
         return postPocess(ret);
     }
 

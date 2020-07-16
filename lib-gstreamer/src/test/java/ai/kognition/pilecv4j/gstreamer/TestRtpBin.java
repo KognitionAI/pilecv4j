@@ -19,9 +19,8 @@ public class TestRtpBin {
 
     @Test
     public void testRtpBinCalls() throws Exception {
-        try(final GstScope main = new GstScope();) {
-
-            final Pipeline pipe = new Pipeline();
+        try(GstScope scope = new GstScope();
+            final Pipeline pipe = new Pipeline();) {
 
             final RtpBin h = new RtpBin()
                 .sendSession(1)

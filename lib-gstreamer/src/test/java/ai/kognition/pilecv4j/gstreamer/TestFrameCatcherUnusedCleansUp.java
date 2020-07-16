@@ -12,14 +12,13 @@ public class TestFrameCatcherUnusedCleansUp extends BaseTest {
 
     @Test
     public void testUnusedCatcher() throws Exception {
-        FrameCatcher outside = null;
-        try (final GstScope m = new GstScope(TestFrameEmitterAndCatcher.class);) {
-            try (final FrameCatcher fc = new FrameCatcher("framecatcher")) {
+        try(GstScope scope = new GstScope();) {
+            FrameCatcher outside = null;
+            try(final FrameCatcher fc = new FrameCatcher("framecatcher")) {
                 outside = fc;
             }
             assertNotNull(outside);
             assertNull(outside.disown());
         }
     }
-
 }

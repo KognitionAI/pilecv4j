@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.bridge.SLF4JBridgeHandler;
 
 import ai.kognition.pilecv4j.gstreamer.Branch;
-import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
 
 public class GstUtils {
     private static final Logger LOGGER = LoggerFactory.getLogger(GstUtils.class);
@@ -98,7 +97,6 @@ public class GstUtils {
             additionalClasses(); // this is a hack for fixing an MT problem
         }
         inited++;
-        BreakoutFilter.init();
     }
 
     /**
@@ -136,9 +134,8 @@ public class GstUtils {
 
     public static void printDetails(final Pad p, final PrintStream out, final String prefix) {
         out.println(prefix + indent + p);
-        out.println(prefix + indent + "caps:      " + p.getCaps());
         out.println(prefix + indent + "allowed:   " + p.getAllowedCaps());
-        out.println(prefix + indent + "negotiated:" + p.getNegotiatedCaps());
+        out.println(prefix + indent + "negotiated:" + p.getCurrentCaps());
         final Pad peer = p.getPeer();
         if(peer != null) {
             final Element peerElement = peer.getParentElement();
@@ -216,7 +213,7 @@ public class GstUtils {
         final GstObject parent = pad.getParent();
 
         final StringWriter strHolder;
-        try (final StringWriter srcPadDescPw = new StringWriter();
+        try(final StringWriter srcPadDescPw = new StringWriter();
             PrintStream srcPadWriter = new PrintStream(new WriterOutputStream(srcPadDescPw, Charset.defaultCharset()))) {
             strHolder = srcPadDescPw;
             GstUtils.printDetails(pad, srcPadWriter, "");
@@ -279,19 +276,19 @@ public class GstUtils {
             "org.freedesktop.gstreamer.lowlevel.GstAPI",
             "org.freedesktop.gstreamer.lowlevel.GstBufferAPI",
             "org.freedesktop.gstreamer.lowlevel.GstColorBalanceAPI",
-            "org.freedesktop.gstreamer.lowlevel.GstControllerAPI",
-            "org.freedesktop.gstreamer.lowlevel.GstControlSourceAPI",
             "org.freedesktop.gstreamer.lowlevel.GstDeviceProviderAPI",
             "org.freedesktop.gstreamer.lowlevel.GstElementAPI",
             "org.freedesktop.gstreamer.lowlevel.GstEventAPI",
             "org.freedesktop.gstreamer.lowlevel.GstInterpolationControlSourceAPI",
-            "org.freedesktop.gstreamer.lowlevel.GstLFOControlSourceAPI",
             "org.freedesktop.gstreamer.lowlevel.GstMessageAPI",
             "org.freedesktop.gstreamer.lowlevel.GstMiniObjectAPI",
             "org.freedesktop.gstreamer.lowlevel.GstObjectAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstPromiseAPI",
             "org.freedesktop.gstreamer.lowlevel.GstQueryAPI",
             "org.freedesktop.gstreamer.lowlevel.GstSampleAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstSDPMessageAPI",
             "org.freedesktop.gstreamer.lowlevel.GstStructureAPI",
+            "org.freedesktop.gstreamer.lowlevel.GstWebRTCSessionDescriptionAPI",
             "org.freedesktop.gstreamer.lowlevel.GValueAPI")
             .forEach(cn -> {
                 try {
@@ -301,7 +298,7 @@ public class GstUtils {
                         "\" doesn't appear on the classpath. Please regenerate the list of classes to load.");
                 } catch(final Throwable ule) {
                     // we are going to assume you don't need this class in this current process.
-                    LOGGER.debug("Couldn't load class \"" + cn + "\" due to a " + ule.getClass().getSimpleName());
+                    LOGGER.debug("Couldn't load class \"" + cn + "\" due to a " + ule.getClass().getSimpleName(), ule);
                 }
             });
 

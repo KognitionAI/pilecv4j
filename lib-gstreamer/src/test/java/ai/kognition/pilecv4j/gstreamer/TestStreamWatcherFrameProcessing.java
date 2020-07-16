@@ -41,12 +41,12 @@ public class TestStreamWatcherFrameProcessing {
     @Test
     public void testSlowFrameProcessing() throws Exception {
         final AtomicLong slowFramesProcessed = new AtomicLong(0);
-        try(final GstScope m = new GstScope(TestStreamWatcherFrameProcessing.class);
+        try(GstScope scope = new GstScope();
             final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 60);
-            final FrameCatcher fc = new FrameCatcher("framecatcher");) {
+            final FrameCatcher fc = new FrameCatcher("framecatcher");
 
+            @SuppressWarnings("resource")
             final Pipeline pipe = new BinManager()
-                .scope(m)
                 .add(fe.disown())
                 .make("videoconvert")
                 .caps("video/x-raw")
@@ -59,7 +59,7 @@ public class TestStreamWatcherFrameProcessing {
                         slowFramesProcessed.incrementAndGet();
                     }))
                 .add(fc.disown())
-                .buildPipeline();
+                .buildPipeline();) {
 
             // instrument(pipe);
             pipe.play();

@@ -14,17 +14,16 @@ public class TestFrameEmitterAndCatcher extends BaseTest {
 
     @Test
     public void testFrameEmitterToCather() throws Exception {
-        try (final GstScope m = new GstScope(TestFrameEmitterAndCatcher.class);
+        try(GstScope scope = new GstScope();
             final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 30);
-            final FrameCatcher fc = new FrameCatcher("framecatcher");) {
+            final FrameCatcher fc = new FrameCatcher("framecatcher");
 
             final Pipeline pipe = new BinManager()
-                .scope(m)
                 .add(fe.disown())
                 .make("videoconvert")
                 .caps("video/x-raw")
                 .add(fc.disown())
-                .buildPipeline();
+                .buildPipeline();) {
 
             pipe.play();
             assertTrue(poll(o -> fe.isDone()));

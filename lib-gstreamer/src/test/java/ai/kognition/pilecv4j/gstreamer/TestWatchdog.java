@@ -19,49 +19,49 @@ public class TestWatchdog extends BaseTest {
 
     @Test
     public void testBreakoutFilterLoad() throws Exception {
-        try (final GstScope main = new GstScope();) {
-            final AtomicBoolean hit = new AtomicBoolean(false);
-            final BreakoutFilter breakout = (BreakoutFilter)ElementFactory.make("breakout", "breakout");
-            breakout.addWatchdog(1000, () -> hit.set(true));
+        final AtomicBoolean hit = new AtomicBoolean(false);
 
-            try (final FrameCatcher fc = new FrameCatcher("framecatcher");
-                final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40) {
-                    // prevent the EOS from being sent.
-                    @Override
-                    public boolean isDone() {
-                        boolean ret = super.isDone();
-                        if(ret)
-                            ignore(() -> Thread.sleep(2000));
-                        return false;
-                    }
-                };) {
+        try(GstScope scope = new GstScope();
+            final BreakoutFilter breakout = ((BreakoutFilter)ElementFactory.make("breakout", "breakout"))
+                .addWatchdog(1000, () -> hit.set(true));
 
-                final Pipeline pipe = new BinManager()
-                    .scope(main)
-                    .add(fe.disown())
-                    .make("videoconvert")
-                    .caps(new CapsBuilder("video/x-raw")
-                        .addFormatConsideringEndian()
-                        .buildString())
-                    .make("queue", "namedQueuey")
-                    .add(breakout)
-                    .make("videoconvert")
-                    .add(fc.disown())
-                    .stopOnEndOfStream()
-                    .buildPipeline();
+            final FrameCatcher fc = new FrameCatcher("framecatcher");
+            final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40) {
+                // prevent the EOS from being sent.
+                @Override
+                public boolean isDone() {
+                    boolean ret = super.isDone();
+                    if(ret)
+                        ignore(() -> Thread.sleep(2000));
+                    return false;
+                }
+            };
 
-                pipe.play();
+            final Pipeline pipe = new BinManager()
+                .add(fe.disown())
+                .make("videoconvert")
+                .caps(new CapsBuilder("video/x-raw")
+                    .addFormatConsideringEndian()
+                    .buildString())
+                .make("queue", "namedQueuey")
+                .add(breakout)
+                .make("videoconvert")
+                .add(fc.disown())
+                .stopOnEndOfStream()
+                .buildPipeline();) {
 
-                assertTrue(poll(o -> fc.frames.size() == 40));
-                Thread.sleep(10);
-                assertEquals(40, fc.frames.size());
+            pipe.play();
 
-                assertTrue(poll(o -> hit.get()));
+            assertTrue(poll(o -> fc.frames.size() == 40));
+            Thread.sleep(10);
+            assertEquals(40, fc.frames.size());
 
-                if(pipe.isPlaying())
-                    pipe.stop();
-                assertTrue(poll(o -> !pipe.isPlaying()));
-            }
+            assertTrue(poll(o -> hit.get()));
+
+            if(pipe.isPlaying())
+                pipe.stop();
+            assertTrue(poll(o -> !pipe.isPlaying()));
+
         }
     }
 

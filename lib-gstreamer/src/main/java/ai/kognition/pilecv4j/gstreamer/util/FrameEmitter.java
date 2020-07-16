@@ -18,7 +18,7 @@ import ai.kognition.pilecv4j.gstreamer.guard.ElementWrap;
  * This class can be used to source a fixed number of frames for testing purposes.
  */
 public class FrameEmitter implements AutoCloseable {
-    public static boolean HACK_FRAME = true;
+    public static boolean HACK_FRAME = false;
     private final static Logger LOGGER = LoggerFactory.getLogger(FrameEmitter.class);
     private static AtomicInteger sequence = new AtomicInteger(0);
     private ElementWrap<Bin> element;

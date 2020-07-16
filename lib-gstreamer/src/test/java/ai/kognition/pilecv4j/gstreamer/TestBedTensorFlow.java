@@ -65,7 +65,7 @@ public class TestBedTensorFlow extends BaseTest {
 
         // ====================================================================
         final List<String> labels = Files.readAllLines(Paths.get(labelUri), Charset.forName("UTF-8"));
-        try(final Session session = new Session(graph);) {
+        try(final Session session = new Session(graph);
 
             final BreakoutFilter bin = new BreakoutFilter("od")
                 .slowFilter((final VideoFrame bac) -> {
@@ -96,7 +96,7 @@ public class TestBedTensorFlow extends BaseTest {
                                 new Point(d.xmax * mat.width(), d.ymax * mat.height()),
                                 new Scalar(0xff, 0xff, 0xff), thickness);
                         });
-                });
+                });) {
 
             LOGGER.trace("Returning object detected Buffer");
             // return FlowReturn.OK;
@@ -130,7 +130,7 @@ public class TestBedTensorFlow extends BaseTest {
             ;
             // );
 
-            final Pipeline pipe = bb
+            try(final Pipeline pipe = bb
                 // This code actually works to switch the dev for v4l2src
                 // .onError((Pipeline p, GstObject source, int code, String message) -> {
                 // System.out.println("Source:" + source);
@@ -139,18 +139,19 @@ public class TestBedTensorFlow extends BaseTest {
                 // source.set("device", "/dev/video1");
                 // p.play();
                 // })
-                .buildPipeline();
+                .buildPipeline();) {
 
-            // instrument(pipe);
-            pipe.play();
+                // instrument(pipe);
+                pipe.play();
 
-            Thread.sleep(5000);
+                Thread.sleep(5000);
 
-            try(final PrintStream ps = new PrintStream(new File("/tmp/pipeline.txt"))) {
-                printDetails(pipe, ps);
+                try(final PrintStream ps = new PrintStream(new File("/tmp/pipeline.txt"))) {
+                    printDetails(pipe, ps);
+                }
+
+                Gst.main();
             }
-
-            Gst.main();
         }
     }
 

@@ -16,7 +16,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-import ai.kognition.pilecv4j.gstreamer.guard.GstWrap;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 
 public class TestBranch extends BaseTest {
@@ -24,21 +23,20 @@ public class TestBranch extends BaseTest {
 
     @Test
     public void testBranch() throws Exception {
-        try (final GstScope main = new GstScope();
-            final GstWrap<Caps> capsw = new GstWrap<>(new CapsBuilder("video/x-raw")
+        try(GstScope scope = new GstScope();
+            Caps capsw = new CapsBuilder("video/x-raw")
                 .addFormatConsideringEndian()
                 .add("width", "640")
                 .add("height", "480")
-                .build());
+                .build();
             final FrameCatcher fc1 = new FrameCatcher("fc1");
-            final FrameCatcher fc2 = new FrameCatcher("fc2");) {
+            final FrameCatcher fc2 = new FrameCatcher("fc2");
 
             final Pipeline pipe = new BinManager()
-                .scope(main)
                 .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())
                 .make("videoscale")
                 .make("videoconvert")
-                .caps(capsw.disown())
+                .caps(capsw)
                 .tee(new Branch("b1_")
                     .make("queue")
                     .make("fakesink"),
@@ -48,12 +46,12 @@ public class TestBranch extends BaseTest {
                     new Branch("b3_")
                         .make("queue")
                         .add(fc2.disown()))
-                .buildPipeline();
+                .buildPipeline();) {
 
             pipe.play();
             Thread.sleep(1000);
             final File file = folder.newFile("pipeline.txt");
-            try (final PrintStream ps = new PrintStream(file)) {
+            try(final PrintStream ps = new PrintStream(file)) {
                 printDetails(pipe, ps);
             }
             assertTrue(file.exists());
