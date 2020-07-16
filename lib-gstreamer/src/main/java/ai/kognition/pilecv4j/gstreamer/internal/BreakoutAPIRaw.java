@@ -14,4 +14,6 @@ public class BreakoutAPIRaw {
 
     public native static void gst_breakout_current_frame_mat_unmap(long gstmat);
 
+    public native static void set_im_maker(long immakerRef);
+
 }

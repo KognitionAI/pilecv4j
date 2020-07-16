@@ -32,6 +32,7 @@ import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler.Cancelable;
 import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
 import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPI;
 import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPIRaw;
+import ai.kognition.pilecv4j.image.ImageAPI;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
@@ -507,17 +508,20 @@ public class BreakoutFilter extends BaseTransform {
         public FlowReturn new_sample(final BreakoutFilter elem) {
             try(
 
-                VideoFrame mat =
+                VideoFrame mat = new VideoFrame(
+                    BreakoutAPIRaw.gst_breakout_current_frame_mat(me, true), System.currentTimeMillis()) {
 
-                    new VideoFrame(
-                        BreakoutAPIRaw.gst_breakout_current_frame_mat(me, true), System.currentTimeMillis()) {
+                    @Override
+                    public void close() {
+                        BreakoutAPIRaw.gst_breakout_current_frame_mat_unmap(super.nativeObj);
+                        super.close();
+                    }
 
-                        @Override
-                        public void close() {
-                            BreakoutAPIRaw.gst_breakout_current_frame_mat_unmap(super.nativeObj);
-                            super.close();
-                        }
-                    };
+                    @Override
+                    public void doNativeDelete() {
+                        ImageAPI.free_gstmat(super.nativeObj);
+                    }
+                };
 
             ) {
                 // we need to copy the list because any one of these filters can change it

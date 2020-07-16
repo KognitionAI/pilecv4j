@@ -73,6 +73,10 @@ if ( NOT "${OpenCV_VERSION}" STREQUAL "$ENV{DEP_OPENCV_VERSION}")
   message(FATAL_ERROR "OpenCV Dependency version ($ENV{DEP_OPENCV_VERSION}) is different from the version being built against (${OpenCV_VERSION}).")
 endif()
 
+if(NOT DEFINED ENV{COMMON_INCLUDE})
+  message(FATAL_ERROR "You need to define the environment variable COMMON_INCLUDE to point to '[pilecv4j-root]/native-common-include/include' or build from the pom file which sets it correctly.")
+endif()
+
 include_directories(sources/include)
 include_directories($ENV{COMMON_INCLUDE})
 
@@ -103,6 +107,7 @@ endif()
 add_library(ai.kognition.pilecv4j.image
   MODULE
   sources/opencv/CvRasterNative.cpp
+  sources/opencv/gstbridge.cpp
 #  sources/opencv/gpumat.cpp
   sources/houghspace/Transform.cpp
   sources/mjpeg/jpegtoavi.cpp)

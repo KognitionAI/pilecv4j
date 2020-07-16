@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
 import ai.kognition.pilecv4j.gstreamer.GstScope;
 import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.image.ImageAPI;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
 public interface BreakoutAPI extends Library {
@@ -66,6 +67,8 @@ public interface BreakoutAPI extends Library {
         final BreakoutAPI ret = Native.loadLibrary(LIBNAME, BreakoutAPI.class, options);
 
         BreakoutAPIRaw.init();
+
+        BreakoutAPIRaw.set_im_maker(ImageAPI.get_im_maker()); // the bridge
 
         return ret;
     }

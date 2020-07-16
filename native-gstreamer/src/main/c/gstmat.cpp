@@ -1,29 +1,35 @@
-#include <opencv2/core/mat.hpp>
+#include "imagemaker.h"
 
 extern "C" {
 #include "gstbreakout.h"
 }
 
-static void* mapData(GstMapInfo* map, GstVideoFrame* vframe, bool writable) {
-  gst_buffer_map (vframe->buffer, map, writable ? GST_MAP_WRITE : GST_MAP_READ);
-  return map->data;
-}
-
-struct GstMat : public cv::Mat {
-  // This is a c struct and has no constructor ... otherwise this wouldn't work
-  // because the order of operations would be:
-  //    1) call mapData
-  //    2) super class initialized
-  //    3) member initialization (including map which would be reset).
+struct GstFrameData {
   GstMapInfo map;
   GstVideoFrame* frame;
+};
 
-  inline GstMat(int height, int width, int stride, int type, GstVideoFrame* vframe, bool writable) :
-    cv::Mat(height, width, type, mapData(&map, vframe, writable), stride), frame(vframe) {
+static const std::size_t gstFrameDataStructSize = sizeof(GstFrameData);
+static ai::kognition::pilecv4j::ImageMaker* imaker;
+
+class DataMapper : public ai::kognition::pilecv4j::DataMapper {
+public:
+  GstVideoFrame* vframe;
+  bool writable;
+
+  inline void* mapData(void* alignedStruct) {
+    GstFrameData* vfd = (GstFrameData*)alignedStruct;
+    vfd->frame = vframe;
+    gst_buffer_map (vframe->buffer, &(vfd->map), writable ? GST_MAP_WRITE : GST_MAP_READ);
+    return vfd->map.data;
   }
 };
 
 extern "C" {
+
+  void set_im_maker(uint64_t im) {
+    imaker = (ai::kognition::pilecv4j::ImageMaker*)im;
+  }
 
   uint64_t gst_breakout_current_frame_mat(uint64_t me, bool writable) {
     GstBreakout* breakout = (GstBreakout*)me;
@@ -38,17 +44,16 @@ extern "C" {
     int width = GST_VIDEO_FRAME_WIDTH(current);
     int height = GST_VIDEO_FRAME_HEIGHT(current);
 
-    GstMat* rret = new GstMat(height, width,stride, CV_8UC3, current, writable );
-    uint64_t ret = (uint64_t) rret;
+    DataMapper m;
+    m.vframe = current;
+    m.writable = writable;
 
-    cv::Mat* cvmat = rret;
-    return (uint64_t)cvmat;
+    return imaker->makeImage(height, width, stride, gstFrameDataStructSize, &m);
   }
 
-  void gst_breakout_current_frame_mat_unmap(long gstmat) {
-    cv::Mat* cvmat = (cv::Mat*)gstmat;
-    GstMat* it = static_cast<GstMat*>(cvmat);
-    gst_buffer_unmap(it->frame->buffer, &(it->map));
+  void gst_breakout_current_frame_mat_unmap(uint64_t gstmat) {
+    GstFrameData* fd = (GstFrameData*)imaker->userdata(gstmat);
+    gst_buffer_unmap(fd->frame->buffer, &(fd->map));
   }
 
 }

@@ -26,7 +26,7 @@ public class ImageAPI {
     static {
         // read a properties file from the classpath.
         final Properties ocvVersionProps = new Properties();
-        try (InputStream ocvVerIs = ImageAPI.class.getClassLoader().getResourceAsStream(OCV_VERSION_PROPS)) {
+        try(InputStream ocvVerIs = ImageAPI.class.getClassLoader().getResourceAsStream(OCV_VERSION_PROPS)) {
             ocvVersionProps.load(ocvVerIs);
         } catch(final IOException e) {
             throw new IllegalStateException("Problem loading the properties file \"" + OCV_VERSION_PROPS + "\" from the classpath", e);
@@ -103,6 +103,16 @@ public class ImageAPI {
         final double gradientDirSlopDeg, final double quantFactor, short[] ret, int hswidth, int hsheight,
         AddHoughSpaceEntryContributorFunc hsem, int houghThreshold, int rowstart, int rowend, int colstart, int colend,
         byte EDGE);
+    // =========================================================
+
+    // =========================================================
+    // Gst bridge functionality
+    // =========================================================
+
+    public native static void free_gstmat(long gstmat);
+
+    public native static long get_im_maker();
+
     // =========================================================
 
     // public static native long GpuMat_create(long nativeObject);

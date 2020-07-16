@@ -14,10 +14,6 @@ import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
 @Ignore
 public class TestPlayground {
-    // static {
-    // GstUtils.testMode();
-    // }
-
     @Test
     public void test() throws Exception {
         final MutableInt count = new MutableInt(0);
@@ -49,9 +45,9 @@ public class TestPlayground {
                         .addFormatConsideringEndian()
                         .buildString())
                     .add(breakout)
-                    // .make("videoconvert")
-                    // .make("xvimagesink")
-                    .make("fakesink")
+                    .make("videoconvert")
+                    .make("xvimagesink")
+                    // .make("fakesink")
                     .buildPipeline();) {
 
             pipe.play();

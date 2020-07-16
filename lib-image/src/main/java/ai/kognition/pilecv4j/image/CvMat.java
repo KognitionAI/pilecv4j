@@ -220,13 +220,7 @@ public class CvMat extends Mat implements AutoCloseable {
     public void close() {
         if(!skipCloseOnceForReturn) {
             if(!deletedAlready) {
-                try {
-                    nDelete.invoke(this, super.nativeObj);
-                } catch(final IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
-                    throw new RuntimeException(
-                        "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
-                        e);
-                }
+                doNativeDelete();
                 deletedAlready = true;
                 if(TRACK_MEMORY_LEAKS) {
                     delStackTrace = new RuntimeException("Here's where I was closed");
@@ -438,6 +432,16 @@ public class CvMat extends Mat implements AutoCloseable {
      */
     public static CvMat wrapNative(final long nativeObj) {
         return new CvMat(nativeObj);
+    }
+
+    protected void doNativeDelete() {
+        try {
+            nDelete.invoke(this, super.nativeObj);
+        } catch(final IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+            throw new RuntimeException(
+                "Got an exception trying to call Mat.n_Delete. Either the security model is too restrictive or the version of OpenCv can't be supported.",
+                e);
+        }
     }
 
     // Prevent Mat finalize from being called
