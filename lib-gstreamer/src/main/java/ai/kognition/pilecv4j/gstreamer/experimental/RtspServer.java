@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.gstreamer;
+package ai.kognition.pilecv4j.gstreamer.experimental;
 
 import static net.dempsy.util.Functional.ignore;
 

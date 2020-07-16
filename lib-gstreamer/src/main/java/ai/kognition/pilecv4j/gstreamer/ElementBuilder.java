@@ -47,7 +47,7 @@ public class ElementBuilder {
         return currentElement;
     }
 
-    static String nextName(final String basename) {
+    public static String nextName(final String basename) {
         return basename + Branch.sequence.getAndIncrement();
     }
 }

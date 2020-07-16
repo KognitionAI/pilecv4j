@@ -54,8 +54,12 @@ public class TestStreamWatcherFrameProcessing {
                         if(FrameEmitter.HACK_FRAME)
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                         System.out.println("" + bac);
-                        uncheck(() -> Thread.sleep(100)); // ~10 frame/second
-                        slowFramesProcessed.incrementAndGet();
+                        try {
+                            Thread.sleep(100); // ~10 frame/second
+                            slowFramesProcessed.incrementAndGet();
+                        } catch(InterruptedException ie) {
+                            LOGGER.trace("Interrupted slow frame processing (assuming for exiting).");
+                        }
                     }))
                 .add(fc.disown())
                 .buildPipeline();) {

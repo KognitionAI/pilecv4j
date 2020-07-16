@@ -30,6 +30,8 @@ import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler;
 import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler.Cancelable;
 
 import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
+import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPI;
+import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPIRaw;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);

@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.gstreamer;
+package ai.kognition.pilecv4j.gstreamer.internal;
 
 import com.sun.jna.Native;
 

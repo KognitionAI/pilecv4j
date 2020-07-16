@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.gstreamer;
+package ai.kognition.pilecv4j.gstreamer.internal;
 
 import java.io.File;
 import java.util.Arrays;
@@ -22,6 +22,8 @@ import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
+import ai.kognition.pilecv4j.gstreamer.GstScope;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 

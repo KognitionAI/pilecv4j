@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.gstreamer;
+package ai.kognition.pilecv4j.gstreamer.experimental;
 
 import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertTrue;
@@ -6,6 +6,10 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Ignore;
 import org.junit.Test;
 
+import ai.kognition.pilecv4j.gstreamer.BaseTest;
+import ai.kognition.pilecv4j.gstreamer.BinManager;
+import ai.kognition.pilecv4j.gstreamer.GstScope;
+import ai.kognition.pilecv4j.gstreamer.experimental.RtspServer;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 
 // TODO: Get this working on Windows. It already works on Linux
