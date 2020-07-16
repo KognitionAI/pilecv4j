@@ -84,11 +84,6 @@ public class BinManager {
         return this;
     }
 
-    public BinManager accessElement(final Consumer<Element> onCreateCallback) {
-        current.accessElement(onCreateCallback);
-        return this;
-    }
-
     /**
      * Add an element that has static pads.
      */
@@ -261,17 +256,17 @@ public class BinManager {
      */
     public Pipeline buildPipeline() {
         final Pipeline pipe = new Pipeline() {
-            boolean alreadyDisposed = false;
+            boolean alreadyClosed = false;
 
             @Override
-            public void dispose() {
-                if(!alreadyDisposed) {
+            public void close() {
+                if(!alreadyClosed) {
                     if(LOGGER.isTraceEnabled())
-                        LOGGER.trace("disposing {} with a ref count of {}", this, this.getRefCount());
-                    super.dispose();
-                    disposeAll(primary);
+                        LOGGER.trace("closing {}", this.getName());
+                    closeAll(primary);
+                    super.close();
                 }
-                alreadyDisposed = true;
+                alreadyClosed = true;
             }
         };
         final Pipeline ret = postPocess(build(pipe, false));
@@ -299,17 +294,17 @@ public class BinManager {
     public Bin buildBin(final String binName, final boolean ghostPads) {
         final Bin bin = binName == null ? new Bin() {
             @Override
-            public void dispose() {
+            public void close() {
                 LOGGER.debug("disposing " + this + " with a ref count of " + this.getRefCount());
-                super.dispose();
-                disposeAll(primary);
+                closeAll(primary);
+                super.close();
             }
         } : new Bin(binName) {
             @Override
-            public void dispose() {
+            public void close() {
                 LOGGER.debug("disposing " + this + " with a ref count of " + this.getRefCount());
-                super.dispose();
-                disposeAll(primary);
+                closeAll(primary);
+                super.close();
             }
         };
         final Bin ret = build(bin, ghostPads);
@@ -447,13 +442,13 @@ public class BinManager {
             branch.sinks.stream().forEach(b -> appendEnds(b, ret));
     }
 
-    private static void disposeAll(final Branch cur) {
+    private static void closeAll(final Branch cur) {
         final List<Branch> branches = cur.sinks;
 
         for(int b = branches.size() - 1; b >= 0; b--)
-            disposeAll(branches.get(b));
+            closeAll(branches.get(b));
 
-        cur.disposeAll();
+        cur.closeAll();
     }
 
     private static void addFullChainTo(final Bin pipe, final Branch primary) {

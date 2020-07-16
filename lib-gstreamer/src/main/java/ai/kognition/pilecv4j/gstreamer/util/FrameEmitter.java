@@ -12,7 +12,6 @@ import ai.kognition.pilecv4j.gstreamer.BinManager;
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
 import ai.kognition.pilecv4j.gstreamer.CapsBuilder;
 import ai.kognition.pilecv4j.gstreamer.VideoFrame;
-import ai.kognition.pilecv4j.gstreamer.guard.ElementWrap;
 
 /**
  * This class can be used to source a fixed number of frames for testing purposes.
@@ -21,7 +20,7 @@ public class FrameEmitter implements AutoCloseable {
     public static boolean HACK_FRAME = false;
     private final static Logger LOGGER = LoggerFactory.getLogger(FrameEmitter.class);
     private static AtomicInteger sequence = new AtomicInteger(0);
-    private ElementWrap<Bin> element;
+    private Bin element;
     public final int numFrames;
 
     private int curFrames = 0;
@@ -46,14 +45,14 @@ public class FrameEmitter implements AutoCloseable {
                 }
             });
 
-        element = new ElementWrap<>(new BinManager()
+        element = new BinManager()
             .delayed(new URIDecodeBin("source")).with("uri", sourceUri)
             .make("videoconvert")
             .caps(new CapsBuilder("video/x-raw")
                 .addFormatConsideringEndian()
                 .buildString())
             .add(breakout)
-            .buildBin());
+            .buildBin();
 
         this.numFrames = numFrames;
     }
@@ -63,7 +62,7 @@ public class FrameEmitter implements AutoCloseable {
     }
 
     public Bin disown() {
-        final Bin ret = element.disown();
+        final Bin ret = element;
         element = null;
         return ret;
     }

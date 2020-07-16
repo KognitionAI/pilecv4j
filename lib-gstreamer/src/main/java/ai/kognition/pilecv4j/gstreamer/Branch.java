@@ -156,11 +156,6 @@ public class Branch {
         return this;
     }
 
-    public Branch accessElement(final Consumer<Element> onCreateCallback) {
-        onCreateCallback.accept(currentElement.element);
-        return this;
-    }
-
     /**
      * Add an element that has static pads.
      */
@@ -424,15 +419,17 @@ public class Branch {
             multiqueue = new ElementBuilder("multiqueue").build();
     }
 
-    void disposeAll() {
+    void closeAll() {
         if(tee != null)
-            tee.dispose();
+            tee.close();
+        if(multiqueue != null)
+            multiqueue.close();
 
         for(int i = elements.size() - 1; i >= 0; i--) {
             final Element ce = elements.get(i).element;
             if(LOGGER.isTraceEnabled())
-                LOGGER.trace("disposing {} with a ref count of {}", ce, ce.getRefCount());
-            ce.dispose();
+                LOGGER.trace("closing {} ", ce.getName());
+            ce.close();
         }
     }
 

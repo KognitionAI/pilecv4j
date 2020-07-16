@@ -22,7 +22,6 @@ import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 

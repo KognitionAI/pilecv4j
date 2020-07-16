@@ -3,8 +3,6 @@ package ai.kognition.pilecv4j.gstreamer;
 import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Test;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-
 public class TestGstMain {
     @Test
     public void testMultipleGstMainCalls() throws Exception {

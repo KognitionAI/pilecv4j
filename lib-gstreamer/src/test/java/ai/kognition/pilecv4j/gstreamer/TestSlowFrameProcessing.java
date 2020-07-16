@@ -15,7 +15,6 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.FrameEmitter;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
@@ -41,7 +40,7 @@ public class TestSlowFrameProcessing {
     @Test
     public void testSlowFrameProcessing() throws Exception {
         final AtomicLong slowFramesProcessed = new AtomicLong(0);
-        try(GstScope scope = new GstScope();
+        try(final GstScope scope = new GstScope();
             final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 60);
             final FrameCatcher fc = new FrameCatcher("framecatcher");
 
@@ -55,8 +54,12 @@ public class TestSlowFrameProcessing {
                         if(FrameEmitter.HACK_FRAME)
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                         System.out.println("" + bac);
-                        uncheck(() -> Thread.sleep(100)); // ~10 frame/second
-                        slowFramesProcessed.incrementAndGet();
+                        try {
+                            Thread.sleep(100); // ~10 frame/second
+                            slowFramesProcessed.incrementAndGet();
+                        } catch(InterruptedException ie) {
+                            LOGGER.trace("Interrupted slow frame processing (assuming for exiting).");
+                        }
                     }))
                 .add(fc.disown())
                 .buildPipeline();) {

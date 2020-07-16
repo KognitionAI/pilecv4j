@@ -8,7 +8,6 @@ import org.freedesktop.gstreamer.elements.DecodeBin;
 import org.freedesktop.gstreamer.event.EOSEvent;
 import org.junit.Test;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
 public class TestBuildersSimplerPipeline extends BaseTest {

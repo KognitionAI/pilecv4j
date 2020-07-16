@@ -7,8 +7,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-
 // This only works when there's a display
 public class TestInlineDisplay extends BaseTest {
     @Rule public TemporaryFolder folder = new TemporaryFolder();

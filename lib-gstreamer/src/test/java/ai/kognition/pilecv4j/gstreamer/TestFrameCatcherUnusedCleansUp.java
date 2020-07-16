@@ -5,7 +5,6 @@ import static org.junit.Assert.assertNull;
 
 import org.junit.Test;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 
 public class TestFrameCatcherUnusedCleansUp extends BaseTest {

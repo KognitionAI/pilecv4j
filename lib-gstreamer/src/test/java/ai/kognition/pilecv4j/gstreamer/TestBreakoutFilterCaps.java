@@ -2,8 +2,6 @@ package ai.kognition.pilecv4j.gstreamer;
 
 import org.junit.Test;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
-
 public class TestBreakoutFilterCaps extends BaseTest {
 
     @Test(expected = UnsupportedOperationException.class)

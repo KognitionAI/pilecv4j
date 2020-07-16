@@ -42,7 +42,6 @@ public class BreakoutFilter extends BaseTransform {
     private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
 
     public static class BreakoutFilterTypeProvider implements NativeObject.TypeProvider {
-
         @Override
         public Stream<TypeRegistration<?>> types() {
             return Stream.of(Natives.registration(BreakoutFilter.class, GTYPE_NAME, BreakoutFilter::new));
@@ -50,7 +49,7 @@ public class BreakoutFilter extends BaseTransform {
 
     }
 
-    protected static void initFromScope() {}
+    static void initFromScope() {}
 
     private final long me;
 
@@ -137,6 +136,8 @@ public class BreakoutFilter extends BaseTransform {
                 }, noDataTimeoutMillis, TimeUnit.MILLISECONDS));
 
         filter(new VideoFrameFilter() {
+            private boolean isClosed = false;
+
             @Override
             public void accept(final VideoFrame cv) {
                 timeOfLastFrame.set(System.currentTimeMillis());
@@ -145,8 +146,11 @@ public class BreakoutFilter extends BaseTransform {
             @Override
             public void close() {
                 synchronized(cancelable) {
-                    final Cancelable toCancel = cancelable.getAndSet(null);
-                    toCancel.cancel();
+                    if(!isClosed) {
+                        final Cancelable toCancel = cancelable.getAndSet(null);
+                        toCancel.cancel();
+                        isClosed = true;
+                    }
                 }
             }
         });

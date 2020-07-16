@@ -6,7 +6,6 @@ import static org.junit.Assert.assertTrue;
 import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Test;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 

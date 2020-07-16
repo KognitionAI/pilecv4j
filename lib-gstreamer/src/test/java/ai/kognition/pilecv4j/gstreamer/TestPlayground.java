@@ -10,7 +10,6 @@ import org.opencv.imgproc.Imgproc;
 
 import net.dempsy.util.MutableInt;
 
-import ai.kognition.pilecv4j.gstreamer.guard.GstScope;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
 @Ignore

@@ -1,4 +1,4 @@
-package ai.kognition.pilecv4j.gstreamer.guard;
+package ai.kognition.pilecv4j.gstreamer.util;
 
 import java.util.Collections;
 import java.util.List;
