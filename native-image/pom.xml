@@ -64,12 +64,11 @@
       </plugin>
       <plugin>
         <artifactId>maven-antrun-plugin</artifactId>
-        <version>1.3</version>
         <executions>
           <execution>
             <phase>process-resources</phase>
             <configuration>
-              <tasks>
+              <target>
                 <checksum todir="${project.build.directory}/build" format="CHECKSUM">
                   <fileset dir="${project.build.directory}/build">
                     <include name="**/*.dll"/>
@@ -88,7 +87,7 @@
                   </fileset>
                   <flattenmapper/>
                 </copy>                
-              </tasks>
+              </target>
             </configuration>
             <goals>
               <goal>run</goal>
