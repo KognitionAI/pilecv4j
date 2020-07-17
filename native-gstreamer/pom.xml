@@ -13,6 +13,10 @@
   <artifactId>native-gstreamer</artifactId>
   <packaging>pom</packaging>
 
+  <properties>
+    <common.include>${project.parent.basedir}/native-common-include/include</common.include>
+  </properties>
+
   <build>
     <directory>${basedir}/target/${platform}-${build.type}</directory>
     <sourceDirectory>src/main/c</sourceDirectory>
@@ -40,6 +44,7 @@
                 <CMAKE_CLASSIFIER>${platform}</CMAKE_CLASSIFIER>
                 <PROJECT_VERSION>${project.version}</PROJECT_VERSION>
                 <DEP_OPENCV_VERSION>${opencv-build.version}</DEP_OPENCV_VERSION>
+                <COMMON_INCLUDE>${common.include}</COMMON_INCLUDE>
               </environmentVariables>
               <downloadBinaries>${download.cmake}</downloadBinaries>
             </configuration>
