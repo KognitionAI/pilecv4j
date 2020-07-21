@@ -32,29 +32,37 @@ public class GaussianBlurTest {
     private final int borderType;
 
     @Parameterized.Parameters
-    public static Collection parameters() {
+    public static Collection<Object[]> parameters() {
         return Arrays.asList(new Object[][] {{GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
-                                              GaussianBlurTest.class.getClassLoader().getResource("test-images/flower_3x3ExpectedOutput.bmp"), new Size(3, 3),
-                                              0, 0, BORDER_DEFAULT}, {GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
-                                                                      GaussianBlurTest.class.getClassLoader().getResource(
-                                                                          "test-images/flower_7x7ExpectedOutput.bmp"), new Size(7, 7), 1, 0, BORDER_DEFAULT},
-                                             {GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
-                                              GaussianBlurTest.class.getClassLoader().getResource("test-images/flower_5x3ExpectedOutput.bmp"), new Size(5, 3),
-                                              1, 0.5, BORDER_DEFAULT}, {GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
-                                                                        GaussianBlurTest.class.getClassLoader().getResource(
-                                                                            "test-images/flower_borderTestExpectedOutput.bmp"), new Size(5, 3), 0, 0,
-                                                                        BORDER_REPLICATE},
-                                             {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
-                                              GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit_3x3ExpectedOutput.bmp"), new Size(3, 3), 0,
-                                              0, BORDER_DEFAULT}, {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
-                                                                   GaussianBlurTest.class.getClassLoader().getResource(
-                                                                       "test-images/fruit_7x7ExpectedOutput.bmp"), new Size(7, 7), 1, 0, BORDER_DEFAULT},
-                                             {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
-                                              GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit_5x3ExpectedOutput.bmp"), new Size(5, 3), 1,
-                                              0.5, BORDER_DEFAULT}, {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
-                                                                     GaussianBlurTest.class.getClassLoader().getResource(
-                                                                         "test-images/fruit_borderTestExpectedOutput.bmp"), new Size(5, 3), 0, 0,
-                                                                     BORDER_REPLICATE}});
+            GaussianBlurTest.class.getClassLoader().getResource("test-images/flower_3x3ExpectedOutput.bmp"),new Size(3, 3),
+            0,0,BORDER_DEFAULT},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource(
+                    "test-images/flower_7x7ExpectedOutput.bmp"),
+                new Size(7, 7),1,0,BORDER_DEFAULT},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource("test-images/flower_5x3ExpectedOutput.bmp"),new Size(5, 3),
+                1,0.5,BORDER_DEFAULT},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/flower.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource(
+                    "test-images/flower_borderTestExpectedOutput.bmp"),
+                new Size(5, 3),0,0,
+                BORDER_REPLICATE},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit_3x3ExpectedOutput.bmp"),new Size(3, 3),0,
+                0,BORDER_DEFAULT},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource(
+                    "test-images/fruit_7x7ExpectedOutput.bmp"),
+                new Size(7, 7),1,0,BORDER_DEFAULT},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit_5x3ExpectedOutput.bmp"),new Size(5, 3),1,
+                0.5,BORDER_DEFAULT},
+            {GaussianBlurTest.class.getClassLoader().getResource("test-images/fruit.jpg"),
+                GaussianBlurTest.class.getClassLoader().getResource(
+                    "test-images/fruit_borderTestExpectedOutput.bmp"),
+                new Size(5, 3),0,0,
+                BORDER_REPLICATE}});
     }
 
     public GaussianBlurTest(final URL imageToTransform, final URL expectedImageResult, final Size size, final double sigmaX, final double sigmaY,

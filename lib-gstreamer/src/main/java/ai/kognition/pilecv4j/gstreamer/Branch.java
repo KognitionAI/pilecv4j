@@ -257,10 +257,17 @@ public class Branch {
 
     /**
      * Set an error handler for an error that happens on the most recently added Element.
+     *
+     * @throws IllegalStateException if there is no element on the Branch yet, or there is already an
+     *     error handler on the current element.
      */
-    public <T extends Bin> Branch onError(final OnError<T> cb) {
+    public <T extends Bin> Branch onError(final OnError cb) throws IllegalStateException {
         if(currentElement == null)
-            throw new IllegalStateException("You must add an element before attach an error handler to it.");
+            throw new IllegalStateException("You must add an element before attaching an error handler to it.");
+        if(currentElement.errorHandler != null)
+            throw new IllegalStateException(
+                "You should only set a single " + OnError.class.getSimpleName() + " handler for any given element. The element \"" + currentElement.element
+                    + "\" appears to have more than one set.");
         this.currentElement.errorHandler = cb;
         return this;
     }
@@ -574,7 +581,7 @@ public class Branch {
         public final boolean delayed;
         public PadAddedCallback padAddedCallback;
         public DynamicLink linker;
-        public OnError<?> errorHandler;
+        public OnError errorHandler;
 
         public ElementHolder(final Element element, final boolean delayed) {
             this.element = element;

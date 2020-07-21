@@ -24,21 +24,11 @@ public class GaussianBlur {
      * Gaussian kernel uses surrounding pixels to transform a given region.
      */
     public enum BorderTypes {
-        BORDER_CONSTANT(Core.BORDER_CONSTANT),
-        BORDER_REPLICATE(Core.BORDER_REPLICATE),
-        BORDER_REFLECT(Core.BORDER_REFLECT),
-        BORDER_WRAP(Core.BORDER_WRAP),
-        BORDER_REFLECT_101(Core.BORDER_REFLECT_101),
-        BORDER_TRANSPARENT(Core.BORDER_TRANSPARENT),
-        BORDER_REFLECT101(Core.BORDER_REFLECT101),
-        BORDER_DEFAULT(Core.BORDER_DEFAULT),
-        BORDER_ISOLATED(Core.BORDER_ISOLATED);
+        BORDER_CONSTANT(Core.BORDER_CONSTANT), BORDER_REPLICATE(Core.BORDER_REPLICATE), BORDER_REFLECT(Core.BORDER_REFLECT), BORDER_WRAP(
+            Core.BORDER_WRAP), BORDER_REFLECT_101(Core.BORDER_REFLECT_101), BORDER_TRANSPARENT(
+                Core.BORDER_TRANSPARENT), BORDER_REFLECT101(Core.BORDER_REFLECT101), BORDER_DEFAULT(Core.BORDER_DEFAULT), BORDER_ISOLATED(Core.BORDER_ISOLATED);
 
-        private final int value;
-
-        private BorderTypes(final int value) {
-            this.value = value;
-        }
+        private BorderTypes(final int value) {}
     }
 
     private final Size kernelSize;

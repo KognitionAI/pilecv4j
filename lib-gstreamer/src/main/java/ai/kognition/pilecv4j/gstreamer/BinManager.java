@@ -38,7 +38,7 @@ public class BinManager {
     private int ghostPadNum = 0;
     private boolean stopOnEos = false;
     private Runnable exitNotification = null;
-    private OnError<?> onErrCb = null;
+    private OnError onErrCb = null;
 
     /**
      * Add an element that has dynamic pads. This will manage linking the dynamic pads as they're being added to the
@@ -229,22 +229,28 @@ public class BinManager {
     }
 
     @FunctionalInterface
-    public static interface OnError<T extends Bin> {
-        public void handleError(T pipe, GstObject source, int code, String message);
+    public static interface OnError {
+        public void handleError(Bin pipe, GstObject registeredWith, GstObject source, int code, String message);
     }
 
     /**
      * Set an error handler for an error that happens on the most recently added Element.
+     *
+     * @throws IllegalStateException if there is no element on the Branch yet, or there is already an
+     *     error handler on the current element.
      */
-    public <T extends Bin> BinManager onError(final OnError<T> cb) {
-        this.current.onError(cb);
+    public <T extends Bin> BinManager onError(final OnError cb) throws IllegalStateException {
+        this.current.onError(cb);  // throws IllegalStateException
         return this;
     }
 
     /**
-     * Set an error handler for the entire Bin.
+     * Set an error handler for the entire Bin. The OnError callback will be called with the same
+     * value for the first parameter {@code pipe} and the second parameter {@code registeredWith}.
+     *
+     * @throws IllegalStateException if there is already an error handler on the current element.
      */
-    public <T extends Bin> BinManager onAnyError(final OnError<T> cb) {
+    public <T extends Bin> BinManager onAnyError(final OnError cb) throws IllegalStateException {
         if(this.onErrCb != null)
             throw new IllegalStateException("You should only set a single " + OnError.class.getSimpleName() + " handler for the entire pipeline.");
         this.onErrCb = cb;
@@ -372,30 +378,34 @@ public class BinManager {
 
         // ======================================================================
         // Set up the error handler
-        final Map<String, OnError<?>> elementToHandler = new HashMap<>();
+        final Map<Element, OnError> elementToHandler = new HashMap<>();
 
         allBranches()
             .flatMap((final Branch b) -> b.elements.stream())
             .filter(eh -> eh.errorHandler != null)
-            .forEach(eh -> elementToHandler.put(eh.element.getName(), eh.errorHandler));
+            .forEach(eh -> elementToHandler.put(eh.element, eh.errorHandler));
 
         if(elementToHandler.size() > 0 || onErrCb != null) {
-            @SuppressWarnings("unchecked")
-            final OnError<T> onErrCb2 = (OnError<T>)onErrCb;
-
             GstUtils.onError(pipe, (final GstObject source, final int code, final String message) -> {
-                final String eName = source != null ? source.getName() : null;
-                @SuppressWarnings("unchecked")
-                final OnError<T> eSpecific = (OnError<T>)elementToHandler.get(eName);
-                if(eSpecific != null)
-                    eSpecific.handleError(pipe, source, code, message);
-                if(onErrCb2 != null)
-                    onErrCb2.handleError(pipe, source, code, message);
+                if(source instanceof Element)
+                    callErrorHandlerIfNecessary(elementToHandler, pipe, source, source, code, message);
+                if(onErrCb != null)
+                    onErrCb.handleError(pipe, pipe, source, code, message);
             });
         }
         // ======================================================================
 
         return pipe;
+    }
+
+    private static void callErrorHandlerIfNecessary(final Map<Element, OnError> handlers, final Bin pipe, final GstObject registerCheck,
+        final GstObject whereErrHappened, final int code, final String message) {
+        final OnError handler = handlers.get(registerCheck);
+        if(handler != null)
+            handler.handleError(pipe, registerCheck, whereErrHappened, code, message);
+        final GstObject parent = registerCheck.getParent();
+        if(parent != null)
+            callErrorHandlerIfNecessary(handlers, pipe, parent, whereErrHappened, code, message);
     }
 
     private BinManager createGhostPads(final Bin bin) {

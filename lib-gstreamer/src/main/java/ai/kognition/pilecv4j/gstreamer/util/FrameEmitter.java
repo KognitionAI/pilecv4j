@@ -27,6 +27,7 @@ public class FrameEmitter implements AutoCloseable {
     private BreakoutFilter breakout = null;
     public boolean emitted = false;
 
+    @SuppressWarnings("resource")
     public FrameEmitter(final String sourceUri, final int numFrames) {
         final int seq = sequence.getAndIncrement();
         breakout = new BreakoutFilter("emitter" + seq)
