@@ -3,7 +3,6 @@ package ai.kognition.pilecv4j.image;
 import static ai.kognition.pilecv4j.image.UtilsForTesting.compare;
 import static ai.kognition.pilecv4j.image.UtilsForTesting.translateClasspath;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 import java.awt.image.BufferedImage;
 import java.awt.image.DataBufferByte;
@@ -13,12 +12,10 @@ import java.util.Set;
 
 import org.junit.Test;
 import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.image.display.ImageDisplay.Implementation;
 
@@ -170,28 +167,28 @@ public class TestUtils {
     // }));
 
     final public static Set<String> notWorking = new HashSet<>(Arrays.asList(
-        // "TYPE_0/img08.bmp"
-        // , "TYPE_0/img21.pcx"
-        // , "TYPE_0/img20.pcx"
-        // , "TYPE_0/img34.tif"
-        // , "TYPE_0/img18.pcx"
-        // , "TYPE_0/img45.tif"
-        // , "TYPE_0/img44.tif"
-        // , "TYPE_0/img16.pcx"
-        // , "TYPE_0/img22.PCX"
-        // , "TYPE_0/img45.tif"
-        // , "TYPE_0/img46.tif"
-        // , "TYPE_0/img47.tif"
-        // // These seem to be a problem for non TwelveMonkeys IIO plugins
-        // , "TYPE_0/img13.tif"
-        // , "TYPE_0/img56.tif"
-        // , "TYPE_0/img11.tif"
-        // , "TYPE_0/img53.tif"
-        // , "TYPE_0/img91.tif"
-        // , "TYPE_0/img12.tif"
-        // , "TYPE_0/img55.tif"
-        // , "TYPE_0/img32.tif"
-        // , "TYPE_0/img54.tif"
+    // "TYPE_0/img08.bmp"
+    // , "TYPE_0/img21.pcx"
+    // , "TYPE_0/img20.pcx"
+    // , "TYPE_0/img34.tif"
+    // , "TYPE_0/img18.pcx"
+    // , "TYPE_0/img45.tif"
+    // , "TYPE_0/img44.tif"
+    // , "TYPE_0/img16.pcx"
+    // , "TYPE_0/img22.PCX"
+    // , "TYPE_0/img45.tif"
+    // , "TYPE_0/img46.tif"
+    // , "TYPE_0/img47.tif"
+    // // These seem to be a problem for non TwelveMonkeys IIO plugins
+    // , "TYPE_0/img13.tif"
+    // , "TYPE_0/img56.tif"
+    // , "TYPE_0/img11.tif"
+    // , "TYPE_0/img53.tif"
+    // , "TYPE_0/img91.tif"
+    // , "TYPE_0/img12.tif"
+    // , "TYPE_0/img55.tif"
+    // , "TYPE_0/img32.tif"
+    // , "TYPE_0/img54.tif"
 
     ));
 

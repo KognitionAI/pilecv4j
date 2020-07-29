@@ -730,7 +730,7 @@ public class Utils {
                         mask >>>= 1; // shift the mask over to remove it from the sign bit
                         matToMask = closer.add(new CvMat()); // new mat to move forward with
                         Core.multiply(tmpMat, new Scalar(0.5D), matToMask); // shift all of values in the channel >> 1. That
-                        // is, divide by 2.
+                                                                                // is, divide by 2.
                     }
                 }
 
