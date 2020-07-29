@@ -730,7 +730,7 @@ public class Utils {
                         mask >>>= 1; // shift the mask over to remove it from the sign bit
                         matToMask = closer.add(new CvMat()); // new mat to move forward with
                         Core.multiply(tmpMat, new Scalar(0.5D), matToMask); // shift all of values in the channel >> 1. That
-                                                                            // is, divide by 2.
+                        // is, divide by 2.
                     }
                 }
 
@@ -1128,13 +1128,29 @@ public class Utils {
         return preserveAspectRatio(mat.size(), newSize);
     }
 
+    /**
+     *
+     * @param originalMatSize The Size of the original image
+     * @param newSize The desired Size of the new image
+     * @return The size of the new image, scaled to match the height or width of {@param newSize}
+     *
+     * 4 POSSIBLE CASES:
+     * Case 1: {@param newSize} is strictly larger than {@param originalMatSize}:
+     *     Result: size matches one of the width or height, whichever requires less scaling.
+     * Case 2: {@param newSize} is strictly smaller than {@param originalMatSize}:
+     *     Result: size wherein both the width and height are less than or equal to {@param newSize}
+     * Case 3: Exactly one of the height or width of {@param newSize} is greater than its corresponding dimension in {@param originalMatSize}:
+     *     In this case, the image is always scaled down.
+     *     Result: size of the scaled down image, matching the height or width of the lower specification
+     * Case 4: One or both of the height and width in {@param newSize} matches the corresponding dimension in {@param originalMatSize}
+     *      Result: returns {@param originalMatSize}
+     */
     public static Size preserveAspectRatio(final Size originalMatSize, final Size newSize) {
         // calculate the appropriate resize
         final double fh = newSize.height / originalMatSize.height;
         final double fw = newSize.width / originalMatSize.width;
-        final double scale = fw < fh ? fw : fh;
-        return (scale >= 1.0) ? new Size(originalMatSize.width, originalMatSize.height)
-            : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+        final double scale = Math.min(fw, fh);
+        return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
     }
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {
