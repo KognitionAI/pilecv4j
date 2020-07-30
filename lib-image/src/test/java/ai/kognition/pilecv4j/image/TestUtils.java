@@ -116,7 +116,7 @@ public class TestUtils {
         int resizeH = 360; // Requires scale up by 2
         int resizeW = 500; // Requires scale up by 2.08
         try(CvMat mat = ImageFile.readMatFromFile(file);) {
-            final Size toResizeTo = Utils.preserveAspectRatio(mat, new Size(resizeW, resizeH));
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, new Size(resizeW, resizeH));
             assertEquals("Scaled width up by a factor of 2 (lower factor)", 480, toResizeTo.width, 1E-8);
             assertEquals("Scaled height up by a factor of 2 (lower factor)", resizeH, toResizeTo.height, 1E-8);
         }
@@ -128,7 +128,7 @@ public class TestUtils {
         int resizeH = 100; // Requires scale down by a factor of 0.5555
         int resizeW = 120; // Requires scale down by a factor of 0.5
         try(CvMat mat = ImageFile.readMatFromFile(file);) {
-            final Size toResizeTo = Utils.preserveAspectRatio(mat, new Size(resizeW, resizeH));
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, new Size(resizeW, resizeH));
             assertEquals("Scaled width down by a factor of 0.5 (lower factor)", resizeW, toResizeTo.width, 1E-8);
             assertEquals("Scaled height down by a factor of 0.5 (lower factor)", 90, toResizeTo.height, 1E-8);
         }
@@ -140,7 +140,7 @@ public class TestUtils {
         int resizeH = 360; // Requires scale up by a factor of 2
         int resizeW = 80; // Requires scale down by a factor of 0.333 .
         try(CvMat mat = ImageFile.readMatFromFile(file);) {
-            final Size toResizeTo = Utils.preserveAspectRatio(mat, new Size(resizeW, resizeH));
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, new Size(resizeW, resizeH));
             assertEquals("Scaled width down by a factor of 0.333 (scale down is prioritized)", resizeW, toResizeTo.width, 1E-8);
             assertEquals("Scaled height down by a factor of 0.333 (scale down is prioritized)", 60, toResizeTo.height, 1E-8);
         }

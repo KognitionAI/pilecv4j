@@ -132,7 +132,7 @@ public class ResizableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
     public ImageData convertToDisplayableSWT(final Mat image) {
         try (final CvMat toDisplay = new CvMat();) {
-            Imgproc.resize(image, toDisplay, Utils.preserveAspectRatio(image, parentBounds));
+            Imgproc.resize(image, toDisplay, Utils.scaleDownOrNothing(image, parentBounds));
             return SwtUtils.convertToDisplayableSWT(toDisplay);
         }
     }
