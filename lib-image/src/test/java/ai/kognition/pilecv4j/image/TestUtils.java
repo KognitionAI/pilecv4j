@@ -12,6 +12,7 @@ import java.util.Set;
 
 import org.junit.Test;
 import org.opencv.core.CvType;
+import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
@@ -106,6 +107,42 @@ public class TestUtils {
             }
             assertEquals(1, mat.channels());
             compare(mat, im);
+        }
+    }
+
+    @Test
+    public void testScaleUp() throws Exception {
+        String file = translateClasspath("test-images/180x240_people.jpg");
+        int resizeH = 360; // Requires scale up by 2
+        int resizeW = 500; // Requires scale up by 2.08
+        try(CvMat mat = ImageFile.readMatFromFile(file);) {
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, new Size(resizeW, resizeH));
+            assertEquals("Scaled width up by a factor of 2 (lower factor)", 480, toResizeTo.width, 1E-8);
+            assertEquals("Scaled height up by a factor of 2 (lower factor)", resizeH, toResizeTo.height, 1E-8);
+        }
+    }
+
+    @Test
+    public void testScaleDown() throws Exception {
+        String file = translateClasspath("test-images/180x240_people.jpg");
+        int resizeH = 100; // Requires scale down by a factor of 0.5555
+        int resizeW = 120; // Requires scale down by a factor of 0.5
+        try(CvMat mat = ImageFile.readMatFromFile(file);) {
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, new Size(resizeW, resizeH));
+            assertEquals("Scaled width down by a factor of 0.5 (lower factor)", resizeW, toResizeTo.width, 1E-8);
+            assertEquals("Scaled height down by a factor of 0.5 (lower factor)", 90, toResizeTo.height, 1E-8);
+        }
+    }
+
+    @Test
+    public void testMixedScale() throws Exception {
+        String file = translateClasspath("test-images/180x240_people.jpg");
+        int resizeH = 360; // Requires scale up by a factor of 2
+        int resizeW = 80; // Requires scale down by a factor of 0.333 .
+        try(CvMat mat = ImageFile.readMatFromFile(file);) {
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, new Size(resizeW, resizeH));
+            assertEquals("Scaled width down by a factor of 0.333 (scale down is prioritized)", resizeW, toResizeTo.width, 1E-8);
+            assertEquals("Scaled height down by a factor of 0.333 (scale down is prioritized)", 60, toResizeTo.height, 1E-8);
         }
     }
 

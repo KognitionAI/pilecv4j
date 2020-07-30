@@ -122,7 +122,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
         try(final Closer closer = new Closer();) {
             if(screenDim != null) {
                 if(adjustedSize.ref == null) {
-                    adjustedSize.ref = Utils.preserveAspectRatio(mx, screenDim);
+                    adjustedSize.ref = Utils.scaleDownOrNothing(mx, screenDim);
                 }
 
                 final VideoFrame lmat = chain(closer.add(new VideoFrame(mx.decodeTimeMillis)),

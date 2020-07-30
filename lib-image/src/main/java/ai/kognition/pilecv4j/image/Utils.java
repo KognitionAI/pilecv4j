@@ -730,7 +730,7 @@ public class Utils {
                         mask >>>= 1; // shift the mask over to remove it from the sign bit
                         matToMask = closer.add(new CvMat()); // new mat to move forward with
                         Core.multiply(tmpMat, new Scalar(0.5D), matToMask); // shift all of values in the channel >> 1. That
-                                                                            // is, divide by 2.
+                                                                                // is, divide by 2.
                     }
                 }
 
@@ -1124,11 +1124,11 @@ public class Utils {
         }
     }
 
-    public static Size preserveAspectRatio(final Mat mat, final Size newSize) {
-        return preserveAspectRatio(mat.size(), newSize);
+    public static Size scaleDownOrNothing(final Mat mat, final Size newSize) {
+        return scaleDownOrNothing(mat.size(), newSize);
     }
 
-    public static Size preserveAspectRatio(final Size originalMatSize, final Size newSize) {
+    public static Size scaleDownOrNothing(final Size originalMatSize, final Size newSize) {
         // calculate the appropriate resize
         final double fh = newSize.height / originalMatSize.height;
         final double fw = newSize.width / originalMatSize.width;
@@ -1136,6 +1136,26 @@ public class Utils {
         return (scale >= 1.0) ? new Size(originalMatSize.width, originalMatSize.height)
             : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
     }
+
+    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
+        return scaleWhilePreservingAspectRatio(mat.size(), maxSize);
+    }
+
+    /**
+     *
+     * @param originalMatSize The size of the original image
+     * @param maxSize The maximum desired size of the new image
+     * @return The size of the new image, which matches the height or width of {@param newSize} such that the image does not exceed those dimensions while
+     * preserving the size.
+     */
+    public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {
+        // calculate the appropriate resize
+        final double fh = maxSize.height / originalMatSize.height;
+        final double fw = maxSize.width / originalMatSize.width;
+        final double scale = Math.min(fw, fh);
+        return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+    }
+
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {
         // Here we use the description for the perpendicularDistance.
