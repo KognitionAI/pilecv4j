@@ -1124,27 +1124,29 @@ public class Utils {
         }
     }
 
+    public static Size scaleDownOrNothing(final Mat mat, final Size newSize) {
+        return scaleDownOrNothing(mat.size(), newSize);
+    }
+
+    public static Size scaleDownOrNothing(final Size originalMatSize, final Size newSize) {
+        // calculate the appropriate resize
+        final double fh = newSize.height / originalMatSize.height;
+        final double fw = newSize.width / originalMatSize.width;
+        final double scale = fw < fh ? fw : fh;
+        return (scale >= 1.0) ? new Size(originalMatSize.width, originalMatSize.height)
+            : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+    }
+
     public static Size preserveAspectRatio(final Mat mat, final Size newSize) {
         return preserveAspectRatio(mat.size(), newSize);
     }
 
     /**
      *
-     * @param originalMatSize The Size of the original image
-     * @param newSize The desired Size of the new image
-     * @return The size of the new image, scaled to match the height or width of {@param newSize}, whichever requires the percent change in scale - unless
-     * one dimension is to be scaled up and the other scaled down, in which case scaling down is always prioritized.
-     *
-     * RETURN VALUE IS DEFINED DIFFERENTLY ACCORDING TO 4 POSSIBLE CASES:
-     * Case 1: {@param newSize} is strictly larger than {@param originalMatSize}:
-     *     Result: size matches one of the width or height, whichever requires less percent scaling.
-     * Case 2: {@param newSize} is strictly smaller than {@param originalMatSize}:
-     *     Result: size wherein both the width and height are less than or equal to {@param newSize}
-     * Case 3: Exactly one of the height or width of {@param newSize} is greater than its corresponding dimension in {@param originalMatSize}:
-     *     In this case, the image is always scaled down.
-     *     Result: size of the scaled down image, matching the height or width of the lower specification.
-     * Case 4: One or both of the height and width in {@param newSize} matches the corresponding dimension in {@param originalMatSize}
-     *      Result: returns {@param originalMatSize}
+     * @param originalMatSize The size of the original image
+     * @param newSize The desired size of the new image
+     * @return The size of the new image, which matches the height or width of {@param newSize} such that the image does not exceed those dimensions while
+     * preserving the size.
      */
     public static Size preserveAspectRatio(final Size originalMatSize, final Size newSize) {
         // calculate the appropriate resize
@@ -1153,6 +1155,7 @@ public class Utils {
         final double scale = Math.min(fw, fh);
         return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
     }
+
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {
         // Here we use the description for the perpendicularDistance.
