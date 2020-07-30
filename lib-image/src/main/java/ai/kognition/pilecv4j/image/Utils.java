@@ -1132,16 +1132,17 @@ public class Utils {
      *
      * @param originalMatSize The Size of the original image
      * @param newSize The desired Size of the new image
-     * @return The size of the new image, scaled to match the height or width of {@param newSize}
+     * @return The size of the new image, scaled to match the height or width of {@param newSize}, whichever requires the percent change in scale - unless
+     * one dimension is to be scaled up and the other scaled down, in which case scaling down is always prioritized.
      *
-     * 4 POSSIBLE CASES:
+     * RETURN VALUE IS DEFINED DIFFERENTLY ACCORDING TO 4 POSSIBLE CASES:
      * Case 1: {@param newSize} is strictly larger than {@param originalMatSize}:
-     *     Result: size matches one of the width or height, whichever requires less scaling.
+     *     Result: size matches one of the width or height, whichever requires less percent scaling.
      * Case 2: {@param newSize} is strictly smaller than {@param originalMatSize}:
      *     Result: size wherein both the width and height are less than or equal to {@param newSize}
      * Case 3: Exactly one of the height or width of {@param newSize} is greater than its corresponding dimension in {@param originalMatSize}:
      *     In this case, the image is always scaled down.
-     *     Result: size of the scaled down image, matching the height or width of the lower specification
+     *     Result: size of the scaled down image, matching the height or width of the lower specification.
      * Case 4: One or both of the height and width in {@param newSize} matches the corresponding dimension in {@param originalMatSize}
      *      Result: returns {@param originalMatSize}
      */
