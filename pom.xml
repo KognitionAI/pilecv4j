@@ -12,6 +12,7 @@
     <module>lib-image</module>
     <module>lib-tf</module>
     <module>lib-gstreamer</module>
+    <module>lib-objdetect</module>
     <module>native-image</module>
     <module>native-nr</module>
     <module>native-gstreamer</module>
