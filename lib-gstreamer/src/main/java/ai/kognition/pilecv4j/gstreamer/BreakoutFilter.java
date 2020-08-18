@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -390,15 +389,6 @@ public class BreakoutFilter extends BaseTransform {
             ref = o;
         }
 
-        public void computeIfAbsent(final Supplier<T> updateFunction) {
-            synchronized(this) {
-                if(ref == null) {
-                    ref = updateFunction.get();
-                    notify();
-                }
-            }
-        }
-
         public T getAndSet(final T newVal) {
             synchronized(this) {
                 final T ret = ref;
@@ -441,7 +431,7 @@ public class BreakoutFilter extends BaseTransform {
                 while(!stop.get()) {
                     final VideoFrame frame = to.getNonNullAndSetToNull(stop);
                     if(frame != null && !stop.get()) {
-                        try {
+                        try(final QuietCloseable qc = () -> dispose(frame);) {
                             processor.accept(frame);
                         } catch(final Exception exc) {
                             if(LOGGER.isDebugEnabled())
@@ -450,7 +440,6 @@ public class BreakoutFilter extends BaseTransform {
                                 LOGGER.info("StreamWatcher: User supplied processor threw exception: {} (to see stack trace enable debug logging for {})",
                                     exc.getLocalizedMessage(), BreakoutFilter.class.getName());
                         }
-                        dispose(frame);
                     } // otherwise we're stopped.
                 }
             };
@@ -465,31 +454,8 @@ public class BreakoutFilter extends BaseTransform {
 
         @Override
         public void accept(final VideoFrame frame) {
-
-            // This works but will leave the OLDEST frame
-            // for the other side of the `to` queue to
-            // work with. However, it will be slightly more
-            // cpu friendly when frames are missed.
-            //
-            // to.computeIfAbsent(() -> new CvMatAndCaps(
-            // frame.pooledDeepCopy(getPool(frame)),
-            // frameAndCaps.caps,
-            // true));
-
             dispose(to.getAndSet(
                 frame.pooledDeepCopy(getPool(frame))));
-
-            // TODO:
-            // This uses the original gstreamer data buffer but
-            // unfortunately gstreamer owns it so this can crash
-            // unexpectedly. Changing to ffmpeg and allocating
-            // our own frame space will allow us to move the data
-            // using a zero-copy technique
-            //
-            // dispose(to.getAndSet(new CvMatAndCaps(
-            // frame.shallowCopy(),
-            // frameAndCaps.caps,
-            // true)));
         }
     }
 

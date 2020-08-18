@@ -43,6 +43,7 @@ G_BEGIN_DECLS
 
 typedef struct _GstBreakout GstBreakout;
 typedef struct _GstBreakoutClass GstBreakoutClass;
+typedef struct _GstBreakoutPrivate GstBreakoutPrivate;
 
 
 struct _GstBreakout
@@ -51,6 +52,8 @@ struct _GstBreakout
 
   GstVideoFrame* cur;
   GstPad*        sink;
+
+  GstBreakoutPrivate* priv;
 };
 
 struct _GstBreakoutClass

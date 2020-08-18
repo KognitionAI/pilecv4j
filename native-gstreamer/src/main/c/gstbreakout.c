@@ -44,6 +44,24 @@
 #include <stdio.h>
 #include "gstbreakout-marshal.h"
 
+// this is in the cpp module gstmat.cpp since I could put it there
+uint64_t currentTimeNanos();
+
+struct _GstBreakoutPrivate {
+  int64_t        maxDelayMillis;
+
+  // min/max TimeDifference is to keep track of the outliers
+  // which will be removed from the average.
+  int64_t minTimeDifference;
+  int64_t maxTimeDifference;
+
+  int64_t cumulativeTimeDifferences;
+  int64_t timeDifference;
+  uint64_t numTimeMeasurements;
+
+  uint8_t calcMode;
+};
+
 // This is index into the callback array
 enum
 {
@@ -51,6 +69,15 @@ enum
   SIGNAL_TRANSFORM_IP,
 
   LAST_SIGNAL
+};
+
+#define BREAKOUT_DEFAULT_MAX_DELAY_MILLIS -1
+#define BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE 10
+#define NANOS_PER_MILLI 1000000L
+
+enum {
+  PROP_0,
+  PROP_MAX_DELAY_MILLIS
 };
 
 
@@ -73,9 +100,6 @@ static gboolean gst_breakout_set_info (GstVideoFilter * filter, GstCaps * incaps
 static GstFlowReturn gst_breakout_transform_frame_ip (GstVideoFilter * filter,
     GstVideoFrame * frame);
 
-//static GstFlowReturn gst_breakout_prepare_output_buffer (GstBaseTransform * trans,
-//    GstBuffer *input, GstBuffer **outbuf);
-
 // exposed to java
 typedef struct {
   GstBuffer* buffer;
@@ -83,11 +107,6 @@ typedef struct {
   guint32 width;
   guint32 height;
 } FrameDetails;
-
-enum
-{
-  PROP_0,
-};
 
 /* pad templates */
 
@@ -151,6 +170,11 @@ gst_breakout_class_init (GstBreakoutClass * klass)
           G_STRUCT_OFFSET (GstBreakoutClass, new_sample),
           NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0, G_TYPE_NONE);
 
+  g_object_class_install_property (gobject_class, PROP_MAX_DELAY_MILLIS,
+     g_param_spec_int64("maxDelayMillis", "maxDelayMillis",
+               "Maximum frame delay in milliseconds before filter will skip all processing to get caught up",
+               -1, G_MAXINT64, BREAKOUT_DEFAULT_MAX_DELAY_MILLIS, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   gst_segment_init (&defaultSegment, GST_FORMAT_TIME);
 }
 
@@ -162,6 +186,7 @@ static void gst_breakout_init (GstBreakout *breakout)
   GValue p = G_VALUE_INIT;
 
   breakout->cur = NULL;
+  breakout->priv = NULL;
 
   // =====================================================================
   // store off the sink pad for quick retrieval later. It's an ALWAYS pad
@@ -185,6 +210,21 @@ static void gst_breakout_init (GstBreakout *breakout)
   gst_base_transform_set_in_place(&(breakout->base_breakout.element), TRUE);
 }
 
+static void makePrivateParts(GstBreakout* breakout, int64_t maxDelayMillis) {
+  GST_OBJECT_LOCK(breakout);
+  if (!breakout->priv) {
+    GstBreakoutPrivate* priv = malloc(sizeof(GstBreakoutPrivate));
+    priv->maxDelayMillis = maxDelayMillis;
+    priv->cumulativeTimeDifferences = 0L;
+    priv->numTimeMeasurements = 0L;
+    priv->timeDifference = 0L;
+    priv->minTimeDifference = 0L;
+    priv->maxTimeDifference = 0L;
+    priv->calcMode = TRUE;
+    breakout->priv = priv;
+  }
+  GST_OBJECT_UNLOCK(breakout);
+}
 void
 gst_breakout_set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)
@@ -193,6 +233,10 @@ gst_breakout_set_property (GObject * object, guint property_id,
   GST_TRACE_OBJECT (breakout, "set_property");
 
   switch (property_id) {
+  case PROP_MAX_DELAY_MILLIS: {
+    makePrivateParts(breakout, g_value_get_int64(value));
+    break;
+  }
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     break;
@@ -207,6 +251,12 @@ gst_breakout_get_property (GObject * object, guint property_id,
   GST_TRACE_OBJECT (breakout, "get_property");
 
   switch (property_id) {
+  case PROP_MAX_DELAY_MILLIS:
+    if (breakout->priv)
+      g_value_set_int64(value, breakout->priv->maxDelayMillis);
+    else
+      g_value_set_int64(value, BREAKOUT_DEFAULT_MAX_DELAY_MILLIS);
+    break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     break;
@@ -223,6 +273,13 @@ gst_breakout_dispose (GObject * object)
   if (breakout->sink != NULL) {
     gst_object_unref(breakout->sink);
     breakout->sink = NULL;
+  }
+
+  if (breakout->priv) {
+    GST_OBJECT_LOCK(breakout);
+    free(breakout->priv);
+    breakout->priv = NULL;
+    GST_OBJECT_UNLOCK(breakout);
   }
 
   G_OBJECT_CLASS (gst_breakout_parent_class)->dispose (object);
@@ -273,6 +330,52 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
   GstBreakout *breakout = GST_BREAKOUT (filter);
   GST_TRACE_OBJECT (breakout, "transform_frame_ip");
 
+  GstBreakoutPrivate * priv = breakout->priv;
+  if (priv) {
+    const int64_t maxDelayMillis = breakout->priv->maxDelayMillis;
+
+    // are we limiting the latency?
+    if (maxDelayMillis >= 0) {
+      uint64_t curTime = currentTimeNanos();
+      const int64_t diff = curTime - (int64_t) (frame->buffer->pts);
+
+      // are we still gathering metrics to record the clock shift?
+      if (priv->calcMode) {
+        GST_OBJECT_LOCK(breakout);
+        if (priv->numTimeMeasurements == 0)
+          priv->minTimeDifference = priv->maxTimeDifference = diff;
+        else {
+          if (diff < priv->minTimeDifference)
+            priv->minTimeDifference = diff;
+          if (diff > priv->maxTimeDifference)
+            priv->maxTimeDifference = diff;
+        }
+
+        priv->numTimeMeasurements++;
+        priv->cumulativeTimeDifferences += diff;
+
+        // if we have enough samples then just take the current average.
+        //                                                                       the +2 is for the outliers
+        if (priv->numTimeMeasurements >= (BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE + 2)) {
+          // adjust for the min and max outliers
+          priv->cumulativeTimeDifferences -= priv->minTimeDifference;
+          priv->cumulativeTimeDifferences -= priv->maxTimeDifference;
+
+          //                                                                                   -2 is for the outliers
+          priv->timeDifference = (int64_t)( (double)(priv->cumulativeTimeDifferences) / (double) (priv->numTimeMeasurements - 2L));
+          priv->timeDifference += (priv->maxDelayMillis * NANOS_PER_MILLI);
+          priv->calcMode = FALSE;
+        }
+        GST_OBJECT_UNLOCK(breakout);
+      } else {
+        // we have the time shift we're going to assume is basically no delay.
+        if (diff > priv->timeDifference) {
+          GST_DEBUG_OBJECT(breakout, "Dropping a frame due to latency");
+          return GST_FLOW_OK;
+        }
+      }
+    }
+  }
   breakout->cur = frame;
   g_signal_emit (breakout, gst_breakout_signals[SIGNAL_TRANSFORM_IP], 0);
   breakout->cur = NULL;

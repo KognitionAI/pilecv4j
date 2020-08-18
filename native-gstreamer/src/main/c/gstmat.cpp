@@ -1,4 +1,6 @@
 #include "imagemaker.h"
+#include <stdio.h>
+#include <chrono>
 
 extern "C" {
 #include "gstbreakout.h"
@@ -25,7 +27,14 @@ public:
   }
 };
 
+static const auto arbitraryTimeInThePast = std::chrono::steady_clock::now();
+
 extern "C" {
+
+  uint64_t currentTimeNanos() {
+    auto finish = std::chrono::steady_clock::now();
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(finish - arbitraryTimeInThePast).count());
+  }
 
   void set_im_maker(uint64_t im) {
     imaker = (ai::kognition::pilecv4j::ImageMaker*)im;
