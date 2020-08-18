@@ -7,7 +7,7 @@
   <parent>
     <groupId>ai.kognition.pilecv4j</groupId>
     <artifactId>pilecv4j-parent</artifactId>
-    <version>0.10-SNAPSHOT</version>
+    <version>0.10</version>
   </parent>
 
   <artifactId>native-gstreamer</artifactId>
