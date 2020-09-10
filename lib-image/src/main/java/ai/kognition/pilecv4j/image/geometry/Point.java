@@ -41,6 +41,10 @@ public interface Point {
       };
    }
 
+   default public org.opencv.core.Point toOcv() {
+      return new org.opencv.core.Point(x(), y());
+   }
+
    public static String toString(final Point p) {
       return p.getClass().getSimpleName() + "[ x=" + p.x() + ", y=" + p.y() + " ]";
    }
