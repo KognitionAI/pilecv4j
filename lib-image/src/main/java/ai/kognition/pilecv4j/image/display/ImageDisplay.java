@@ -4,8 +4,10 @@ import static net.dempsy.util.Functional.chain;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.eclipse.swt.SWT;
@@ -70,6 +72,7 @@ public abstract class ImageDisplay implements QuietCloseable {
     public static void syncExec(final Runnable eventHandler) {
         if(eventHandler == null)
             throw new NullPointerException("Cannot pass a null Runnable to " + ImageDisplay.class.getSimpleName() + ".syncExec.");
+
         if(Thread.currentThread() == executorThread) {
             try {
                 eventHandler.run();
@@ -77,18 +80,19 @@ public abstract class ImageDisplay implements QuietCloseable {
                 LOGGER.info("Exception processing {} event.", ImageDisplay.class.getSimpleName(), rte);
             }
         } else {
-            final Object waiter = new Object();
             try {
-                synchronized(waiter) {
-                    executor.submit(() -> {
-                        synchronized(waiter) {
-                            try (QuietCloseable qc = () -> waiter.notify();) {
-                                eventHandler.run();
-                            }
-                        }
-                    });
-                    waiter.wait();
+                final Future<?> future = executor.submit(() -> {
+                    // can only throw a RuntimeException
+                    eventHandler.run();
+                });
+
+                try {
+                    future.get();
+                } catch(final ExecutionException e) {
+                    // the eventHandler can only throw a RuntimeException
+                    throw(RuntimeException)e.getCause();
                 }
+
             } catch(final RuntimeException rte) {
                 LOGGER.info("Exception processing {} event.", ImageDisplay.class.getSimpleName(), rte);
             } catch(final InterruptedException ie) {
@@ -192,7 +196,7 @@ public abstract class ImageDisplay implements QuietCloseable {
             throw new IllegalArgumentException("Cannot handle an image of type " + CvType.typeToString(type) + "  yet.");
 
         final int newType = (inChannels == 1) ? CvType.CV_8UC1 : CvType.CV_8UC3;
-        try (CvMat ret = new CvMat()) {
+        try(CvMat ret = new CvMat()) {
 
             mat.convertTo(ret, newType, 1.0 / 256.0);
             return ret.returnMe();
@@ -200,14 +204,14 @@ public abstract class ImageDisplay implements QuietCloseable {
     }
 
     public static void main(final String[] args) throws Exception {
-        try (final ImageDisplay id = new Builder()
+        try(final ImageDisplay id = new Builder()
             .implementation(Implementation.SWT)
             .build();) {
             String string = (args.length > 0 ? args[0] : null);
             if(string == null) {
                 final Display display = new Display();
                 final Shell shell = new Shell(display);
-                try (QuietCloseable c1 = () -> display.close();
+                try(QuietCloseable c1 = () -> display.close();
                     QuietCloseable c2 = () -> shell.close()) {
                     final FileDialog dialog = new FileDialog(shell, SWT.OPEN);
                     dialog.setText("Open an image file or cancel");

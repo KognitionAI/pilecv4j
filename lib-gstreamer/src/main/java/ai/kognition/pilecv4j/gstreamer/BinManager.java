@@ -17,6 +17,7 @@ import org.freedesktop.gstreamer.GhostPad;
 import org.freedesktop.gstreamer.GstObject;
 import org.freedesktop.gstreamer.Pad;
 import org.freedesktop.gstreamer.Pipeline;
+import org.freedesktop.gstreamer.State;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -266,6 +267,11 @@ public class BinManager {
 
             @Override
             public void close() {
+                final State curState = getState();
+
+                if(curState == State.PLAYING)
+                    stop();
+
                 if(!alreadyClosed) {
                     if(LOGGER.isTraceEnabled())
                         LOGGER.trace("closing {}", this.getName());

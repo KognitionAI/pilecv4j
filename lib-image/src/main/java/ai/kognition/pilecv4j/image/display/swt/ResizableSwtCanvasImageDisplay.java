@@ -23,6 +23,7 @@ import net.dempsy.util.QuietCloseable;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.Utils;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
+import ai.kognition.pilecv4j.image.geometry.SimplePoint;
 
 public class ResizableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
@@ -45,6 +46,34 @@ public class ResizableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
         parentBounds = new Size(curBounds.width, curBounds.height);
     }
 
+    // This can return null if there is no image yet.
+    protected Size getDisplayImageSize() {
+        try(final CvMat lcurrentImageMat = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
+            if(lcurrentImageMat != null)
+                return lcurrentImageMat.size();
+
+            return null;
+        }
+    }
+
+    /**
+     * @return the current image to display which should be assigned to a try-with-resource managed variable
+     */
+    protected CvMat getDisplayImage() {
+        return Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);
+    }
+
+    public SimplePoint translateToImageCoords(final int canvasRow, final int canvasCol) {
+        final Size lcurrentImageMatSize = getDisplayImageSize();
+        if(lcurrentImageMatSize != null) {
+            final Size size = Utils.scaleDownOrNothing(lcurrentImageMatSize, parentBounds);
+            final double nr = canvasRow * lcurrentImageMatSize.height / size.height;
+            final double nc = canvasCol * lcurrentImageMatSize.width / size.width;
+            return new SimplePoint(nr, nc);
+        }
+        return null;
+    }
+
     public Canvas attach(final Composite parentx, final Runnable closeCallback, final KeyPressCallback kpCallback,
         final SelectCallback selectCallback) {
 
@@ -57,14 +86,14 @@ public class ResizableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
         ImageDisplay.syncExec(() -> {
             canvas.addListener(SWT.Paint, e -> {
-                try (final CvMat lcurrentImageMat = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
+                try(final CvMat lcurrentImageMat = getDisplayImage();) {
                     if(lcurrentImageMat != null) {
                         if(parent.isVisible()) {
                             if(parentBounds == null) {
                                 updateBounds();
                             }
                             final Image lcurrentImage = new Image(display, convertToDisplayableSWT(lcurrentImageMat));
-                            try (QuietCloseable qc = () -> lcurrentImage.dispose();) {
+                            try(QuietCloseable qc = () -> lcurrentImage.dispose();) {
                                 final int x = ((int)parentBounds.width - lcurrentImage.getBounds().width) >>> 1;
                                 final int y = ((int)parentBounds.height - lcurrentImage.getBounds().height) >>> 1;
                                 canvas.setBounds(x, y, lcurrentImage.getBounds().width, lcurrentImage.getBounds().height);
@@ -131,7 +160,7 @@ public class ResizableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
     }
 
     public ImageData convertToDisplayableSWT(final Mat image) {
-        try (final CvMat toDisplay = new CvMat();) {
+        try(final CvMat toDisplay = new CvMat();) {
             Imgproc.resize(image, toDisplay, Utils.scaleDownOrNothing(image, parentBounds));
             return SwtUtils.convertToDisplayableSWT(toDisplay);
         }
