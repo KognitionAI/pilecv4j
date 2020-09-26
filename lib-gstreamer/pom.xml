@@ -5,7 +5,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.12-SNAPSHOT</version>
+    <version>0.12</version>
   </parent>
   <artifactId>lib-gstreamer</artifactId>
   <dependencies>

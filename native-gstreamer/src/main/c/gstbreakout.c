@@ -58,6 +58,7 @@ struct _GstBreakoutPrivate {
   int64_t cumulativeTimeDifferences;
   int64_t timeDifference;
   uint64_t numTimeMeasurements;
+  uint64_t numFramesWaitingForValidPts;
 
   uint8_t calcMode;
 };
@@ -73,6 +74,7 @@ enum
 
 #define BREAKOUT_DEFAULT_MAX_DELAY_MILLIS -1
 #define BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE 10
+#define BREAKOUT_NUM_MEASUREMENTS_BEFORE_WARNING 50
 #define NANOS_PER_MILLI 1000000L
 
 enum {
@@ -217,6 +219,7 @@ static void makePrivateParts(GstBreakout* breakout, int64_t maxDelayMillis) {
     priv->maxDelayMillis = maxDelayMillis;
     priv->cumulativeTimeDifferences = 0L;
     priv->numTimeMeasurements = 0L;
+    priv->numFramesWaitingForValidPts = 0L;
     priv->timeDifference = 0L;
     priv->minTimeDifference = 0L;
     priv->maxTimeDifference = 0L;
@@ -324,6 +327,12 @@ gst_breakout_set_info (GstVideoFilter * filter, GstCaps * incaps,
   return TRUE;
 }
 
+static const uint64_t ONES = 0xFFFFFFFFFFFFFFFF;
+
+static gboolean isValidPts(uint64_t pts) {
+  return !((pts == ONES) || (pts == (uint64_t)0));
+}
+
 static GstFlowReturn
 gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
 {
@@ -336,42 +345,54 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
 
     // are we limiting the latency?
     if (maxDelayMillis >= 0) {
-      uint64_t curTime = currentTimeNanos();
-      const int64_t diff = curTime - (int64_t) (frame->buffer->pts);
+      // check to see if we're getting PTS
+      uint64_t pts = (uint64_t) (frame->buffer->pts);
+      if (isValidPts(pts)) {
+        priv->numFramesWaitingForValidPts = 0L; // reset in case we got a few bad ones.
 
-      // are we still gathering metrics to record the clock shift?
-      if (priv->calcMode) {
-        GST_OBJECT_LOCK(breakout);
-        if (priv->numTimeMeasurements == 0)
-          priv->minTimeDifference = priv->maxTimeDifference = diff;
-        else {
-          if (diff < priv->minTimeDifference)
-            priv->minTimeDifference = diff;
-          if (diff > priv->maxTimeDifference)
-            priv->maxTimeDifference = diff;
+        uint64_t curTime = currentTimeNanos();
+        const int64_t diff = curTime - (int64_t) (pts);
+
+        // are we still gathering metrics to record the clock shift?
+        if (priv->calcMode) {
+          GST_OBJECT_LOCK(breakout);
+          if (priv->numTimeMeasurements == 0)
+            priv->minTimeDifference = priv->maxTimeDifference = diff;
+          else {
+            if (diff < priv->minTimeDifference)
+              priv->minTimeDifference = diff;
+            if (diff > priv->maxTimeDifference)
+              priv->maxTimeDifference = diff;
+          }
+
+          priv->numTimeMeasurements++;
+          priv->cumulativeTimeDifferences += diff;
+
+          // if we have enough samples then just take the current average.
+          //                                                                       the +2 is for the outliers
+          if (priv->numTimeMeasurements >= (BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE + 2)) {
+            // adjust for the min and max outliers
+            priv->cumulativeTimeDifferences -= priv->minTimeDifference;
+            priv->cumulativeTimeDifferences -= priv->maxTimeDifference;
+
+            //                                                                                   -2 is for the outliers
+            priv->timeDifference = (int64_t)( (double)(priv->cumulativeTimeDifferences) / (double) (priv->numTimeMeasurements - 2L));
+            priv->timeDifference += (priv->maxDelayMillis * NANOS_PER_MILLI);
+            priv->calcMode = FALSE;
+          }
+          GST_OBJECT_UNLOCK(breakout);
+        } else {
+          // we have the time shift we're going to assume is basically no delay.
+          if (diff > priv->timeDifference) {
+            GST_DEBUG_OBJECT(breakout, "Dropping a frame due to latency");
+            return GST_FLOW_OK;
+          }
         }
-
-        priv->numTimeMeasurements++;
-        priv->cumulativeTimeDifferences += diff;
-
-        // if we have enough samples then just take the current average.
-        //                                                                       the +2 is for the outliers
-        if (priv->numTimeMeasurements >= (BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE + 2)) {
-          // adjust for the min and max outliers
-          priv->cumulativeTimeDifferences -= priv->minTimeDifference;
-          priv->cumulativeTimeDifferences -= priv->maxTimeDifference;
-
-          //                                                                                   -2 is for the outliers
-          priv->timeDifference = (int64_t)( (double)(priv->cumulativeTimeDifferences) / (double) (priv->numTimeMeasurements - 2L));
-          priv->timeDifference += (priv->maxDelayMillis * NANOS_PER_MILLI);
-          priv->calcMode = FALSE;
-        }
-        GST_OBJECT_UNLOCK(breakout);
-      } else {
-        // we have the time shift we're going to assume is basically no delay.
-        if (diff > priv->timeDifference) {
-          GST_DEBUG_OBJECT(breakout, "Dropping a frame due to latency");
-          return GST_FLOW_OK;
+      } else { // invalid pts. Track it. If it happens for too long we need to issue a warning
+        priv->numFramesWaitingForValidPts++;
+        if (priv->numFramesWaitingForValidPts > BREAKOUT_NUM_MEASUREMENTS_BEFORE_WARNING) {
+          GST_WARNING_OBJECT( breakout, "expected valid PTS but haven't gotten one.");
+          priv->numFramesWaitingForValidPts = 0L; // reset.
         }
       }
     }
