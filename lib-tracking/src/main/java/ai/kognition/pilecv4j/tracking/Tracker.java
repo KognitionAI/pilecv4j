@@ -57,7 +57,7 @@ public interface Tracker extends AutoCloseable {
      * <code>
      *   try(final Tracker trackerToReturn = new Tracker()) {
      *       // attempt initialization
-     *       return trackerToReturn.returnMe();
+     *       return trackerToReturn.skipOnceForReturn();
      *   }
      * </code>
      * </pre>
