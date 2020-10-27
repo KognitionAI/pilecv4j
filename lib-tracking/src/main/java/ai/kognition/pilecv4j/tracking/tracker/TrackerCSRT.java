@@ -44,7 +44,7 @@ public class TrackerCSRT extends org.opencv.tracking.TrackerCSRT implements Trac
             nativeDelete.setAccessible(true);
         } catch(final NoSuchMethodException | SecurityException e) {
             throw new RuntimeException("Got an exception trying to access " + TrackerCSRT.class.getSimpleName() +
-                ".delete. Either the security model is too restrictive or the version of OpenCv can't be supported.", e);
+                ".delete or .create_0. Either the security model is too restrictive or the version of OpenCv can't be supported.", e);
         }
     }
 

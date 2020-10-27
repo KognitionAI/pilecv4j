@@ -45,7 +45,7 @@ public class TrackerKCF extends org.opencv.tracking.TrackerKCF implements Tracke
             nativeDelete.setAccessible(true);
         } catch(final NoSuchMethodException | SecurityException e) {
             throw new RuntimeException("Got an exception trying to access " + TrackerKCF.class.getSimpleName() +
-                ".delete. Either the security model is too restrictive or the version of OpenCv can't be supported.", e);
+                ".delete or .create_0. Either the security model is too restrictive or the version of OpenCv can't be supported.", e);
         }
     }
 
