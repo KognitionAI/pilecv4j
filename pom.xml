@@ -12,6 +12,7 @@
     <module>lib-image</module>
     <module>lib-tf</module>
     <module>lib-gstreamer</module>
+    <module>lib-tracking</module>
     <module>native-image</module>
     <module>native-nr</module>
     <module>native-gstreamer</module>
@@ -256,7 +257,6 @@
         <artifactId>junit</artifactId>
         <version>4.13.1</version>
       </dependency>
-
     </dependencies>
   </dependencyManagement>
 
@@ -341,8 +341,8 @@
       <plugin>
         <artifactId>maven-compiler-plugin</artifactId>
         <configuration>
-          <source>1.8</source>
-          <target>1.8</target>
+          <source>11</source>
+          <target>11</target>
           <debug>true</debug>
         </configuration>
       </plugin>
