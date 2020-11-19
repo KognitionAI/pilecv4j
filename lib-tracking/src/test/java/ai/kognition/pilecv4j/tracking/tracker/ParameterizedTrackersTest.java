@@ -51,7 +51,7 @@ public class ParameterizedTrackersTest {
 
     @Parameters(name = "{index}={0}")
     public static Collection<Object[]> params() {
-        return List.of(new Object[] {TrackerImpl.CSRT, 5d}, new Object[] {TrackerImpl.KCF, 7.5d}, new Object[] {TrackerImpl.MOSSE, 10d});
+        return List.of(new Object[] {TrackerImpl.CSRT,5d}, new Object[] {TrackerImpl.KCF,7.5d}, new Object[] {TrackerImpl.MOSSE,10d});
     }
 
     @Test
@@ -106,7 +106,6 @@ public class ParameterizedTrackersTest {
             return radiusOfMovement * Math.cos(radians) + center_cols;
         };
 
-        final long timeStart = System.currentTimeMillis();
         try(final Tracker tracker = trackerImpl.get();
             final ImageDisplay display = enableDisplay ? new ImageDisplay.Builder().build() : null) {
 
@@ -143,15 +142,15 @@ public class ParameterizedTrackersTest {
                             });
                             display.update(matNumberI);
                         }
-                        return new Object[] {expectedBbox, update};
+                        return new Object[] {expectedBbox,update};
                     }
                 })
                 .collect(Collectors.toList());
-            final long timeTotal = System.currentTimeMillis() - timeStart;
 
             IntStream.range(0, maxIterations)
                 .forEach(i -> {
                     final Rect2d expected = (Rect2d)results.get(i)[0];
+                    @SuppressWarnings("unchecked")
                     final Optional<Rect2d> update = (Optional<Rect2d>)results.get(i)[1];
                     assertTrue(i + ": tracker should have seen the circle.", update.isPresent());
                     final Point centroid = centroidFromRect(expected);
