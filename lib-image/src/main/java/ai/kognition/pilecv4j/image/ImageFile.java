@@ -376,7 +376,7 @@ public class ImageFile {
         return wrote;
     }
 
-    private static boolean doWrite(final Mat ri, final String filename, final boolean canOverwrite) throws IOException {
+    private static boolean doWrite(final Mat ri, final String filename, final boolean canOverwrite) {
         LOGGER.trace("Writing image {} to {}", ri, filename);
         try(final CvMat newMat = new CvMat();) {
             final Mat toWrite;

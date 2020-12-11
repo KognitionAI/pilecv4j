@@ -85,8 +85,8 @@ public class VideoFrame extends CvMat {
                 if(ret == null) {
                     totalSize.incrementAndGet();
                     return new VideoFrame(this, h, w, type, decodeTimeMillis);
-                } else
-                    resident.decrementAndGet();
+                }
+                resident.decrementAndGet();
                 return ret.leavingPool(decodeTimeMillis);
             }
         }

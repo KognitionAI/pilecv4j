@@ -5,8 +5,6 @@ import java.util.List;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Rect2d;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This is a reimplementation of {@link org.opencv.tracking.MultiTracker} but written in Java for Java.
@@ -15,7 +13,6 @@ import org.slf4j.LoggerFactory;
  * trackers, and to be able to remove them.
  */
 public class NaiveMultiTracker {
-    private static final Logger LOGGER = LoggerFactory.getLogger(NaiveMultiTracker.class);
     public final List<Tracker> trackers = new ArrayList<>();
 
     /**

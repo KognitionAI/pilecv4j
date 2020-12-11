@@ -240,7 +240,7 @@ public class BinManager {
      * @throws IllegalStateException if there is no element on the Branch yet, or there is already an
      *     error handler on the current element.
      */
-    public <T extends Bin> BinManager onError(final OnError cb) throws IllegalStateException {
+    public BinManager onError(final OnError cb) throws IllegalStateException {
         this.current.onError(cb);  // throws IllegalStateException
         return this;
     }
@@ -251,7 +251,7 @@ public class BinManager {
      *
      * @throws IllegalStateException if there is already an error handler on the current element.
      */
-    public <T extends Bin> BinManager onAnyError(final OnError cb) throws IllegalStateException {
+    public BinManager onAnyError(final OnError cb) throws IllegalStateException {
         if(this.onErrCb != null)
             throw new IllegalStateException("You should only set a single " + OnError.class.getSimpleName() + " handler for the entire pipeline.");
         this.onErrCb = cb;

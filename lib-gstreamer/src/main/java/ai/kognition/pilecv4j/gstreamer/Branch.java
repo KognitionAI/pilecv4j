@@ -261,7 +261,7 @@ public class Branch {
      * @throws IllegalStateException if there is no element on the Branch yet, or there is already an
      *     error handler on the current element.
      */
-    public <T extends Bin> Branch onError(final OnError cb) throws IllegalStateException {
+    public Branch onError(final OnError cb) throws IllegalStateException {
         if(currentElement == null)
             throw new IllegalStateException("You must add an element before attaching an error handler to it.");
         if(currentElement.errorHandler != null)

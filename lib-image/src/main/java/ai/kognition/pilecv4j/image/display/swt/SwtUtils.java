@@ -18,16 +18,12 @@ public class SwtUtils {
 
     public static synchronized Display getDisplay() {
         if(theDisplay == null) {
-            try {
-                startSwt();
-            } catch(final InterruptedException e) {
-                throw new IllegalStateException(e);
-            }
+            startSwt();
         }
         return theDisplay;
     }
 
-    private static synchronized void startSwt() throws InterruptedException {
+    private static synchronized void startSwt() {
         ImageDisplay.syncExec(() -> {
             theDisplay = new Display();
 
@@ -39,7 +35,7 @@ public class SwtUtils {
         });
     }
 
-    public static synchronized void stopSwt() throws InterruptedException {
+    public static synchronized void stopSwt() {
         ImageDisplay.syncExec(() -> {
             theDisplay.syncExec(() -> {
                 if(theDisplay != null && !theDisplay.isDisposed())
