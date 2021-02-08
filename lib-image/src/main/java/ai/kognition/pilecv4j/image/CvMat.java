@@ -8,6 +8,8 @@ import java.util.function.Function;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
+import org.opencv.core.Scalar;
+import org.opencv.core.Size;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -158,6 +160,14 @@ public class CvMat extends Mat implements AutoCloseable {
      */
     public CvMat mm(final Mat other) {
         return mm(other, 1.0D);
+    }
+
+    /**
+     * @return the transpose of the matrix. <b>Note: The caller owns the CvMat returned.</b>
+     */
+    @Override
+    public CvMat t() {
+        return CvMat.move(super.t());
     }
 
     /**
@@ -344,19 +354,52 @@ public class CvMat extends Mat implements AutoCloseable {
     }
 
     /**
-     * Convenience method that wraps the return value of <a href=
-     * "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html#a69ae0402d116fc9c71908d8508dc2f09">{@code Mat.ones}</a>
-     * in a {@link CvMat}.
+     * Convenience method that wraps the return value of
+     * <a href= "https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html#a69ae0402d116fc9c71908d8508dc2f09">{@code
+     * Mat.ones}</a> in a {@link CvMat}.
      *
-     * @param rows number of rows of in the resulting {@link CvMat}
-     * @param cols number of columns of in the resulting {@link CvMat}
+     * @param rows number of rows of the resulting {@link CvMat}
+     * @param cols number of columns of the resulting {@link CvMat}
      * @param type type of the resulting {@link CvMat}. See
      *     <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
-     * @return a new {@link CvMat} with all ones of the given proportions and type. <b>Note: The caller owns the CvMat
-     * returned</b>
+     *
+     * @return a new {@link CvMat} with all ones of the given proportions and type. <b>Note: The caller owns the CvMat returned</b>
      */
     public static CvMat ones(final int rows, final int cols, final int type) {
         return CvMat.move(Mat.ones(rows, cols, type));
+    }
+
+    public static CvMat eye(final Size size, final int type) {
+        try(final CvMat identity = CvMat.move(Mat.eye(size, type))) {
+            return identity.returnMe();
+        }
+    }
+
+    public static CvMat eye(final int rows, final int cols, final int type) {
+        try(final CvMat identity = CvMat.move(Mat.eye(rows, cols, type));) {
+            return identity.returnMe();
+        }
+    }
+
+    public static CvMat identity(final int rows, final int cols, final int type) {
+        return eye(rows, cols, type);
+    }
+
+    /**
+     * Convenience method for {@link Core#setIdentity(Mat, Scalar)} that returns an identity matrix scaled by a value.
+     *
+     * @param rows number of rows of the resulting {@link CvMat}
+     * @param cols number of columns of the resulting {@link CvMat}
+     * @param type type of the resulting {@link CvMat}. See {@link Core} for example values.
+     * @param value the value of the diagonal elements in the matrix.
+     *
+     * @return a new {@link CvMat} with the values = mtx(i,j) = [{@param value} if i=j; 0 otherwise]
+     */
+    public static CvMat identity(final int rows, final int cols, final int type, final Scalar value) {
+        try(final CvMat identity = new CvMat(rows, cols, type)) {
+            Core.setIdentity(identity, value);
+            return identity.returnMe();
+        }
     }
 
     /**
@@ -448,7 +491,8 @@ public class CvMat extends Mat implements AutoCloseable {
     @Override
     protected void finalize() throws Throwable {
         if(!deletedAlready) {
-            LOGGER.warn("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
+            LOGGER.debug("Finalizing a {} that hasn't been closed.", this.getClass()
+                .getSimpleName());
             if(TRACK_MEMORY_LEAKS)
                 LOGGER.warn("TRACKING: Here's where I was instantiated: ", stackTrace);
             close();
