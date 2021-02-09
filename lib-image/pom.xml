@@ -5,7 +5,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.13</version>
+    <version>0.14-SNAPSHOT</version>
   </parent>
   <artifactId>lib-image</artifactId>
   <dependencies> 
