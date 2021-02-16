@@ -24,19 +24,22 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
     public static boolean DEFAULT_DEEP_COPY = true;
 
     private final boolean deepCopy;
-    private ImageDisplay window = null;
+    private final ImageDisplay window;
+    private final boolean ownsDisplay;
+    private final Size screenDim;
+
     private Pipeline stopOnClose = null;
     private Runnable exitNotification = null;
-    private final Size screenDim;
 
     private final MutableRef<Size> adjustedSize = new MutableRef<>();
 
-    public InlineDisplay(final ImageDisplay display) {
-        this(display, DEFAULT_DEEP_COPY);
+    public InlineDisplay(final ImageDisplay display, final boolean ownsDisplay) {
+        this(display, ownsDisplay, DEFAULT_DEEP_COPY);
     }
 
-    public InlineDisplay(final ImageDisplay display, final boolean deepCopy) {
+    public InlineDisplay(final ImageDisplay display, final boolean ownsDisplay, final boolean deepCopy) {
         this.window = display;
+        this.ownsDisplay = ownsDisplay;
         screenDim = null;
         this.deepCopy = deepCopy;
         this.window.setCloseCallback(() -> {
@@ -69,6 +72,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
             .keyPressHandler(kpc)
             .build();
 
+        ownsDisplay = true;
     }
 
     public static class Builder {
@@ -133,6 +137,12 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
                 process(lmat);
             }
         }
+    }
+
+    @Override
+    public void close() {
+        if(window != null && ownsDisplay)
+            window.close();
     }
 
     public void stopOnClose(final Pipeline pipe, final Runnable exitNotification) {
