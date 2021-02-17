@@ -53,8 +53,8 @@ public class TestBranchWithMultiqueue extends BaseTest {
             assertTrue(file.exists());
             pipe.stop();
             assertTrue(poll(o -> !pipe.isPlaying()));
-            assertTrue(fc1.frames.size() > 10);
-            assertEquals(fc1.frames.size(), fc2.frames.size());
+            assertTrue(fc1.numCaught() > 10);
+            assertEquals(fc1.numCaught(), fc2.numCaught());
         }
     }
 }

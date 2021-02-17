@@ -51,9 +51,9 @@ public class TestWatchdog extends BaseTest {
 
             pipe.play();
 
-            assertTrue(poll(o -> fc.frames.size() == 40));
+            assertTrue(poll(o -> fc.numCaught() == 40));
             Thread.sleep(10);
-            assertEquals(40, fc.frames.size());
+            assertEquals(40, fc.numCaught());
 
             assertTrue(poll(o -> hit.get()));
 

@@ -10,7 +10,6 @@ import org.junit.Test;
 import ai.kognition.pilecv4j.gstreamer.BaseTest;
 import ai.kognition.pilecv4j.gstreamer.BinManager;
 import ai.kognition.pilecv4j.gstreamer.GstScope;
-import ai.kognition.pilecv4j.gstreamer.experimental.RtspServer;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 
 // TODO: Get this working on Windows. It already works on Linux
@@ -27,7 +26,7 @@ public class TestRtspServerMain extends BaseTest {
             thread.setDaemon(true);
             thread.start();
 
-            try(final FrameCatcher fc = new FrameCatcher("frame-catcher");) {
+            try(final FrameCatcher fc = new FrameCatcher("frame-catcher", false);) {
 
                 new BinManager()
                     .delayed("uridecodebin").with("uri", "rtsp://localhost:8554/test")
@@ -36,7 +35,7 @@ public class TestRtspServerMain extends BaseTest {
                     .buildPipeline()
                     .play();
 
-                assertTrue(poll(o -> fc.frames.size() > 20));
+                assertTrue(poll(o -> fc.numCaught() > 20));
             } finally {
                 RtspServer.stopMain();
                 thread.join(5000);

@@ -13,7 +13,8 @@ import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
 import ai.kognition.pilecv4j.gstreamer.CapsBuilder;
 
 public class FrameCatcher implements QuietCloseable {
-    public final List<Frame> frames = new LinkedList<>();
+    private final List<Frame> frames = new LinkedList<>();
+    private int frameCount = 0;
     private Bin bin;
 
     public static class Frame {
@@ -29,8 +30,13 @@ public class FrameCatcher implements QuietCloseable {
         }
     }
 
-    @SuppressWarnings("resource")
     public FrameCatcher(final String name) {
+        this(name, false);
+    }
+
+    @SuppressWarnings("resource")
+    public FrameCatcher(final String name, final boolean keepFrames) {
+
         bin = new BinManager()
             .add(new BreakoutFilter(name)
                 .filter(vf -> vf.rasterAp(raster -> {
@@ -38,13 +44,23 @@ public class FrameCatcher implements QuietCloseable {
                     bb.rewind();
                     final byte[] data = new byte[raster.getNumBytes()];
                     bb.get(data);
-                    frames.add(new Frame(data, vf.width(), vf.height()));
+                    if(keepFrames)
+                        frames.add(new Frame(data, vf.width(), vf.height()));
+                    frameCount++;
                 })))
             .caps(new CapsBuilder("video/x-raw")
                 .addFormatConsideringEndian()
                 .build())
             .make("fakesink").with("sync", true)
             .buildBin();
+    }
+
+    public int numCaught() {
+        return frameCount;
+    }
+
+    public List<Frame> frames() {
+        return frames;
     }
 
     public Bin disown() {
@@ -55,6 +71,8 @@ public class FrameCatcher implements QuietCloseable {
 
     @Override
     public void close() {
+        frames.clear();
+
         if(bin != null) {
             bin.dispose();
             disown();

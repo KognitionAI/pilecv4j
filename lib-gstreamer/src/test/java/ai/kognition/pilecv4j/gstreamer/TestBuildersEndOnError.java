@@ -20,7 +20,7 @@ public class TestBuildersEndOnError extends BaseTest {
         final AtomicReference<String> errElementName = new AtomicReference<>(null);
 
         try(GstScope scope = new GstScope();
-            final FrameCatcher fc = new FrameCatcher("framecatcher");
+            final FrameCatcher fc = new FrameCatcher("framecatcher", true);
 
             final Pipeline pipe = new BinManager()
                 .delayed("uridecodebin", "myjunkyderidecodeybin").with("uri", STREAM.toString())

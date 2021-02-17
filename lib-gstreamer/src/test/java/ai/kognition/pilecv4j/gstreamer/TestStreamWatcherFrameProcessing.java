@@ -69,7 +69,7 @@ public class TestStreamWatcherFrameProcessing {
             assertTrue(poll(o -> fe.isDone()));
             pipe.stop();
             assertTrue(poll(o -> !pipe.isPlaying()));
-            assertEquals(60, fc.frames.size());
+            assertEquals(60, fc.numCaught());
             // the slowFramesProcessed should be less than 1/2 of the processed frames
             assertTrue(30 > slowFramesProcessed.get());
         }

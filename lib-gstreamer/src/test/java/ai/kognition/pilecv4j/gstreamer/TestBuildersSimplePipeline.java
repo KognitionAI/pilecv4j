@@ -27,9 +27,9 @@ public class TestBuildersSimplePipeline extends BaseTest {
 
             pipe.play();
             // wait until at least 1 frame goes through.
-            poll(o -> fc.frames.size() > 0);
+            poll(o -> fc.numCaught() > 0);
             // mark the # of frames to start.
-            final int startingNumFrames = fc.frames.size();
+            final int startingNumFrames = fc.numCaught();
             // wait 1 second.
             Thread.sleep(1000);
             // stop
@@ -39,7 +39,7 @@ public class TestBuildersSimplePipeline extends BaseTest {
             assertTrue(poll(o -> !pipe.isPlaying()));
 
             // one second worth of frames should be more than 25 and less than 35 (actually, should be 29)
-            final int numFrames = fc.frames.size() - startingNumFrames;
+            final int numFrames = fc.numCaught() - startingNumFrames;
             assertTrue("Number of frames(" + numFrames + ") was less than 25.", 25 < numFrames);
             assertTrue("Number of frames(" + numFrames + ") was greater than 35.", 35 > numFrames);
         }

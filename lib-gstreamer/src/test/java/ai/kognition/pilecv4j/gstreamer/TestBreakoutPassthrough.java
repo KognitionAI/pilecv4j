@@ -61,7 +61,7 @@ public class TestBreakoutPassthrough {
             pipe.stop();
             assertTrue(poll(o -> !pipe.isPlaying()));
 
-            assertEquals(30, fc.frames.size());
+            assertEquals(30, fc.numCaught());
         }
     }
 }

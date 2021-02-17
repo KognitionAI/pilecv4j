@@ -29,7 +29,7 @@ public class TestFrameEmitterAndCatcher extends BaseTest {
             pipe.stop();
             assertTrue(poll(o -> !pipe.isPlaying()));
             // this should be 30 but occasionally we get only 29
-            assertTrue(poll(o -> fc.frames.size() >= 29));
+            assertTrue(poll(o -> fc.numCaught() >= 29));
         }
     }
 }

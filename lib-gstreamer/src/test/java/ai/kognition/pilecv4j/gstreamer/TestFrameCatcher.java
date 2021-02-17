@@ -23,7 +23,7 @@ public class TestFrameCatcher extends BaseTest {
                 .buildPipeline();) {
 
             pipe.play();
-            assertTrue(poll(o -> fc.frames.size() >= 30));
+            assertTrue(poll(o -> fc.numCaught() >= 30));
             pipe.stop();
             assertTrue(poll(o -> !pipe.isPlaying()));
         }

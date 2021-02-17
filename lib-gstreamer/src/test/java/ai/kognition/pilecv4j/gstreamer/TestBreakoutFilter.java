@@ -4,6 +4,7 @@ import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -35,7 +36,7 @@ public class TestBreakoutFilter extends BaseTest {
 
             List<Frame> frames = null;
 
-            try(final FrameCatcher fc = new FrameCatcher("framecatcher");
+            try(final FrameCatcher fc = new FrameCatcher("framecatcher", true);
                 final FrameEmitter fe = new FrameEmitter(STREAM.toString(), 40);
 
                 final Pipeline pipe = new BinManager()
@@ -55,15 +56,15 @@ public class TestBreakoutFilter extends BaseTest {
                 Thread.sleep(1000);
                 GstUtils.printDetails(pipe);
 
-                assertTrue(poll(o -> fc.frames.size() == 40));
+                assertTrue(poll(o -> fc.numCaught() == 40));
                 Thread.sleep(10);
-                assertEquals(40, fc.frames.size());
+                assertEquals(40, fc.numCaught());
 
                 pipe.stop();
                 assertTrue(poll(o -> !pipe.isPlaying()));
                 Thread.sleep(100);
 
-                frames = fc.frames;
+                frames = new ArrayList<>(fc.frames());
             }
 
             final AtomicInteger checked = new AtomicInteger(0);
