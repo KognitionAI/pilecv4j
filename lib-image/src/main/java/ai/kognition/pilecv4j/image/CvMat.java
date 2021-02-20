@@ -448,7 +448,7 @@ public class CvMat extends Mat implements AutoCloseable {
     @Override
     protected void finalize() throws Throwable {
         if(!deletedAlready) {
-            LOGGER.debug("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
+            LOGGER.warn("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
             if(TRACK_MEMORY_LEAKS)
                 LOGGER.debug("TRACKING: Here's where I was instantiated: ", stackTrace);
             close();
