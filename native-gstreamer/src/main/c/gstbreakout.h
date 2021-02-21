@@ -72,8 +72,6 @@ struct _GstBreakoutClass
 KAI_EXPORT GType gst_breakout_get_type (void);
 
 // get data about the current frame.
-KAI_EXPORT GstBuffer* gst_breakout_current_frame_buffer (GstBreakout* breakout);
-KAI_EXPORT GstCaps* gst_breakout_current_frame_caps     (GstBreakout* breakout);
 KAI_EXPORT uint64_t who_am_i                            (GstBreakout* breakout);
 
 G_END_DECLS

@@ -12,13 +12,10 @@ import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
-import org.freedesktop.gstreamer.Buffer;
-import org.freedesktop.gstreamer.Caps;
 import org.freedesktop.gstreamer.Gst;
 import org.freedesktop.gstreamer.Registry;
 import org.freedesktop.gstreamer.lowlevel.GFunctionMapper;
 import org.freedesktop.gstreamer.lowlevel.GTypeMapper;
-import org.freedesktop.gstreamer.lowlevel.annotations.CallerOwnsReturn;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -76,14 +73,6 @@ public interface BreakoutAPI extends Library {
     static BreakoutAPI FILTER_API = _init();
 
     long who_am_i(BreakoutFilter filter);
-
-    boolean gst_breakout_set_caps(BreakoutFilter appsrc, Caps incaps, Caps outcaps);
-
-    @CallerOwnsReturn
-    Buffer gst_breakout_current_frame_buffer(BreakoutFilter breakout);
-
-    @CallerOwnsReturn
-    Caps gst_breakout_current_frame_caps(BreakoutFilter breakout);
 
     public static class _FrameDetails extends com.sun.jna.Structure {
         public Pointer buffer;

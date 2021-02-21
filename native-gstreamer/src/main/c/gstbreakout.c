@@ -408,45 +408,6 @@ uint64_t who_am_i(GstBreakout* breakout) {
   return (uint64_t)breakout;
 }
 
-
-GstBuffer *
-gst_breakout_current_frame_buffer (GstBreakout * breakout)
-{
-  GstBuffer *buffer;
-  GstVideoFrame* current;
-
-  current = breakout->cur;
-  if (current == NULL)
-    goto nothing;
-  buffer = current->buffer;
-  GST_DEBUG_OBJECT (breakout, "we have a buffer %p with a ref count %d", buffer, (int)buffer->mini_object.refcount);
-  return buffer;
-
-  /* special conditions */
-  nothing:
-  {
-    GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
-    return NULL;
-  }
-}
-
-GstCaps* gst_breakout_current_frame_caps(GstBreakout* breakout) {
-  GstVideoFrame* current;
-
-  current = breakout->cur;
-  if (current == NULL)
-    goto nothing;
-
-  return gst_video_info_to_caps(&(current->info));
-
-  nothing:
-  {
-    GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
-    return NULL;
-  }
-}
-
-
 static gboolean plugin_init (GstPlugin * plugin) {
   // Since this is not meant to be used from a decodebin the rank is NONE
   return gst_element_register (plugin, "breakout", GST_RANK_NONE,
