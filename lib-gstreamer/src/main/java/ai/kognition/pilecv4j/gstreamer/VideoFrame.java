@@ -22,6 +22,8 @@ public class VideoFrame extends CvMat {
     private RuntimeException rtpStackTrace = null;
     private boolean skipCloseOnceForReturn = false;
 
+    long frameNumber;
+
     protected VideoFrame(final long nativeObj, final long decodeTimeMillis) {
         super(nativeObj);
         this.pool = null;
@@ -135,6 +137,10 @@ public class VideoFrame extends CvMat {
 
     public static Pool getPool(final int h, final int w, final int type) {
         return new Pool(h, w, type);
+    }
+
+    public long frameNumber() {
+        return frameNumber;
     }
 
     @Override

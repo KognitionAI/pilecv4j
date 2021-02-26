@@ -35,6 +35,7 @@ import ai.kognition.pilecv4j.image.ImageAPI;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
+    private static final boolean traceOn = LOGGER.isTraceEnabled();
 
     public static final String GST_NAME = "breakout";
     public static final String GTYPE_NAME = "GstBreakout";
@@ -219,11 +220,6 @@ public class BreakoutFilter extends BaseTransform {
 
     private static final BreakoutAPI gst() {
         return FILTER_API;
-    }
-
-    private synchronized VideoFrameFilter push(final VideoFrameFilter pf) {
-        filterStack.add(pf);
-        return pf;
     }
 
     private static abstract class ProxyFilter implements VideoFrameFilter {
@@ -426,11 +422,13 @@ public class BreakoutFilter extends BaseTransform {
                 toDispose.close();
         }
 
-        private Runnable fromProcessor(final Consumer<VideoFrame> processor) {
+        private Runnable fromProcessor(final VideoFrameFilter processor) {
             return () -> {
                 while(!stop.get()) {
                     final VideoFrame frame = to.getNonNullAndSetToNull(stop);
                     if(frame != null && !stop.get()) {
+                        if(traceOn)
+                            LOGGER.trace("FRAME: dequeued frame: {}", frame.frameNumber);
                         try(final QuietCloseable qc = () -> dispose(frame);) {
                             processor.accept(frame);
                         } catch(final Exception exc) {
@@ -445,7 +443,12 @@ public class BreakoutFilter extends BaseTransform {
             };
         }
 
+        private final AtomicLong frameNumber = new AtomicLong(0);
+
         private StreamWatcher(final VideoFrame mat, final int numThreads, final VideoFrameFilter processor) {
+            mat.frameNumber = frameNumber.getAndIncrement();
+            if(traceOn)
+                LOGGER.trace("FRAME: Initial frame: {}, {}", frameNumber, mat);
             super.initPool(mat);
             for(int i = 0; i < numThreads; i++)
                 threads.add(chain(new Thread(fromProcessor(processor), "Stream Watcher " + sequence.getAndIncrement()), t -> t.setDaemon(true),
@@ -454,6 +457,10 @@ public class BreakoutFilter extends BaseTransform {
 
         @Override
         public void accept(final VideoFrame frame) {
+            final long lframeNum = frameNumber.getAndIncrement();
+            frame.frameNumber = lframeNum;
+            if(traceOn)
+                LOGGER.trace("FRAME: queuing frame: {}", lframeNum);
             dispose(to.getAndSet(
                 frame.pooledDeepCopy(getPool(frame))));
         }
@@ -532,7 +539,7 @@ public class BreakoutFilter extends BaseTransform {
                     return actualFilter.new_sample(elem);
                 }
             });
-        push(listener);
+        filterStack.add(listener);
         return this;
     }
 }
