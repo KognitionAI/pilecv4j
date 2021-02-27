@@ -341,7 +341,7 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
 
   GstBreakoutPrivate * priv = breakout->priv;
   if (priv) {
-    const int64_t maxDelayMillis = breakout->priv->maxDelayMillis;
+    const int64_t maxDelayMillis = priv->maxDelayMillis;
 
     // are we limiting the latency?
     if (maxDelayMillis >= 0) {
@@ -377,14 +377,17 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
 
             //                                                                                   -2 is for the outliers
             priv->timeDifference = (int64_t)( (double)(priv->cumulativeTimeDifferences) / (double) (priv->numTimeMeasurements - 2L));
-            priv->timeDifference += (priv->maxDelayMillis * NANOS_PER_MILLI);
+            priv->timeDifference += (maxDelayMillis * NANOS_PER_MILLI);
             priv->calcMode = FALSE;
+            GST_DEBUG_OBJECT(breakout, "Watching for a frame latency of %ld by measuring the difference between the clock and the PTS which is averaging %ld.",
+                (long) maxDelayMillis, (long) (priv->timeDifference / NANOS_PER_MILLI));
           }
           GST_OBJECT_UNLOCK(breakout);
         } else {
           // we have the time shift we're going to assume is basically no delay.
           if (diff > priv->timeDifference) {
-            GST_DEBUG_OBJECT(breakout, "Dropping a frame due to latency");
+            long millisDelay = (long)(diff - (priv->timeDifference - (maxDelayMillis * NANOS_PER_MILLI))) / NANOS_PER_MILLI;
+            GST_DEBUG_OBJECT(breakout, "Dropping a frame due to latency (%ld)", (long)millisDelay);
             return GST_FLOW_OK;
           }
         }

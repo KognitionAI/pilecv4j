@@ -49,8 +49,9 @@ public class BreakoutFilter extends BaseTransform {
         public Stream<TypeRegistration<?>> types() {
             return Stream.of(Natives.registration(BreakoutFilter.class, GTYPE_NAME, BreakoutFilter::new));
         }
-
     }
+
+    private final AtomicLong frameNumber = new AtomicLong(0);
 
     static void initFromScope() {}
 
@@ -443,12 +444,9 @@ public class BreakoutFilter extends BaseTransform {
             };
         }
 
-        private final AtomicLong frameNumber = new AtomicLong(0);
-
         private StreamWatcher(final VideoFrame mat, final int numThreads, final VideoFrameFilter processor) {
-            mat.frameNumber = frameNumber.getAndIncrement();
             if(traceOn)
-                LOGGER.trace("FRAME: Initial frame: {}, {}", frameNumber, mat);
+                LOGGER.trace("FRAME: Initial frame: {}, {}", mat.frameNumber, mat);
             super.initPool(mat);
             for(int i = 0; i < numThreads; i++)
                 threads.add(chain(new Thread(fromProcessor(processor), "Stream Watcher " + sequence.getAndIncrement()), t -> t.setDaemon(true),
@@ -457,10 +455,8 @@ public class BreakoutFilter extends BaseTransform {
 
         @Override
         public void accept(final VideoFrame frame) {
-            final long lframeNum = frameNumber.getAndIncrement();
-            frame.frameNumber = lframeNum;
             if(traceOn)
-                LOGGER.trace("FRAME: queuing frame: {}", lframeNum);
+                LOGGER.trace("FRAME: queuing frame: {}", frame.frameNumber);
             dispose(to.getAndSet(
                 frame.pooledDeepCopy(getPool(frame))));
         }
@@ -482,7 +478,7 @@ public class BreakoutFilter extends BaseTransform {
             try(
 
                 VideoFrame mat = new VideoFrame(
-                    BreakoutAPIRaw.gst_breakout_current_frame_mat(me, true), System.currentTimeMillis()) {
+                    BreakoutAPIRaw.gst_breakout_current_frame_mat(me, true), System.currentTimeMillis(), frameNumber.getAndIncrement()) {
 
                     @Override
                     public void close() {
