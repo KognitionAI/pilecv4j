@@ -31,6 +31,19 @@ public:
     GstMat* it = static_cast<GstMat*>(cvmat);
     return it->userdata;
   }
+
+  virtual void freeImage(uint64_t mat) {
+    cv::Mat* cvmat = (cv::Mat*)mat;
+    GstMat* it = static_cast<GstMat*>(cvmat);
+    delete it;
+  }
+
+  virtual uint64_t copy(uint64_t mat) {
+    cv::Mat* cvmat = (cv::Mat*)mat;
+    cv::Mat* ret = new cv::Mat();
+    cvmat->copyTo(*ret);
+    return (uint64_t)ret;
+  }
 };
 
 static ai::kognition::pilecv4j::ImageMaker* imaker = new ImageMaker();

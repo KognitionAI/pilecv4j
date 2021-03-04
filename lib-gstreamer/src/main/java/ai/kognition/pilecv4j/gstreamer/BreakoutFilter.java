@@ -19,7 +19,6 @@ import org.freedesktop.gstreamer.FlowReturn;
 import org.freedesktop.gstreamer.elements.BaseTransform;
 import org.freedesktop.gstreamer.glib.NativeObject;
 import org.freedesktop.gstreamer.glib.Natives;
-import org.freedesktop.gstreamer.lowlevel.GstAPI.GstCallback;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +30,6 @@ import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler.Cancelable;
 import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
 import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPI;
 import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPIRaw;
-import ai.kognition.pilecv4j.image.ImageAPI;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
@@ -43,6 +41,7 @@ public class BreakoutFilter extends BaseTransform {
     private final List<VideoFrameFilter> filterStack = new ArrayList<>();
 
     private static final BreakoutAPI FILTER_API = BreakoutAPI.FILTER_API;
+    private BreakoutAPIRaw.push_frame_callback actualFilter = null;
 
     public static class BreakoutFilterTypeProvider implements NativeObject.TypeProvider {
         @Override
@@ -89,11 +88,11 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public BreakoutFilter filter(final VideoFrameFilter filter) {
-        return doConnect(filter);
+        return doConnect(filter, true);
     }
 
-    public BreakoutFilter delayedFilter(final Function<VideoFrame, VideoFrameFilter> filterSupplier) {
-        return doDelayedConnect(mac -> filterSupplier.apply(mac));
+    public BreakoutFilter watch(final VideoFrameFilter filter) {
+        return doConnect(filter, false);
     }
 
     public BreakoutFilter slowFilter(final VideoFrameFilter filter) {
@@ -101,7 +100,7 @@ public class BreakoutFilter extends BaseTransform {
     }
 
     public BreakoutFilter slowFilter(final int numThreads, final VideoFrameFilter filter) {
-        return doDelayedConnect(mac -> new SlowFilterSlippage(mac, numThreads, filter));
+        return doDelayedConnect(mac -> new SlowFilterSlippage(mac, numThreads, filter), true);
     }
 
     private final static AutoDisposeSingleThreadScheduler dataWatcher = new AutoDisposeSingleThreadScheduler("Frame Watchdog");
@@ -139,7 +138,7 @@ public class BreakoutFilter extends BaseTransform {
                     }
                 }, noDataTimeoutMillis, TimeUnit.MILLISECONDS));
 
-        filter(new VideoFrameFilter() {
+        watch(new VideoFrameFilter() {
             private boolean isClosed = false;
 
             @Override
@@ -168,7 +167,7 @@ public class BreakoutFilter extends BaseTransform {
      * {@code Consumer<CvMatAndCaps>}.
      */
     public BreakoutFilter delayedSlowFilter(final int numThreads, final Function<VideoFrame, VideoFrameFilter> watcherSupplier) {
-        return doDelayedConnect(mac -> new SlowFilterSlippage(mac, numThreads, watcherSupplier.apply(mac)));
+        return doDelayedConnect(mac -> new SlowFilterSlippage(mac, numThreads, watcherSupplier.apply(mac)), true);
     }
 
     /**
@@ -186,7 +185,7 @@ public class BreakoutFilter extends BaseTransform {
      * {@link VideoFrame} will not be put back into the pipeline.
      */
     public BreakoutFilter streamWatcher(final int numThreads, final VideoFrameFilter watcher) {
-        return doDelayedConnect(mac -> new StreamWatcher(mac, numThreads, watcher));
+        return doDelayedConnect(mac -> new StreamWatcher(mac, numThreads, watcher), false);
     }
 
     /**
@@ -196,7 +195,7 @@ public class BreakoutFilter extends BaseTransform {
      * {@code Consumer<CvMatAndCaps>}.
      */
     public BreakoutFilter delayedStreamWatcher(final int numThreads, final Function<VideoFrame, VideoFrameFilter> watcherSupplier) {
-        return doDelayedConnect(mac -> new StreamWatcher(mac, numThreads, watcherSupplier.apply(mac)));
+        return doDelayedConnect(mac -> new StreamWatcher(mac, numThreads, watcherSupplier.apply(mac)), false);
     }
 
     @Override
@@ -214,8 +213,9 @@ public class BreakoutFilter extends BaseTransform {
             if(listener instanceof ProxyFilter)
                 ((ProxyFilter)listener).close();
         }
-        if(filterStack.size() == 0)
-            disconnect(NEW_SAMPLE.class, actualFilter);
+        if(filterStack.size() == 0) {
+            BreakoutAPIRaw.set_push_frame_callback(me, null, 0);
+        }
         return this;
     }
 
@@ -457,55 +457,77 @@ public class BreakoutFilter extends BaseTransform {
         public void accept(final VideoFrame frame) {
             if(traceOn)
                 LOGGER.trace("FRAME: queuing frame: {}", frame.frameNumber);
-            dispose(to.getAndSet(
-                frame.pooledDeepCopy(getPool(frame))));
+            dispose(to.getAndSet(frame.shallowCopy()));
         }
     }
 
     // =================================================
     // Signals.
     // =================================================
+
     /**
      * This callback is the main filter callback.
      */
-    private static interface NEW_SAMPLE {
-        public FlowReturn new_sample(BreakoutFilter elem);
-    }
+    private final BreakoutAPIRaw.push_frame_callback actualFilter(final boolean needToSendBackResults) {
 
-    private final NEW_SAMPLE actualFilter = new NEW_SAMPLE() {
-        @Override
-        public FlowReturn new_sample(final BreakoutFilter elem) {
-            try(
+        // If it needToSendBackResults then it will be closed in the native code automatically.
+        // when it needToBeAbleToWriteData, the callback DOES NOT own the frame. And therefore
+        // the close and doNativeDelete need to be disabled.
+        if(needToSendBackResults) {
+            return new BreakoutAPIRaw.push_frame_callback() {
+                @Override
+                public void push_frame(final long frame) {
+                    try(
+                        VideoFrame mat = new VideoFrame(
+                            frame, System.currentTimeMillis(), frameNumber.getAndIncrement()) {
 
-                VideoFrame mat = new VideoFrame(
-                    BreakoutAPIRaw.gst_breakout_current_frame_mat(me, true), System.currentTimeMillis(), frameNumber.getAndIncrement()) {
+                            // needToSendBackResults mats are closed automatically in the native code
+                            // once the push_frame returns.
+                            @Override
+                            public void doNativeDelete() {}
+                        };
 
-                    @Override
-                    public void close() {
-                        BreakoutAPIRaw.gst_breakout_current_frame_mat_unmap(super.nativeObj);
-                        super.close();
+                    ) {
+                        // we need to copy the list because any one of these filters can change it
+                        final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
+                        curFilters.forEach(f -> f.accept(mat));
+                        return;
+                    } catch(final VideoFrameFilterException vffe) {
+                        LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
+                        return;
+                    } catch(final Exception e) {
+                        LOGGER.error("Unexpected processing exception:", e);
+                        return;
                     }
+                }
+            };
+        } else {
+            // If the callback doesn't need to have changed made sent back into the pipeline
+            // then there's this is pushed a fully owned copy and not something backed by
+            // the actual gstreamer video frame.
+            return new BreakoutAPIRaw.push_frame_callback() {
+                @Override
+                public void push_frame(final long frame) {
+                    try(
+                        VideoFrame mat = new VideoFrame(
+                            frame, System.currentTimeMillis(), frameNumber.getAndIncrement());
 
-                    @Override
-                    public void doNativeDelete() {
-                        ImageAPI.free_gstmat(super.nativeObj);
+                    ) {
+                        // we need to copy the list because any one of these filters can change it
+                        final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
+                        curFilters.forEach(f -> f.accept(mat));
+                        return;
+                    } catch(final VideoFrameFilterException vffe) {
+                        LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
+                        return;
+                    } catch(final Exception e) {
+                        LOGGER.error("Unexpected processing exception:", e);
+                        return;
                     }
-                };
-
-            ) {
-                // we need to copy the list because any one of these filters can change it
-                final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
-                curFilters.forEach(f -> f.accept(mat));
-                return FlowReturn.OK;
-            } catch(final VideoFrameFilterException vffe) {
-                LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
-                return vffe.flowReturn;
-            } catch(final Exception e) {
-                LOGGER.error("Unexpected processing exception:", e);
-                return FlowReturn.ERROR;
-            }
+                }
+            };
         }
-    };
+    }
     // =================================================
 
     private synchronized void swap(final VideoFrameFilter currentFilter, final VideoFrameFilter newFilter) {
@@ -516,25 +538,21 @@ public class BreakoutFilter extends BaseTransform {
         filterStack.set(index, newFilter);
     }
 
-    private BreakoutFilter doDelayedConnect(final Function<VideoFrame, VideoFrameFilter> watcherSupplier) {
+    private BreakoutFilter doDelayedConnect(final Function<VideoFrame, VideoFrameFilter> watcherSupplier, final boolean needToBeAbleToWriteData) {
         doConnect(new VideoFrameFilter() {
-
             @Override
             public void accept(final VideoFrame mac) {
                 swap(this, watcherSupplier.apply(mac));
             }
-        });
+        }, needToBeAbleToWriteData);
         return this;
     }
 
-    private synchronized BreakoutFilter doConnect(final VideoFrameFilter listener) {
-        if(filterStack.size() == 0)
-            connect(NEW_SAMPLE.class, actualFilter, new GstCallback() {
-                @SuppressWarnings("unused")
-                public FlowReturn callback(final BreakoutFilter elem) {
-                    return actualFilter.new_sample(elem);
-                }
-            });
+    private synchronized BreakoutFilter doConnect(final VideoFrameFilter listener, final boolean needsToWriteResults) {
+        if(filterStack.size() == 0) {
+            actualFilter = actualFilter(needsToWriteResults);
+            BreakoutAPIRaw.set_push_frame_callback(me, actualFilter, needsToWriteResults ? 1 : 0);
+        }
         filterStack.add(listener);
         return this;
     }

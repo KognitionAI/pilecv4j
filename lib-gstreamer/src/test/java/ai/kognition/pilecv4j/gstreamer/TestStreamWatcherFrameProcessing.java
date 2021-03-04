@@ -50,7 +50,7 @@ public class TestStreamWatcherFrameProcessing {
                 .make("videoconvert")
                 .caps("video/x-raw")
                 .add(new BreakoutFilter("filter1")
-                    .slowFilter((final VideoFrame bac) -> {
+                    .streamWatcher((final VideoFrame bac) -> {
                         if(FrameEmitter.HACK_FRAME)
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                         System.out.println("" + bac);

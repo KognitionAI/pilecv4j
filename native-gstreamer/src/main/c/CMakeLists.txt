@@ -1,9 +1,18 @@
 cmake_minimum_required (VERSION 3.4)
 project (ai.kognition.pilecv4j.gstreamer)
 
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
 find_package(PkgConfig)
 
 set (CMAKE_CXX_STANDARD 11)
+
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
 
 pkg_check_modules(GST_VIDEO gstreamer-video-1.0 REQUIRED)
 
@@ -17,7 +26,6 @@ link_directories(${GST_VIDEO_LIBRARY_DIRS})
 add_library(gstbreakout SHARED
   gstbreakout.c
   gstmat.cpp
-  gstbreakout-marshal.c
   )
 
 target_include_directories(gstbreakout PRIVATE src/main/c PUBLIC ${GST_VIDEO_INCLUDE_DIRS})

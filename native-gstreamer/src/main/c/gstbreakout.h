@@ -45,15 +45,18 @@ typedef struct _GstBreakout GstBreakout;
 typedef struct _GstBreakoutClass GstBreakoutClass;
 typedef struct _GstBreakoutPrivate GstBreakoutPrivate;
 
+typedef void (*push_frame)(uint64_t frame);
 
 struct _GstBreakout
 {
   GstVideoFilter base_breakout;
 
-  GstVideoFrame* cur;
   GstPad*        sink;
 
   GstBreakoutPrivate* priv;
+
+  push_frame push_frame_callback;
+  int writable;
 };
 
 struct _GstBreakoutClass
