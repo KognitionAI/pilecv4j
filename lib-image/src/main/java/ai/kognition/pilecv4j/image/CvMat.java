@@ -450,7 +450,7 @@ public class CvMat extends Mat implements AutoCloseable {
         if(!deletedAlready) {
             LOGGER.warn("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
             if(TRACK_MEMORY_LEAKS)
-                LOGGER.debug("TRACKING: Here's where I was instantiated: ", stackTrace);
+                LOGGER.warn("TRACKING: Here's where I was instantiated: ", stackTrace);
             close();
         }
     }

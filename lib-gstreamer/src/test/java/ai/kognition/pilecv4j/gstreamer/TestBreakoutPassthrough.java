@@ -37,17 +37,17 @@ public class TestBreakoutPassthrough {
                 .make("videoconvert")
                 .caps("video/x-raw")
                 .add(new BreakoutFilter("filter")
-                    .filter((final VideoFrame bac) -> {
+                    .watch((final VideoFrame bac) -> {
                         if(FrameEmitter.HACK_FRAME)
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                     }))
                 .add(new BreakoutFilter("filter1")
-                    .filter((final VideoFrame bac) -> {
+                    .watch((final VideoFrame bac) -> {
                         if(FrameEmitter.HACK_FRAME)
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                     }))
                 .add(new BreakoutFilter("filter2")
-                    .filter((final VideoFrame bac) -> {
+                    .watch((final VideoFrame bac) -> {
                         if(FrameEmitter.HACK_FRAME)
                             LOGGER.trace("byte0 " + bac.rasterOp(r -> r.underlying().get(0)));
                     }))

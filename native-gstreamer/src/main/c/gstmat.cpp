@@ -36,14 +36,14 @@ extern "C" {
     return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(finish - arbitraryTimeInThePast).count());
   }
 
+  // exposed to java
   void set_im_maker(uint64_t im) {
     imaker = (ai::kognition::pilecv4j::ImageMaker*)im;
   }
 
-  uint64_t gst_breakout_current_frame_mat(uint64_t me, bool writable) {
-    GstBreakout* breakout = (GstBreakout*)me;
+  // NOT exposed to java
+  uint64_t gst_breakout_current_frame_mat(GstBreakout* breakout, int writable, GstVideoFrame* current) {
 
-    GstVideoFrame* current = breakout->cur;
     if (current == NULL) {
       GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
       return 0L;
@@ -57,12 +57,24 @@ extern "C" {
     m.vframe = current;
     m.writable = writable;
 
-    return imaker->makeImage(height, width, stride, gstFrameDataStructSize, &m);
+    uint64_t ret = imaker->makeImage(height, width, stride, gstFrameDataStructSize, &m);
+    return ret;
+
   }
 
+  // NOT exposed to java
   void gst_breakout_current_frame_mat_unmap(uint64_t gstmat) {
     GstFrameData* fd = (GstFrameData*)imaker->userdata(gstmat);
     gst_buffer_unmap(fd->frame->buffer, &(fd->map));
   }
 
+  // NOT exposed to java
+  void gst_breakout_free_gstmat(uint64_t gstmat) {
+    imaker->freeImage(gstmat);
+  }
+
+  // NOT exposed to java
+  uint64_t gst_breakout_copy_gstmat(uint64_t gstmat) {
+    return imaker->copy(gstmat);
+  }
 }

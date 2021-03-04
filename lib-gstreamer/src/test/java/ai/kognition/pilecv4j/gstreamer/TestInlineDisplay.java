@@ -21,7 +21,7 @@ public class TestInlineDisplay extends BaseTest {
                     .add("height", "480")
                     .build();
 
-                BreakoutFilter breakout = new BreakoutFilter("inline-display").filter(new InlineDisplay.Builder().build());) {
+                BreakoutFilter breakout = new BreakoutFilter("inline-display").watch(new InlineDisplay.Builder().build());) {
 
                 final Pipeline pipe = new BinManager()
                     .delayed(new URIDecodeBin("source")).with("uri", STREAM.toString())

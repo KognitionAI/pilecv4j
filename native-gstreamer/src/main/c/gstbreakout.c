@@ -39,10 +39,12 @@
 #include <gst/video/video.h>
 #include <gst/video/video-frame.h>
 #include <gst/video/gstvideofilter.h>
+
 #include "gstbreakout.h"
+#include "gstmat.h"
+
 #include <stdint.h>
 #include <stdio.h>
-#include "gstbreakout-marshal.h"
 
 // this is in the cpp module gstmat.cpp since I could put it there
 uint64_t currentTimeNanos();
@@ -61,15 +63,6 @@ struct _GstBreakoutPrivate {
   uint64_t numFramesWaitingForValidPts;
 
   uint8_t calcMode;
-};
-
-// This is index into the callback array
-enum
-{
-  /* signals */
-  SIGNAL_TRANSFORM_IP,
-
-  LAST_SIGNAL
 };
 
 #define BREAKOUT_DEFAULT_MAX_DELAY_MILLIS -1
@@ -118,8 +111,6 @@ typedef struct {
 #define VIDEO_SINK_CAPS \
     GST_VIDEO_CAPS_MAKE(GST_VIDEO_FORMATS_ALL)
 
-static guint gst_breakout_signals[LAST_SIGNAL] = { 0 };
-
 /* class initialization */
 
 G_DEFINE_TYPE_WITH_CODE (GstBreakout, gst_breakout, GST_TYPE_VIDEO_FILTER,
@@ -127,6 +118,7 @@ G_DEFINE_TYPE_WITH_CODE (GstBreakout, gst_breakout, GST_TYPE_VIDEO_FILTER,
         "debug category for breakout element"));
 
 GstSegment defaultSegment;
+
 
 static void
 gst_breakout_class_init (GstBreakoutClass * klass)
@@ -162,15 +154,12 @@ gst_breakout_class_init (GstBreakoutClass * klass)
   base_transform_class->start = GST_DEBUG_FUNCPTR (gst_breakout_start);
   base_transform_class->stop = GST_DEBUG_FUNCPTR (gst_breakout_stop);
 
+  base_transform_class->transform_ip_on_passthrough = TRUE;
+
   video_filter_class->set_info = GST_DEBUG_FUNCPTR (gst_breakout_set_info);
   // There is currently no transform_frame. All processing is done "IP"
   video_filter_class->transform_frame = NULL;
   video_filter_class->transform_frame_ip = GST_DEBUG_FUNCPTR (gst_breakout_transform_frame_ip);
-
-  gst_breakout_signals[SIGNAL_TRANSFORM_IP] =
-      g_signal_new ("new_sample", G_TYPE_FROM_CLASS (klass), G_SIGNAL_RUN_LAST,
-          G_STRUCT_OFFSET (GstBreakoutClass, new_sample),
-          NULL, NULL, g_cclosure_marshal_VOID__VOID, G_TYPE_NONE, 0, G_TYPE_NONE);
 
   g_object_class_install_property (gobject_class, PROP_MAX_DELAY_MILLIS,
      g_param_spec_int64("maxDelayMillis", "maxDelayMillis",
@@ -187,8 +176,9 @@ static void gst_breakout_init (GstBreakout *breakout)
   GstPad* pad = NULL;
   GValue p = G_VALUE_INIT;
 
-  breakout->cur = NULL;
   breakout->priv = NULL;
+  breakout->push_frame_callback = NULL;
+  breakout->writable = 0;
 
   // =====================================================================
   // store off the sink pad for quick retrieval later. It's an ALWAYS pad
@@ -400,15 +390,25 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
       }
     }
   }
-  breakout->cur = frame;
-  g_signal_emit (breakout, gst_breakout_signals[SIGNAL_TRANSFORM_IP], 0);
-  breakout->cur = NULL;
+
+  const int writable = breakout->writable;
+  uint64_t frameMat = gst_breakout_current_frame_mat(breakout, writable, frame);
+  uint64_t lmat = writable ? frameMat : gst_breakout_copy_gstmat(frameMat);
+  (*breakout->push_frame_callback)(lmat);
+  gst_breakout_current_frame_mat_unmap(frameMat);
+  gst_breakout_free_gstmat(frameMat);
 
   return GST_FLOW_OK;
 }
 
 uint64_t who_am_i(GstBreakout* breakout) {
   return (uint64_t)breakout;
+}
+
+void set_push_frame_callback(uint64_t me, push_frame callback, int32_t writable ) {
+  GstBreakout* breakout = (GstBreakout*)me;
+  breakout->push_frame_callback = callback;
+  breakout->writable = writable;
 }
 
 static gboolean plugin_init (GstPlugin * plugin) {

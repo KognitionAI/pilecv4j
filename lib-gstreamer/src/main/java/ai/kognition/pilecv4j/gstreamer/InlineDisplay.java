@@ -133,7 +133,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
                     m -> Imgproc.resize(mx, m, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST));
                 process(lmat);
             } else {
-                final VideoFrame lmat = (deepCopy ? mx.deepCopy() : mx.shallowCopy());
+                final VideoFrame lmat = closer.add(deepCopy ? mx.deepCopy() : mx.shallowCopy());
                 process(lmat);
             }
         }

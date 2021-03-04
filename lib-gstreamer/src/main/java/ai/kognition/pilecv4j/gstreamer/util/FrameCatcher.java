@@ -39,15 +39,17 @@ public class FrameCatcher implements QuietCloseable {
 
         bin = new BinManager()
             .add(new BreakoutFilter(name)
-                .filter(vf -> vf.rasterAp(raster -> {
-                    final ByteBuffer bb = raster.underlying();
-                    bb.rewind();
-                    final byte[] data = new byte[raster.getNumBytes()];
-                    bb.get(data);
-                    if(keepFrames)
-                        frames.add(new Frame(data, vf.width(), vf.height()));
+                .watch(vf -> {
                     frameCount++;
-                })))
+                    if(keepFrames)
+                        vf.rasterAp(raster -> {
+                            final ByteBuffer bb = raster.underlying();
+                            bb.rewind();
+                            final byte[] data = new byte[raster.getNumBytes()];
+                            bb.get(data);
+                            frames.add(new Frame(data, vf.width(), vf.height()));
+                        });
+                }))
             .caps(new CapsBuilder("video/x-raw")
                 .addFormatConsideringEndian()
                 .build())

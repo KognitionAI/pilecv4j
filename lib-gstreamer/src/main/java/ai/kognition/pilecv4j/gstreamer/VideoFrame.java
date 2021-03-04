@@ -1,7 +1,5 @@
 package ai.kognition.pilecv4j.gstreamer;
 
-import static net.dempsy.util.Functional.chain;
-
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -54,8 +52,9 @@ public class VideoFrame extends CvMat {
         return VideoFrame.wrapNativeVideoFrame(nativeObj, decodeTimeMillis, frameNumber);
     }
 
-    private VideoFrame leavingPool(final long decodeTimeMillis) {
+    private VideoFrame leavingPool(final long decodeTimeMillis, final long frameNumber) {
         this.decodeTimeMillis = decodeTimeMillis;
+        this.frameNumber = frameNumber;
         if(TRACK_MEMORY_LEAKS) {
             rtpStackTrace = null;
         }
@@ -90,7 +89,7 @@ public class VideoFrame extends CvMat {
                     return new VideoFrame(this, h, w, type, decodeTimeMillis, frameNumber);
                 }
                 resident.decrementAndGet();
-                return chain(ret.leavingPool(decodeTimeMillis), vf -> vf.frameNumber = frameNumber);
+                return ret.leavingPool(decodeTimeMillis, frameNumber);
             }
         }
 
