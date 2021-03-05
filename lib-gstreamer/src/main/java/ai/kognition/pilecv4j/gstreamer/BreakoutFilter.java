@@ -471,14 +471,16 @@ public class BreakoutFilter extends BaseTransform {
     private final BreakoutAPIRaw.push_frame_callback actualFilter(final boolean needToSendBackResults) {
 
         // If it needToSendBackResults then it will be closed in the native code automatically.
-        // when it needToBeAbleToWriteData, the callback DOES NOT own the frame. And therefore
-        // the close and doNativeDelete need to be disabled.
+        // when it needToSendBackResults (same as needing to write the data), the callback DOES
+        // NOT own the frame. And therefore the close and doNativeDelete need to be disabled.
         if(needToSendBackResults) {
             return new BreakoutAPIRaw.push_frame_callback() {
                 @Override
                 public void push_frame(final long frame) {
+                    if(traceOn)
+                        LOGGER.trace("frame pushed :{}", frame);
                     try(
-                        VideoFrame mat = new VideoFrame(
+                        final VideoFrame mat = new VideoFrame(
                             frame, System.currentTimeMillis(), frameNumber.getAndIncrement()) {
 
                             // needToSendBackResults mats are closed automatically in the native code
@@ -502,12 +504,15 @@ public class BreakoutFilter extends BaseTransform {
                 }
             };
         } else {
-            // If the callback doesn't need to have changed made sent back into the pipeline
+            // If the callback doesn't need to have changes made sent back into the pipeline
             // then there's this is pushed a fully owned copy and not something backed by
             // the actual gstreamer video frame.
             return new BreakoutAPIRaw.push_frame_callback() {
                 @Override
                 public void push_frame(final long frame) {
+                    if(traceOn)
+                        LOGGER.trace("frame pushed :{}", frame);
+
                     try(
                         VideoFrame mat = new VideoFrame(
                             frame, System.currentTimeMillis(), frameNumber.getAndIncrement());
