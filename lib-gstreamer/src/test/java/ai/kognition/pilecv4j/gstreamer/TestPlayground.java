@@ -10,15 +10,13 @@ import org.freedesktop.gstreamer.Pipeline;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import net.dempsy.util.MutableInt;
-
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
 @Ignore
 public class TestPlayground {
     @Test
     public void test() throws Exception {
-        final MutableInt count = new MutableInt(0);
+        // final MutableInt count = new MutableInt(0);
 
         final AtomicReference<Pipeline> rpipe = new AtomicReference<>();
         final AtomicLong al = new AtomicLong(0);
