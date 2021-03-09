@@ -44,6 +44,7 @@
                 <PROJECT_VERSION>${project.version}</PROJECT_VERSION>
                 <DEP_OPENCV_VERSION>${opencv-build.version}</DEP_OPENCV_VERSION>
                 <COMMON_INCLUDE>${common.include}</COMMON_INCLUDE>
+                <CMAKE_BUILD_TYPE>${cmake.build.type}</CMAKE_BUILD_TYPE>
               </environmentVariables>
               <downloadBinaries>${download.cmake}</downloadBinaries>
             </configuration>

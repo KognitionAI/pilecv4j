@@ -1,5 +1,4 @@
 #include "imagemaker.h"
-#include <stdio.h>
 #include <chrono>
 
 extern "C" {
@@ -11,21 +10,7 @@ struct GstFrameData {
   GstVideoFrame* frame;
 };
 
-static const std::size_t gstFrameDataStructSize = sizeof(GstFrameData);
 static ai::kognition::pilecv4j::ImageMaker* imaker;
-
-class DataMapper : public ai::kognition::pilecv4j::DataMapper {
-public:
-  GstVideoFrame* vframe;
-  bool writable;
-
-  inline void* mapData(void* alignedStruct) {
-    GstFrameData* vfd = (GstFrameData*)alignedStruct;
-    vfd->frame = vframe;
-    gst_buffer_map (vframe->buffer, &(vfd->map), writable ? GST_MAP_WRITE : GST_MAP_READ);
-    return vfd->map.data;
-  }
-};
 
 static const auto arbitraryTimeInThePast = std::chrono::steady_clock::now();
 
@@ -42,7 +27,7 @@ extern "C" {
   }
 
   // NOT exposed to java
-  uint64_t gst_breakout_current_frame_mat(GstBreakout* breakout, int writable, GstVideoFrame* current) {
+  uint64_t gst_breakout_current_frame_mat(GstBreakout* breakout, GstVideoFrame* current, void* data) {
 
     if (current == NULL) {
       GST_WARNING_OBJECT (breakout, "there is no frame at this point. The method should be called from within a callback. Return NULL");
@@ -53,28 +38,12 @@ extern "C" {
     int width = GST_VIDEO_FRAME_WIDTH(current);
     int height = GST_VIDEO_FRAME_HEIGHT(current);
 
-    DataMapper m;
-    m.vframe = current;
-    m.writable = writable;
+    return imaker->makeImage(height, width, stride, data);
 
-    uint64_t ret = imaker->makeImage(height, width, stride, gstFrameDataStructSize, &m);
-    return ret;
-
-  }
-
-  // NOT exposed to java
-  void gst_breakout_current_frame_mat_unmap(uint64_t gstmat) {
-    GstFrameData* fd = (GstFrameData*)imaker->userdata(gstmat);
-    gst_buffer_unmap(fd->frame->buffer, &(fd->map));
   }
 
   // NOT exposed to java
   void gst_breakout_free_gstmat(uint64_t gstmat) {
     imaker->freeImage(gstmat);
-  }
-
-  // NOT exposed to java
-  uint64_t gst_breakout_copy_gstmat(uint64_t gstmat) {
-    return imaker->copy(gstmat);
   }
 }

@@ -200,7 +200,7 @@ public class VideoFrame extends CvMat {
         return new VideoFrame(ImageAPI.CvRaster_copy(nativeObj), decodeTimeMillis, frameNumber);
     }
 
-    private static VideoFrame wrapNativeVideoFrame(final long nativeObj, final long decodeTimeMillis, final long frameNumber) {
+    public static VideoFrame wrapNativeVideoFrame(final long nativeObj, final long decodeTimeMillis, final long frameNumber) {
         return new VideoFrame(nativeObj, decodeTimeMillis, frameNumber);
     }
 }

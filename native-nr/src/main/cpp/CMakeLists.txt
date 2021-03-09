@@ -1,6 +1,10 @@
 cmake_minimum_required (VERSION 3.4)
 project (ai.kognition.pilecv4j.util)
 
+if (DEFINED ENV{CMAKE_BUILD_TYPE})
+   set(CMAKE_BUILD_TYPE $ENV{CMAKE_BUILD_TYPE})
+endif()
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()

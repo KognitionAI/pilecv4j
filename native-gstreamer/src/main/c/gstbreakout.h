@@ -56,7 +56,7 @@ struct _GstBreakout
   GstBreakoutPrivate* priv;
 
   push_frame push_frame_callback;
-  int writable;
+  int32_t writable;
 };
 
 struct _GstBreakoutClass

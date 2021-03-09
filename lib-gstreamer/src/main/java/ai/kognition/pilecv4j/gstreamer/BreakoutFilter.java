@@ -473,65 +473,35 @@ public class BreakoutFilter extends BaseTransform {
         // If it needToSendBackResults then it will be closed in the native code automatically.
         // when it needToSendBackResults (same as needing to write the data), the callback DOES
         // NOT own the frame. And therefore the close and doNativeDelete need to be disabled.
-        if(needToSendBackResults) {
-            return new BreakoutAPIRaw.push_frame_callback() {
-                @Override
-                public void push_frame(final long frame) {
-                    if(traceOn)
-                        LOGGER.trace("frame pushed :{}", frame);
-                    try(
-                        final VideoFrame mat = new VideoFrame(
-                            frame, System.currentTimeMillis(), frameNumber.getAndIncrement()) {
+        return new BreakoutAPIRaw.push_frame_callback() {
+            @Override
+            public void push_frame(final long frame) {
+                if(traceOn)
+                    LOGGER.trace("frame pushed :{}", frame);
+                try(
+                    final VideoFrame mat = new VideoFrame(
+                        frame, System.currentTimeMillis(), frameNumber.getAndIncrement()) {
 
-                            // needToSendBackResults mats are closed automatically in the native code
-                            // once the push_frame returns.
-                            @Override
-                            public void doNativeDelete() {}
-                        };
+                        // mats are closed automatically in the native code
+                        // once the push_frame returns.
+                        @Override
+                        public void doNativeDelete() {}
+                    };
 
-                    ) {
-                        // we need to copy the list because any one of these filters can change it
-                        final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
-                        curFilters.forEach(f -> f.accept(mat));
-                        return;
-                    } catch(final VideoFrameFilterException vffe) {
-                        LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
-                        return;
-                    } catch(final Exception e) {
-                        LOGGER.error("Unexpected processing exception:", e);
-                        return;
-                    }
+                ) {
+                    // we need to copy the list because any one of these filters can change it
+                    final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
+                    curFilters.forEach(f -> f.accept(mat));
+                    return;
+                } catch(final VideoFrameFilterException vffe) {
+                    LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
+                    return;
+                } catch(final Exception e) {
+                    LOGGER.error("Unexpected processing exception:", e);
+                    return;
                 }
-            };
-        } else {
-            // If the callback doesn't need to have changes made sent back into the pipeline
-            // then there's this is pushed a fully owned copy and not something backed by
-            // the actual gstreamer video frame.
-            return new BreakoutAPIRaw.push_frame_callback() {
-                @Override
-                public void push_frame(final long frame) {
-                    if(traceOn)
-                        LOGGER.trace("frame pushed :{}", frame);
-
-                    try(
-                        VideoFrame mat = new VideoFrame(
-                            frame, System.currentTimeMillis(), frameNumber.getAndIncrement());
-
-                    ) {
-                        // we need to copy the list because any one of these filters can change it
-                        final List<VideoFrameFilter> curFilters = new ArrayList<>(filterStack);
-                        curFilters.forEach(f -> f.accept(mat));
-                        return;
-                    } catch(final VideoFrameFilterException vffe) {
-                        LOGGER.error("Unexpected processing exception: {}", vffe.flowReturn, vffe);
-                        return;
-                    } catch(final Exception e) {
-                        LOGGER.error("Unexpected processing exception:", e);
-                        return;
-                    }
-                }
-            };
-        }
+            }
+        };
     }
     // =================================================
 

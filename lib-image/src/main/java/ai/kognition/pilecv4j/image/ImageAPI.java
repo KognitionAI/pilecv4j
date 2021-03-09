@@ -109,8 +109,6 @@ public class ImageAPI {
     // Gst bridge functionality
     // =========================================================
 
-    public native static void free_gstmat(long gstmat);
-
     public native static long get_im_maker();
 
     // =========================================================

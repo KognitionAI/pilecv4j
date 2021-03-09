@@ -44,7 +44,6 @@
 #include "gstmat.h"
 
 #include <stdint.h>
-#include <stdio.h>
 
 // this is in the cpp module gstmat.cpp since I could put it there
 uint64_t currentTimeNanos();
@@ -392,11 +391,17 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
   }
 
   const int writable = breakout->writable;
-  uint64_t frameMat = gst_breakout_current_frame_mat(breakout, writable, frame);
-  uint64_t lmat = writable ? frameMat : gst_breakout_copy_gstmat(frameMat);
-  (*breakout->push_frame_callback)(lmat);
-  gst_breakout_current_frame_mat_unmap(frameMat);
+
+  GstMapInfo mi;
+  gst_buffer_map(frame->buffer,&mi,writable ? GST_MAP_WRITE : GST_MAP_READ);
+
+  // create a mat wrapping the mapped data
+  uint64_t frameMat = gst_breakout_current_frame_mat(breakout, frame, mi.data);
+
+  (*breakout->push_frame_callback)(frameMat);
+
   gst_breakout_free_gstmat(frameMat);
+  gst_buffer_unmap(frame->buffer, &mi);
 
   return GST_FLOW_OK;
 }
