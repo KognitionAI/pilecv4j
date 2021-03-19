@@ -62,16 +62,20 @@ struct _GstBreakoutPrivate {
   uint64_t numFramesWaitingForValidPts;
 
   uint8_t calcMode;
+  uint8_t correctDelay;
+  uint8_t enableDelayHandling;
 };
 
 #define BREAKOUT_DEFAULT_MAX_DELAY_MILLIS -1
+#define BREAKOUT_DEFAULT_CORRECT_DELAY 0
 #define BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE 10
 #define BREAKOUT_NUM_MEASUREMENTS_BEFORE_WARNING 50
 #define NANOS_PER_MILLI 1000000L
 
 enum {
   PROP_0,
-  PROP_MAX_DELAY_MILLIS
+  PROP_MAX_DELAY_MILLIS,
+  PROP_CORRECT_DELAY
 };
 
 
@@ -79,7 +83,7 @@ GST_DEBUG_CATEGORY_STATIC (gst_breakout_debug_category);
 #define GST_CAT_DEFAULT gst_breakout_debug_category
 
 /* prototypes */
-
+static void makePrivateParts(GstBreakout* breakout);
 static void gst_breakout_set_property (GObject * object,
     guint property_id, const GValue * value, GParamSpec * pspec);
 static void gst_breakout_get_property (GObject * object,
@@ -162,8 +166,13 @@ gst_breakout_class_init (GstBreakoutClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_MAX_DELAY_MILLIS,
      g_param_spec_int64("maxDelayMillis", "maxDelayMillis",
-               "Maximum frame delay in milliseconds before filter will skip all processing to get caught up",
+               "Maximum frame delay in milliseconds before filter will begin tracking the delay. If correct-delay is also set, it will throw away frames until the delay is below this level.",
                -1, G_MAXINT64, BREAKOUT_DEFAULT_MAX_DELAY_MILLIS, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_CORRECT_DELAY,
+     g_param_spec_int64("correct-delay", "correct-delay",
+               "Throw away frames until the delay is below the level set for maxDelayMillis.",
+               -1, G_MAXINT8, BREAKOUT_DEFAULT_CORRECT_DELAY, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gst_segment_init (&defaultSegment, GST_FORMAT_TIME);
 }
@@ -175,7 +184,7 @@ static void gst_breakout_init (GstBreakout *breakout)
   GstPad* pad = NULL;
   GValue p = G_VALUE_INIT;
 
-  breakout->priv = NULL;
+  breakout->priv = NULL; // set and filled in before this function returns
   breakout->push_frame_callback = NULL;
   breakout->writable = 0;
 
@@ -199,13 +208,15 @@ static void gst_breakout_init (GstBreakout *breakout)
   // The transform is always_in_place. This should be set because I'm only setting
   // the transform_ip and not the transform but it can't hurt.
   gst_base_transform_set_in_place(&(breakout->base_breakout.element), TRUE);
+
+  makePrivateParts(breakout);
 }
 
-static void makePrivateParts(GstBreakout* breakout, int64_t maxDelayMillis) {
+static void makePrivateParts(GstBreakout* breakout) {
   GST_OBJECT_LOCK(breakout);
   if (!breakout->priv) {
     GstBreakoutPrivate* priv = malloc(sizeof(GstBreakoutPrivate));
-    priv->maxDelayMillis = maxDelayMillis;
+    priv->maxDelayMillis = BREAKOUT_DEFAULT_MAX_DELAY_MILLIS;
     priv->cumulativeTimeDifferences = 0L;
     priv->numTimeMeasurements = 0L;
     priv->numFramesWaitingForValidPts = 0L;
@@ -213,6 +224,8 @@ static void makePrivateParts(GstBreakout* breakout, int64_t maxDelayMillis) {
     priv->minTimeDifference = 0L;
     priv->maxTimeDifference = 0L;
     priv->calcMode = TRUE;
+    priv->correctDelay = BREAKOUT_DEFAULT_CORRECT_DELAY;
+    priv->enableDelayHandling = FALSE;
     breakout->priv = priv;
   }
   GST_OBJECT_UNLOCK(breakout);
@@ -226,9 +239,14 @@ gst_breakout_set_property (GObject * object, guint property_id,
 
   switch (property_id) {
   case PROP_MAX_DELAY_MILLIS: {
-    makePrivateParts(breakout, g_value_get_int64(value));
+    breakout->priv->maxDelayMillis = g_value_get_int64(value);
+    breakout->priv->enableDelayHandling = TRUE;
     break;
   }
+  case PROP_CORRECT_DELAY:
+    breakout->priv->correctDelay == g_value_get_int(value) == 0 ? FALSE : TRUE;
+    breakout->priv->enableDelayHandling = TRUE;
+    break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
     break;
@@ -240,14 +258,16 @@ gst_breakout_get_property (GObject * object, guint property_id,
     GValue * value, GParamSpec * pspec)
 {
   GstBreakout *breakout = GST_BREAKOUT (object);
+  int v = 0;
   GST_TRACE_OBJECT (breakout, "get_property");
 
   switch (property_id) {
   case PROP_MAX_DELAY_MILLIS:
-    if (breakout->priv)
-      g_value_set_int64(value, breakout->priv->maxDelayMillis);
-    else
-      g_value_set_int64(value, BREAKOUT_DEFAULT_MAX_DELAY_MILLIS);
+    g_value_set_int64(value, breakout->priv->maxDelayMillis);
+    break;
+  case PROP_CORRECT_DELAY:
+    v = breakout->priv->correctDelay == 0 ? FALSE : TRUE;
+    g_value_set_int(value, v);
     break;
   default:
     G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -329,63 +349,65 @@ gst_breakout_transform_frame_ip (GstVideoFilter * filter, GstVideoFrame * frame)
   GST_TRACE_OBJECT (breakout, "transform_frame_ip");
 
   GstBreakoutPrivate * priv = breakout->priv;
-  if (priv) {
+  if (priv->enableDelayHandling) {
     const int64_t maxDelayMillis = priv->maxDelayMillis;
 
-    // are we limiting the latency?
-    if (maxDelayMillis >= 0) {
-      // check to see if we're getting PTS
-      uint64_t pts = (uint64_t) (frame->buffer->pts);
-      if (isValidPts(pts)) {
-        priv->numFramesWaitingForValidPts = 0L; // reset in case we got a few bad ones.
+    // check to see if we're getting PTS
+    uint64_t pts = (uint64_t) (frame->buffer->pts);
+    if (isValidPts(pts)) {
+      priv->numFramesWaitingForValidPts = 0L; // reset in case we got a few bad ones.
 
-        uint64_t curTime = currentTimeNanos();
-        const int64_t diff = curTime - (int64_t) (pts);
+      uint64_t curTime = currentTimeNanos();
+      const int64_t diff = curTime - (int64_t) (pts);
 
-        // are we still gathering metrics to record the clock shift?
-        if (priv->calcMode) {
-          GST_OBJECT_LOCK(breakout);
-          if (priv->numTimeMeasurements == 0)
-            priv->minTimeDifference = priv->maxTimeDifference = diff;
-          else {
-            if (diff < priv->minTimeDifference)
-              priv->minTimeDifference = diff;
-            if (diff > priv->maxTimeDifference)
-              priv->maxTimeDifference = diff;
-          }
+      // are we still gathering metrics to record the clock shift?
+      if (priv->calcMode) {
+        // ======================================================
+        GST_OBJECT_LOCK(breakout);
+        if (priv->numTimeMeasurements == 0)
+          priv->minTimeDifference = priv->maxTimeDifference = diff;
+        else {
+          if (diff < priv->minTimeDifference)
+            priv->minTimeDifference = diff;
+          if (diff > priv->maxTimeDifference)
+            priv->maxTimeDifference = diff;
+        }
 
-          priv->numTimeMeasurements++;
-          priv->cumulativeTimeDifferences += diff;
+        priv->numTimeMeasurements++;
+        priv->cumulativeTimeDifferences += diff;
 
-          // if we have enough samples then just take the current average.
-          //                                                                       the +2 is for the outliers
-          if (priv->numTimeMeasurements >= (BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE + 2)) {
-            // adjust for the min and max outliers
-            priv->cumulativeTimeDifferences -= priv->minTimeDifference;
-            priv->cumulativeTimeDifferences -= priv->maxTimeDifference;
+        // if we have enough samples then just take the current average.
+        //                                                                       the +2 is for the outliers
+        if (priv->numTimeMeasurements >= (BREAKOUT_DEFAULT_NUM_MEASUREMENTS_FOR_AVERAGE + 2)) {
+          // adjust for the min and max outliers
+          priv->cumulativeTimeDifferences -= priv->minTimeDifference;
+          priv->cumulativeTimeDifferences -= priv->maxTimeDifference;
 
-            //                                                                                   -2 is for the outliers
-            priv->timeDifference = (int64_t)( (double)(priv->cumulativeTimeDifferences) / (double) (priv->numTimeMeasurements - 2L));
-            priv->timeDifference += (maxDelayMillis * NANOS_PER_MILLI);
-            priv->calcMode = FALSE;
-            GST_DEBUG_OBJECT(breakout, "Watching for a frame latency of %ld by measuring the difference between the clock and the PTS which is averaging %ld.",
-                (long) maxDelayMillis, (long) (priv->timeDifference / NANOS_PER_MILLI));
-          }
-          GST_OBJECT_UNLOCK(breakout);
-        } else {
-          // we have the time shift we're going to assume is basically no delay.
-          if (diff > priv->timeDifference) {
-            long millisDelay = (long)(diff - (priv->timeDifference - (maxDelayMillis * NANOS_PER_MILLI))) / NANOS_PER_MILLI;
+          //                                                                                   -2 is for the outliers
+          priv->timeDifference = (int64_t)( (double)(priv->cumulativeTimeDifferences) / (double) (priv->numTimeMeasurements - 2L));
+          priv->timeDifference += (maxDelayMillis * NANOS_PER_MILLI);
+          priv->calcMode = FALSE;
+          GST_DEBUG_OBJECT(breakout, "Watching for a frame latency of %ld by measuring the difference between the clock and the PTS which is averaging %ld.",
+              (long) maxDelayMillis, (long) (priv->timeDifference / NANOS_PER_MILLI));
+        }
+        GST_OBJECT_UNLOCK(breakout);
+      } else {
+        // we have the time shift we're going to assume is basically no delay.
+        if (diff > priv->timeDifference) {
+          long millisDelay = (long)(diff - (priv->timeDifference - (maxDelayMillis * NANOS_PER_MILLI))) / NANOS_PER_MILLI;
+          if (priv->correctDelay) {
             GST_DEBUG_OBJECT(breakout, "Dropping a frame due to latency (%ld)", (long)millisDelay);
             return GST_FLOW_OK;
+          } else {
+            GST_DEBUG_OBJECT(breakout, "Frame latency exceeded %ld and is currently %ld", (long)maxDelayMillis, (long)millisDelay);
           }
         }
-      } else { // invalid pts. Track it. If it happens for too long we need to issue a warning
-        priv->numFramesWaitingForValidPts++;
-        if (priv->numFramesWaitingForValidPts > BREAKOUT_NUM_MEASUREMENTS_BEFORE_WARNING) {
-          GST_WARNING_OBJECT( breakout, "expected valid PTS but haven't gotten one.");
-          priv->numFramesWaitingForValidPts = 0L; // reset.
-        }
+      }
+    } else { // invalid pts. Track it. If it happens for too long we need to issue a warning
+      priv->numFramesWaitingForValidPts++;
+      if (priv->numFramesWaitingForValidPts > BREAKOUT_NUM_MEASUREMENTS_BEFORE_WARNING) {
+        GST_WARNING_OBJECT( breakout, "expected valid PTS but haven't gotten one.");
+        priv->numFramesWaitingForValidPts = 0L; // reset.
       }
     }
   }
