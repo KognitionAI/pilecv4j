@@ -730,7 +730,7 @@ public class Utils {
                         mask >>>= 1; // shift the mask over to remove it from the sign bit
                         matToMask = closer.add(new CvMat()); // new mat to move forward with
                         Core.multiply(tmpMat, new Scalar(0.5D), matToMask); // shift all of values in the channel >> 1. That
-                                                                                // is, divide by 2.
+                                                                            // is, divide by 2.
                     }
                 }
 
@@ -1119,7 +1119,7 @@ public class Utils {
                 .map(p -> new double[] {p.x,p.y,p.z})
                 .toArray(double[][]::new);
             try(CvMat pointsAsMat = Utils.toMat(points);) {
-                return CvMat.move(pointsAsMat.t());
+                return pointsAsMat.t();
             }
         }
     }
@@ -1155,7 +1155,6 @@ public class Utils {
         final double scale = Math.min(fw, fh);
         return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
     }
-
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {
         // Here we use the description for the perpendicularDistance.

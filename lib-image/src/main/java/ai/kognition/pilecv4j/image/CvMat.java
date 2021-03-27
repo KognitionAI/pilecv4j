@@ -13,6 +13,8 @@ import org.opencv.core.Size;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ai.kognition.pilecv4j.image.CvRaster.Closer;
+
 /**
  * <p>
  * This class is an easier (perhaps) and more efficient interface to an OpenCV
@@ -167,7 +169,9 @@ public class CvMat extends Mat implements AutoCloseable {
      */
     @Override
     public CvMat t() {
-        return CvMat.move(super.t());
+        try(Closer closer = new Closer();) {
+            return CvMat.move(closer.addMat(super.t()));
+        }
     }
 
     /**
@@ -181,9 +185,11 @@ public class CvMat extends Mat implements AutoCloseable {
      * "https://docs.opencv.org/4.0.1/d2/de8/group__core__array.html#gacb6e64071dffe36434e1e7ee79e7cb35">cv::gemm()</a>
      */
     public CvMat mm(final Mat other, final double scale) {
-        final Mat ret = new Mat();
-        Core.gemm(this, other, scale, nullMat, 0.0D, ret);
-        return CvMat.move(ret);
+        try(Closer closer = new Closer();) {
+            final Mat ret = closer.addMat(new Mat());
+            Core.gemm(this, other, scale, nullMat, 0.0D, ret);
+            return CvMat.move(ret);
+        }
     }
 
     /**
