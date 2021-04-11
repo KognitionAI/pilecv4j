@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Rect2d;
+import org.opencv.tracking.legacy_TrackerCSRT;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +20,7 @@ import ai.kognition.pilecv4j.tracking.Tracker;
  *
  * @see <a href="https://arxiv.org/abs/1611.08461">arxiv: Discriminitive Correlation Filter with Channel and Spatial Reliability</a>
  */
-public class TrackerCSRT extends org.opencv.tracking.TrackerCSRT implements Tracker {
+public class TrackerCSRT extends legacy_TrackerCSRT implements Tracker {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrackerCSRT.class);
     public static final boolean SUPPORTS_MASKING = true;
 
@@ -38,9 +39,9 @@ public class TrackerCSRT extends org.opencv.tracking.TrackerCSRT implements Trac
 
     static {
         try {
-            nativeCreate = org.opencv.tracking.TrackerCSRT.class.getDeclaredMethod("create_0");
+            nativeCreate = legacy_TrackerCSRT.class.getDeclaredMethod("create_0");
             nativeCreate.setAccessible(true);
-            nativeDelete = org.opencv.tracking.TrackerCSRT.class.getDeclaredMethod("delete", long.class);
+            nativeDelete = legacy_TrackerCSRT.class.getDeclaredMethod("delete", long.class);
             nativeDelete.setAccessible(true);
         } catch(final NoSuchMethodException | SecurityException e) {
             throw new RuntimeException("Got an exception trying to access " + TrackerCSRT.class.getSimpleName() +

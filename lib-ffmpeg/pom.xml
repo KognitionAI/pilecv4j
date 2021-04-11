@@ -5,9 +5,11 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.11-SNAPSHOT</version>
+    <version>1.0-SNAPSHOT</version>
   </parent>
   <artifactId>lib-ffmpeg</artifactId>
+  <name>lib-ffmpeg (${project.version})</name>
+  <description></description>
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -27,6 +29,11 @@
   
     <!-- 3rd party test deps -->
     <dependency>
+      <groupId>org.bytedeco</groupId>
+      <artifactId>ffmpeg-platform</artifactId>
+      <version>4.1.3-1.5</version>
+    </dependency>
+    <dependency>
       <groupId>net.dempsy</groupId>
       <artifactId>dempsy-test-utils</artifactId>
       <scope>test</scope>
@@ -44,86 +51,4 @@
     </dependency>
   </dependencies>
 
-  <!-- At this level the profile just selects which tensorflow dependency to include -->
-  <!-- Currently the pilecv4j-tensorflow-packaging project ONLY builds Linux 64 bit  -->
-  <!--  so any other platform just defaults to the standard build. -->
-  <profiles>
-    <profile>
-      <id>linux-x86</id>
-      <activation>
-        <os>
-          <family>linux</family>
-          <arch>i386</arch>
-        </os>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow</artifactId>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>linux-64bit</id>
-      <activation>
-        <os>
-          <family>linux</family>
-          <arch>amd64</arch>
-        </os>
-      </activation>
-      <dependencies>
-        <dependency> 
-          <groupId>ai.kognition.pilecv4j</groupId>
-          <artifactId>tensorflow-lib-jar</artifactId>
-          <classifier>withlib</classifier>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>windows-x86_64</id>
-      <activation>
-        <os>
-          <family>windows</family>
-          <arch>amd64</arch>
-        </os>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow</artifactId>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
-    </profile>
-    <profile>
-      <id>windows-x86</id>
-      <activation>
-        <os>
-          <family>windows</family>
-          <arch>x86</arch>
-        </os>
-      </activation>
-      <dependencies>
-        <dependency>
-          <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow</artifactId>
-          <scope>test</scope>
-        </dependency>
-      </dependencies>
-    </profile>
-  </profiles>
-  
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <configuration>
-          <reuseForks>false</reuseForks>
-        </configuration>
-      </plugin>
-    </plugins>
-  </build>
 </project>

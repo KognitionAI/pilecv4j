@@ -25,9 +25,9 @@
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv-build.version>4.1.2</opencv-build.version>
-    <opencv-short.version>412</opencv-short.version>
-    <cuda.version>10.2</cuda.version>
+    <opencv-build.version>4.5.2</opencv-build.version>
+    <opencv-short.version>452</opencv-short.version>
+    <cuda.version>11.2</cuda.version>
 
     <!-- Normally the opencv-base version is the same as the opencv-build version   -->
     <!--  however, the build version needs to be unadulterated by version suffixes -->
@@ -38,7 +38,7 @@
     <!-- The artifact version -->
     <opencv.version>${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
-    <tensorflow.version>1.12.0</tensorflow.version>    
+    <tensorflow-core-api.version>0.3.1</tensorflow-core-api.version>    
     <slf4j.version>1.7.25</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
@@ -137,10 +137,18 @@
         <classifier>withlib</classifier>
         <version>${opencv.version}</version>
       </dependency>
+      
+      <!-- Tensorflow -->
       <dependency>
         <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow</artifactId>
-        <version>${tensorflow.version}</version>
+        <artifactId>tensorflow-core-api</artifactId>
+        <version>${tensorflow-core-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-api</artifactId>
+        <version>${tensorflow-core-api.version}</version>
+        <classifier>linux-x86_64-gpu</classifier>
       </dependency>
 
       <!-- Internal to the product -->

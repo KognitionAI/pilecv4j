@@ -77,11 +77,6 @@
       <artifactId>lib-tf</artifactId>
       <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow</artifactId>
-      <scope>test</scope>
-    </dependency>
   </dependencies>
 
   <build>

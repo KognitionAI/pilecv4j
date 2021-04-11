@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Rect2d;
+import org.opencv.tracking.legacy_TrackerKCF;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,7 +20,7 @@ import ai.kognition.pilecv4j.tracking.Tracker;
  *
  * @see <a href="https://arxiv.org/abs/1404.7584">arxiv: High-Speed Tracking with Kernelized Correlation Filters</a>
  */
-public class TrackerKCF extends org.opencv.tracking.TrackerKCF implements Tracker {
+public class TrackerKCF extends legacy_TrackerKCF implements Tracker {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrackerKCF.class);
     public static final boolean SUPPORTS_MASKING = false;
 
@@ -32,16 +33,15 @@ public class TrackerKCF extends org.opencv.tracking.TrackerKCF implements Tracke
     protected final RuntimeException stackTrace;
     protected RuntimeException delStackTrace;
 
-
     static {
         CvMat.initOpenCv();
     }
 
     static {
         try {
-            nativeCreate = org.opencv.tracking.TrackerKCF.class.getDeclaredMethod("create_0");
+            nativeCreate = legacy_TrackerKCF.class.getDeclaredMethod("create_0");
             nativeCreate.setAccessible(true);
-            nativeDelete = org.opencv.tracking.TrackerKCF.class.getDeclaredMethod("delete", long.class);
+            nativeDelete = legacy_TrackerKCF.class.getDeclaredMethod("delete", long.class);
             nativeDelete.setAccessible(true);
         } catch(final NoSuchMethodException | SecurityException e) {
             throw new RuntimeException("Got an exception trying to access " + TrackerKCF.class.getSimpleName() +

@@ -105,13 +105,6 @@
       <artifactId>imageio-tiff</artifactId>
       <optional>true</optional>
     </dependency>
-
-    <!-- To compile and test TensorUtils we're just going to go against the CPU version of tenstflow -->
-    <dependency>
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow</artifactId>
-      <optional>true</optional>
-    </dependency>
   </dependencies>
 
   <build>

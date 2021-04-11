@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.opencv.core.Mat;
 import org.opencv.core.Rect2d;
+import org.opencv.tracking.legacy_TrackerMOSSE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,9 +19,9 @@ import ai.kognition.pilecv4j.tracking.Tracker;
  * Extension of OpenCV's implementation of the Minimum Output of Sum of Squard Error (MOSSE) filter to fit {@link Tracker}.
  *
  * @see <a href="https://www.cs.colostate.edu/~vision/publications/bolme_cvpr10.pdf">cs.colorado-state: Visual Object Tracking using Adaptive Correlation
- *     Filters</a>
+ * Filters</a>
  */
-public class TrackerMOSSE extends org.opencv.tracking.TrackerMOSSE implements Tracker {
+public class TrackerMOSSE extends legacy_TrackerMOSSE implements Tracker {
     private static final Logger LOGGER = LoggerFactory.getLogger(TrackerMOSSE.class);
     public static final boolean SUPPORTS_MASKING = false;
 
@@ -39,9 +40,9 @@ public class TrackerMOSSE extends org.opencv.tracking.TrackerMOSSE implements Tr
 
     static {
         try {
-            nativeCreate = org.opencv.tracking.TrackerMOSSE.class.getDeclaredMethod("create_0");
+            nativeCreate = legacy_TrackerMOSSE.class.getDeclaredMethod("create_0");
             nativeCreate.setAccessible(true);
-            nativeDelete = org.opencv.tracking.TrackerMOSSE.class.getDeclaredMethod("delete", long.class);
+            nativeDelete = legacy_TrackerMOSSE.class.getDeclaredMethod("delete", long.class);
             nativeDelete.setAccessible(true);
         } catch(final NoSuchMethodException | SecurityException e) {
             throw new RuntimeException("Got an exception trying to access " + TrackerMOSSE.class.getSimpleName() +
