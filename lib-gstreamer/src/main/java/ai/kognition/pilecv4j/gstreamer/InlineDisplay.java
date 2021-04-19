@@ -14,6 +14,7 @@ import net.dempsy.util.MutableRef;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.Utils;
+import ai.kognition.pilecv4j.image.VideoFrame;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.image.display.ImageDisplay.KeyPressCallback;
 
@@ -129,7 +130,7 @@ public class InlineDisplay implements BreakoutFilter.VideoFrameFilter {
                     adjustedSize.ref = Utils.scaleDownOrNothing(mx, screenDim);
                 }
 
-                final VideoFrame lmat = chain(closer.add(new VideoFrame(mx.decodeTimeMillis, rac.frameNumber)),
+                final VideoFrame lmat = chain(closer.add(new VideoFrame(mx.decodeTimeMillis, rac.frameNumber, rac.isRgb)),
                     m -> Imgproc.resize(mx, m, adjustedSize.ref, -1, -1, Imgproc.INTER_NEAREST));
                 process(lmat);
             } else {

@@ -27,9 +27,10 @@ import net.dempsy.util.QuietCloseable;
 import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler;
 import net.dempsy.util.executor.AutoDisposeSingleThreadScheduler.Cancelable;
 
-import ai.kognition.pilecv4j.gstreamer.VideoFrame.Pool;
 import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPI;
 import ai.kognition.pilecv4j.gstreamer.internal.BreakoutAPIRaw;
+import ai.kognition.pilecv4j.image.VideoFrame;
+import ai.kognition.pilecv4j.image.VideoFrame.Pool;
 
 public class BreakoutFilter extends BaseTransform {
     private static Logger LOGGER = LoggerFactory.getLogger(BreakoutFilter.class);
@@ -262,7 +263,7 @@ public class BreakoutFilter extends BaseTransform {
         protected void cleanup() {}
 
         private void initPool(final VideoFrame frame) {
-            storedBuffers.set(VideoFrame.getPool(frame.rows(), frame.cols(), frame.type()));
+            storedBuffers.set(VideoFrame.getPool(frame.rows(), frame.cols(), frame.type(), frame.isRgb));
         }
 
         VideoFrame.Pool getPool(final VideoFrame frame) {
@@ -480,7 +481,7 @@ public class BreakoutFilter extends BaseTransform {
                     LOGGER.trace("frame pushed :{}", frame);
                 try(
                     final VideoFrame mat = new VideoFrame(
-                        frame, System.currentTimeMillis(), frameNumber.getAndIncrement()) {
+                        frame, System.currentTimeMillis(), frameNumber.getAndIncrement(), true) {
 
                         // mats are closed automatically in the native code
                         // once the push_frame returns.

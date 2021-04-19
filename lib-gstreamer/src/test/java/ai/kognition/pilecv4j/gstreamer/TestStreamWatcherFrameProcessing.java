@@ -18,6 +18,7 @@ import org.slf4j.LoggerFactory;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.FrameEmitter;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
+import ai.kognition.pilecv4j.image.VideoFrame;
 
 public class TestStreamWatcherFrameProcessing {
     static {

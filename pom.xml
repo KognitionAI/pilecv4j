@@ -13,9 +13,11 @@
     <module>lib-tf</module>
     <module>lib-gstreamer</module>
     <module>lib-tracking</module>
+    <module>lib-ffmpeg</module>
     <module>native-image</module>
     <module>native-nr</module>
     <module>native-gstreamer</module>
+    <module>native-ffmpeg</module>
   </modules>
 
   <properties>
@@ -175,6 +177,12 @@
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>native-image</artifactId>
+        <classifier>${platform}</classifier>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>native-ffmpeg</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>

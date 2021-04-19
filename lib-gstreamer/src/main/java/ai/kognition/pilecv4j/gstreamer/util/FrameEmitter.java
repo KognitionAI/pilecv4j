@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory;
 import ai.kognition.pilecv4j.gstreamer.BinManager;
 import ai.kognition.pilecv4j.gstreamer.BreakoutFilter;
 import ai.kognition.pilecv4j.gstreamer.CapsBuilder;
-import ai.kognition.pilecv4j.gstreamer.VideoFrame;
+import ai.kognition.pilecv4j.image.VideoFrame;
 
 /**
  * This class can be used to source a fixed number of frames for testing purposes.

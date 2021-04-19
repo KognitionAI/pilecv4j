@@ -17,6 +17,7 @@ import org.opencv.imgproc.Imgproc;
 
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher;
 import ai.kognition.pilecv4j.gstreamer.util.FrameCatcher.Frame;
+import ai.kognition.pilecv4j.image.VideoFrame;
 import ai.kognition.pilecv4j.gstreamer.util.FrameEmitter;
 import ai.kognition.pilecv4j.gstreamer.util.GstUtils;
 
