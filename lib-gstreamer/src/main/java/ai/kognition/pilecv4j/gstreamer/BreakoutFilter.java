@@ -430,7 +430,7 @@ public class BreakoutFilter extends BaseTransform {
                     final VideoFrame frame = to.getNonNullAndSetToNull(stop);
                     if(frame != null && !stop.get()) {
                         if(traceOn)
-                            LOGGER.trace("FRAME: dequeued frame: {}", frame.frameNumber);
+                            LOGGER.trace("FRAME: dequeued frame: {}", frame.frameNumber());
                         try(final QuietCloseable qc = () -> dispose(frame);) {
                             processor.accept(frame);
                         } catch(final Exception exc) {
@@ -447,7 +447,7 @@ public class BreakoutFilter extends BaseTransform {
 
         private StreamWatcher(final VideoFrame mat, final int numThreads, final VideoFrameFilter processor) {
             if(traceOn)
-                LOGGER.trace("FRAME: Initial frame: {}, {}", mat.frameNumber, mat);
+                LOGGER.trace("FRAME: Initial frame: {}, {}", mat.frameNumber(), mat);
             super.initPool(mat);
             for(int i = 0; i < numThreads; i++)
                 threads.add(chain(new Thread(fromProcessor(processor), "Stream Watcher " + sequence.getAndIncrement()), t -> t.setDaemon(true),
@@ -457,7 +457,7 @@ public class BreakoutFilter extends BaseTransform {
         @Override
         public void accept(final VideoFrame frame) {
             if(traceOn)
-                LOGGER.trace("FRAME: queuing frame: {}", frame.frameNumber);
+                LOGGER.trace("FRAME: queuing frame: {}", frame.frameNumber());
             dispose(to.getAndSet(frame.shallowCopy()));
         }
     }

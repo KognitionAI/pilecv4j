@@ -11,12 +11,14 @@ endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_C_FLAGS_DEBUG "-g")
+
 find_package(PkgConfig)
 
 set (CMAKE_CXX_STANDARD 11)
-
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_C_FLAGS_RELEASE "-O3")
 
 pkg_check_modules(GST_VIDEO gstreamer-video-1.0 REQUIRED)
 

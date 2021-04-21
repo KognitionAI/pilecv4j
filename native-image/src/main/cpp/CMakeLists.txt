@@ -9,6 +9,11 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS_RELEASE "-O3")
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_C_FLAGS_DEBUG "-g")
+
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 include(CheckTypeSize)
@@ -49,9 +54,6 @@ if(UNIX)
   add_definitions(-DUNIX)
   # buffer overrun protection
   set (CMAKE_MODULE_LINKER_FLAGS "-Wl,-z,noexecstack")
-
-  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-  set(CMAKE_C_FLAGS_RELEASE "-O3")
 endif()
 
 message(STATUS "OpenCV Dependency version $ENV{DEP_OPENCV_VERSION}")

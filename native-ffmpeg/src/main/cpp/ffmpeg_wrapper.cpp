@@ -81,7 +81,7 @@ static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "Failed to create a codec context",
     "Failed to create a frame",
     "Failed to create a packet",
-    "Logging isn't compiled in this instance."
+    "Logging isn't compiled."
 };
 
 static const char* totallyUnknownError = "UNKNOWN ERROR";
@@ -212,6 +212,14 @@ extern "C" {
     c->state = CODEC;
 
     return stat;
+  }
+
+  int read_packet(void *opaque, uint8_t *buf, int buf_size) {
+    return 0;
+  }
+
+  uint64_t process_frames_custom_source(uint64_t ctx, push_frame callback) {
+    //avio_alloc_context();
   }
 
   uint64_t process_frames(uint64_t ctx, push_frame callback) {

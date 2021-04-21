@@ -20,7 +20,7 @@ public class VideoFrame extends CvMat {
     private RuntimeException rtpStackTrace = null;
     private boolean skipCloseOnceForReturn = false;
 
-    public long frameNumber;
+    private long frameNumber;
     public final boolean isRgb;
 
     public VideoFrame(final long nativeObj, final long decodeTimeMillis, final long frameNumber, final boolean isRgb) {
