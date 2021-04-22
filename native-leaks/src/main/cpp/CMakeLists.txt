@@ -30,9 +30,7 @@ endif()
 
 add_library(${PROJECT_NAME}
   MODULE
-  sources/leak.cpp
-  sources/replace.cpp
-  sources/overrides.c)
+  sources/leak.cpp)
 
 target_link_libraries(${PROJECT_NAME}
   ${JNI_LIBRARIES})
