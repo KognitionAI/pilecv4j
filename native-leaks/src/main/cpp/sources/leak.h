@@ -29,24 +29,7 @@ namespace pilecv4j
   void DumpAllocs();
   void ClearAllocs();
   void EndLeakTracking();
-  void MarkLeakTracking(const char* text);
-  bool IsLeakTrackingOn();
-
-  class LeakWatchGuard
-  {
-    bool enabledByMe;
-  public:
-    inline LeakWatchGuard(): enabledByMe(false)
-    {
-      if (!IsLeakTrackingOn())
-      {
-        enabledByMe = true;
-        StartLeakTracking();
-      }
-    }
-
-    inline ~LeakWatchGuard() { if (enabledByMe) EndLeakTracking(); }
-  };
+  //void MarkLeakTracking(const char* text);
 
   class LeakDetectOff
   {
