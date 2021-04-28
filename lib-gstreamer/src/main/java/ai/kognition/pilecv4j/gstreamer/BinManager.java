@@ -1,10 +1,14 @@
 package ai.kognition.pilecv4j.gstreamer;
 
+import static net.dempsy.util.Functional.chain;
+import static net.dempsy.util.Functional.ignore;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -258,6 +262,16 @@ public class BinManager {
         return this;
     }
 
+    private Runnable log(final Runnable run, final String op) {
+        return () -> {
+            try {
+                run.run();
+            } catch(final RuntimeException rte) {
+                LOGGER.error("Asynchronout pipeline operation {} failed.", op, rte);
+            }
+        };
+    }
+
     /**
      * Convert the current builder to a {@link Pipeline}
      */
@@ -271,6 +285,22 @@ public class BinManager {
 
                 if(curState == State.PLAYING)
                     stop();
+
+                final AtomicReference<State> pipelineState = new AtomicReference<>(null);
+                {
+                    final Thread th = chain(new Thread(() -> log(() -> pipelineState.set(getState()), "check state")), t -> t.setDaemon(true), t -> t.start());
+                    ignore(() -> th.join(1000)); // 1 second to finish
+                    if(th.isAlive()) {
+                        LOGGER.warn("Couldn't shut down gstreamer pipeline.");
+                    } else if(pipelineState.get() != null && pipelineState.get() != State.NULL) {
+                        final Thread th2 = chain(new Thread(() -> log(() -> setState(State.NULL), "set state to NULL")), t -> t.setDaemon(true),
+                            t -> t.start());
+                        ignore(() -> th2.join(5000)); // 1 second to finish
+                        if(th2.isAlive()) {
+                            LOGGER.warn("Couldn't shut down gstreamer pipeline.");
+                        }
+                    }
+                }
 
                 if(!alreadyClosed) {
                     if(LOGGER.isTraceEnabled())
