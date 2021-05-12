@@ -85,6 +85,9 @@ public class CvMat extends Mat implements AutoCloseable {
             track = Boolean.parseBoolean(System.getenv("PILECV4J_TRACK_MEMORY_LEAKS"));
 
         TRACK_MEMORY_LEAKS = track;
+
+        if(TRACK_MEMORY_LEAKS)
+            LOGGER.info("Tracking memory leaks in {} enabled.", CvMat.class.getSimpleName());
     }
 
     public static void initOpenCv() {}
@@ -196,7 +199,7 @@ public class CvMat extends Mat implements AutoCloseable {
      * Apply the given {@link Function} to a {@link CvRaster} containing the image data for this {@link CvMat}
      *
      * @param function is the {@link Function} to pass the {@link CvRaster} to.
-     * @return the return value of the provided {@code function}
+     * @return the return value of the pro)vided {@code function}
      * @see CvRaster
      */
     public <T> T rasterOp(final Function<CvRaster, T> function) {
@@ -497,8 +500,7 @@ public class CvMat extends Mat implements AutoCloseable {
     @Override
     protected void finalize() throws Throwable {
         if(!deletedAlready) {
-            LOGGER.debug("Finalizing a {} that hasn't been closed.", this.getClass()
-                .getSimpleName());
+            LOGGER.warn("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
             if(TRACK_MEMORY_LEAKS)
                 LOGGER.warn("TRACKING: Here's where I was instantiated: ", stackTrace);
             close();
