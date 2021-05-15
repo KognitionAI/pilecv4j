@@ -10,6 +10,18 @@ public:
     return (uint64_t)cvmat;
   }
 
+  virtual ai::kognition::pilecv4j::MatAndData allocateImage(int height, int width){
+    cv::Mat* cvmat = new cv::Mat(height, width, CV_8UC3);
+    return {(uint64_t)cvmat, cvmat->data};
+  }
+
+  virtual uint64_t allocateImageWithCopyOfData(int height, int width, int stride, void* data) {
+    cv::Mat* cvmat = new cv::Mat();
+    cv::Mat dataWrapper(height, width, CV_8UC3, data, stride);
+    dataWrapper.copyTo(*cvmat);
+    return (uint64_t)cvmat;
+  }
+
   virtual void freeImage(uint64_t mat) {
     delete ((cv::Mat*)mat);
   }

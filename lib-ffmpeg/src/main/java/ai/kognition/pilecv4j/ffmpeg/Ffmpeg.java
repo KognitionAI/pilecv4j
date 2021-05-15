@@ -1,5 +1,12 @@
 package ai.kognition.pilecv4j.ffmpeg;
 
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_DEBUG;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_ERROR;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_FATAL;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_INFO;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_TRACE;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_WARN;
+
 import java.net.URI;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
@@ -21,9 +28,6 @@ public class Ffmpeg {
 
     static {
         FfmpegApi._init();
-
-        if(LOGGER.isTraceEnabled())
-            enableLogging();
     }
 
     @FunctionalInterface
@@ -41,12 +45,13 @@ public class Ffmpeg {
                 throw new FfmpegException("Couldn't create new stream context");
 
             this.nativeDef = nativeDef;
+            setLogLevel(LOGGER);
         }
 
         @Override
         public void close() {
             if(nativeDef != 0)
-                FfmpegApi.ffmpeg_deleteContext(nativeDef);
+                FfmpegApi.pcv4j_ffmpeg_deleteContext(nativeDef);
         }
 
         public void openStream(final URI url) {
@@ -54,13 +59,40 @@ public class Ffmpeg {
         }
 
         public void openStream(final String url) {
-            throwIfNecessary(FfmpegApi.ffmpeg_openStream(nativeDef, url));
-            throwIfNecessary(FfmpegApi.ffmpeg_findFirstVideoStream(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openStream(nativeDef, url));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
+        }
+
+        public void setLogLevel(final Logger logger) {
+            // find the level
+            final int logLevelSet;
+            if(logger.isTraceEnabled())
+                logLevelSet = LOG_LEVEL_TRACE;
+            else if(logger.isDebugEnabled())
+                logLevelSet = LOG_LEVEL_DEBUG;
+            else if(logger.isInfoEnabled())
+                logLevelSet = LOG_LEVEL_INFO;
+            else if(logger.isWarnEnabled())
+                logLevelSet = LOG_LEVEL_WARN;
+            else if(logger.isErrorEnabled())
+                logLevelSet = LOG_LEVEL_ERROR;
+            else
+                logLevelSet = LOG_LEVEL_FATAL;
+
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_log_level(nativeDef, logLevelSet));
+        }
+
+        public void sync(final boolean sync) {
+            FfmpegApi.pcv4j_ffmpeg_set_syc(nativeDef, sync ? 1 : 0);
+        }
+
+        public void addOption(final String key, final String value) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_add_option(nativeDef, key, value));
         }
 
         public void processFrames(final VideoFrameConsumer consumer) {
 
-            FfmpegApi.process_frames(nativeDef, new push_frame_callback() {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_process_frames(nativeDef, new push_frame_callback() {
 
                 @Override
                 public void push_frame(final long frame, final int isRbg) {
@@ -75,34 +107,26 @@ public class Ffmpeg {
                         consumer.handle(mat);
                     }
                 }
-            });
+            }));
         }
+
+        public synchronized void stop() {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_stop(nativeDef));
+        }
+
     }
 
     public static String errorMessage(final long errorCode) {
         final MutableObject<Pointer> nmes = new MutableObject<>(null);
-        try(final QuietCloseable qc = () -> FfmpegApi.ffmpeg_freeString(nmes.getValue());) {
-            nmes.setValue(FfmpegApi.ffmpeg_statusMessage(errorCode));
+        try(final QuietCloseable qc = () -> FfmpegApi.pcv4j_ffmpeg_freeString(nmes.getValue());) {
+            nmes.setValue(FfmpegApi.pcv4j_ffmpeg_statusMessage(errorCode));
             return Optional.ofNullable(nmes.getValue()).orElseThrow(() -> new FfmpegException("Failed to retrieve status message for code: " + errorCode))
                 .getString(0);
         }
     }
 
     public static StreamContext createStreamContext() {
-        return new StreamContext(FfmpegApi.ffmpeg_createContext());
-    }
-
-    public static boolean enableLogging() {
-        return enableLogging(true);
-    }
-
-    public static boolean enableLogging(final boolean doIt) {
-        final long result = FfmpegApi.enable_logging(doIt ? 1 : 0);
-        if(result != 0L) {
-            LOGGER.warn("Failed to enable logging: ", errorMessage(result));
-            return false;
-        }
-        return true;
+        return new StreamContext(FfmpegApi.pcv4j_ffmpeg_createContext());
     }
 
     private static void throwIfNecessary(final long status) {

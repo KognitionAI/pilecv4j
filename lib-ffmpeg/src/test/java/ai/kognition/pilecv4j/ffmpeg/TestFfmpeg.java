@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
@@ -19,7 +20,7 @@ public class TestFfmpeg extends BaseTest {
 
     @Test
     public void testInit() {
-        FfmpegApi.ffmpeg_init();
+        FfmpegApi.pcv4j_ffmpeg_init();
     }
 
     @Test
@@ -41,6 +42,9 @@ public class TestFfmpeg extends BaseTest {
         final AtomicLong frameCount = new AtomicLong(0);
         try(final StreamContext c = Ffmpeg.createStreamContext();
             final ImageDisplay id = new ImageDisplay.Builder().build()) {
+            // c.sync(true);
+            c.setLogLevel(LoggerFactory.getLogger(this.getClass()));
+            // c.addOption("rtsp_transport", "tcp");
             c.openStream(STREAM);
             c.processFrames(f -> {
                 frameCount.getAndIncrement();
