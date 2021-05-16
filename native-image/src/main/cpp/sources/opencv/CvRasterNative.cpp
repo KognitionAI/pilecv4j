@@ -11,6 +11,7 @@ extern "C" {
   KAI_EXPORT void* CvRaster_getData(uint64_t native);
   KAI_EXPORT uint64_t CvRaster_copy(uint64_t native);
   KAI_EXPORT uint64_t CvRaster_move(uint64_t native);
+  KAI_EXPORT void CvRaster_freeByMove(uint64_t native);
   KAI_EXPORT void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle);
   KAI_EXPORT uint64_t CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong);
   KAI_EXPORT uint64_t CvRaster_defaultMat();
@@ -44,6 +45,17 @@ uint64_t CvRaster_move(uint64_t native) {
   if (native == 0L)
     return 0L;
   return (uint64_t)(new cv::Mat(std::move(*((cv::Mat*) native))));
+}
+
+void CvRaster_freeByMove(uint64_t native) {
+  if (native != 0L) {
+    // explicit call to the move constructor moving the
+    // resources into m, and then closing m at the end of the
+    // block. The allows the mat passed as a parameter to
+    // carry on with its lifecycle with all of its resources
+    // freed.
+    cv::Mat m(std::move(*((cv::Mat*) native)));
+  }
 }
 
 void CvRaster_assign(uint64_t destHandle, uint64_t srcHandle) {

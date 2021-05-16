@@ -53,10 +53,10 @@ public class CvMatOfPoint2fTest {
             final CvMat regularOlMat = matOfPoint.asCvMat(true, false);
             final CvMat reshaped = CvMat.move(regularOlMat.reshape(2, numPoints));
             final CvMatOfPoint2f matOfPointAgain = new CvMatOfPoint2f(reshaped);
-            final CvMat diff = new CvMat()) {
+            final CvMat diff = new CvMat();) {
             Core.subtract(matOfPoint, matOfPointAgain, diff);
             diff.rasterOp(r -> (FlatFloatPixelConsumer)(i, pix) -> {
-                for(final float val : pix) {
+                for(final float val: pix) {
                     assertEquals(0f, val, 10e-4f);
                 }
             });

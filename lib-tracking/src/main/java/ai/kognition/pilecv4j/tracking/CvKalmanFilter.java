@@ -92,10 +92,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
      */
     @Override
     public CvMat correct(final Mat measurement) {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.correct(measurement)));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.correct(measurement));
     }
 
     /**
@@ -103,10 +100,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
      */
     @Override
     public CvMat predict(final Mat control) {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.predict(control)));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.predict(control));
     }
 
     /**
@@ -114,18 +108,12 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
      */
     @Override
     public CvMat predict() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.predict()))) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.predict());
     }
 
     @Override
     public CvMat get_statePre() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_statePre()))) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_statePre());
     }
 
     /**
@@ -146,10 +134,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_statePost() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_statePost()))) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_statePost());
     }
 
     /**
@@ -173,10 +158,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_transitionMatrix() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_transitionMatrix()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_transitionMatrix());
     }
 
     /**
@@ -197,10 +179,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_controlMatrix() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_controlMatrix()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_controlMatrix());
     }
 
     /**
@@ -225,10 +204,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_measurementMatrix() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_measurementMatrix()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_measurementMatrix());
     }
 
     /**
@@ -249,10 +225,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_processNoiseCov() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_processNoiseCov()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_processNoiseCov());
     }
 
     /**
@@ -273,10 +246,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_measurementNoiseCov() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_measurementNoiseCov()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_measurementNoiseCov());
     }
 
     /**
@@ -297,10 +267,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_errorCovPre() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_errorCovPre()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_errorCovPre());
     }
 
     /**
@@ -321,10 +288,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_gain() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_gain()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_gain());
     }
 
     /**
@@ -345,10 +309,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
 
     @Override
     public CvMat get_errorCovPost() {
-        try(Closer c = new Closer();
-            final CvMat toReturn = CvMat.move(c.addMat(super.get_errorCovPost()));) {
-            return toReturn.returnMe();
-        }
+        return CvMat.move(super.get_errorCovPost());
     }
 
     /**

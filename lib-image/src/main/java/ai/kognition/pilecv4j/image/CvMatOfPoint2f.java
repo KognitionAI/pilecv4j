@@ -68,10 +68,12 @@ public class CvMatOfPoint2f extends MatOfPoint2f implements AutoCloseable {
      */
     public CvMat asCvMat(final boolean flatten, final boolean transpose) {
         try(final var mat = CvMat.shallowCopy(this);
-            final var shaped = flatten ? CvMat.move(mat.reshape(1)) : mat.returnMe()) {
+            // shaped can be the actual mat, and to avoid closing it twice,
+            // returnMe is called.
+            final var shaped = flatten ? CvMat.move(mat.reshape(1)) : mat.returnMe();) {
 
             if(transpose)
-                try(final var mat_t = shaped.t()) {
+                try(final var mat_t = shaped.t();) {
                     return mat_t.returnMe();
                 }
             else

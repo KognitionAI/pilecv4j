@@ -1,5 +1,7 @@
 package ai.kognition.pilecv4j.image;
 
+import static net.dempsy.util.Functional.uncheck;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
@@ -15,7 +17,6 @@ import com.sun.jna.Pointer;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import net.dempsy.util.Functional;
 import net.dempsy.util.QuietCloseable;
 
 /**
@@ -590,13 +591,13 @@ public abstract class CvRaster implements AutoCloseable {
             if(mat instanceof AutoCloseable)
                 add((AutoCloseable)mat);
             else
-                toClose.add(0, (QuietCloseable)() -> CvMat.move(mat).close());
+                toClose.add(0, (QuietCloseable)() -> CvMat.closeRawMat(mat));
             return mat;
         }
 
         @Override
         public void close() {
-            toClose.stream().forEach(r -> Functional.uncheck(() -> r.close()));
+            toClose.stream().forEach(r -> uncheck(() -> r.close()));
         }
     }
 

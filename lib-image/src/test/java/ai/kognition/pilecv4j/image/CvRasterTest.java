@@ -10,7 +10,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
 import net.dempsy.util.Functional;
@@ -48,7 +47,7 @@ public class CvRasterTest {
 
     @Test
     public void testMove() throws Exception {
-        try (final CvMat cvmat = scopedGetAndMove();) {
+        try(final CvMat cvmat = scopedGetAndMove();) {
             assertEquals(IMAGE_WIDTH_HEIGHT, cvmat.rows());
             assertEquals(IMAGE_WIDTH_HEIGHT, cvmat.cols());
 
@@ -66,10 +65,9 @@ public class CvRasterTest {
      * Mat 'move' functionality.
      */
     private static CvMat scopedGetAndMove() {
-        final Mat mat = Imgcodecs.imread(testImagePath, IMREAD_UNCHANGED);
-        assertEquals(IMAGE_WIDTH_HEIGHT, mat.rows());
-        assertEquals(IMAGE_WIDTH_HEIGHT, mat.cols());
-        try (final CvMat ret = CvMat.move(mat);) {
+        try(final CvMat ret = CvMat.move(Imgcodecs.imread(testImagePath, IMREAD_UNCHANGED));) {
+            assertEquals(IMAGE_WIDTH_HEIGHT, ret.rows());
+            assertEquals(IMAGE_WIDTH_HEIGHT, ret.cols());
             // A true std::move was applied to mat so we really shouldn't
             // access it afterward.
             return ret.returnMe();
@@ -79,7 +77,7 @@ public class CvRasterTest {
     @Test
     public void testShow() throws Exception {
         if(SHOW) {
-            try (final CvMat raster = ImageFile.readMatFromFile(testImagePath);
+            try(final CvMat raster = ImageFile.readMatFromFile(testImagePath);
                 QuietCloseable c = new ImageDisplay.Builder().implementation(Implementation.SWT)
                     .show(raster).windowName("Test").build();
 
@@ -96,11 +94,11 @@ public class CvRasterTest {
     public void testSimpleCreate() throws Exception {
         final String expectedFileLocation = testImagePath;
 
-        try (final CvMat mat = new CvMat(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
+        try(final CvMat mat = new CvMat(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
             mat.rasterAp(raster -> {
                 raster.apply((BytePixelSetter)(r, c) -> new byte[] {(byte)(((r + c) >> 1) & 0xff)});
 
-                try (final CvMat expected = Functional.uncheck(() -> ImageFile.readMatFromFile(expectedFileLocation));) {
+                try(final CvMat expected = Functional.uncheck(() -> ImageFile.readMatFromFile(expectedFileLocation));) {
                     expected.rasterAp(e -> assertEquals(e, raster));
                 }
             });
@@ -111,14 +109,14 @@ public class CvRasterTest {
     public void testEqualsAndNotEquals() throws Exception {
         final String expectedFileLocation = testImagePath;
 
-        try (final CvMat omat = new CvMat(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
+        try(final CvMat omat = new CvMat(IMAGE_WIDTH_HEIGHT, IMAGE_WIDTH_HEIGHT, CvType.CV_8UC1)) {
             omat.rasterAp(ra -> ra.apply((BytePixelSetter)(r, c) -> {
                 if(r == 134 && c == 144)
                     return new byte[] {-1};
                 return new byte[] {(byte)(((r + c) >> 1) & 0xff)};
             }));
 
-            try (final CvMat emat = ImageFile.readMatFromFile(expectedFileLocation);) {
+            try(final CvMat emat = ImageFile.readMatFromFile(expectedFileLocation);) {
                 emat.rasterAp(expected -> omat.rasterAp(raster -> {
                     assertNotEquals(expected, raster);
 
@@ -132,7 +130,7 @@ public class CvRasterTest {
 
     @Test
     public void testReduce() throws Exception {
-        try (final CvMat mat = new CvMat(255, 255, CvType.CV_8UC1);) {
+        try(final CvMat mat = new CvMat(255, 255, CvType.CV_8UC1);) {
             mat.rasterAp(raster -> {
                 raster.apply((BytePixelSetter)(r, c) -> new byte[] {(byte)c});
             });

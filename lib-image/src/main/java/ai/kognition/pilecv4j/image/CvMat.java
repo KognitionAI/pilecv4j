@@ -13,7 +13,7 @@ import org.opencv.core.Size;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
+import net.dempsy.util.QuietCloseable;
 
 /**
  * <p>
@@ -69,7 +69,7 @@ import ai.kognition.pilecv4j.image.CvRaster.Closer;
  * rather than {@code CvMat#close}d by the developer, a {@code debug} level log message will be emitted
  * identifying where the leaked {@link CvMat} was initially instantiated.
  */
-public class CvMat extends Mat implements AutoCloseable {
+public class CvMat extends Mat implements QuietCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
     public static final boolean TRACK_MEMORY_LEAKS;
 
@@ -172,9 +172,7 @@ public class CvMat extends Mat implements AutoCloseable {
      */
     @Override
     public CvMat t() {
-        try(Closer closer = new Closer();) {
-            return CvMat.move(closer.addMat(super.t()));
-        }
+        return CvMat.move(super.t());
     }
 
     /**
@@ -188,11 +186,14 @@ public class CvMat extends Mat implements AutoCloseable {
      * "https://docs.opencv.org/4.0.1/d2/de8/group__core__array.html#gacb6e64071dffe36434e1e7ee79e7cb35">cv::gemm()</a>
      */
     public CvMat mm(final Mat other, final double scale) {
-        try(Closer closer = new Closer();) {
-            final Mat ret = closer.addMat(new Mat());
+        final Mat ret = new Mat(); // we don't close this because we're going to move it.
+        try {
             Core.gemm(this, other, scale, nullMat, 0.0D, ret);
-            return CvMat.move(ret);
+        } catch(final RuntimeException rte) {
+            CvMat.closeRawMat(ret);
+            throw rte;
         }
+        return CvMat.move(ret);
     }
 
     /**
@@ -313,13 +314,14 @@ public class CvMat extends Mat implements AutoCloseable {
      */
     public static CvMat deepCopy(final Mat mat) {
         if(mat.rows() == 0)
-            return move(new Mat(mat.rows(), mat.cols(), mat.type()));
+            return new CvMat(mat.rows(), mat.cols(), mat.type());
         if(mat.isContinuous())
             return move(mat.clone());
 
-        final CvMat newMat = new CvMat(mat.rows(), mat.cols(), mat.type());
-        mat.copyTo(newMat);
-        return newMat;
+        try(final CvMat newMat = new CvMat(mat.rows(), mat.cols(), mat.type());) {
+            mat.copyTo(newMat);
+            return newMat.returnMe();
+        }
     }
 
     /**
@@ -343,7 +345,32 @@ public class CvMat extends Mat implements AutoCloseable {
      * CvMat returned</b>
      */
     public static CvMat move(final Mat mat) {
-        return new CvMat(ImageAPI.CvRaster_move(mat.nativeObj));
+        final var ret = new CvMat(ImageAPI.CvRaster_move(mat.nativeObj));
+        // if it's a CvMat we can close it now freeing up ALL of the resources
+        // rather than just simply the data matrix. Otherwise it will wait for
+        // the gc to get around to finalizing
+        if(mat instanceof CvMat)
+            ((CvMat)mat).close();
+        return ret;
+    }
+
+    /**
+     * <p>
+     * This call can be made to close a
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>'s and free
+     * it's resources. The
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> passed
+     * in <em>SOULD NOT</em> be used after this call. Doing so will result in a crash.
+     * </p>
+     */
+    public static void closeRawMat(final Mat mat) {
+        if(mat == null)
+            return;
+
+        if(mat instanceof CvMat)
+            ((CvMat)mat).close();
+        else
+            ImageAPI.CvRaster_freeByMove(mat.nativeObj);
     }
 
     /**

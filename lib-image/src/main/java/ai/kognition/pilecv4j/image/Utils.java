@@ -1102,12 +1102,12 @@ public class Utils {
 
     public static CvMat pointsToColumns2D(final Mat undistoredPoint) {
         final MatOfPoint2f matOfPoints = new MatOfPoint2f(undistoredPoint);
-        try(final QuietCloseable destroyer = () -> CvMat.move(matOfPoints).close();) {
+        try(final QuietCloseable destroyer = () -> CvMat.closeRawMat(matOfPoints);) {
             final double[][] points = matOfPoints.toList().stream()
                 .map(p -> new double[] {p.x,p.y})
                 .toArray(double[][]::new);
             try(CvMat pointsAsMat = Utils.toMat(points);) {
-                return CvMat.move(pointsAsMat.t());
+                return pointsAsMat.t();
             }
         }
     }
