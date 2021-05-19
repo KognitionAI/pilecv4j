@@ -37,6 +37,7 @@ add_definitions( -DLOGGING )
 # build target
 add_library(${PROJECT_NAME} SHARED
   ffmpeg_wrapper.cpp
+  ffmpeg_codes.cpp
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE src/main/cpp PUBLIC ${AVCODEC_INCLUDE_DIR})

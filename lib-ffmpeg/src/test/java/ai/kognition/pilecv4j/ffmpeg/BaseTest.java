@@ -16,8 +16,8 @@ public class BaseTest {
         SHOW = show;
     }
 
-    public final static URI STREAM = new File(
-        BaseTest.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile()).toURI();
+    public final static File STREAM_FILE = new File(BaseTest.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile());
+    // public final static File STREAM_FILE = new File("/tmp/test-videos/heron8-clip.mp4");
 
-    // public final static URI STREAM = uncheck(() -> new URI("rtsp://admin:gregormendel1@172.16.2.11:554/"));
+    public final static URI STREAM = STREAM_FILE.toURI();
 }

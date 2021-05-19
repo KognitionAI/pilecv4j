@@ -8,8 +8,12 @@ import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_TRACE;
 import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_WARN;
 
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import com.sun.jna.Pointer;
 
@@ -20,11 +24,22 @@ import org.slf4j.LoggerFactory;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.fill_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.push_frame_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.seek_buffer_callback;
 import ai.kognition.pilecv4j.image.VideoFrame;
 
 public class Ffmpeg {
     private static final Logger LOGGER = LoggerFactory.getLogger(Ffmpeg.class);
+
+    public static final int AVERROR_EOF = FfmpegApi.pcv4j_ffmpeg_code_averror_eof();
+
+    // values of 'whence' passed to seek_buffer_callback
+    public static final int SEEK_SET = FfmpegApi.pcv4j_ffmpeg_code_seek_set();
+    public static final int SEEK_CUR = FfmpegApi.pcv4j_ffmpeg_code_seek_cur();
+    public static final int SEEK_END = FfmpegApi.pcv4j_ffmpeg_code_seek_end();
+    public static final int AVSEEK_SIZE = FfmpegApi.pcv4j_ffmpeg_code_seek_size();
+    public static final int AVEAGAIN = FfmpegApi.pcv4j_ffmpeg_code_eagain();
 
     static {
         FfmpegApi._init();
@@ -35,10 +50,30 @@ public class Ffmpeg {
         public void handle(VideoFrame frame);
     }
 
+    @FunctionalInterface
+    public static interface VideoDataSupplier {
+        public int fillBuffer(ByteBuffer buf, int numBytes);
+    }
+
+    @FunctionalInterface
+    public static interface VideoDataSeek {
+        public long seekBuffer(ByteBuffer buf, long offset, int whence);
+    }
+
     public static class StreamContext implements QuietCloseable {
 
         public final long nativeDef;
         private final AtomicLong frameNumber = new AtomicLong(0);
+
+        // ======================================================================
+        // JNA will only hold a weak reference to the callbacks passed in
+        // so if we dynamically allocate them then they will be garbage collected.
+        // In order to prevent that we're keeping strong references to them.
+        // These are not private in order to avoid any possibility that the
+        // JVM optimized them out since they aren't read anywhere in this code.
+        fill_buffer_callback strongRefDs;
+        seek_buffer_callback strongRefS;
+        // ======================================================================
 
         StreamContext(final long nativeDef) {
             if(nativeDef == 0)
@@ -60,6 +95,26 @@ public class Ffmpeg {
 
         public void openStream(final String url) {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openStream(nativeDef, url));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
+        }
+
+        public void openStream(final VideoDataSupplier dataSupplier, final VideoDataSeek seeker) {
+            final ByteBuffer buffer = customStreamBuffer();
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCustomStream(nativeDef,
+
+                strongRefDs = new fill_buffer_callback() {
+                    @Override
+                    public int fill_buffer(final int numBytes) {
+                        return dataSupplier.fillBuffer(buffer, numBytes);
+                    }
+                },
+
+                strongRefS = (seeker != null ? new seek_buffer_callback() {
+                    @Override
+                    public long fill_buffer(final long offset, final int whence) {
+                        return seeker.seekBuffer(buffer, offset, whence);
+                    }
+                } : null)));
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
         }
 
@@ -107,13 +162,18 @@ public class Ffmpeg {
                         consumer.handle(mat);
                     }
                 }
-            }));
+            }), Ffmpeg.AVERROR_EOF);
         }
 
         public synchronized void stop() {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_stop(nativeDef));
         }
 
+        private ByteBuffer customStreamBuffer() {
+            final Pointer value = FfmpegApi.pcv4j_ffmpeg_customStreamBuffer(nativeDef);
+            final int bufSize = FfmpegApi.pcv4j_ffmpeg_customStreamBufferSize(nativeDef);
+            return value.getByteBuffer(0, bufSize);
+        }
     }
 
     public static String errorMessage(final long errorCode) {
@@ -129,8 +189,9 @@ public class Ffmpeg {
         return new StreamContext(FfmpegApi.pcv4j_ffmpeg_createContext());
     }
 
-    private static void throwIfNecessary(final long status) {
-        if(status != 0L) {
+    private static void throwIfNecessary(final long status, final long... ignore) {
+        final Set<Long> toIgnore = Arrays.stream(ignore).mapToObj(Long::valueOf).collect(Collectors.toSet());
+        if(status != 0L && !toIgnore.contains(status)) {
             throw new FfmpegException(status, errorMessage(status));
         }
     }

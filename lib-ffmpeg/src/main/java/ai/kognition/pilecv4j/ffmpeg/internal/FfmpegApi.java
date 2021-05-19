@@ -55,6 +55,14 @@ public class FfmpegApi {
         public void push_frame(long val, int isRbg);
     }
 
+    public static interface fill_buffer_callback extends Callback {
+        public int fill_buffer(int numBytesToWrite);
+    }
+
+    public static interface seek_buffer_callback extends Callback {
+        public long fill_buffer(long offset, int whence);
+    }
+
     public static void _init() {}
 
     public static native int pcv4j_ffmpeg_init();
@@ -78,10 +86,45 @@ public class FfmpegApi {
 
     /**
      * Prepare a stream context for reading from the given url
-     *
-     * @return status
      */
     public static native long pcv4j_ffmpeg_openStream(long streamCtx, String url);
+
+    public static native int pcv4j_ffmpeg_customStreamBufferSize(long streamCtx);
+
+    public static native Pointer pcv4j_ffmpeg_customStreamBuffer(long streamCtx);
+
+    public static native long pcv4j_ffmpeg_openCustomStream(long streamCtx, fill_buffer_callback callback, seek_buffer_callback seek);
+
+    /**
+     * Get the AV Error code for EOF. Can be called at any time.
+     */
+    public static native int pcv4j_ffmpeg_code_averror_eof();
+
+    /**
+     * Get the seek code.
+     */
+    public static native int pcv4j_ffmpeg_code_seek_set();
+
+    /**
+     * Get the seek code.
+     */
+    public static native int pcv4j_ffmpeg_code_seek_cur();
+
+    /**
+     * Get the seek code.
+     */
+    public static native int pcv4j_ffmpeg_code_seek_end();
+
+    /**
+     * Get the "error: code for EAGAIN
+     */
+    public static native int pcv4j_ffmpeg_code_eagain();
+
+    /**
+     * Get the FFmpeg specific seek code. This means just return
+     * the entire stream size or a negative number if not supported.
+     */
+    public static native int pcv4j_ffmpeg_code_seek_size();
 
     /**
      * Once a stream is open, find the first video stream within the container
