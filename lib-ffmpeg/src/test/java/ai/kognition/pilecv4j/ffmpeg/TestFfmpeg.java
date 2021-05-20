@@ -20,10 +20,6 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 public class TestFfmpeg extends BaseTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestFfmpeg.class);
 
-    // public static String TEST_VIDEO = "file:///tmp/test-videos/living-room-tracking.mp4";
-    // public static String TEST_VIDEO = "file:///tmp/test-videos/Libertas-70sec.mp4";
-    // public static String TEST_VIDEO = "rtsp://admin:gregormendel1@172.16.2.11:554/";
-
     @Test
     public void testInit() {
         FfmpegApi.pcv4j_ffmpeg_init();
@@ -47,9 +43,9 @@ public class TestFfmpeg extends BaseTest {
     public void testConsumeFrames() {
         final AtomicLong frameCount = new AtomicLong(0);
         try(final StreamContext c = Ffmpeg.createStreamContext();
-            final ImageDisplay id = new ImageDisplay.Builder().build();) {
+            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
             c.setLogLevel(LOGGER);
-            c.addOption("rtsp_transport", "tcp");
+            c.addOption("rtsp_flags", "prefer_tcp");
             c.openStream(STREAM);
             c.processFrames(f -> {
                 frameCount.getAndIncrement();

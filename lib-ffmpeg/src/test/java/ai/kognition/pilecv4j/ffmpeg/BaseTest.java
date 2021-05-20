@@ -20,4 +20,5 @@ public class BaseTest {
     // public final static File STREAM_FILE = new File("/tmp/test-videos/heron8-clip.mp4");
 
     public final static URI STREAM = STREAM_FILE.toURI();
+    // public final static URI STREAM = uncheck(() -> new URI("rtsp://admin:gregormendel1@172.16.2.11:554/"));
 }

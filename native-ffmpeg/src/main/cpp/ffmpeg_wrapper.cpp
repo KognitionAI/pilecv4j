@@ -153,10 +153,13 @@ struct StreamContext {
    */
   AVCodecContext* codecCtx = nullptr;
 
+  //========================================================================
   /**
    * Color converter to BGR/RGB. Available only after beginning play
    */
   SwsContext* colorCvrt = nullptr;
+  AVPixelFormat lastFormatUsed;
+  //========================================================================
 
   /**
    * Set of user specified options (e.g. rtsp_transport = tcp). Available after state=OPEN
@@ -244,6 +247,7 @@ struct StreamContext {
     if (formatCtx != nullptr)
       avformat_free_context(formatCtx);
   }
+
 };
 // =====================================================
 
@@ -325,7 +329,7 @@ static AVPixelFormat upgradePixFormatIfNecessary(StreamContext* c, AVPixelFormat
       break;
   }
   if (upgraded && c->logLevel <= DEBUG)
-    log(c, DEBUG, "Upgrading pixel format from %d to %d", cur, pixFormat);
+    log(c, TRACE, "Upgrading pixel format from %d to %d", cur, pixFormat);
   return pixFormat;
 }
 
@@ -771,8 +775,13 @@ static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, A
 
       curFormat = upgradePixFormatIfNecessary(c, curFormat);
       if (curFormat != AV_PIX_FMT_RGB24 && curFormat != AV_PIX_FMT_BGR24) {
+        // use the existing setup if it's there already.
         SwsContext* swCtx = *colorCvrt;
-        if (swCtx == nullptr) {
+        if (swCtx == nullptr || c->lastFormatUsed != curFormat) {
+          c->lastFormatUsed = curFormat;
+          if (swCtx)
+            sws_freeContext(swCtx);
+
           *colorCvrt = swCtx =
               sws_getContext(
                 w,

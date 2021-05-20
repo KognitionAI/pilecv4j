@@ -10,6 +10,7 @@ import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_WARN;
 import java.net.URI;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
@@ -143,6 +144,10 @@ public class Ffmpeg {
 
         public void addOption(final String key, final String value) {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_add_option(nativeDef, key, value));
+        }
+
+        public void addOptions(final Map<String, String> options) {
+            options.entrySet().stream().forEach(e -> addOption(e.getKey(), e.getValue()));
         }
 
         public void processFrames(final VideoFrameConsumer consumer) {
