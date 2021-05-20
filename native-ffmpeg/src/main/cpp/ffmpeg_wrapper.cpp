@@ -450,8 +450,10 @@ extern "C" {
 
   uint64_t pcv4j_ffmpeg_findFirstVideoStream(uint64_t ctx) {
     StreamContext* c = (StreamContext*)ctx;
-    if (c->state != OPEN)
+    if (c->state != OPEN) {
+      log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)OPEN, (int)c->state);
       return MAKE_P_STAT(STREAM_BAD_STATE);
+    }
 
     uint64_t stat = MAKE_AV_STAT(avformat_find_stream_info(c->formatCtx, nullptr));
     if (isError(stat))
@@ -509,8 +511,10 @@ extern "C" {
 
   uint64_t pcv4j_ffmpeg_process_frames(uint64_t ctx, push_frame callback) {
     StreamContext* c = (StreamContext*)ctx;
-    if (c->state != CODEC)
+    if (c->state != CODEC) {
+      log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)CODEC, (int)c->state);
       return MAKE_P_STAT(STREAM_BAD_STATE);
+    }
 
     c->state = PLAY;
     const bool sync = c->sync;
@@ -590,8 +594,10 @@ extern "C" {
     StreamContext* c = (StreamContext*)ctx;
     if (c->state == STOP)
       return 0;
-    if (c->state != PLAY)
+    if (c->state != PLAY) {
+      log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)PLAY, (int)c->state);
       return MAKE_P_STAT(STREAM_BAD_STATE);
+    }
     c->stop = true;
     return 0;
   }
@@ -605,8 +611,10 @@ extern "C" {
 
 static uint64_t open_stream(uint64_t ctx, const char* url, fill_buffer readCallback, seek_buffer seekCallback) {
   StreamContext* c = (StreamContext*)ctx;
-  if (c->state != FRESH)
+  if (c->state != FRESH) {
+    log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)FRESH, (int)c->state);
     return MAKE_P_STAT(STREAM_BAD_STATE);
+  }
 
   if (c->formatCtx)
     return MAKE_P_STAT(STREAM_IN_USE);
