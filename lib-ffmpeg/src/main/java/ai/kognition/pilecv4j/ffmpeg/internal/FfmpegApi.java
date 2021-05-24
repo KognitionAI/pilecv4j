@@ -89,10 +89,26 @@ public class FfmpegApi {
      */
     public static native long pcv4j_ffmpeg_openStream(long streamCtx, String url);
 
+    /**
+     * This is for testing and will inject an EOS in the stream to cause
+     */
+    public static native void pcv4j_ffmpeg_injectEos();
+
+    /**
+     * When running a custom data source, a constant ByteBuffer wrapping native memory
+     * is used to transfer the data. The size of that buffer is retrieved with this call.
+     */
     public static native int pcv4j_ffmpeg_customStreamBufferSize(long streamCtx);
 
+    /**
+     * When running a custom data source, a constant ByteBuffer wrapping native memory
+     * is used to transfer the data. That buffer is retrieved using this call.
+     */
     public static native Pointer pcv4j_ffmpeg_customStreamBuffer(long streamCtx);
 
+    /**
+     * Prepare a stream context for reading from the given a custom source of data
+     */
     public static native long pcv4j_ffmpeg_openCustomStream(long streamCtx, fill_buffer_callback callback, seek_buffer_callback seek);
 
     /**

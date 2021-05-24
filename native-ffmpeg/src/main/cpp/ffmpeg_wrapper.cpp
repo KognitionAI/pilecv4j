@@ -16,6 +16,12 @@ extern "C"
 #include <chrono>
 #include <thread>
 
+//#define SUPPORT_EOS_INJECT 1
+#ifdef SUPPORT_EOS_INJECT
+  static bool eosInjected = false;
+#endif
+
+
 #undef av_err2str
 #define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE),AV_ERROR_MAX_STRING_SIZE, errnum)
 
@@ -550,6 +556,13 @@ extern "C" {
 
     while ((lastResult = av_read_frame(pFormatContext, pPacket)) >= 0 && !c->stop)
     {
+#ifdef SUPPORT_EOS_INJECT
+      if (eosInjected) {
+        lastResult = AVERROR_EOF;
+        eosInjected = false;
+        break;
+      }
+#endif
       // if it's the video stream
       if (pPacket->stream_index == video_stream_index) {
         log(c, TRACE, "AVPacket->pts %" PRId64, pPacket->pts);
@@ -606,6 +619,13 @@ extern "C" {
   void pcv4j_ffmpeg_set_im_maker(uint64_t im) {
     imaker = (ai::kognition::pilecv4j::ImageMaker*)im;
   }
+
+  void pcv4j_ffmpeg_injectEos() {
+#ifdef SUPPORT_EOS_INJECT
+    eosInjected = true;
+#endif
+  }
+
 }
 //========================================================================
 
