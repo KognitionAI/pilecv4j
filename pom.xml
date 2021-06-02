@@ -41,7 +41,7 @@
     <opencv.version>${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
     <tensorflow-core-api.version>0.3.1</tensorflow-core-api.version>    
-    <slf4j.version>1.7.25</slf4j.version>
+    <slf4j.version>1.7.30</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
     <cmake.generator>${generator}</cmake.generator>
@@ -211,7 +211,6 @@
       <dependency>
         <groupId>org.freedesktop.gstreamer</groupId>
         <artifactId>gst1-java-core</artifactId>
-        <!-- This needs to move to the official release but it will take a lot of work. -->
         <version>1.2.0</version>
       </dependency>
       <dependency>
@@ -222,12 +221,12 @@
       <dependency> <!-- Requirement of using the NativeLibraryLoader from Dempsy -->
         <groupId>commons-io</groupId>
         <artifactId>commons-io</artifactId>
-        <version>2.6</version>
+        <version>2.9.0</version>
       </dependency>
       <dependency> <!-- Needed for the NativeLibraryLoader -->
         <groupId>org.apache.commons</groupId>
         <artifactId>commons-lang3</artifactId>
-        <version>3.8.1</version>
+        <version>3.12.0</version>
       </dependency>
       <dependency>
         <groupId>net.java.dev.jna</groupId>
