@@ -47,7 +47,7 @@
     <cmake.generator>${generator}</cmake.generator>
     <cmake.options>${platform.option}</cmake.options>
     
-    <dempsy-commons.version>2.2.0</dempsy-commons.version>
+    <dempsy-commons.version>2.3.4-SNAPSHOT</dempsy-commons.version>
     
     <commons.cli.version>1.4</commons.cli.version>
     <tiff-java.version>2.0.1</tiff-java.version>
