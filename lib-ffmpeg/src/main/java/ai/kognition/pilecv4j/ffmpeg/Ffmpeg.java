@@ -90,16 +90,18 @@ public class Ffmpeg {
                 FfmpegApi.pcv4j_ffmpeg_deleteContext(nativeDef);
         }
 
-        public void openStream(final URI url) {
-            openStream(url.toString());
+        public StreamContext openStream(final URI url) {
+            return openStream(url.toString());
         }
 
-        public void openStream(final String url) {
+        public StreamContext openStream(final String url) {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openStream(nativeDef, url));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream2(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCodec(nativeDef));
+            return this;
         }
 
-        public void openStream(final VideoDataSupplier dataSupplier, final VideoDataSeek seeker) {
+        public StreamContext openStream(final VideoDataSupplier dataSupplier, final VideoDataSeek seeker) {
             final ByteBuffer buffer = customStreamBuffer();
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCustomStream(nativeDef,
 
@@ -116,10 +118,12 @@ public class Ffmpeg {
                         return seeker.seekBuffer(buffer, offset, whence);
                     }
                 } : null)));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream2(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCodec(nativeDef));
+            return this;
         }
 
-        public void setLogLevel(final Logger logger) {
+        public StreamContext setLogLevel(final Logger logger) {
             // find the level
             final int logLevelSet;
             if(logger.isTraceEnabled())
@@ -136,21 +140,25 @@ public class Ffmpeg {
                 logLevelSet = LOG_LEVEL_FATAL;
 
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_log_level(nativeDef, logLevelSet));
+            return this;
         }
 
-        public void sync(final boolean sync) {
+        public StreamContext sync(final boolean sync) {
             FfmpegApi.pcv4j_ffmpeg_set_syc(nativeDef, sync ? 1 : 0);
+            return this;
         }
 
-        public void addOption(final String key, final String value) {
+        public StreamContext addOption(final String key, final String value) {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_add_option(nativeDef, key, value));
+            return this;
         }
 
-        public void addOptions(final Map<String, String> options) {
+        public StreamContext addOptions(final Map<String, String> options) {
             options.entrySet().stream().forEach(e -> addOption(e.getKey(), e.getValue()));
+            return this;
         }
 
-        public void processFrames(final VideoFrameConsumer consumer) {
+        public StreamContext processFrames(final VideoFrameConsumer consumer) {
 
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_process_frames(nativeDef, new push_frame_callback() {
 
@@ -167,11 +175,19 @@ public class Ffmpeg {
                         consumer.handle(mat);
                     }
                 }
-            }), Ffmpeg.AVERROR_EOF);
+            }, null, null), Ffmpeg.AVERROR_EOF);
+
+            return this;
         }
 
-        public synchronized void stop() {
+        public synchronized StreamContext stop() {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_stop(nativeDef));
+            return this;
+        }
+
+        public StreamContext remux(final String fmt, final String outputFileUri) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_process_frames(nativeDef, null, fmt, outputFileUri), Ffmpeg.AVERROR_EOF);
+            return this;
         }
 
         private ByteBuffer customStreamBuffer() {

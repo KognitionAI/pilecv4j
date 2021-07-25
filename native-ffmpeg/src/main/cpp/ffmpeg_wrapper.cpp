@@ -57,9 +57,11 @@ enum Pcv4jStat {
   FAILED_CREATE_FRAME = 6,
   FAILED_CREATE_PACKET = 7,
   LOGGING_NOT_COMPILED = 8,
-  ADD_OPTION_TOO_LATE = 9
+  ADD_OPTION_TOO_LATE = 9,
+  NO_OUTPUT_FILE_SPECIFIED = 10,
+  UNSUPPORTED_CODEC = 11
 };
-#define MAX_PCV4J_CODE 9
+#define MAX_PCV4J_CODE 11
 // status message descriptions corresponding to the custom codes.
 static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "OK",
@@ -71,7 +73,9 @@ static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "Failed to create a frame",
     "Failed to create a packet",
     "Logging isn't compiled.",
-    "Can't add an option after opening a stream."
+    "Can't add an option after opening a stream.",
+    "No output file was specified.",
+    "Unsupported Codec"
 };
 // =====================================================
 
@@ -124,6 +128,7 @@ static AVRational millisecondTimeBase = AVRational{1,1000};
 enum StreamContextState {
   FRESH,
   OPEN,
+  STREAM,
   CODEC,
   PLAY,
   STOP
@@ -131,7 +136,7 @@ enum StreamContextState {
 
 struct StreamContext {
   /**
-   * The timebase for the selected stream. This is available after state=CODEC
+   * The timebase for the selected stream. This is available after state=STREAM
    */
   AVRational streamTimebase;
 
@@ -378,12 +383,11 @@ static int64_t seek_in_custom_source(void *opaque, int64_t offset, int whence) {
 //========================================================================
 // Some local helper method's definitions
 //========================================================================
-static uint64_t findFirstVidCodec(StreamContext* c,
+static uint64_t findFirstSupportedVidCodec(StreamContext* c,
     AVFormatContext* pFormatContext, AVCodec** pCodec,AVCodecParameters** pCodecParameters,
-    int* video_stream_index, AVRational* timebase);
+    int* video_stream_index);
 static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext,
-    AVFrame *pFrame, AVPacket *pPacket, push_frame callback,
-    SwsContext** colorCvrt);
+    AVPacket *pPacket, push_frame callback, SwsContext** colorCvrt);
 static uint64_t open_stream(uint64_t ctx, const char* url, fill_buffer readCallback,
     seek_buffer seekCallback);
 //========================================================================
@@ -454,6 +458,83 @@ extern "C" {
     return open_stream(ctx,url,nullptr,nullptr);
   }
 
+  uint64_t pcv4j_ffmpeg_findFirstVideoStream2(uint64_t ctx) {
+    StreamContext* c = (StreamContext*)ctx;
+    if (c->state != OPEN) {
+      log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)OPEN, (int)c->state);
+      return MAKE_P_STAT(STREAM_BAD_STATE);
+    }
+
+    uint64_t stat = MAKE_AV_STAT(avformat_find_stream_info(c->formatCtx, nullptr));
+    if (isError(stat))
+      return stat;
+
+    // the component that knows how to enCOde and DECode the stream
+    // it's the codec (audio or video)
+    // http://ffmpeg.org/doxygen/trunk/structAVCodec.html
+    AVCodec *pCodec = nullptr;
+    // this component describes the properties of a codec used by the stream
+    // https://ffmpeg.org/doxygen/trunk/structAVCodecParameters.html
+    AVCodecParameters *pCodecParameters = nullptr;
+    int video_stream_index = -1;
+
+    stat = findFirstSupportedVidCodec(c, c->formatCtx, &pCodec, &pCodecParameters, &video_stream_index);
+    if (isError(stat))
+      return stat;
+
+    c->streamIndex = video_stream_index;
+    c->streamTimebase = c->formatCtx->streams[video_stream_index]->time_base;
+    c->state = STREAM;
+
+    return stat;
+  }
+
+  uint64_t pcv4j_ffmpeg_openCodec(uint64_t ctx) {
+    StreamContext* c = (StreamContext*)ctx;
+    if (c->state != STREAM) {
+      log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)STREAM, (int)c->state);
+      return MAKE_P_STAT(STREAM_BAD_STATE);
+    }
+
+    AVCodecParameters *pCodecParameters = c->formatCtx->streams[c->streamIndex]->codecpar;
+    AVCodec* pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
+    if (pCodec==NULL) {
+      log(c, ERROR, "Unsupported codec, ID %d",(int)pCodecParameters->codec_id);
+      return MAKE_P_STAT(UNSUPPORTED_CODEC);
+    }
+
+    // https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html
+    c->codecCtx = avcodec_alloc_context3(pCodec);
+    if (!c->codecCtx) {
+      log(c, ERROR, "failed to allocated memory for AVCodecContext");
+      return MAKE_P_STAT(FAILED_CREATE_CODEC_CONTEXT);
+    }
+    AVCodecContext* pCodecContext = c->codecCtx;
+
+    // Fill the codec context based on the values from the supplied codec parameters
+    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
+    uint64_t stat = MAKE_AV_STAT(avcodec_parameters_to_context(pCodecContext, pCodecParameters));
+    if (isError(stat))
+      return stat;
+
+    // Initialize the AVCodecContext to use the given AVCodec.
+    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
+    AVDictionary* opts = nullptr;
+    c->buildOptions(&opts);
+    stat = avcodec_open2(pCodecContext, pCodec, &opts);
+    if (opts != nullptr)
+      av_dict_free(&opts);
+
+    if (isError(stat))
+    {
+      log(c, ERROR, "failed to open codec through avcodec_open2");
+      return stat;
+    }
+
+    c->state = CODEC;
+    return stat;
+  }
+
   uint64_t pcv4j_ffmpeg_findFirstVideoStream(uint64_t ctx) {
     StreamContext* c = (StreamContext*)ctx;
     if (c->state != OPEN) {
@@ -468,16 +549,13 @@ extern "C" {
     // the component that knows how to enCOde and DECode the stream
     // it's the codec (audio or video)
     // http://ffmpeg.org/doxygen/trunk/structAVCodec.html
-    AVCodec *pCodec = NULL;
+    AVCodec *pCodec = nullptr;
     // this component describes the properties of a codec used by the stream
     // https://ffmpeg.org/doxygen/trunk/structAVCodecParameters.html
-    AVCodecParameters *pCodecParameters =  NULL;
+    AVCodecParameters *pCodecParameters = nullptr;
     int video_stream_index = -1;
 
-    AVFormatContext* pFormatContext = c->formatCtx;
-    AVRational timebase{1,1};
-
-    stat = findFirstVidCodec(c, pFormatContext, &pCodec, &pCodecParameters, &video_stream_index, &timebase);
+    stat = findFirstSupportedVidCodec(c, c->formatCtx, &pCodec, &pCodecParameters, &video_stream_index);
     if (isError(stat))
       return stat;
 
@@ -509,13 +587,15 @@ extern "C" {
     }
 
     c->streamIndex = video_stream_index;
-    c->streamTimebase = timebase;
+    c->streamTimebase = c->formatCtx->streams[video_stream_index]->time_base;
     c->state = CODEC;
 
     return stat;
   }
 
-  uint64_t pcv4j_ffmpeg_process_frames(uint64_t ctx, push_frame callback) {
+  uint64_t pcv4j_ffmpeg_process_frames(uint64_t ctx, push_frame callback, const char* fmt, const char* outputFile) {
+    bool remux = outputFile != nullptr;
+
     StreamContext* c = (StreamContext*)ctx;
     if (c->state != CODEC) {
       log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)CODEC, (int)c->state);
@@ -525,13 +605,6 @@ extern "C" {
     c->state = PLAY;
     const bool sync = c->sync;
 
-    // https://ffmpeg.org/doxygen/trunk/structAVFrame.html
-    AVFrame *pFrame = av_frame_alloc();
-    if (!pFrame)
-    {
-      log(c, ERROR, "failed to allocated memory for AVFrame");
-      return MAKE_P_STAT(FAILED_CREATE_FRAME);
-    }
     // https://ffmpeg.org/doxygen/trunk/structAVPacket.html
     AVPacket *pPacket = av_packet_alloc();
     if (!pPacket)
@@ -540,25 +613,94 @@ extern "C" {
       return MAKE_P_STAT(FAILED_CREATE_PACKET);
     }
 
-    uint64_t response = 0;
-
     AVCodecContext* pCodecContext = c->codecCtx;
     AVFormatContext* pFormatContext = c->formatCtx;
     const int video_stream_index = c->streamIndex;
 
     // fill the Packet with data from the Stream
     // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
-    int lastResult = 0;
+    int returnResult = 0;
     SwsContext** colorCvrt = &(c->colorCvrt);
 
     if (sync)
       c->startPlayTime = now();
 
-    while ((lastResult = av_read_frame(pFormatContext, pPacket)) >= 0 && !c->stop)
+    // ==================================================
+    // Create and setup the output_format_context if we're remuxing
+    // ==================================================
+    AVFormatContext *output_format_context = nullptr;
+    AVStream* in_stream = nullptr;
+    bool cleanupIoContext = false; // track whether or not we need to cleanup the io context
+    if (remux) {
+      in_stream = c->formatCtx->streams[c->streamIndex];
+      avformat_alloc_output_context2(&output_format_context, NULL, fmt, outputFile);
+      if (!output_format_context) {
+        log(c, ERROR, "Failed to allocate output format context using a format of \"%s\" and an output file of \"%s\"",
+            fmt == nullptr ? "[NULL]" : fmt, outputFile);
+        returnResult = MAKE_AV_STAT(AVERROR_UNKNOWN);
+        goto end;
+      }
+
+      AVStream* out_stream = avformat_new_stream(output_format_context, NULL);
+      if (!out_stream) {
+        log(c, ERROR, "Failed allocating output stream");
+        returnResult = MAKE_AV_STAT(AVERROR_UNKNOWN);
+        goto end;
+      }
+
+      AVCodecParameters *in_codecpar = in_stream->codecpar;
+      int ret = avcodec_parameters_copy(out_stream->codecpar, in_codecpar);
+      if (ret < 0) {
+        log(c, ERROR, "Failed to copy codec parameters");
+        returnResult = MAKE_AV_STAT(ret);
+        goto end;
+      }
+
+      {
+        // set the tag ....
+        bool setTag = true;
+        unsigned int tag = 0;
+        if (av_codec_get_tag2(c->formatCtx->iformat->codec_tag, in_codecpar->codec_id, &tag) < 0) {
+          log(c, DEBUG, "Failed to get tag");
+          setTag = false;
+        }
+        if (setTag)
+          out_stream->codecpar->codec_tag = tag;
+      }
+
+      // https://ffmpeg.org/doxygen/trunk/group__lavf__misc.html#gae2645941f2dc779c307eb6314fd39f10
+      av_dump_format(output_format_context, 0, outputFile, 1);
+
+      // unless it's a no file (we'll talk later about that) write to the disk (FLAG_WRITE)
+      // but basically it's a way to save the file to a buffer so you can store it
+      // wherever you want.
+      if (!(output_format_context->oformat->flags & AVFMT_NOFILE)) {
+        ret = avio_open(&output_format_context->pb, outputFile, AVIO_FLAG_WRITE);
+        if (ret < 0) {
+          log(c, ERROR, "Could not open output file '%s'", outputFile);
+          returnResult = MAKE_AV_STAT(ret);
+          goto end;
+        }
+        cleanupIoContext = true; // we need to close what we opened.
+      }
+
+      // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
+      ret = avformat_write_header(output_format_context, nullptr);
+
+      if (ret < 0) {
+        log(c, ERROR, "Error occurred when opening output file\n");
+        returnResult = MAKE_AV_STAT(ret);
+        goto end;
+      }
+
+    }
+    // ==================================================
+
+    while ((returnResult = av_read_frame(pFormatContext, pPacket)) >= 0 && !c->stop)
     {
 #ifdef SUPPORT_EOS_INJECT
       if (eosInjected) {
-        lastResult = AVERROR_EOF;
+        returnResult = AVERROR_EOF;
         eosInjected = false;
         break;
       }
@@ -566,21 +708,54 @@ extern "C" {
       // if it's the video stream
       if (pPacket->stream_index == video_stream_index) {
         log(c, TRACE, "AVPacket->pts %" PRId64, pPacket->pts);
-        response = decode_packet(c, pCodecContext, pFrame, pPacket, callback, colorCvrt);
-        if (isError(response))
-          break;
+        if (callback != nullptr) {
+          uint64_t response = decode_packet(c, pCodecContext, pPacket, callback, colorCvrt);
+          if (isError(response))
+            break;
+        }
+
+        // I'm done with the packet so I can recalculate the PTS and DTS
+        // right on the existing packet
+        if (remux) {
+          AVStream* out_stream = output_format_context->streams[0];
+          pPacket->stream_index = 0;
+          pPacket->pts = av_rescale_q_rnd(pPacket->pts, in_stream->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+          pPacket->dts = av_rescale_q_rnd(pPacket->dts, in_stream->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+          pPacket->duration = av_rescale_q(pPacket->duration, in_stream->time_base, out_stream->time_base);
+          // https://ffmpeg.org/doxygen/trunk/structAVPacket.html#ab5793d8195cf4789dfb3913b7a693903
+          pPacket->pos = -1;
+
+          int ret = av_interleaved_write_frame(output_format_context, pPacket);
+          if (ret < 0) {
+            log(c, ERROR, "Error muxing packet");
+            break;
+          }
+        }
       }
       // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
       av_packet_unref(pPacket);
     }
 
-    log(c, INFO, "Last result of read was: %s", av_err2str(lastResult));
+    if (remux) {
+      //https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga7f14007e7dc8f481f054b21614dfec13
+      av_write_trailer(output_format_context);
+    }
+
+    log(c, INFO, "Last result of read was: %s", av_err2str(returnResult));
     log(c, INFO, "releasing all the resources");
 
-    av_packet_free(&pPacket);
-    av_frame_free(&pFrame);
+    end:
+    if (output_format_context) {
+      if (cleanupIoContext) {
+        avio_closep(&output_format_context->pb);
+        output_format_context->pb = nullptr;
+      }
+      avformat_free_context(output_format_context);
+    }
+    if (pPacket)
+      av_packet_free(&pPacket);
 
-    return lastResult;
+    return returnResult;
   }
 
   long pcv4j_ffmpeg_set_log_level(uint64_t ctx, int32_t logLevel) {
@@ -667,9 +842,8 @@ static uint64_t open_stream(uint64_t ctx, const char* url, fill_buffer readCallb
   return ret;
 }
 
-static uint64_t findFirstVidCodec(StreamContext* c, AVFormatContext* pFormatContext,
-    AVCodec** pCodec,AVCodecParameters** pCodecParameters,
-    int* rvsi, AVRational* timebase) {
+static uint64_t findFirstSupportedVidCodec(StreamContext* c, AVFormatContext* pFormatContext,
+    AVCodec** pCodec,AVCodecParameters** pCodecParameters, int* rvsi) {
 
   // if there's no streams, there's no stream.
   if (pFormatContext->streams == nullptr)
@@ -722,10 +896,9 @@ static uint64_t findFirstVidCodec(StreamContext* c, AVFormatContext* pFormatCont
         video_stream_index = i;
         *pCodec = pLocalCodec;
         *pCodecParameters = pLocalCodecParameters;
-        *timebase = pFormatContext->streams[video_stream_index]->time_base;
       }
 
-      log(c, DEBUG, "Video Codec: resolution %d x %d", pLocalCodecParameters->width, pLocalCodecParameters->height);
+      log(c, DEBUG, "Video Codec (%d): resolution %d x %d",pLocalCodecParameters->codec_id, pLocalCodecParameters->width, pLocalCodecParameters->height);
     } else if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
       log(c, DEBUG, "Audio Codec: %d channels, sample rate %d", pLocalCodecParameters->channels, pLocalCodecParameters->sample_rate);
     }
@@ -747,7 +920,7 @@ static uint64_t findFirstVidCodec(StreamContext* c, AVFormatContext* pFormatCont
   return 0;
 }
 
-static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, AVFrame *pFrame, AVPacket *pPacket, push_frame callback, SwsContext** colorCvrt)
+static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, AVPacket *pPacket, push_frame callback, SwsContext** colorCvrt)
 {
   // Supply raw packet data as input to a decoder
   // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
@@ -759,8 +932,16 @@ static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, A
   }
 
   const int logLevel = c->logLevel;
-  bool sync = c->sync;
 
+  // https://ffmpeg.org/doxygen/trunk/structAVFrame.html
+  AVFrame *pFrame = av_frame_alloc();
+  if (!pFrame)
+  {
+    log(c, ERROR, "failed to allocated memory for AVFrame");
+    return MAKE_P_STAT(FAILED_CREATE_FRAME);
+  }
+
+  int returnCode = 0;
   while (response >= 0)
   {
     // Return decoded output data (into a frame) from a decoder
@@ -770,26 +951,23 @@ static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, A
       break;
     } else if (response < 0) {
       log(c, ERROR, "Error while receiving a frame from the decoder: %s", av_err2str(response));
-      return MAKE_AV_STAT(response);
+      returnCode = MAKE_AV_STAT(response);
+      break;
     }
 
     if (response >= 0) {
 
       int64_t pts = pFrame->best_effort_timestamp;
-      int64_t timeToDiplayFrame = sync ?
-          (av_rescale_q(pts, c->streamTimebase, millisecondTimeBase) + c->startPlayTime) :
-          -1;
 
       AVPixelFormat curFormat = (AVPixelFormat)pFrame->format;
       if (logLevel <= TRACE) {
         log(c, TRACE,
-            "Frame %d (type=%c, size=%d bytes, format=%d) pts %d (clock millis: %d), timebase %d/%d, key_frame %d [DTS %d]",
+            "Frame %d (type=%c, size=%d bytes, format=%d) pts %d, timebase %d/%d, key_frame %d [DTS %d]",
             pCodecContext->frame_number,
             av_get_picture_type_char(pFrame->pict_type),
             pFrame->pkt_size,
             curFormat,
             pts,
-            timeToDiplayFrame,
             c->streamTimebase.num, c->streamTimebase.den,
             pFrame->key_frame,
             pFrame->coded_picture_number
@@ -835,8 +1013,10 @@ static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, A
         isRgb = (curFormat == AV_PIX_FMT_RGB24) ? 1 : 0;
       }
 
-      bool skipIt = false;
-      if (sync) {
+      if (c->sync) {
+        bool skipIt = false;
+        int64_t timeToDiplayFrame = av_rescale_q(pts, c->streamTimebase, millisecondTimeBase) + c->startPlayTime;
+
         int64_t curTime = now();
         if (curTime < timeToDiplayFrame) {
           log(c, TRACE, "Sleeping for %d", (timeToDiplayFrame - curTime));
@@ -846,13 +1026,18 @@ static uint64_t decode_packet(StreamContext* c, AVCodecContext *pCodecContext, A
           log(c, DEBUG, "Throwing away frame because it's %d milliseconds late.",(curTime - timeToDiplayFrame) );
           skipIt=true;
         }
-      }
-      if (!skipIt)
+        if (!skipIt)
+          (*callback)(mat, isRgb);
+      } else
         (*callback)(mat, isRgb);
+
       imaker->freeImage(mat);
     }
   }
-  return 0;
+
+  // cleanup and return.
+  av_frame_free(&pFrame);
+  return returnCode;
 }
 
 

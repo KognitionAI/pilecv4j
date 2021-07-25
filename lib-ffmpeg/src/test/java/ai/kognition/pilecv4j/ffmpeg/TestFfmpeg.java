@@ -2,11 +2,14 @@ package ai.kognition.pilecv4j.ffmpeg;
 
 import static org.junit.Assert.assertTrue;
 
+import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,6 +22,8 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 public class TestFfmpeg extends BaseTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestFfmpeg.class);
+
+    @Rule public TemporaryFolder tempDir = new TemporaryFolder();
 
     @Test
     public void testInit() {
@@ -42,22 +47,51 @@ public class TestFfmpeg extends BaseTest {
     @Test
     public void testConsumeFrames() {
         final AtomicLong frameCount = new AtomicLong(0);
-        try(final StreamContext c = Ffmpeg.createStreamContext();
-            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
-            c.setLogLevel(LOGGER);
-            c.addOption("rtsp_flags", "prefer_tcp");
-            c.openStream(STREAM);
-            c.processFrames(f -> {
-                frameCount.getAndIncrement();
-                if(SHOW) {
-                    try(final CvMat rgb = f.bgr(false);) {
-                        id.update(rgb);
+        try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
+            final StreamContext c = Ffmpeg.createStreamContext();) {
+            c.setLogLevel(LOGGER)
+                .addOption("rtsp_flags", "prefer_tcp")
+                .openStream(STREAM)
+                .processFrames(f -> {
+                    frameCount.getAndIncrement();
+                    if(SHOW) {
+                        try(final CvMat rgb = f.bgr(false);) {
+                            id.update(rgb);
+                        }
                     }
-                }
-            });
+                });
         }
 
         assertTrue(frameCount.get() > 50);
+    }
+
+    @Test
+    public void testRemux() throws Exception {
+        final File destination = tempDir.newFile("out.flv");
+        try(final StreamContext c = Ffmpeg.createStreamContext();) {
+            c.setLogLevel(LOGGER)
+                .addOption("rtsp_flags", "prefer_tcp")
+                .openStream(STREAM)
+                // .remux("flv", "rtmp://localhost/live/test-cam");
+                .remux(null, destination.getAbsolutePath());
+        }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        if(SHOW) {
+            try(final ImageDisplay id = new ImageDisplay.Builder().build();
+                final StreamContext c = Ffmpeg.createStreamContext();) {
+                c.setLogLevel(LOGGER)
+                    .openStream(destination.toURI())
+                    .processFrames(f -> {
+                        try(final CvMat rgb = f.bgr(false);) {
+                            id.update(rgb);
+                        }
+                    });
+            }
+        }
     }
 
     @Test
@@ -70,44 +104,44 @@ public class TestFfmpeg extends BaseTest {
 
         try(final StreamContext c = Ffmpeg.createStreamContext();
             final ImageDisplay id = new ImageDisplay.Builder().build();) {
-            c.setLogLevel(LoggerFactory.getLogger(this.getClass()));
-            c.openStream(
+            c.setLogLevel(LoggerFactory.getLogger(this.getClass()))
+                .openStream(
 
-                // read bytes from buffer
-                (bb, numBytes) -> {
-                    if(pos.val >= contents.length)
-                        return Ffmpeg.AVERROR_EOF;
-                    final int size = bb.capacity();
-                    LOGGER.trace("buf size: {}, to write: {}, from pos: {}", size, numBytes, pos.val);
-                    bb.rewind();
-                    int numToSend = numBytes > bb.capacity() ? bb.capacity() : numBytes;
-                    if(numToSend + (int)pos.val > contents.length) {
-                        numToSend = contents.length - (int)pos.val;
+                    // read bytes from buffer
+                    (bb, numBytes) -> {
+                        if(pos.val >= contents.length)
+                            return Ffmpeg.AVERROR_EOF;
+                        final int size = bb.capacity();
+                        LOGGER.trace("buf size: {}, to write: {}, from pos: {}", size, numBytes, pos.val);
+                        bb.rewind();
+                        int numToSend = numBytes > bb.capacity() ? bb.capacity() : numBytes;
+                        if(numToSend + (int)pos.val > contents.length) {
+                            numToSend = contents.length - (int)pos.val;
+                        }
+                        LOGGER.trace("contents read from {} to {}({})", pos.val, (pos.val + numToSend), numToSend);
+                        bb.put(contents, (int)pos.val, numToSend);
+                        pos.val += numToSend;
+                        if(pos.val >= contents.length)
+                            LOGGER.debug("Last bytes being sent!");
+                        return numToSend;
+                    },
+
+                    // need to support seek to read some mp4 files
+                    (final ByteBuffer bb, final long offset, final int whence) -> {
+                        if(whence == Ffmpeg.SEEK_SET)
+                            pos.val = offset;
+                        else if(whence == Ffmpeg.SEEK_CUR)
+                            pos.val += offset;
+                        else if(whence == Ffmpeg.SEEK_END)
+                            pos.val = contents.length - offset;
+                        else if(whence == Ffmpeg.AVSEEK_SIZE)
+                            return contents.length;
+                        else
+                            return -1;
+                        return pos.val;
                     }
-                    LOGGER.trace("contents read from {} to {}({})", pos.val, (pos.val + numToSend), numToSend);
-                    bb.put(contents, (int)pos.val, numToSend);
-                    pos.val += numToSend;
-                    if(pos.val >= contents.length)
-                        LOGGER.debug("Last bytes being sent!");
-                    return numToSend;
-                },
 
-                // need to support seek to read some mp4 files
-                (final ByteBuffer bb, final long offset, final int whence) -> {
-                    if(whence == Ffmpeg.SEEK_SET)
-                        pos.val = offset;
-                    else if(whence == Ffmpeg.SEEK_CUR)
-                        pos.val += offset;
-                    else if(whence == Ffmpeg.SEEK_END)
-                        pos.val = contents.length - offset;
-                    else if(whence == Ffmpeg.AVSEEK_SIZE)
-                        return contents.length;
-                    else
-                        return -1;
-                    return pos.val;
-                }
-
-            );
+                );
 
             if(SHOW)
                 c.sync(true);

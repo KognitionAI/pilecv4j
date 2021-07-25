@@ -150,12 +150,26 @@ public class FfmpegApi {
     public static native long pcv4j_ffmpeg_findFirstVideoStream(long streamCtx);
 
     /**
+     * Once a stream is open, find the first video stream within the container
+     *
+     * @return status
+     */
+    public static native long pcv4j_ffmpeg_findFirstVideoStream2(long streamCtx);
+
+    /**
+     * Once the first video stream found, initialize the codec for decoding
+     *
+     * @return status
+     */
+    public static native long pcv4j_ffmpeg_openCodec(long streamCtx);
+
+    /**
      * Process the frames with the callback until the stream ends or until/unless
      * there is a problem.
      *
      * @return status
      */
-    public native static long pcv4j_ffmpeg_process_frames(long streamCtx, push_frame_callback func);
+    public native static long pcv4j_ffmpeg_process_frames(long streamCtx, push_frame_callback func, String fmt, String outputFile);
 
     /**
      * set the log level for the Ffmpeg_wrapper.
