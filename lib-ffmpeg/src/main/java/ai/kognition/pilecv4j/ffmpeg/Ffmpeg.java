@@ -96,7 +96,7 @@ public class Ffmpeg {
 
         public StreamContext openStream(final String url) {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openStream(nativeDef, url));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream2(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCodec(nativeDef));
             return this;
         }
@@ -118,7 +118,7 @@ public class Ffmpeg {
                         return seeker.seekBuffer(buffer, offset, whence);
                     }
                 } : null)));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream2(nativeDef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCodec(nativeDef));
             return this;
         }

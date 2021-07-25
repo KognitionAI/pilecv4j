@@ -150,13 +150,6 @@ public class FfmpegApi {
     public static native long pcv4j_ffmpeg_findFirstVideoStream(long streamCtx);
 
     /**
-     * Once a stream is open, find the first video stream within the container
-     *
-     * @return status
-     */
-    public static native long pcv4j_ffmpeg_findFirstVideoStream2(long streamCtx);
-
-    /**
      * Once the first video stream found, initialize the codec for decoding
      *
      * @return status

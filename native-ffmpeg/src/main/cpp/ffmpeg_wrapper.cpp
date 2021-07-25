@@ -458,7 +458,7 @@ extern "C" {
     return open_stream(ctx,url,nullptr,nullptr);
   }
 
-  uint64_t pcv4j_ffmpeg_findFirstVideoStream2(uint64_t ctx) {
+  uint64_t pcv4j_ffmpeg_findFirstVideoStream(uint64_t ctx) {
     StreamContext* c = (StreamContext*)ctx;
     if (c->state != OPEN) {
       log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)OPEN, (int)c->state);
@@ -532,64 +532,6 @@ extern "C" {
     }
 
     c->state = CODEC;
-    return stat;
-  }
-
-  uint64_t pcv4j_ffmpeg_findFirstVideoStream(uint64_t ctx) {
-    StreamContext* c = (StreamContext*)ctx;
-    if (c->state != OPEN) {
-      log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)OPEN, (int)c->state);
-      return MAKE_P_STAT(STREAM_BAD_STATE);
-    }
-
-    uint64_t stat = MAKE_AV_STAT(avformat_find_stream_info(c->formatCtx, nullptr));
-    if (isError(stat))
-      return stat;
-
-    // the component that knows how to enCOde and DECode the stream
-    // it's the codec (audio or video)
-    // http://ffmpeg.org/doxygen/trunk/structAVCodec.html
-    AVCodec *pCodec = nullptr;
-    // this component describes the properties of a codec used by the stream
-    // https://ffmpeg.org/doxygen/trunk/structAVCodecParameters.html
-    AVCodecParameters *pCodecParameters = nullptr;
-    int video_stream_index = -1;
-
-    stat = findFirstSupportedVidCodec(c, c->formatCtx, &pCodec, &pCodecParameters, &video_stream_index);
-    if (isError(stat))
-      return stat;
-
-    // https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html
-    c->codecCtx = avcodec_alloc_context3(pCodec);
-    if (!c->codecCtx) {
-      log(c, ERROR, "failed to allocated memory for AVCodecContext");
-      return MAKE_P_STAT(FAILED_CREATE_CODEC_CONTEXT);
-    }
-    AVCodecContext* pCodecContext = c->codecCtx;
-
-    // Fill the codec context based on the values from the supplied codec parameters
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
-    stat = MAKE_AV_STAT(avcodec_parameters_to_context(pCodecContext, pCodecParameters));
-    if (isError(stat))
-      return stat;
-
-    // Initialize the AVCodecContext to use the given AVCodec.
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
-    AVDictionary* opts = nullptr;
-    c->buildOptions(&opts);
-    stat = avcodec_open2(pCodecContext, pCodec, &opts);
-    if (opts != nullptr)
-      av_dict_free(&opts);
-    if (isError(stat))
-    {
-      log(c, ERROR, "failed to open codec through avcodec_open2");
-      return stat;
-    }
-
-    c->streamIndex = video_stream_index;
-    c->streamTimebase = c->formatCtx->streams[video_stream_index]->time_base;
-    c->state = CODEC;
-
     return stat;
   }
 
