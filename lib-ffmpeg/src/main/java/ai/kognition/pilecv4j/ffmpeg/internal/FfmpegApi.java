@@ -85,11 +85,6 @@ public class FfmpegApi {
     public static native void pcv4j_ffmpeg_deleteContext(long streamCtx);
 
     /**
-     * Prepare a stream context for reading from the given url
-     */
-    public static native long pcv4j_ffmpeg_openStream(long streamCtx, String url);
-
-    /**
      * This is for testing and will inject an EOS in the stream to cause
      */
     public static native void pcv4j_ffmpeg_injectEos();
@@ -105,11 +100,6 @@ public class FfmpegApi {
      * is used to transfer the data. That buffer is retrieved using this call.
      */
     public static native Pointer pcv4j_ffmpeg_customStreamBuffer(long streamCtx);
-
-    /**
-     * Prepare a stream context for reading from the given a custom source of data
-     */
-    public static native long pcv4j_ffmpeg_openCustomStream(long streamCtx, fill_buffer_callback callback, seek_buffer_callback seek);
 
     /**
      * Get the AV Error code for EOF. Can be called at any time.
@@ -143,26 +133,20 @@ public class FfmpegApi {
     public static native int pcv4j_ffmpeg_code_seek_size();
 
     /**
-     * Once a stream is open, find the first video stream within the container
-     *
-     * @return status
-     */
-    public static native long pcv4j_ffmpeg_findFirstVideoStream(long streamCtx);
-
-    /**
-     * Once the first video stream found, initialize the codec for decoding
-     *
-     * @return status
-     */
-    public static native long pcv4j_ffmpeg_openCodec(long streamCtx);
-
-    /**
      * Process the frames with the callback until the stream ends or until/unless
      * there is a problem.
      *
      * @return status
      */
-    public native static long pcv4j_ffmpeg_process_frames(long streamCtx, push_frame_callback func, String fmt, String outputFile);
+    public native static long pcv4j_ffmpeg_play(long streamCtx);
+
+    public native static long pcv4j_ffmpeg_stop(final long nativeDef);
+
+    // ===================================================================
+
+    // ===================================================================
+    // Methods that set up the stream before playing
+    // ===================================================================
 
     /**
      * set the log level for the Ffmpeg_wrapper.
@@ -181,11 +165,16 @@ public class FfmpegApi {
     /**
      * Set synchronize the stream with real time. Should only be used with files.
      */
-    public native static void pcv4j_ffmpeg_set_syc(final long nativeDef, final int doIt);
+    public native static long pcv4j_ffmpeg_set_sync(final long nativeDef, final int doIt);
 
-    public native static long pcv4j_ffmpeg_stop(final long nativeDef);
-    // ===================================================================
+    public native static long pcv4j_ffmpeg_set_frame_handler(long nativeDef, push_frame_callback handler);
+
+    public native static long pcv4j_ffmpeg_add_remuxer(final long nativeDef, final String fmt, final String outputUri);
 
     public native static void pcv4j_ffmpeg_set_im_maker(long immakerRef);
+
+    public native static long pcv4j_ffmpeg_set_source(long nativeDef, String url);
+
+    public static native long pcv4j_ffmpeg_set_custom_source(long streamCtx, fill_buffer_callback callback, seek_buffer_callback seek);
 
 }

@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import com.sun.jna.Pointer;
@@ -90,21 +91,10 @@ public class Ffmpeg {
                 FfmpegApi.pcv4j_ffmpeg_deleteContext(nativeDef);
         }
 
-        public StreamContext openStream(final URI url) {
-            return openStream(url.toString());
-        }
-
-        public StreamContext openStream(final String url) {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openStream(nativeDef, url));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCodec(nativeDef));
-            return this;
-        }
-
-        public StreamContext openStream(final VideoDataSupplier dataSupplier, final VideoDataSeek seeker) {
+        public StreamContext setSource(final VideoDataSupplier dataSupplier, final VideoDataSeek seeker) {
             final ByteBuffer buffer = customStreamBuffer();
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCustomStream(nativeDef,
 
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_custom_source(nativeDef,
                 strongRefDs = new fill_buffer_callback() {
                     @Override
                     public int fill_buffer(final int numBytes) {
@@ -118,8 +108,7 @@ public class Ffmpeg {
                         return seeker.seekBuffer(buffer, offset, whence);
                     }
                 } : null)));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_findFirstVideoStream(nativeDef));
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_openCodec(nativeDef));
+
             return this;
         }
 
@@ -144,7 +133,7 @@ public class Ffmpeg {
         }
 
         public StreamContext sync(final boolean sync) {
-            FfmpegApi.pcv4j_ffmpeg_set_syc(nativeDef, sync ? 1 : 0);
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_sync(nativeDef, sync ? 1 : 0));
             return this;
         }
 
@@ -158,9 +147,8 @@ public class Ffmpeg {
             return this;
         }
 
-        public StreamContext processFrames(final VideoFrameConsumer consumer) {
-
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_process_frames(nativeDef, new push_frame_callback() {
+        public StreamContext setFrameHandler(final VideoFrameConsumer consumer) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_frame_handler(nativeDef, new push_frame_callback() {
 
                 @Override
                 public void push_frame(final long frame, final int isRbg) {
@@ -175,8 +163,7 @@ public class Ffmpeg {
                         consumer.handle(mat);
                     }
                 }
-            }, null, null), Ffmpeg.AVERROR_EOF);
-
+            }));
             return this;
         }
 
@@ -185,15 +172,35 @@ public class Ffmpeg {
             return this;
         }
 
-        public StreamContext remux(final String fmt, final String outputFileUri) {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_process_frames(nativeDef, null, fmt, outputFileUri), Ffmpeg.AVERROR_EOF);
-            return this;
-        }
-
         private ByteBuffer customStreamBuffer() {
             final Pointer value = FfmpegApi.pcv4j_ffmpeg_customStreamBuffer(nativeDef);
             final int bufSize = FfmpegApi.pcv4j_ffmpeg_customStreamBufferSize(nativeDef);
             return value.getByteBuffer(0, bufSize);
+        }
+
+        public StreamContext play() {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_play(nativeDef), Ffmpeg.AVERROR_EOF);
+            return this;
+        }
+
+        public StreamContext addRemuxer(final String fmt, final String outputUri) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_add_remuxer(nativeDef, fmt, outputUri));
+            return this;
+        }
+
+        public StreamContext setSource(final String url) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_source(nativeDef, url));
+            return this;
+        }
+
+        public StreamContext setSource(final URI url) {
+            return setSource(url.toString());
+        }
+
+        public StreamContext optionally(final boolean doIt, final Consumer<StreamContext> whatToDo) {
+            if(doIt)
+                whatToDo.accept(this);
+            return this;
         }
     }
 

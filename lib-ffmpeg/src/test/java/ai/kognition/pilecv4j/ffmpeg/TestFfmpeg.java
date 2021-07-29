@@ -37,12 +37,12 @@ public class TestFfmpeg extends BaseTest {
         }
     }
 
-    @Test
-    public void testOpenStream() {
-        try(StreamContext c = Ffmpeg.createStreamContext();) {
-            c.openStream(STREAM);
-        }
-    }
+    // @Test
+    // public void testOpenStream() {
+    // try(StreamContext c = Ffmpeg.createStreamContext();) {
+    // c.openStream(STREAM);
+    // }
+    // }
 
     @Test
     public void testConsumeFrames() {
@@ -51,15 +51,16 @@ public class TestFfmpeg extends BaseTest {
             final StreamContext c = Ffmpeg.createStreamContext();) {
             c.setLogLevel(LOGGER)
                 .addOption("rtsp_flags", "prefer_tcp")
-                .openStream(STREAM)
-                .processFrames(f -> {
+                .setFrameHandler(f -> {
                     frameCount.getAndIncrement();
                     if(SHOW) {
                         try(final CvMat rgb = f.bgr(false);) {
                             id.update(rgb);
                         }
                     }
-                });
+                })
+                .setSource(STREAM)
+                .play();
         }
 
         assertTrue(frameCount.get() > 50);
@@ -71,9 +72,10 @@ public class TestFfmpeg extends BaseTest {
         try(final StreamContext c = Ffmpeg.createStreamContext();) {
             c.setLogLevel(LOGGER)
                 .addOption("rtsp_flags", "prefer_tcp")
-                .openStream(STREAM)
-                // .remux("flv", "rtmp://localhost/live/test-cam");
-                .remux(null, destination.getAbsolutePath());
+                // .addRemuxer("flv", "rtmp://localhost/live/test-cam");
+                .addRemuxer("flv", destination.getAbsolutePath())
+                .setSource(STREAM)
+                .play();
         }
 
         assertTrue(destination.exists());
@@ -84,12 +86,13 @@ public class TestFfmpeg extends BaseTest {
             try(final ImageDisplay id = new ImageDisplay.Builder().build();
                 final StreamContext c = Ffmpeg.createStreamContext();) {
                 c.setLogLevel(LOGGER)
-                    .openStream(destination.toURI())
-                    .processFrames(f -> {
+                    .setFrameHandler(f -> {
                         try(final CvMat rgb = f.bgr(false);) {
                             id.update(rgb);
                         }
-                    });
+                    })
+                    .setSource(destination.toURI())
+                    .play();
             }
         }
     }
@@ -105,7 +108,7 @@ public class TestFfmpeg extends BaseTest {
         try(final StreamContext c = Ffmpeg.createStreamContext();
             final ImageDisplay id = new ImageDisplay.Builder().build();) {
             c.setLogLevel(LoggerFactory.getLogger(this.getClass()))
-                .openStream(
+                .setSource(
 
                     // read bytes from buffer
                     (bb, numBytes) -> {
@@ -146,7 +149,7 @@ public class TestFfmpeg extends BaseTest {
             if(SHOW)
                 c.sync(true);
 
-            c.processFrames(f -> {
+            c.setFrameHandler(f -> {
                 frameCount.getAndIncrement();
                 if(SHOW) {
                     try(final CvMat rgb = f.bgr(false);) {
@@ -154,6 +157,8 @@ public class TestFfmpeg extends BaseTest {
                     }
                 }
             });
+
+            c.play();
 
             assertTrue(frameCount.get() > 50);
         }
