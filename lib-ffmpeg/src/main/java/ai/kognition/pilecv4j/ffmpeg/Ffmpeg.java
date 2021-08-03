@@ -8,6 +8,7 @@ import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_TRACE;
 import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_WARN;
 
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Map;
@@ -75,6 +76,7 @@ public class Ffmpeg {
         // JVM optimized them out since they aren't read anywhere in this code.
         fill_buffer_callback strongRefDs;
         seek_buffer_callback strongRefS;
+        push_frame_callback pfc;
         // ======================================================================
 
         StreamContext(final long nativeDef) {
@@ -148,7 +150,9 @@ public class Ffmpeg {
         }
 
         public StreamContext setFrameHandler(final VideoFrameConsumer consumer) {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_frame_handler(nativeDef, new push_frame_callback() {
+            if(pfc != null)
+                throw new IllegalStateException("Can't set frame handler twice.");
+            pfc = new push_frame_callback() {
 
                 @Override
                 public void push_frame(final long frame, final int isRbg) {
@@ -163,7 +167,9 @@ public class Ffmpeg {
                         consumer.handle(mat);
                     }
                 }
-            }));
+            };
+
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_frame_handler(nativeDef, pfc));
             return this;
         }
 
@@ -186,6 +192,10 @@ public class Ffmpeg {
         public StreamContext addRemuxer(final String fmt, final String outputUri) {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_add_remuxer(nativeDef, fmt, outputUri));
             return this;
+        }
+
+        public StreamContext addRemuxer(final String outputUri) {
+            return addRemuxer(determineFormatFromUri(outputUri), outputUri);
         }
 
         public StreamContext setSource(final String url) {
@@ -221,6 +231,21 @@ public class Ffmpeg {
         final Set<Long> toIgnore = Arrays.stream(ignore).mapToObj(Long::valueOf).collect(Collectors.toSet());
         if(status != 0L && !toIgnore.contains(status)) {
             throw new FfmpegException(status, errorMessage(status));
+        }
+    }
+
+    private static String determineFormatFromUri(final String uri) {
+        try {
+            final URI u = new URI(uri);
+            if("rtmp".equals(u.getScheme()))
+                return "flv";
+            else if("rtsp".equals(u.getScheme()))
+                return "mp4";
+            else
+                return null;
+        } catch(final URISyntaxException uris) {
+            // assume this is just a filename with no schema
+            return null; // this is a valid format for ffmpeg given a valid extention on the filename.
         }
     }
 

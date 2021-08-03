@@ -139,9 +139,10 @@ enum StreamContextState {
 
 struct Remuxer {
   std::string fmt;
+  bool fmtNull;
   std::string outputUri;
 
-  inline Remuxer(const char* pfmt, const char* poutputUri) : fmt(pfmt), outputUri(poutputUri) {}
+  inline Remuxer(const char* pfmt, const char* poutputUri) : fmt(pfmt == nullptr ? "" : pfmt), fmtNull(pfmt == nullptr), outputUri(poutputUri) {}
 };
 
 struct StreamContext {
@@ -613,7 +614,7 @@ static uint64_t process_frames(uint64_t ctx) {
   bool remux = c->remuxers.size() > 0;
 
   // TODO: this needs to handle more than the first one added.
-  const char* fmt = remux ? c->remuxers[0].fmt.c_str() : nullptr;
+  const char* fmt = remux ? (c->remuxers[0].fmtNull ? nullptr : c->remuxers[0].fmt.c_str()) : nullptr;
   const char* outputUri = remux ? c->remuxers[0].outputUri.c_str() : nullptr;
 
   if (remux) {
