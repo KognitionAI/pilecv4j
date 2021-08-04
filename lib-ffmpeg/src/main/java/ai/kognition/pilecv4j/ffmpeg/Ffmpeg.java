@@ -203,6 +203,11 @@ public class Ffmpeg {
             return this;
         }
 
+        public StreamContext setMaxRemuxErrorCount(final int maxRemuxErrorCount) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_max_remux_error_count(nativeDef, maxRemuxErrorCount));
+            return this;
+        }
+
         public StreamContext setSource(final URI url) {
             return setSource(url.toString());
         }

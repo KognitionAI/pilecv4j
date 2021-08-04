@@ -113,6 +113,9 @@ static const char* logLevelNames[] = {
 // defaults and constants
 #define PCV4J_CUSTOMIO_BUFSIZE 8192
 #define DEFAULT_MAX_DELAY_MILLIS 1000
+// MAX_REMUX_ERRORS needs to be set high enough so that rtsp feeds
+// that have out of order PTS eventually correct themselves.
+#define DEFAULT_MAX_REMUX_ERRORS 20
 
 static AVRational millisecondTimeBase = AVRational{1,1000};
 // ==================================
@@ -158,6 +161,7 @@ struct StreamContext {
   std::vector<std::tuple<std::string,std::string> > options;
 
   std::vector<Remuxer> remuxers;
+  int maxRemuxErrorCount = DEFAULT_MAX_REMUX_ERRORS;
   // =========================================
 
   /**
@@ -246,6 +250,11 @@ struct StreamContext {
 
   inline uint64_t setFrameHandler(push_frame handler) {
     frameHandler = handler;
+    return 0;
+  }
+
+  inline uint64_t setMaxRemuxErrorCount(int pmaxRemuxErrorCount) {
+    maxRemuxErrorCount = pmaxRemuxErrorCount;
     return 0;
   }
 
@@ -523,29 +532,31 @@ extern "C" {
   uint64_t pcv4j_ffmpeg_add_remuxer(uint64_t ctx, const char* fmt, const char* outputUri) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, INFO, "Adding remuxer: [%s,%s]", PO(fmt), PO(outputUri) );
-    c->addRemuxer(fmt, outputUri);
-    return 0;
+    return c->addRemuxer(fmt, outputUri);
   }
 
   uint64_t pcv4j_ffmpeg_set_frame_handler(uint64_t ctx, push_frame handler) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting frame handler" );
-    c->setFrameHandler(handler);
-    return 0;
+    return c->setFrameHandler(handler);
+  }
+
+  uint64_t pcv4j_ffmpeg_max_remux_error_count(uint64_t ctx, int32_t pmaxRemuxErrorCount) {
+    StreamContext* c = (StreamContext*)ctx;
+    log(c, DEBUG, "Setting maxRemuxErrorCount: %d", pmaxRemuxErrorCount );
+    return c->setMaxRemuxErrorCount((int)pmaxRemuxErrorCount);
   }
 
   uint64_t pcv4j_ffmpeg_set_source(uint64_t ctx, const char* sourceUri) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting source uri %s", PO(sourceUri) );
-    c->setSource(sourceUri);
-    return 0;
+    return c->setSource(sourceUri);
   }
 
   uint64_t pcv4j_ffmpeg_set_custom_source(uint64_t ctx, fill_buffer callback, seek_buffer seekCallback) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting custom source" );
-    c->setSource(callback, seekCallback);
-    return 0;
+    return c->setSource(callback, seekCallback);
   }
 
   uint64_t pcv4j_ffmpeg_set_sync(uint64_t ctx, int32_t doIt) {
@@ -604,11 +615,16 @@ extern "C" {
 //========================================================================
 
 static uint64_t process_frames(uint64_t ctx) {
+  int64_t startTime = now(); // this is used to calculate PTS for remuxing if required.
+  int remuxErrorCount = 0; // if this count goes above MAX_REMUX_ERRORS then process_frames will fail.
+
   StreamContext* c = (StreamContext*)ctx;
   if (c->state != CODEC) {
     log(c, ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)CODEC, (int)c->state);
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
+
+  const int maxRemuxErrorCount = c->maxRemuxErrorCount;
 
   push_frame callback = c->frameHandler;
   bool remux = c->remuxers.size() > 0;
@@ -617,9 +633,8 @@ static uint64_t process_frames(uint64_t ctx) {
   const char* fmt = remux ? (c->remuxers[0].fmtNull ? nullptr : c->remuxers[0].fmt.c_str()) : nullptr;
   const char* outputUri = remux ? c->remuxers[0].outputUri.c_str() : nullptr;
 
-  if (remux) {
+  if (remux)
     log(c, DEBUG, "Remuxer: [%s, %s]", PO(fmt), PO(outputUri));
-  }
 
   c->state = PLAY;
   const bool sync = c->sync;
@@ -710,7 +725,6 @@ static uint64_t process_frames(uint64_t ctx) {
       returnResult = MAKE_AV_STAT(ret);
       goto end;
     }
-
   }
   // ==================================================
 
@@ -725,16 +739,28 @@ static uint64_t process_frames(uint64_t ctx) {
 #endif
     // if it's the video stream
     if (pPacket->stream_index == video_stream_index) {
-      log(c, TRACE, "AVPacket->pts %" PRId64, pPacket->pts);
+      log(c, TRACE, "AVPacket->pts,dts %" PRId64 ",%" PRId64, pPacket->pts, pPacket->dts);
+
       if (callback != nullptr) {
         uint64_t response = decode_packet(c, pPacket, colorCvrt);
-        if (isError(response))
+        if (isError(response)) {
+          av_packet_unref(pPacket); // break skips the unref
           break;
+        }
       }
 
       // I'm done with the packet so I can recalculate the PTS and DTS
       // right on the existing packet
       if (remux) {
+        // if the input stream has no valid pts (like when reading the live feed from milestone)
+        // then we're going to calculate it.
+        if (pPacket->pts == AV_NOPTS_VALUE) {
+          pPacket->pts = av_rescale_q((int64_t)(now() - startTime), millisecondTimeBase, in_stream->time_base);
+          pPacket->dts = pPacket->pts;
+
+          log(c, TRACE, "calced  ->pts,dts %" PRId64 ",%" PRId64, pPacket->pts, pPacket->dts);
+        }
+
         AVStream* out_stream = output_format_context->streams[0];
         pPacket->stream_index = 0;
         pPacket->pts = av_rescale_q_rnd(pPacket->pts, in_stream->time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
@@ -742,12 +768,21 @@ static uint64_t process_frames(uint64_t ctx) {
         pPacket->duration = av_rescale_q(pPacket->duration, in_stream->time_base, out_stream->time_base);
         // https://ffmpeg.org/doxygen/trunk/structAVPacket.html#ab5793d8195cf4789dfb3913b7a693903
         pPacket->pos = -1;
+        if (c->logLevel <= TRACE)
+          log(c, TRACE, "rescaled  pts,dts %" PRId64 ",%" PRId64 ", outstream time_base: %d/%d",
+              pPacket->pts, pPacket->dts, out_stream->time_base.num, out_stream->time_base.den);
 
         int ret = av_interleaved_write_frame(output_format_context, pPacket);
         if (ret < 0) {
-          log(c, ERROR, "Error muxing packet");
-          break;
-        }
+          log(c, ERROR, "Error muxing packet \"%s\"", av_err2str(ret));
+          remuxErrorCount++;
+          if (remuxErrorCount > maxRemuxErrorCount) {
+            log(c, ERROR, "TOO MANY CONTINUOUS REMUX ERRORS(%d). EXITING!", (int)remuxErrorCount);
+            av_packet_unref(pPacket); // break skips the unref
+            break;
+          }
+        } else
+          remuxErrorCount = 0;
       }
     }
     // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
@@ -775,7 +810,6 @@ static uint64_t process_frames(uint64_t ctx) {
 
   return returnResult;
 }
-
 
 static uint64_t find_first_video_stream(uint64_t ctx) {
   StreamContext* c = (StreamContext*)ctx;
@@ -808,6 +842,7 @@ static uint64_t find_first_video_stream(uint64_t ctx) {
   return stat;
 }
 
+static const AVRational UNKNOWN_TIME_BASE{0, 1};
 
 static uint64_t open_codec(StreamContext* c) {
   if (c->state != STREAM) {
@@ -815,7 +850,9 @@ static uint64_t open_codec(StreamContext* c) {
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
-  AVCodecParameters *pCodecParameters = c->formatCtx->streams[c->streamIndex]->codecpar;
+  AVStream* pStream = c->formatCtx->streams[c->streamIndex];
+
+  AVCodecParameters *pCodecParameters = pStream->codecpar;
   AVCodec* pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
   if (pCodec==NULL) {
     log(c, ERROR, "Unsupported codec, ID %d",(int)pCodecParameters->codec_id);
@@ -828,11 +865,17 @@ static uint64_t open_codec(StreamContext* c) {
     log(c, ERROR, "failed to allocated memory for AVCodecContext");
     return MAKE_P_STAT(FAILED_CREATE_CODEC_CONTEXT);
   }
-  AVCodecContext* pCodecContext = c->codecCtx;
+
+  // See the accepted answer here: https://stackoverflow.com/questions/40275242/libav-ffmpeg-copying-decoded-video-timestamps-to-encoder
+  AVRational demuxTimeBase = pStream->time_base;
+  if (!(demuxTimeBase.num == UNKNOWN_TIME_BASE.num && demuxTimeBase.den == UNKNOWN_TIME_BASE.den)) {
+    log(c, TRACE, "initializing decode codec context time_base to: %d/%d (this may be reset when the codec is open)", (int)(demuxTimeBase.num), (int)(demuxTimeBase.den));
+    c->codecCtx->time_base = demuxTimeBase;
+  }
 
   // Fill the codec context based on the values from the supplied codec parameters
   // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
-  uint64_t stat = MAKE_AV_STAT(avcodec_parameters_to_context(pCodecContext, pCodecParameters));
+  uint64_t stat = MAKE_AV_STAT(avcodec_parameters_to_context(c->codecCtx, pCodecParameters));
   if (isError(stat))
     return stat;
 
@@ -840,7 +883,12 @@ static uint64_t open_codec(StreamContext* c) {
   // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
   AVDictionary* opts = nullptr;
   c->buildOptions(&opts);
-  stat = avcodec_open2(pCodecContext, pCodec, &opts);
+  stat = avcodec_open2(c->codecCtx, pCodec, &opts);
+
+  const int logLevel = c->logLevel;
+  if (logLevel <= TRACE)
+    log(c, TRACE, "decode codec context time_base: %d/%d (after open)", c->codecCtx->time_base.num, c->codecCtx->time_base.den);
+
   if (opts != nullptr)
     av_dict_free(&opts);
 
@@ -853,7 +901,6 @@ static uint64_t open_codec(StreamContext* c) {
   c->state = CODEC;
   return stat;
 }
-
 
 static uint64_t open_stream(uint64_t ctx, const char* url, fill_buffer readCallback, seek_buffer seekCallback) {
   StreamContext* c = (StreamContext*)ctx;
@@ -919,8 +966,9 @@ static uint64_t findFirstSupportedVidCodec(StreamContext* c, AVFormatContext* pF
 
     AVCodecParameters *pLocalCodecParameters = lStream->codecpar;
     if (logLevel <= DEBUG) {
-      log(c, DEBUG, "AVStream->time_base before open coded %d/%d", lStream->time_base.num, lStream->time_base.den);
-      log(c, DEBUG, "AVStream->r_frame_rate before open coded %d/%d", lStream->r_frame_rate.num, lStream->r_frame_rate.den);
+      log(c, DEBUG, "AVStream->time_base before open codec %d/%d", lStream->time_base.num, lStream->time_base.den);
+      log(c, DEBUG, "AVStream->r_frame_rate before open codec %d/%d", lStream->r_frame_rate.num, lStream->r_frame_rate.den);
+      log(c, DEBUG, "AVStream->avg_frame_rate before open codec %d/%d", lStream->avg_frame_rate.num, lStream->avg_frame_rate.den);
       log(c, DEBUG, "AVStream->start_time %" PRId64, lStream->start_time);
       log(c, DEBUG, "AVStream->duration %" PRId64, lStream->duration);
 

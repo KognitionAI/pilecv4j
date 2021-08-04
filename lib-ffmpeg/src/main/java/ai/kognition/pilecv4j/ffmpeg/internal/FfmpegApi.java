@@ -169,6 +169,8 @@ public class FfmpegApi {
 
     public native static long pcv4j_ffmpeg_set_frame_handler(long nativeDef, push_frame_callback handler);
 
+    public native static long pcv4j_ffmpeg_max_remux_error_count(long nativeDef, int maxRemuxErrorCount);
+
     public native static long pcv4j_ffmpeg_add_remuxer(final long nativeDef, final String fmt, final String outputUri);
 
     public native static void pcv4j_ffmpeg_set_im_maker(long immakerRef);
