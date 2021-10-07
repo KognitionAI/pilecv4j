@@ -123,9 +123,9 @@ namespace pilecv4j {
 
   PyObject* ImageSource::convertMatToNumPyArray(cv::Mat* mat, bool ownsMatPassed, bool deepcopy, int* statusCode, bool fromPython) {
     *statusCode = OK;
-    if (!PythonEnvironment::instanceX()->numpyImported) {
+    if (!PythonEnvironment::instance()->numpyImported) {
       import_array();
-      PythonEnvironment::instanceX()->numpyImported = true;
+      PythonEnvironment::instance()->numpyImported = true;
     }
 
     std::unique_ptr<cv::Mat> ig(ownsMatPassed ? mat : nullptr);
@@ -159,9 +159,9 @@ namespace pilecv4j {
   cv::Mat* ImageSource::convertNumPyArrayToMat(PyObject* npArrayObj, bool deepcopy, int* statusCode, bool fromPython) {
     *statusCode = OK;
 
-    if (!PythonEnvironment::instanceX()->numpyImported) {
+    if (!PythonEnvironment::instance()->numpyImported) {
       import_array();
-      PythonEnvironment::instanceX()->numpyImported = true;
+      PythonEnvironment::instance()->numpyImported = true;
     }
 
     log(TRACE,"ImageSource::convertNumPyArrayToMat (%ld,%s).",(long)npArrayObj,deepcopy ? "True" : "False");

@@ -17,8 +17,6 @@ static bool inited = false;
 
 using namespace pilecv4j;
 
-static std::mutex mutex;
-
 //static void dumpDict(PyObject* module) {
 //  PyObject *key, *value;
 //  Py_ssize_t pos = 0;
@@ -55,8 +53,10 @@ extern "C" {
   }
 
   int32_t initPython() {
+    static std::mutex initMutex;
+
     log(DEBUG, "initPython called from java.");
-    std::lock_guard<std::mutex> lck(mutex);
+    std::lock_guard<std::mutex> lck(initMutex);
 
     if (inited) {
       log(WARN, "Attempted call to initialize python more than once.");
@@ -68,7 +68,7 @@ extern "C" {
       return (int32_t) FAILED_INSTALL_KOGNITION_MODULE;
 
     // This will instantiate a PythonEnvironment
-    PythonEnvironment::instanceX();
+    PythonEnvironment::instance();
 
     inited = true;
     return (int32_t)OK;
@@ -95,7 +95,7 @@ extern "C" {
 
   int32_t runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
     PyObject* paramDict = (PyObject*)paramDictRef;
-    PythonEnvironment* p = PythonEnvironment::instanceX();
+    PythonEnvironment* p = PythonEnvironment::instance();
     return p->runModel(moduleName, functionName, paramDict);
   }
 
@@ -112,7 +112,7 @@ extern "C" {
   }
 
   void addModulePath(const char* modPath) {
-    PythonEnvironment::instanceX()->addModulePath(modPath);
+    PythonEnvironment::instance()->addModulePath(modPath);
   }
 
   uint64_t makeImageSource(uint64_t pt) {
@@ -231,7 +231,7 @@ extern "C" {
   int32_t putPytorchParamDict(uint64_t dictRef, const char* key, uint64_t valRef) {
 
     CallPythonGuard gg;
-    PythonEnvironment::instanceX()->getModuleOrImport(KOGNITION_MODULE);
+    PythonEnvironment::instance()->loadKognitionModule();
     PyObject* pytorch = convert((KogSystem*)valRef);
     if (!pytorch)
       return CANT_INSTANTIATE_PYTHON_OBJECT;

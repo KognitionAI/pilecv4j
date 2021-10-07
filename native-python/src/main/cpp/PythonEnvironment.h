@@ -1,9 +1,12 @@
 #pragma once
 
+#include <mutex>
+
 #include <opencv2/core/mat.hpp>
-#include "KogSystem.h"
 #include <Python.h>
 
+#include "GilGuard.h"
+#include "KogSystem.h"
 #include "log.h"
 
 #define KOGNITION_MODULE "pilecv4j"
@@ -37,18 +40,34 @@ namespace pilecv4j {
     void addModulePath(const char* moduleDir);
 
     // GIL must be Ensured already
-    PyObject* getModuleOrImport(const char * moduleName = KOGNITION_MODULE);
+    int32_t getFunctionFromModuleAtomic(const char* moduleName, const char* funcName, PyObject** callable);
+
+    int32_t runModel(const char* moduleName, const char* functionName, PyObject* paramDict);
 
     // GIL must be Ensured already
-    PyObject* getModuleOrNew(const char * moduleName);
-
-    int32_t runModel(const char* moduleName, const char* functionName, PyObject* paramDict) ;
+    inline void loadKognitionModule() {
+      GilSafeLockGuard<std::mutex> lck(envLock);
+      if (kogModule)
+        return;
+      kogModule = getModuleOrImport(KOGNITION_MODULE);
+    }
 
     /**
      * Get the singleton instance of the PythonEnvironment which should initialize
      * Python itself.
      */
-    static PythonEnvironment* instanceX();
+    static PythonEnvironment* instance();
+
+  private:
+    std::mutex envLock;
+    PyObject* kogModule = nullptr;
+
+    // GIL must be Ensured already
+    PyObject* getModuleOrImport(const char * moduleName);
+
+//    // GIL must be Ensured already
+//    PyObject* getModuleOrNew(const char * moduleName);
+
   };
 }
 

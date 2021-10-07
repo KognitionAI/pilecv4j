@@ -86,7 +86,7 @@ static PyObject* KogMatWithResults_setResult(PKogMatWithResults* self, PyObject*
 
 static void KogMatWithResults_Dealloc(PKogMatWithResults* self)
 {
-  log(DEBUG, "Deleting KogMatWithResults (%ld with kmat %ld, np %ld:%d)",
+  log(TRACE, "Deleting KogMatWithResults (%ld with kmat %ld, np %ld:%d)",
       (long)self, (long)(self->kmat), (long)self->npArray, (int)(self->npArray ? self->npArray->ob_refcnt : -1) );
   if (self->npArray) {
     Py_DECREF(self->npArray);
@@ -180,7 +180,7 @@ static PyObject* ImageSource_steal(PImageSource* imsrc, PyObject* args)
 static void ImageSource_Dealloc(PImageSource* self)
 {
   // we do not delete the image source from the python side.
-  //log(PE, DEBUG, "Deleting ImageSource");
+  log(TRACE, "Dealloc ImageSource");
   //delete self->imageSource;
   self->ob_base.ob_type->tp_free((PyObject*)self);
 }
@@ -222,11 +222,11 @@ typedef struct {
 //------------------
 static PyObject* KogSystem_getImageSource(PKogSystem* pt, PyObject* args)
 {
-  log(DEBUG, "Getting ImageSource from KogSystem");
   PImageSource* ret;
   ImageSource* is;
 
   Py_BEGIN_ALLOW_THREADS
+  log(DEBUG, "Getting ImageSource from KogSystem");
   is = pt->kogSys->getImageSource();
   Py_END_ALLOW_THREADS
 
@@ -290,11 +290,10 @@ static PyObject* KogSystem_modelLabels(PKogSystem* pt, PyObject* args)
 //------------------
 // KogSystem construction and destruction
 //------------------
-static void KogSystem_Dealloc(PImageSource* self)
+static void KogSystem_Dealloc(PKogSystem* self)
 {
   // we do not delete the image source from the python side.
-  //log(PE, DEBUG, "Deleting ImageSource");
-  //delete self->imageSource;
+  log(DEBUG, "Deallocating KogSystem");
   self->ob_base.ob_type->tp_free((PyObject*)self);
 }
 //------------------

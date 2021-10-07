@@ -10,8 +10,6 @@
 //#include "RunScript.h"
 //#include "RunFunction.h"
 
-static std::mutex pyEnvMutex;
-
 //====================================================
 static const char* errCodeStrings[] = {
     "OK",
@@ -64,7 +62,51 @@ namespace pilecv4j {
 
     // clean up - finalize python
     PyEval_RestoreThread(mainThreadState);
+
+    // if we have the Module
+    if (kogModule)
+      Py_DECREF(kogModule);
+
     Py_Finalize();
+  }
+
+  int32_t PythonEnvironment::getFunctionFromModuleAtomic(const char* moduleName, const char* funcName, PyObject** ret) {
+    *ret = nullptr;
+    StatusCode statusCode = OK;
+
+    GilSafeLockGuard<std::mutex> lck(envLock); // atomic. The GIL is release by python itself inside PyImport_Import
+
+    // New reference
+    PyObject *pModule = PythonEnvironment::instance()-> getModuleOrImport(moduleName);
+
+    if (!pModule) {
+      log (ERROR, "Failed to open the module %s", moduleName);
+      statusCode = CANT_OPEN_PYTHON_MODULE;
+      return statusCode;
+    }
+
+    // Load all module level attributes as a dictionary
+    log(TRACE, "Loading dictionary for module %s", moduleName);
+    // Borrowed reference
+    PyObject *pDict = PyModule_GetDict(pModule);
+
+    // New reference
+    PyObject* pFuncName = PyUnicode_FromString(funcName);
+    log(TRACE, "Looking for function %s in module %s", funcName, moduleName);
+    // Borrowed reference
+    PyObject *pFunc = PyDict_GetItem(pDict, pFuncName);
+    Py_DECREF(pFuncName);
+
+    *ret = pFunc;
+    if(!pFunc){
+      log(ERROR, "Couldn't find func %s in module %s", funcName, moduleName);
+      statusCode = CANT_FIND_PYTHON_FUNCTION;
+    }
+
+    if (pModule)
+      Py_DECREF(pModule);
+
+    return statusCode;
   }
 
   PyObject* PythonEnvironment::getModuleOrImport(const char* moduleName) {
@@ -94,32 +136,32 @@ namespace pilecv4j {
     return pModule;
   }
 
-  PyObject* PythonEnvironment::getModuleOrNew(const char* moduleName) {
-    // New reference
-    PyObject* pName = PyUnicode_FromString(moduleName);
-    log(TRACE, "Checking module %s", moduleName);
-    PyObject *pModule;
-    // New reference
-    pModule = PyImport_GetModule(pName);
-    if (!pModule) {
-      log(TRACE, "Creating new module %s", moduleName);
-      // New reference
-      pModule = PyModule_New(moduleName);
-      if (pModule) {
-        log(TRACE, "Created new module %s", moduleName);
-        PyModule_AddStringConstant(pModule, "__file__", "");
-      }
-      else
-        log(TRACE, "Failed to create new module %s", moduleName);
-    } else {
-      log(TRACE, "Module %s exists already", moduleName);
-    }
-
-    if (pName)
-      Py_DECREF(pName);
-
-    return pModule;
-  }
+//  PyObject* PythonEnvironment::getModuleOrNew(const char* moduleName) {
+//    // New reference
+//    PyObject* pName = PyUnicode_FromString(moduleName);
+//    log(TRACE, "Checking module %s", moduleName);
+//    PyObject *pModule;
+//    // New reference
+//    pModule = PyImport_GetModule(pName);
+//    if (!pModule) {
+//      log(TRACE, "Creating new module %s", moduleName);
+//      // New reference
+//      pModule = PyModule_New(moduleName);
+//      if (pModule) {
+//        log(TRACE, "Created new module %s", moduleName);
+//        PyModule_AddStringConstant(pModule, "__file__", "");
+//      }
+//      else
+//        log(TRACE, "Failed to create new module %s", moduleName);
+//    } else {
+//      log(TRACE, "Module %s exists already", moduleName);
+//    }
+//
+//    if (pName)
+//      Py_DECREF(pName);
+//
+//    return pModule;
+//  }
 
   void PythonEnvironment::addModulePath(const char* filedir) {
     CallPythonGuard gg;
@@ -153,8 +195,9 @@ namespace pilecv4j {
     Py_DECREF(dir);
   }
 
-  PythonEnvironment* PythonEnvironment::instanceX()
+  PythonEnvironment* PythonEnvironment::instance()
   {
+    static std::mutex pyEnvMutex; // only used here.
     std::lock_guard<std::mutex> lck (pyEnvMutex);
 
     if (s_instance == nullptr)
