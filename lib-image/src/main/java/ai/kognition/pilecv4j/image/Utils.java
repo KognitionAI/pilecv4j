@@ -1057,9 +1057,9 @@ public class Utils {
     }
 
     public static double[][] to2dDoubleArray(final Mat mat) {
-        if(mat.type() != CvType.CV_64FC1)
-            throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
-                + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
+        // if(mat.type() != CvType.CV_64FC1)
+        // throw new IllegalArgumentException("Cannot convert mat " + mat + " to a double[] given the type " + CvType.typeToString(mat.type())
+        // + " since it must be " + CvType.typeToString(CvType.CV_64FC1));
         // we're going to flatten it.
         final int r = mat.rows();
         final int c = mat.cols();
@@ -1141,6 +1141,10 @@ public class Utils {
         return scaleWhilePreservingAspectRatio(mat.size(), maxSize);
     }
 
+    public static double scaleFactorWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
+        return scaleFactorWhilePreservingAspectRatio(mat.size(), maxSize);
+    }
+
     /**
      *
      * @param originalMatSize The size of the original image
@@ -1150,10 +1154,15 @@ public class Utils {
      */
     public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {
         // calculate the appropriate resize
+        final double scale = scaleFactorWhilePreservingAspectRatio(originalMatSize, maxSize);
+        return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+    }
+
+    public static double scaleFactorWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {
+        // calculate the appropriate resize
         final double fh = maxSize.height / originalMatSize.height;
         final double fw = maxSize.width / originalMatSize.width;
-        final double scale = Math.min(fw, fh);
-        return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+        return Math.min(fw, fh);
     }
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {

@@ -14,10 +14,12 @@
     <module>lib-gstreamer</module>
     <module>lib-tracking</module>
     <module>lib-ffmpeg</module>
+    <module>lib-python</module>
     <module>native-image</module>
     <module>native-nr</module>
     <module>native-gstreamer</module>
     <module>native-ffmpeg</module>
+    <module>native-python</module>
   </modules>
 
   <properties>
@@ -171,12 +173,23 @@
       </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
+        <artifactId>lib-ffmpeg</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
         <artifactId>lib-tf</artifactId>
         <version>${project.version}</version>
       </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>native-image</artifactId>
+        <classifier>${platform}</classifier>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>native-python</artifactId>
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
