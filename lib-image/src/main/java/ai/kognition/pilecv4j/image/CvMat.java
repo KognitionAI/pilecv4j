@@ -305,7 +305,16 @@ public class CvMat extends Mat implements QuietCloseable {
      * using {@link CvMat#deepCopy(Mat)}.
      */
     public static CvMat shallowCopy(final Mat mat) {
-        return new CvMat(ImageAPI.CvRaster_copy(mat.nativeObj));
+        final long newNativeObj = ImageAPI.CvRaster_copy(mat.nativeObj);
+        if(newNativeObj == 0L) {
+            // let's do some checking
+            if(!mat.isContinuous())
+                LOGGER.error("Cannot shallow copy a discontinuous Mat");
+            else
+                LOGGER.error("Failed to shallow copy mat");
+            return null;
+        }
+        return new CvMat(newNativeObj);
     }
 
     /**

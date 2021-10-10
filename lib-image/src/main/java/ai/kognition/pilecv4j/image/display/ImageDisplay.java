@@ -17,6 +17,8 @@ import org.eclipse.swt.widgets.Shell;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
+import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -25,6 +27,7 @@ import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
+import ai.kognition.pilecv4j.image.Utils;
 import ai.kognition.pilecv4j.image.display.swt.SwtImageDisplay;
 import ai.kognition.pilecv4j.image.display.swt.SwtImageDisplay.CanvasType;
 
@@ -121,6 +124,34 @@ public abstract class ImageDisplay implements QuietCloseable {
         public boolean select(Point pointClicked);
     }
 
+    private static class Proxy extends ImageDisplay {
+        protected final ImageDisplay underlying;
+
+        private Proxy(final ImageDisplay underlying) {
+            this.underlying = underlying;
+        }
+
+        @Override
+        public void close() {
+            underlying.close();
+        }
+
+        @Override
+        public void update(final Mat toUpdate) {
+            underlying.update(toUpdate);
+        }
+
+        @Override
+        public void waitUntilClosed() throws InterruptedException {
+            underlying.waitUntilClosed();
+        }
+
+        @Override
+        public void setCloseCallback(final Runnable closeCallback) {
+            underlying.setCloseCallback(closeCallback);
+        }
+    }
+
     /**
      * SWT defaults to SWT_SCROLLABLE
      */
@@ -135,6 +166,8 @@ public abstract class ImageDisplay implements QuietCloseable {
         private Mat toShow = null;
         private String windowName = DEFAULT_WINDOWS_NAME_PREFIX + "_" + sequence.incrementAndGet();
         private SelectCallback selectCallback = null;
+        private Size screenDim = null;
+        private boolean preserveAspectRatio = true;
 
         public Builder keyPressHandler(final KeyPressCallback keyPressHandler) {
             this.keyPressHandler = keyPressHandler;
@@ -166,7 +199,40 @@ public abstract class ImageDisplay implements QuietCloseable {
             return this;
         }
 
+        public Builder dim(final Size screenDim) {
+            return dim(screenDim, true);
+        }
+
+        public Builder dim(final Size screenDim, final boolean preserveAspectRatio) {
+            this.screenDim = screenDim;
+            this.preserveAspectRatio = preserveAspectRatio;
+            return this;
+        }
+
         public ImageDisplay build() {
+            if(screenDim == null)
+                return dobuild();
+            else
+                return new Proxy(dobuild()) {
+                    private Size adjustedSize = null;
+
+                    @Override
+                    public void update(final Mat mat) {
+                        if(adjustedSize == null)
+                            adjustedSize = preserveAspectRatio ? Utils.scaleDownOrNothing(mat, screenDim)
+                                : screenDim;
+
+                        try(CvMat tmat = CvMat.shallowCopy(mat);
+                            CvMat resized = new CvMat();) {
+                            Imgproc.resize(mat, resized, adjustedSize, 0, 0, Imgproc.INTER_NEAREST);
+                            underlying.update(resized);
+                        }
+                    }
+
+                };
+        }
+
+        public ImageDisplay dobuild() {
             switch(implementation) {
                 case HIGHGUI: {
                     if(selectCallback != null)
