@@ -3,7 +3,6 @@ package ai.kognition.pilecv4j.ffmpeg;
 import static org.junit.Assert.assertTrue;
 
 import java.io.File;
-import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.io.FileUtils;
@@ -116,11 +115,7 @@ public class TestFfmpeg extends BaseTest {
                             return Ffmpeg.AVERROR_EOF;
                         final int size = bb.capacity();
                         LOGGER.trace("buf size: {}, to write: {}, from pos: {}", size, numBytes, pos.val);
-                        bb.rewind();
-                        int numToSend = numBytes > bb.capacity() ? bb.capacity() : numBytes;
-                        if(numToSend + (int)pos.val > contents.length) {
-                            numToSend = contents.length - (int)pos.val;
-                        }
+                        final int numToSend = (numBytes + (int)pos.val > contents.length) ? (contents.length - (int)pos.val) : numBytes;
                         LOGGER.trace("contents read from {} to {}({})", pos.val, (pos.val + numToSend), numToSend);
                         bb.put(contents, (int)pos.val, numToSend);
                         pos.val += numToSend;
@@ -130,7 +125,7 @@ public class TestFfmpeg extends BaseTest {
                     },
 
                     // need to support seek to read some mp4 files
-                    (final ByteBuffer bb, final long offset, final int whence) -> {
+                    (final long offset, final int whence) -> {
                         if(whence == Ffmpeg.SEEK_SET)
                             pos.val = offset;
                         else if(whence == Ffmpeg.SEEK_CUR)

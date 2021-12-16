@@ -60,7 +60,7 @@ public class Ffmpeg {
 
     @FunctionalInterface
     public static interface VideoDataSeek {
-        public long seekBuffer(ByteBuffer buf, long offset, int whence);
+        public long seekBuffer(long offset, int whence);
     }
 
     public static class StreamContext implements QuietCloseable {
@@ -95,11 +95,14 @@ public class Ffmpeg {
 
         public StreamContext setSource(final VideoDataSupplier dataSupplier, final VideoDataSeek seeker) {
             final ByteBuffer buffer = customStreamBuffer();
+            final int bufSize = buffer.capacity();
 
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg_set_custom_source(nativeDef,
                 strongRefDs = new fill_buffer_callback() {
                     @Override
-                    public int fill_buffer(final int numBytes) {
+                    public int fill_buffer(final int numBytesRequested) {
+                        final int numBytes = Math.min(numBytesRequested, bufSize);
+                        buffer.rewind();
                         return dataSupplier.fillBuffer(buffer, numBytes);
                     }
                 },
@@ -107,7 +110,7 @@ public class Ffmpeg {
                 strongRefS = (seeker != null ? new seek_buffer_callback() {
                     @Override
                     public long fill_buffer(final long offset, final int whence) {
-                        return seeker.seekBuffer(buffer, offset, whence);
+                        return seeker.seekBuffer(offset, whence);
                     }
                 } : null)));
 
