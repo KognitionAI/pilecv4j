@@ -15,23 +15,30 @@ import org.tensorflow.ndarray.buffer.ByteDataBuffer;
 import org.tensorflow.ndarray.buffer.DataBuffers;
 import org.tensorflow.proto.framework.GraphDef;
 import org.tensorflow.types.TFloat32;
-import org.tensorflow.types.TUint8;
+import org.tensorflow.types.family.TType;
 
 import net.dempsy.util.QuietCloseable;
 
+import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.CvRaster;
 
 public class TensorUtils {
     public static final Logger LOGGER = LoggerFactory.getLogger(TensorUtils.class);
 
-    public static Tensor toTensor(final CvRaster raster) {
+    public static Tensor toTensor(final CvRaster raster, final Class<? extends TType> clazz) {
         final Shape shape = Shape.of(new long[] {1,raster.rows(),raster.cols(),raster.channels()});
         final ByteBuffer bb = raster.underlying();
         bb.rewind();
         try(QuietCloseable qc = () -> bb.rewind();) {
             final ByteDataBuffer bdb = DataBuffers.of(bb);
-            return Tensor.of(TUint8.class, shape, bdb);
+            return Tensor.of(clazz, shape, bdb);
         }
+    }
+
+    public static Tensor toTensor(final CvMat mat, final Class<? extends TType> clazz) {
+        return mat.rasterOp(raster -> {
+            return TensorUtils.toTensor(raster, clazz);
+        });
     }
 
     public static Graph inflate(final byte[] graphBytes) throws InvalidProtocolBufferException {

@@ -95,6 +95,7 @@ public class Utils {
 
     private static final int NUM_DEPTH_CONSTS = 8;
     private static final int[] BITS_PER_CHANNEL_LOOKUP = new int[NUM_DEPTH_CONSTS];
+    public static final Scalar DEFAULT_PADDING = new Scalar(128, 128, 128);
 
     // Dynamically determine if we're at major version 3 or 4 of OpenCV and set the
     // variables appropriately.
@@ -332,6 +333,50 @@ public class Utils {
      */
     public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
         CvMat.rasterAp(mat, raster -> dump(raster, out, numRows, numCols));
+    }
+
+    public static CvMat letterbox(final Mat mat, final Size networkDim) {
+        return letterbox(mat, networkDim, DEFAULT_PADDING);
+    }
+
+    public static CvMat letterbox(final Mat mat, final int dim) {
+        return letterbox(mat, new Size(dim, dim), DEFAULT_PADDING);
+    }
+
+    public static CvMat letterbox(final Mat mat, final int dim, final Scalar padding) {
+        return letterbox(mat, new Size(dim, dim), padding);
+    }
+
+    public static CvMat letterbox(final Mat mat, final Size networkDim, final Scalar padding) {
+        // may want to return these
+        final int top, bottom, left, right;
+
+        if(!networkDim.equals(mat.size())) {
+            // resize the mat
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, networkDim);
+            try(CvMat resized = new CvMat();
+                CvMat toUse = new CvMat();) {
+                Imgproc.resize(mat, resized, toResizeTo);
+                // one of the dim should be exactly the same
+                if((int)(networkDim.width) > resized.width()) { // then the height dim has 0 border
+                    top = bottom = 0;
+                    final int diff = ((int)networkDim.width - resized.width());
+                    right = diff / 2;
+                    left = diff - right;
+                } else { // then the width dim has 0 border OR the image is exactly a square (in which case everything becomes 0 anyway).
+                    right = left = 0;
+                    final int diff = ((int)networkDim.height - resized.height());
+                    top = diff / 2;
+                    bottom = diff - top;
+                }
+
+                Core.copyMakeBorder(resized, toUse, top, bottom, left, right, Core.BORDER_CONSTANT, padding);
+                return toUse.returnMe();
+            }
+        } else {
+            top = bottom = left = right = 0;
+            return CvMat.shallowCopy(mat);
+        }
     }
 
     private static String arrayToHexString(final Function<Integer, Long> valueGetter, final int length, final long mask) {

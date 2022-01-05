@@ -42,7 +42,7 @@
     <!-- The artifact version -->
     <opencv.version>${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
-    <tensorflow-core-api.version>0.3.1</tensorflow-core-api.version>    
+    <tensorflow-core-api.version>0.4.0</tensorflow-core-api.version>    
     <slf4j.version>1.7.30</slf4j.version>
 
     <!-- generator and platform.options are set in the profile -->
