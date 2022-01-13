@@ -1,5 +1,8 @@
 package ai.kognition.pilecv4j.image;
 
+import static net.dempsy.util.BinaryUtils.byteify;
+import static net.dempsy.util.BinaryUtils.intify;
+
 import java.awt.Color;
 import java.awt.image.IndexColorModel;
 
@@ -183,13 +186,4 @@ public class Operations {
 
         return byteify(rret);
     }
-
-    private static byte byteify(final int i) {
-        return i > 127 ? (byte)(i - 256) : (byte)i;
-    }
-
-    private static int intify(final byte b) {
-        return (b < 0) ? (b) + 256 : (int)b;
-    }
-
 }
