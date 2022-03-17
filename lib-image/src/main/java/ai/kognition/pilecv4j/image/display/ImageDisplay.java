@@ -93,7 +93,7 @@ public abstract class ImageDisplay implements QuietCloseable {
                     future.get();
                 } catch(final ExecutionException e) {
                     // the eventHandler can only throw a RuntimeException
-                    throw(RuntimeException)e.getCause();
+                    throw new RuntimeException(e.getCause());
                 }
 
             } catch(final RuntimeException rte) {

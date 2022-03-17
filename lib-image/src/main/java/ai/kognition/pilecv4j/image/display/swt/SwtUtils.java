@@ -1,5 +1,8 @@
 package ai.kognition.pilecv4j.image.display.swt;
 
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.stream.IntStream;
 
 import org.eclipse.swt.graphics.ImageData;
@@ -15,6 +18,44 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 public class SwtUtils {
     private static Display theDisplay = null;
+
+    private static boolean loaded = false;
+
+    public static synchronized void loadNative() {
+        if(!loaded) {
+            // test if the jar is already on the classpath or is shadded
+            boolean onClasspath = false;
+            try {
+                final Class<?> clazz = Class.forName("org.eclipse.swt.widgets.Display");
+                onClasspath = true;
+            } catch(final ClassNotFoundException cnfe) {
+                onClasspath = false;
+            }
+            if(!onClasspath) {
+                final String osName = System.getProperty("os.name").toLowerCase();
+                final String osArch = System.getProperty("os.arch").toLowerCase();
+                final String swtFileNameOsPart = osName.contains("win") ? "win32"
+                    : osName.contains("mac") ? "macosx" : osName.contains("linux") || osName.contains("nix") ? "linux_gtk" : ""; // throw new
+                                                                                                                                 // RuntimeException("Unknown
+                                                                                                                                 // OS name: "+osName)
+
+                final String swtFileNameArchPart = osArch.contains("64") ? "x64" : "x86";
+                final String swtFileName = "swt_" + swtFileNameOsPart + "_" + swtFileNameArchPart + ".jar";
+
+                try {
+                    final URLClassLoader classLoader = (URLClassLoader)SwtUtils.class.getClassLoader();
+                    final Method addUrlMethod = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
+                    addUrlMethod.setAccessible(true);
+
+                    final URL swtFileUrl = new URL("file:" + swtFileName);
+                    addUrlMethod.invoke(classLoader, swtFileUrl);
+                } catch(final Exception e) {
+                    throw new RuntimeException("Unable to add the SWT jar to the class path: " + swtFileName, e);
+                }
+            }
+        } else
+            loaded = true;
+    }
 
     public static synchronized Display getDisplay() {
         if(theDisplay == null) {
