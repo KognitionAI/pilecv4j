@@ -7,9 +7,6 @@
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
 
-//#include "RunScript.h"
-//#include "RunFunction.h"
-
 //====================================================
 static const char* errCodeStrings[] = {
     "OK",
@@ -211,7 +208,7 @@ namespace pilecv4j {
     {
       RunPythonFunction func(moduleName, functionName, paramDict);
       PyObject* obj = func.execute();
-      log(TRACE, "func %s returned object %ld", functionName, (long)obj);
+      log(TRACE, "func %s returned object %ld", functionName, static_cast<long>((uint64_t)obj));
       if (obj) {
         if (obj == Py_None) {
           log(TRACE, "func %s returned object is None", functionName);

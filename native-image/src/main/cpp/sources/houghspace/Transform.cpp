@@ -145,7 +145,7 @@ void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*he
       if (bmlist)
       {
         // do a consistency check
-        int listcount = bmlist->size();
+        int listcount = static_cast<int>(bmlist->size());
         int hscount = (int)ret[hsindex];
 
         if (hscount != listcount) {

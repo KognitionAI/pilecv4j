@@ -11,10 +11,14 @@ endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_C_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_DEBUG "-g")
+if (UNIX)
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+  set(CMAKE_C_FLAGS_RELEASE "-O3")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g")
+  set(CMAKE_C_FLAGS_DEBUG "-g")
+endif()
+
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 # set where to find additional cmake modules if any
 # comment it out if not required
@@ -28,11 +32,19 @@ if(NOT DEFINED ENV{COMMON_INCLUDE})
 endif()
 include_directories($ENV{COMMON_INCLUDE})
 
-find_path( AVCODEC_INCLUDE_DIR libavcodec/avcodec.h )
-find_library( AVCODEC_LIBRARY avcodec )
+find_path( AVCODEC_INCLUDE_DIR libavcodec/avcodec.h REQUIRED )
+message(STATUS "avcodec.h location: ${AVCODEC_INCLUDE_DIR}")
+find_library( AVCODEC_LIBRARY avcodec REQUIRED )
+message(STATUS "avcodec lib: ${AVCODEC_LIBRARY}")
+find_library( AVUTIL_LIBRARY avutil REQUIRED )
+message(STATUS "avutil lib: ${AVUTIL_LIBRARY}")
+find_library( AVFORMAT_LIBRARY avformat REQUIRED )
+message(STATUS "avformat lib: ${AVFORMAT_LIBRARY}")
+find_library( SWSCALE_LIBRARY swscale REQUIRED )
+message(STATUS "swscale lib: ${SWSCALE_LIBRARY}")
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-add_definitions( -DLOGGING )
+add_definitions( -DLOGGING -D_CRT_NO_VA_START_VALIDATION )
 
 # build target
 add_library(${PROJECT_NAME} SHARED
@@ -41,6 +53,4 @@ add_library(${PROJECT_NAME} SHARED
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE src/main/cpp PUBLIC ${AVCODEC_INCLUDE_DIR})
-target_link_libraries(${PROJECT_NAME} ${AVCODEC_LIBRARY})
-
-
+target_link_libraries(${PROJECT_NAME} ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} ${SWSCALE_LIBRARY})

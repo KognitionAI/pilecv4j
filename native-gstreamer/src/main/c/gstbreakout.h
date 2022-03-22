@@ -77,6 +77,8 @@ KAI_EXPORT GType gst_breakout_get_type (void);
 // get data about the current frame.
 KAI_EXPORT uint64_t who_am_i                            (GstBreakout* breakout);
 
+KAI_EXPORT void set_push_frame_callback(uint64_t me, push_frame callback, int32_t writable );
+
 G_END_DECLS
 
 #endif

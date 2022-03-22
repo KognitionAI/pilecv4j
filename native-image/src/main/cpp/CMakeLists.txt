@@ -9,10 +9,14 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
-set(CMAKE_C_FLAGS_RELEASE "-O3")
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_DEBUG "-g")
+set(CMAKE_VERBOSE_MAKEFILE ON)
+
+if(UNIX)
+  set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+  set(CMAKE_C_FLAGS_RELEASE "-O3")
+  set(CMAKE_CXX_FLAGS_DEBUG "-g")
+  set(CMAKE_C_FLAGS_DEBUG "-g")
+endif()
 
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
@@ -123,7 +127,6 @@ add_library(ai.kognition.pilecv4j.image
   MODULE
   sources/opencv/CvRasterNative.cpp
   sources/opencv/gstbridge.cpp
-#  sources/opencv/gpumat.cpp
   sources/houghspace/Transform.cpp
   sources/mjpeg/jpegtoavi.cpp)
 

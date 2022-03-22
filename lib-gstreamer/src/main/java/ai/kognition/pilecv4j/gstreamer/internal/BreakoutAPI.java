@@ -50,7 +50,7 @@ public interface BreakoutAPI extends Library {
                 .library(LIBNAME)
                 .destinationDir(new File(System.getProperty("java.io.tmpdir"), LIBNAME).getAbsolutePath())
                 .addCallback((dir, libname, oslibname) -> {
-                    LOGGER.info("scanning dir:{}, libname:{}, oslibname:{}", dir, libname, oslibname);
+                    LOGGER.info("scanning dir: {}, libname:{}, oslibname:{}", dir, libname, oslibname);
                     NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
                     Registry.get().scanPath(dir.getAbsolutePath());
                 })

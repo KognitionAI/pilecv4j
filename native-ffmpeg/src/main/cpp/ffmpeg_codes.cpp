@@ -1,5 +1,7 @@
 #include <stdint.h>
 
+#include "kog_exports.h"
+
 extern "C"
 {
 #include "libavformat/avformat.h"
@@ -10,27 +12,27 @@ extern "C"
  */
 
 extern "C" {
-  int32_t pcv4j_ffmpeg_code_averror_eof() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_code_averror_eof() {
     return AVERROR_EOF;
   }
 
-  int32_t pcv4j_ffmpeg_code_seek_set() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_code_seek_set() {
     return SEEK_SET;
   }
 
-  int32_t pcv4j_ffmpeg_code_seek_cur() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_code_seek_cur() {
     return SEEK_CUR;
   }
 
-  int32_t pcv4j_ffmpeg_code_seek_end() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_code_seek_end() {
     return SEEK_END;
   }
 
-  int32_t pcv4j_ffmpeg_code_seek_size() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_code_seek_size() {
     return AVSEEK_SIZE;
   }
 
-  int32_t pcv4j_ffmpeg_code_eagain() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_code_eagain() {
     return AVERROR(EAGAIN);
   }
 }

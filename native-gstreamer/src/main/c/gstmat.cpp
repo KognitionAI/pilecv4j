@@ -5,6 +5,8 @@ extern "C" {
 #include "gstbreakout.h"
 }
 
+#include "kog_exports.h"
+
 struct GstFrameData {
   GstMapInfo map;
   GstVideoFrame* frame;
@@ -22,7 +24,7 @@ extern "C" {
   }
 
   // exposed to java
-  void set_im_maker(uint64_t im) {
+  KAI_EXPORT void set_im_maker(uint64_t im) {
     imaker = (ai::kognition::pilecv4j::ImageMaker*)im;
   }
 

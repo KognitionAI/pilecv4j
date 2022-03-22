@@ -7,11 +7,6 @@
 
 using namespace pilecv4j;
 
-//extern "C" {
-//  // Generated from SWIG
-//  PyObject* PyInit__kognition();
-//}
-
 static void initializePyType(PyTypeObject* type_object)
 {
   static PyTypeObject py_type_object_header = { PyObject_HEAD_INIT(NULL) 0};
@@ -76,7 +71,7 @@ static PyObject* KogMatWithResults_setResult(PKogMatWithResults* self, PyObject*
   }
 
   int statusCode;
-  log(TRACE, "setResult on %ld", (long)(self->kmat));
+  log(TRACE, "setResult on %ld", static_cast<long>((uint64_t)(self->kmat)));
   self->kmat->setResult(ImageSource::convertNumPyArrayToMat(npArrayObj, true, &statusCode, true),true);
   if (statusCode != OK) {
     PyErr_SetString(PyExc_TypeError, getStatusMessage(statusCode));
@@ -87,7 +82,7 @@ static PyObject* KogMatWithResults_setResult(PKogMatWithResults* self, PyObject*
 static void KogMatWithResults_Dealloc(PKogMatWithResults* self)
 {
   log(TRACE, "Deleting KogMatWithResults (%ld with kmat %ld, np %ld:%d)",
-      (long)self, (long)(self->kmat), (long)self->npArray, (int)(self->npArray ? self->npArray->ob_refcnt : -1) );
+      static_cast<long>((uint64_t)self), static_cast<long>((uint64_t)(self->kmat)), static_cast<long>((uint64_t)self->npArray), (int)(self->npArray ? self->npArray->ob_refcnt : -1) );
   if (self->npArray) {
     Py_DECREF(self->npArray);
     self->npArray = nullptr;
@@ -169,7 +164,7 @@ static PyObject* ImageSource_steal(PImageSource* imsrc, PyObject* args)
 
   ret->kmat = kmat;
   log(TRACE, "Returning KogMatWithResults (refcnt:%d) (%ld with kmat %ld, np %ld:%d)",
-      (int)ret->ob_base.ob_refcnt, (long)ret, (long)(ret->kmat), (long)ret->npArray, (int)(ret->npArray ? ret->npArray->ob_refcnt : -1));
+      (int)ret->ob_base.ob_refcnt, static_cast<long>((uint64_t)ret), static_cast<long>((uint64_t)(ret->kmat)), static_cast<long>((uint64_t)ret->npArray), (int)(ret->npArray ? ret->npArray->ob_refcnt : -1));
   return (PyObject*)ret;
 }
 //------------------
@@ -239,7 +234,7 @@ static PyObject* KogSystem_getImageSource(PKogSystem* pt, PyObject* args)
   if (!ret)
     return NULL;
   ret->imageSource = is;
-  log(TRACE, "Returning ImageSource (refcnt:%d) (%ld)", (int)ret->ob_base.ob_refcnt, (long)ret);
+  log(TRACE, "Returning ImageSource (refcnt:%d) (%ld)", (int)ret->ob_base.ob_refcnt, static_cast<long>((uint64_t)ret));
   return (PyObject*)ret;
 }
 

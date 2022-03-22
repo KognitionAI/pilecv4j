@@ -25,7 +25,7 @@ namespace pilecv4j {
       resultsSet(false),
       abandoned(false),
       refCnt(0) {
-      log(TRACE,"Constructing KMResult(%ld)", (long)this);
+      log(TRACE,"Constructing KMResult(%ld)", static_cast<long>((uint64_t)this));
       increment();
     }
 
@@ -53,7 +53,7 @@ namespace pilecv4j {
 
   private:
     inline ~KogMatWithResults() {
-      log(TRACE,"Destructing KMResult(%ld)", (long)this);
+      log(TRACE,"Destructing KMResult(%ld)", static_cast<long>((uint64_t)this));
       free();
     }
 
@@ -64,7 +64,7 @@ namespace pilecv4j {
     inline void decrement() {
       std::lock_guard<std::mutex> lck(mutex);
       int32_t val = (--refCnt);
-      log(TRACE,"Decrementing KMResult(%ld) to %d", (long)this, (int)val);
+      log(TRACE,"Decrementing KMResult(%ld) to %d", static_cast<long>((uint64_t)this), (int)val);
       if (val <= 0)
         delete this;
     }
@@ -72,7 +72,7 @@ namespace pilecv4j {
     inline void increment() {
       std::lock_guard<std::mutex> lck(mutex);
       int32_t val = (++refCnt);
-      log(TRACE,"Incrementing KMResult(%ld) to %d", (long)this, (int)val);
+      log(TRACE,"Incrementing KMResult(%ld) to %d", static_cast<long>((uint64_t)this), (int)val);
     }
   };
 

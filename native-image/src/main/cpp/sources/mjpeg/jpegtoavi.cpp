@@ -281,7 +281,7 @@ bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
       return false;
    }
 
-   if((nbr=fread(buff,1,6,fd))!=6)
+   if((nbr=static_cast<long>(fread(buff,1,6,fd)))!=6)
    {
       fprintf(stderr,"error\n");
       return false;
@@ -291,7 +291,7 @@ bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
    fwrite("AVI1",4,1,ofd);
    nbw=10;
 
-   while((nbr=fread(buff,1,512,fd))>0)
+   while((nbr=static_cast<long>(fread(buff,1,512,fd)))>0)
    {
       fwrite(buff,nbr,1,ofd);
       nbw+=nbr;

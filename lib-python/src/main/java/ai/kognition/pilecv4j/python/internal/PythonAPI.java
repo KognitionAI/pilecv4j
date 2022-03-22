@@ -5,6 +5,7 @@ import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
 
+import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
 public class PythonAPI {
@@ -21,6 +22,8 @@ public class PythonAPI {
     public static final int LOG_LEVEL_FATAL = 5;
 
     static {
+    	CvMat.initOpenCv();
+    	
         NativeLibraryLoader.loader()
             .library(LIBNAME)
             .addCallback((dir, libname, oslibname) -> {

@@ -1,5 +1,6 @@
 #include <thread>
 #include <stdio.h>
+#include <string>
 #include "log.h"
 
 static const char* logLevelNames[] = {

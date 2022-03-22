@@ -5,7 +5,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.opencv.core.Core.BORDER_DEFAULT;
 import static org.opencv.core.Core.BORDER_REPLICATE;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.Collection;
@@ -20,12 +22,13 @@ import org.opencv.core.Size;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.geometry.transform.GaussianBlur;
+import net.dempsy.vfs.Vfs;
 
 @RunWith(Parameterized.class)
 public class GaussianBlurTest {
 
-    private final URL imageToTransform;
-    private final URL expectedImageResult;
+    private final File imageToTransform;
+    private final File expectedImageResult;
     private final Size size;
     private final double sigmaX;
     private final double sigmaY;
@@ -66,20 +69,22 @@ public class GaussianBlurTest {
     }
 
     public GaussianBlurTest(final URL imageToTransform, final URL expectedImageResult, final Size size, final double sigmaX, final double sigmaY,
-        final int borderType) {
-        this.imageToTransform = imageToTransform;
-        this.expectedImageResult = expectedImageResult;
-        this.size = size;
-        this.sigmaX = sigmaX;
-        this.sigmaY = sigmaY;
-        this.borderType = borderType;
+        final int borderType) throws IOException, URISyntaxException {
+    	try (var vfs = new Vfs();) {
+	        this.imageToTransform = vfs.toFile(imageToTransform.toURI());
+	        this.expectedImageResult = vfs.toFile(expectedImageResult.toURI());
+	        this.size = size;
+	        this.sigmaX = sigmaX;
+	        this.sigmaY = sigmaY;
+	        this.borderType = borderType;
+    	}
     }
 
     @Test
     public void canBlur() throws IOException {
-        System.out.println(imageToTransform.getFile() + " " + size.width + " " + size.height);
-        try(final CvMat matToTransform = ImageFile.readMatFromFile(imageToTransform.getFile());
-            final CvMat matExpectedResult = ImageFile.readMatFromFile(expectedImageResult.getFile())) {
+        System.out.println(imageToTransform.getAbsolutePath() + " " + size.width + " " + size.height);
+        try(final CvMat matToTransform = ImageFile.readMatFromFile(imageToTransform.getAbsolutePath());
+            final CvMat matExpectedResult = ImageFile.readMatFromFile(expectedImageResult.getAbsolutePath())) {
             assertNotNull(matToTransform);
             assertNotNull(matExpectedResult);
 

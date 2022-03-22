@@ -11,7 +11,7 @@ namespace pilecv4j {
   }
 
   KogSystem* convertPyTorch() {
-    log(TRACE, "converting PyTorch instance at %ld to python", (long)instance);
+    log(TRACE, "converting PyTorch instance at %ld to python", static_cast<long>((uint64_t)instance));
     return instance;
   }
 }

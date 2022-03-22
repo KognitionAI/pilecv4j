@@ -43,11 +43,27 @@ public class Ffmpeg {
     public static final int SEEK_END = FfmpegApi.pcv4j_ffmpeg_code_seek_end();
     public static final int AVSEEK_SIZE = FfmpegApi.pcv4j_ffmpeg_code_seek_size();
     public static final int AVEAGAIN = FfmpegApi.pcv4j_ffmpeg_code_eagain();
+    
+    private static boolean isWindows = OsUtils.isWindows();
 
     static {
         FfmpegApi._init();
     }
 
+    private static final class OsUtils
+    {
+       private static String OS = null;
+       public static String getOsName()
+       {
+          if(OS == null) { OS = System.getProperty("os.name"); }
+          return OS;
+       }
+       public static boolean isWindows()
+       {
+          return getOsName().startsWith("Windows");
+       }
+    }
+    
     @FunctionalInterface
     public static interface VideoFrameConsumer {
         public void handle(VideoFrame frame);
@@ -212,7 +228,25 @@ public class Ffmpeg {
         }
 
         public StreamContext setSource(final URI url) {
-            return setSource(url.toString());
+        	final String uriStr;
+        	
+        	// dewindowsfy the URI. 
+        	if ("file".equals(url.getScheme())) {
+        		// we need to fix the path if there's a windows disk in the uri.
+        		String tmp = url.toString();
+        		if (tmp.startsWith("file:"))
+        			tmp = tmp.substring("file:".length());
+        		while (tmp.startsWith("/"))
+        			tmp = tmp.substring(1);
+        		if (tmp.charAt(1) == ':')
+        			uriStr = "file:" + tmp;
+        		else
+        			uriStr = url.toString();
+        	} else
+        		uriStr = url.toString();
+        	
+        	
+            return setSource(uriStr);
         }
 
         public StreamContext optionally(final boolean doIt, final Consumer<StreamContext> whatToDo) {

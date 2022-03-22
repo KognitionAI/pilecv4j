@@ -1,5 +1,6 @@
 #include <opencv2/core/mat.hpp>
 #include "imagemaker.h"
+#include "kog_exports.h"
 
 #include <memory>
 
@@ -39,7 +40,7 @@ static ai::kognition::pilecv4j::ImageMaker* imaker = new ImageMaker();
 
 extern "C" {
 
-  uint64_t get_im_maker() {
+  KAI_EXPORT uint64_t get_im_maker() {
     return (uint64_t)imaker;
   }
 

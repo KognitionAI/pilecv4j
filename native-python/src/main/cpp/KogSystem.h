@@ -18,7 +18,7 @@ namespace pilecv4j {
 
   public:
     inline KogSystem(get_image_source cb) : getImageSourceCb(cb), modelLabels(nullptr), numLabels(0) {
-      log(TRACE, "Instantiating PyTorch(callback=%ld)", (long)cb);
+      log(TRACE, "Instantiating PyTorch(callback=%ld)", (uint64_t)cb);
     };
 
     static void set(KogSystem* instance);
@@ -38,7 +38,7 @@ namespace pilecv4j {
     }
 
     inline ~KogSystem() {
-      log(TRACE, "Deleting PyTorch(callback=%ld)", (long)getImageSourceCb);
+      log(TRACE, "Deleting PyTorch(callback=%ld)", static_cast<long>( (uint64_t)((void*)getImageSourceCb)));
       freeModelLabels(modelLabels, numLabels);
     }
 

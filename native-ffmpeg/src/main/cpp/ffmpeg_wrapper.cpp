@@ -1,5 +1,6 @@
 #include "pilecv4j_utils.h"
 #include "imagemaker.h"
+#include "kog_exports.h"
 
 extern "C" 
 {
@@ -21,9 +22,13 @@ extern "C"
   static bool eosInjected = false;
 #endif
 
-
+#ifdef __GNUC__
 #undef av_err2str
 #define av_err2str(errnum) av_make_error_string((char*)__builtin_alloca(AV_ERROR_MAX_STRING_SIZE),AV_ERROR_MAX_STRING_SIZE, errnum)
+#else
+#undef av_err2str
+#define av_err2str(errnum) av_make_error_string((char*)_alloca(AV_ERROR_MAX_STRING_SIZE),AV_ERROR_MAX_STRING_SIZE, errnum)
+#endif
 
 #define PO(x) (x == nullptr ? "null" : x)
 // =====================================================
@@ -466,11 +471,11 @@ static ai::kognition::pilecv4j::ImageMaker* imaker;
 //========================================================================
 extern "C" {
 
-  int32_t pcv4j_ffmpeg_init() {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_init() {
     return 0;
   }
 
-  char* pcv4j_ffmpeg_statusMessage(uint64_t status) {
+  KAI_EXPORT char* pcv4j_ffmpeg_statusMessage(uint64_t status) {
     // if the MSBs have a value, then that's what we're going with.
     {
       uint32_t pcv4jCode = (status >> 32) & 0xffffffff;
@@ -487,21 +492,21 @@ extern "C" {
     return ret;
   }
 
-  void pcv4j_ffmpeg_freeString(char* str) {
+  KAI_EXPORT void pcv4j_ffmpeg_freeString(char* str) {
     if (str)
       delete[] str;
   }
 
-  uint64_t pcv4j_ffmpeg_createContext() {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_createContext() {
     return (uint64_t) new StreamContext();
   }
 
-  void pcv4j_ffmpeg_deleteContext(uint64_t ctx) {
+  KAI_EXPORT void pcv4j_ffmpeg_deleteContext(uint64_t ctx) {
     StreamContext* c = (StreamContext*)ctx;
     delete c;
   }
 
-  void* pcv4j_ffmpeg_customStreamBuffer(uint64_t ctx) {
+  KAI_EXPORT void* pcv4j_ffmpeg_customStreamBuffer(uint64_t ctx) {
     StreamContext* c = (StreamContext*)ctx;
     if (c->ioBufferToFillFromJava) {
       free(c->ioBufferToFillFromJava);
@@ -510,11 +515,11 @@ extern "C" {
     return c->ioBufferToFillFromJava;
   }
 
-  int32_t pcv4j_ffmpeg_customStreamBufferSize(uint64_t ctx) {
+  KAI_EXPORT int32_t pcv4j_ffmpeg_customStreamBufferSize(uint64_t ctx) {
     return PCV4J_CUSTOMIO_BUFSIZE;
   }
 
-  long pcv4j_ffmpeg_set_log_level(uint64_t ctx, int32_t logLevel) {
+  KAI_EXPORT long pcv4j_ffmpeg_set_log_level(uint64_t ctx, int32_t logLevel) {
     StreamContext* c = (StreamContext*)ctx;
     if (logLevel <= PCV4J_MAX_LOG_LEVEL && logLevel >= 0)
       c->logLevel = static_cast<LogLevel>(logLevel);
@@ -523,49 +528,49 @@ extern "C" {
     return 0;
   }
 
-  void pcv4j_ffmpeg_add_option(uint64_t ctx, const char* key, const char* value) {
+  KAI_EXPORT void pcv4j_ffmpeg_add_option(uint64_t ctx, const char* key, const char* value) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, INFO, "Setting option \"%s\" = \"%s\"",key,value);
     c->addOption(key, value);
   }
 
-  uint64_t pcv4j_ffmpeg_add_remuxer(uint64_t ctx, const char* fmt, const char* outputUri) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_add_remuxer(uint64_t ctx, const char* fmt, const char* outputUri) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, INFO, "Adding remuxer: [%s,%s]", PO(fmt), PO(outputUri) );
     return c->addRemuxer(fmt, outputUri);
   }
 
-  uint64_t pcv4j_ffmpeg_set_frame_handler(uint64_t ctx, push_frame handler) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_set_frame_handler(uint64_t ctx, push_frame handler) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting frame handler" );
     return c->setFrameHandler(handler);
   }
 
-  uint64_t pcv4j_ffmpeg_max_remux_error_count(uint64_t ctx, int32_t pmaxRemuxErrorCount) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_max_remux_error_count(uint64_t ctx, int32_t pmaxRemuxErrorCount) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting maxRemuxErrorCount: %d", pmaxRemuxErrorCount );
     return c->setMaxRemuxErrorCount((int)pmaxRemuxErrorCount);
   }
 
-  uint64_t pcv4j_ffmpeg_set_source(uint64_t ctx, const char* sourceUri) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_set_source(uint64_t ctx, const char* sourceUri) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting source uri %s", PO(sourceUri) );
     return c->setSource(sourceUri);
   }
 
-  uint64_t pcv4j_ffmpeg_set_custom_source(uint64_t ctx, fill_buffer callback, seek_buffer seekCallback) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_set_custom_source(uint64_t ctx, fill_buffer callback, seek_buffer seekCallback) {
     StreamContext* c = (StreamContext*)ctx;
     log(c, DEBUG, "Setting custom source" );
     return c->setSource(callback, seekCallback);
   }
 
-  uint64_t pcv4j_ffmpeg_set_sync(uint64_t ctx, int32_t doIt) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_set_sync(uint64_t ctx, int32_t doIt) {
     StreamContext* c = (StreamContext*)ctx;
     c->setSync(doIt);
     return 0;
   }
 
-  uint64_t pcv4j_ffmpeg_stop(uint64_t ctx){
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_stop(uint64_t ctx){
     StreamContext* c = (StreamContext*)ctx;
     if (c->state == STOP)
       return 0;
@@ -578,33 +583,37 @@ extern "C" {
   }
 
   // exposed to java
-  void pcv4j_ffmpeg_set_im_maker(uint64_t im) {
+  KAI_EXPORT void pcv4j_ffmpeg_set_im_maker(uint64_t im) {
     imaker = (ai::kognition::pilecv4j::ImageMaker*)im;
   }
 
-  void pcv4j_ffmpeg_injectEos() {
+  KAI_EXPORT void pcv4j_ffmpeg_injectEos() {
 #ifdef SUPPORT_EOS_INJECT
     eosInjected = true;
 #endif
   }
 
-  uint64_t pcv4j_ffmpeg_play(uint64_t ctx) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg_play(uint64_t ctx) {
     StreamContext* c = (StreamContext*)ctx;
     if (!c->isSourceSet())
       return MAKE_P_STAT(NO_SOURCE_SET);
 
+    log(c, DEBUG, "Opening stream source: %s", c->sourceUri.c_str());
     uint64_t rc = open_stream(ctx, c->sourceUri.c_str(), c->dataSupplyCallback, c->seekCallback);
     if (isError(rc))
       return rc;
 
+    log(c, DEBUG, "finding first stream in source");
     rc = find_first_video_stream(ctx);
     if (isError(rc))
       return rc;
 
+    log(c, DEBUG, "opening codec");
     rc = open_codec(c);
     if (isError(rc))
       return rc;
 
+    log(c, DEBUG, "processing frames");
     rc = process_frames(ctx);
     if (isError(rc))
       return rc;

@@ -2,6 +2,7 @@
 #include <thread>
 #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
 #include <numpy/arrayobject.h>
+#include <malloc.h>
 
 #include "ImageSource.h"
 #include "PythonEnvironment.h"
@@ -71,7 +72,7 @@ namespace pilecv4j {
         KogMatWithResults* ret = ondeckx;
         ondeckx = nullptr;
         if (ret) {
-          log(TRACE,"retrieving KogMatWithResults %ld, count:0", (long)ret );
+          log(TRACE,"retrieving KogMatWithResults %ld, count:0", static_cast<long>((uint64_t)ret) );
           return ret;
         } else if (eos) {
           log(TRACE,"EOS(1) on ImageSource detected");
@@ -96,7 +97,7 @@ namespace pilecv4j {
         }
       }
     }
-    log(TRACE,"retrieving Mat %ld count:%ld", (long)ret, (long)count );
+    log(TRACE,"retrieving Mat %ld count:%ld", static_cast<long>((uint64_t)ret), (long)count );
     return ret;
   }
 
@@ -164,7 +165,7 @@ namespace pilecv4j {
       PythonEnvironment::instance()->numpyImported = true;
     }
 
-    log(TRACE,"ImageSource::convertNumPyArrayToMat (%ld,%s).",(long)npArrayObj,deepcopy ? "True" : "False");
+    log(TRACE,"ImageSource::convertNumPyArrayToMat (%ld,%s).",static_cast<long>((uint64_t)npArrayObj),deepcopy ? "True" : "False");
     if (!npArrayObj || npArrayObj == Py_None) {
       log(WARN,"Null NumPy array passed to convert to Mat. Returning nullptr");
       *statusCode = ILLEGAL_ARGUMENT;
@@ -200,8 +201,8 @@ namespace pilecv4j {
     int ndims = PyArray_NDIM(npArray);
     log(TRACE,"ImageSource::convertNumPyArrayToMat number of dims %d", ndims);
 
-    int size[ndims+1];
-    size_t step[ndims+1];
+    int* size = (int*)_alloca((ndims + 1) * sizeof(int));
+    size_t* step = (size_t*)_alloca((ndims + 1) * sizeof(size_t));
     size_t elemsize = CV_ELEM_SIZE1(type);
     const npy_intp* _sizes = PyArray_DIMS(npArray);
     const npy_intp* _strides = PyArray_STRIDES(npArray);

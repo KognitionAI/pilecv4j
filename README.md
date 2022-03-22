@@ -1,10 +1,12 @@
 ## What is this project?
 
-This project contains several tools for creating image and video processing applications in Java. It combines [GStreamer](https://gstreamer.freedesktop.org/), [OpenCv](https://opencv.org/), and [TensorFlow](https://www.tensorflow.org/) into an interoparable Java system.
+This project contains several tools for creating image and video processing applications in Java. It combines [FFMpeg](https://ffmpeg.org/), [GStreamer](https://gstreamer.freedesktop.org/) (**GStreamer is being deprecated in favor of FFMpeg**), [OpenCv](https://opencv.org/), [Python](https://www.python.org/) and [TensorFlow](https://www.tensorflow.org/) into an interoparable Java system.
 
 ## Introduction
 
-The documentation for this project is in its infancy. 
+The documentation for this project is in its infancy (and likely perpetually out of date).
+
+This project will provide a basis for building video processing chains meant for operationalizing AI models. In my own projects I'm currently using various AI frameworks like [Pytorch](https://pytorch.org/) using the `lib-python` functionality. [TensorFlow](https://www.tensorflow.org/) using `lib-tf` and even [Darknet](https://pjreddie.com/darknet/) with some minimal custom native glue code.
 
 ## Prerequisites
 
@@ -13,11 +15,8 @@ Most dependencies will be picked up automatically from [maven central](https://w
 1. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file.
 1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
 1. [gstreamer](https://gstreamer.freedesktop.org/) is a native library for creating and managing video pipelines. The *development* libraries (which require the main runtime libraries to already have been installed separately) will need to be installed on the system. Currently the native build for `gst-gstreamer` assumes gstreamer's [PkgConfig](https://en.wikipedia.org/wiki/Pkg-config) is available on the CMake [FindPkgConfig](https://cmake.org/cmake/help/v3.13/module/FindPkgConfig.html) search path.
-1. On Windows you'll need to install the correct [PkgConfig](https://en.wikipedia.org/wiki/Pkg-config). Under `mingw64` bash you can install it using:
-```
-pacman -Su mingw-w64-x86_64-pkg-config
-```
-It doesn't seem to work if you install it using `pacman -Su pkg-config` as that package doesn't translate the paths correctly.
+1. [FFMpeg]](https://ffmpeg.org/) which probably needs no introduction if you're on this page.
+
 
 ## Contents
 

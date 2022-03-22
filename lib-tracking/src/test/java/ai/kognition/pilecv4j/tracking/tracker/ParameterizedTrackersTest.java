@@ -5,6 +5,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeFalse;
 import static org.opencv.core.CvType.CV_8UC3;
 
+import java.net.URI;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +30,7 @@ import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.tracking.Tracker;
 import ai.kognition.pilecv4j.tracking.TrackerImpl;
+import net.dempsy.vfs.Vfs;
 
 @RunWith(Parameterized.class)
 public class ParameterizedTrackersTest {
@@ -65,10 +67,9 @@ public class ParameterizedTrackersTest {
 
     @Test
     public void canInitialize() throws Exception {
-        try(final CvMat lenna = ImageFile.readMatFromFile(ParameterizedTrackersTest.class.getClassLoader()
-            .getResource("lenna.png")
-            .getFile());
-            final Tracker tracker = trackerImpl.get()) {
+        try(var vfs = new Vfs();
+            final CvMat lenna = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///lenna.png")).getAbsolutePath());
+            final Tracker tracker = trackerImpl.get();) {
 
             final Rect2d initialBbox = new Rect2d(new Point(182, 176), new Point(380, 406));
 

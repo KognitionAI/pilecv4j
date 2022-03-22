@@ -6,12 +6,10 @@
 #include "ImageSource.h"
 #include "GilGuard.h"
 #include "KogSystem.h"
-//#include "swig.h"
+
+#include "kog_exports.h"
 
 int initModule_kognition();
-//extern "C" {
-//KOG_ACCESS_DEC(Kognition, PyTorch)
-//}
 
 static bool inited = false;
 
@@ -40,19 +38,19 @@ using namespace pilecv4j;
 extern PyObject* convert(KogSystem* pt);
 
 extern "C" {
-  char* statusMessage(uint32_t status) {
+  KAI_EXPORT char* statusMessage(uint32_t status) {
     if (status == 0)
       return nullptr;
 
     return strdup(getStatusMessage(status));
   }
 
-  void freeStatusMessage(char* messageRef) {
+  KAI_EXPORT void freeStatusMessage(char* messageRef) {
     if (messageRef)
       free((void*)messageRef);
   }
 
-  int32_t initPython() {
+  KAI_EXPORT int32_t initPython() {
     static std::mutex initMutex;
 
     log(DEBUG, "initPython called from java.");
@@ -74,32 +72,32 @@ extern "C" {
     return (int32_t)OK;
   }
 
-  uint64_t initKogSys(get_image_source cb) {
+  KAI_EXPORT uint64_t initKogSys(get_image_source cb) {
     return (uint64_t)new KogSystem(cb);
   }
 
-  int32_t kogSys_numModelLabels(uint64_t ptRef) {
+  KAI_EXPORT int32_t kogSys_numModelLabels(uint64_t ptRef) {
     KogSystem* ths = (KogSystem*)ptRef;
     return ths->getNumLabels();
   }
 
-  const char* kogSys_modelLabel(uint64_t ptRef, int32_t index) {
+  KAI_EXPORT const char* kogSys_modelLabel(uint64_t ptRef, int32_t index) {
     KogSystem* ths = (KogSystem*)ptRef;
     return ths->getModelLabel(index);
   }
 
-  int32_t closePyTorch(uint64_t ptRef) {
+  KAI_EXPORT int32_t closePyTorch(uint64_t ptRef) {
     delete (KogSystem*)ptRef;
     return OK;
   }
 
-  int32_t runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
+  KAI_EXPORT int32_t runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
     PyObject* paramDict = (PyObject*)paramDictRef;
     PythonEnvironment* p = PythonEnvironment::instance();
     return p->runModel(moduleName, functionName, paramDict);
   }
 
-  uint64_t imageSourceSend(uint64_t imageSourceRef, uint64_t matRef, int32_t rgbi) {
+  KAI_EXPORT uint64_t imageSourceSend(uint64_t imageSourceRef, uint64_t matRef, int32_t rgbi) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     if (matRef == 0L) {
       is->send(nullptr);
@@ -111,33 +109,33 @@ extern "C" {
     return (uint64_t)km;
   }
 
-  void addModulePath(const char* modPath) {
+  KAI_EXPORT void addModulePath(const char* modPath) {
     PythonEnvironment::instance()->addModulePath(modPath);
   }
 
-  uint64_t makeImageSource(uint64_t pt) {
+  KAI_EXPORT uint64_t makeImageSource(uint64_t pt) {
     KogSystem* ptorch = (KogSystem*)pt;
     return uint64_t(new ImageSource());
   }
 
-  uint64_t imageSourcePeek(uint64_t imageSourceRef) {
+  KAI_EXPORT uint64_t imageSourcePeek(uint64_t imageSourceRef) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     return (uint64_t)(is->peek());
   }
 
-  void imageSourceClose(uint64_t imageSourceRef) {
+  KAI_EXPORT void imageSourceClose(uint64_t imageSourceRef) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     delete is;
   }
 
-  void kogMatResults_close(uint64_t nativeObj) {
+  KAI_EXPORT void kogMatResults_close(uint64_t nativeObj) {
     log(TRACE, "Closing KogMatWithResults at %ld", (long)nativeObj);
     if (nativeObj) {
       ((KogMatWithResults*)nativeObj)->decrement();
     }
   }
 
-  int32_t kogMatResults_hasResult(uint64_t nativeObj) {
+  KAI_EXPORT int32_t kogMatResults_hasResult(uint64_t nativeObj) {
     log(TRACE, "hasResult on %ld", (long)(nativeObj));
 
     if (nativeObj)
@@ -146,14 +144,14 @@ extern "C" {
       return 0;
   }
 
-  int32_t kogMatResults_isAbandoned(uint64_t nativeObj) {
+  KAI_EXPORT int32_t kogMatResults_isAbandoned(uint64_t nativeObj) {
     if (nativeObj)
       return ((KogMatWithResults*)nativeObj)->abandoned ? 1 : 0;
     else
       return 0;
   }
 
-  uint64_t kogMatResults_getResults(uint64_t nativeObj) {
+  KAI_EXPORT uint64_t kogMatResults_getResults(uint64_t nativeObj) {
     if (nativeObj) {
       cv::Mat* results = ((KogMatWithResults*)nativeObj)->results;
       if (results)
@@ -164,17 +162,17 @@ extern "C" {
       return 0L;
   }
 
-  uint64_t newParamDict() {
+  KAI_EXPORT uint64_t newParamDict() {
     CallPythonGuard gg;
     return (uint64_t)(PyObject*) PyDict_New();
   }
 
-  void closeParamDict(uint64_t dictRef) {
+  KAI_EXPORT void closeParamDict(uint64_t dictRef) {
     CallPythonGuard gg;
     Py_DECREF((PyObject*)dictRef);
   }
 
-  int32_t putBooleanParamDict(uint64_t dictRef, const char* key, int32_t valRef) {
+  KAI_EXPORT int32_t putBooleanParamDict(uint64_t dictRef, const char* key, int32_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -188,7 +186,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  int32_t putIntParamDict(uint64_t dictRef, const char* key, int64_t valRef) {
+  KAI_EXPORT int32_t putIntParamDict(uint64_t dictRef, const char* key, int64_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -201,7 +199,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  int32_t putFloatParamDict(uint64_t dictRef, const char* key, float64_t valRef) {
+  KAI_EXPORT int32_t putFloatParamDict(uint64_t dictRef, const char* key, float64_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -215,7 +213,7 @@ extern "C" {
   }
 
 
-  int32_t putStringParamDict(uint64_t dictRef, const char* key, const char* valRaw) {
+  KAI_EXPORT int32_t putStringParamDict(uint64_t dictRef, const char* key, const char* valRaw) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -228,7 +226,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  int32_t putPytorchParamDict(uint64_t dictRef, const char* key, uint64_t valRef) {
+  KAI_EXPORT int32_t putPytorchParamDict(uint64_t dictRef, const char* key, uint64_t valRef) {
 
     CallPythonGuard gg;
     PythonEnvironment::instance()->loadKognitionModule();
@@ -250,7 +248,7 @@ extern "C" {
     return result;
   }
 
-  int32_t setLogLevel(int32_t plogLevel) {
+  KAI_EXPORT int32_t setLogLevel(int32_t plogLevel) {
     if (plogLevel <= MAX_LOG_LEVEL && plogLevel >= 0)
       setLogLevel(static_cast<LogLevel>(plogLevel));
     else

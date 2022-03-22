@@ -3,6 +3,9 @@ package ai.kognition.pilecv4j.ffmpeg;
 import java.io.File;
 import java.net.URI;
 
+import net.dempsy.util.Functional;
+import net.dempsy.vfs.Vfs;
+
 public class BaseTest {
 
     public static final boolean SHOW;
@@ -16,9 +19,17 @@ public class BaseTest {
         SHOW = show;
     }
 
-    public final static File STREAM_FILE = new File(BaseTest.class.getClassLoader().getResource("test-videos/Libertas-70sec.mp4").getFile());
-    // public final static File STREAM_FILE = new File("/tmp/test-videos/heron8-clip.mp4");
+    public final static File STREAM_FILE;
+    
+    static {
+    	try (var vfs = new Vfs();) {
+            STREAM_FILE = vfs.toFile(new URI("classpath:///test-videos/Libertas-70sec.mp4"));
+            if (!STREAM_FILE.exists())
+            	throw new RuntimeException();
+    	} catch (Exception e) {
+    		throw new RuntimeException(e);
+    	}
+    }
 
     public final static URI STREAM = STREAM_FILE.toURI();
-    // public final static URI STREAM = uncheck(() -> new URI("rtsp://admin:gregormendel1@172.16.2.11:554/"));
 }

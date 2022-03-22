@@ -109,10 +109,12 @@
       <artifactId>imageio-pict</artifactId>
       <optional>true</optional>
     </dependency>
+    
+    
+    <!-- Testing -->
     <dependency>
-      <groupId>com.twelvemonkeys.imageio</groupId>
-      <artifactId>imageio-tiff</artifactId>
-      <optional>true</optional>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-vfs.api</artifactId>
     </dependency>
   </dependencies>
 
