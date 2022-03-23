@@ -9,6 +9,13 @@
 
 #define SPINS 1
 
+#ifdef __GNUC__
+#define STACK_ALLOC(size) __builtin_alloca(size)
+#else
+#define STACK_ALLOC(size) _alloca(size)
+#endif
+
+
 // CV_8U   0
 // CV_8S   1
 // CV_16U  2
@@ -201,8 +208,8 @@ namespace pilecv4j {
     int ndims = PyArray_NDIM(npArray);
     log(TRACE,"ImageSource::convertNumPyArrayToMat number of dims %d", ndims);
 
-    int* size = (int*)_alloca((ndims + 1) * sizeof(int));
-    size_t* step = (size_t*)_alloca((ndims + 1) * sizeof(size_t));
+    int* size = (int*)STACK_ALLOC((ndims + 1) * sizeof(int));
+    size_t* step = (size_t*)STACK_ALLOC((ndims + 1) * sizeof(size_t));
     size_t elemsize = CV_ELEM_SIZE1(type);
     const npy_intp* _sizes = PyArray_DIMS(npArray);
     const npy_intp* _strides = PyArray_STRIDES(npArray);
