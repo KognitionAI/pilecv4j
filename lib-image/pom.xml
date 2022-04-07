@@ -52,7 +52,7 @@
     <!-- needed for image work but not numerical recipies -->
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>opencv-lib-jar</artifactId>
+      <artifactId>opencv-${platform}</artifactId>
       <classifier>withlib</classifier>
     </dependency>
     <dependency>

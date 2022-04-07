@@ -23,7 +23,7 @@
     <!-- Sister project -->
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>opencv-lib-jar</artifactId>
+      <artifactId>opencv-${platform}</artifactId>
       <classifier>withlib</classifier>
     </dependency>
   
