@@ -84,8 +84,8 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
-        <!-- <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention> -->
-        <opencv-gpu.version-extention></opencv-gpu.version-extention>
+        <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention>
+        <!-- <opencv-gpu.version-extention></opencv-gpu.version-extention> -->
         <platform.option></platform.option>
       </properties>
     </profile>
