@@ -44,13 +44,29 @@ find_library( SWSCALE_LIBRARY swscale REQUIRED )
 message(STATUS "swscale lib: ${SWSCALE_LIBRARY}")
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-add_definitions( -DLOGGING -D_CRT_NO_VA_START_VALIDATION )
+add_definitions( -DLOGGING -D_CRT_NO_VA_START_VALIDATION -DLOGGING )
 
 # build target
 add_library(${PROJECT_NAME} SHARED
-  ffmpeg_wrapper.cpp
-  ffmpeg_codes.cpp
+  utils/log.cpp
+  utils/pilecv4j_ffmpeg_utils.cpp
+  utils/ffmpeg_codes.cpp
+  utils/IMakerManager.cpp
+  utils/Synchronizer.cpp
+  api/StreamContext.cpp
+  api/MediaDataSource.cpp
+  api/MediaProcessor.cpp
+  api/MediaProcessorChain.cpp
+  api/StreamSelector.cpp
+  api/StreamDetails.cpp
+  api/EncodingContext.cpp
+  sources/UriMediaDataSource.cpp
+  sources/CustomMediaDataSource.cpp
+  processors/DecodedFrameProcessor.cpp
+  processors/UriRemuxer.cpp
+  selectors/FirstVideoStreamSelector.cpp
+  selectors/JavaStreamSelector.cpp
   )
 
-target_include_directories(${PROJECT_NAME} PRIVATE src/main/cpp PUBLIC ${AVCODEC_INCLUDE_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE . PUBLIC ${AVCODEC_INCLUDE_DIR})
 target_link_libraries(${PROJECT_NAME} ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} ${SWSCALE_LIBRARY})

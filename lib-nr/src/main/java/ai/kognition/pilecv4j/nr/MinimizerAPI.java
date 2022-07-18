@@ -9,26 +9,26 @@ import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
 public class MinimizerAPI {
 
-   public static final String LIBNAME = "ai.kognition.pilecv4j.util";
+    public static final String LIBNAME = "ai.kognition.pilecv4j.util";
 
-   static {
-      NativeLibraryLoader.loader()
+    static {
+        NativeLibraryLoader.loader()
             .library(LIBNAME)
-            .addCallback((dir, libname, oslibname) -> {
-               NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
+            .addPreLoadCallback((dir, libname, oslibname) -> {
+                NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
             })
             .load();
 
-      Native.register(LIBNAME);
-   }
+        Native.register(LIBNAME);
+    }
 
-   static void _init() {}
+    static void _init() {}
 
-   public interface EvalCallback extends Callback {
-      float eval(Pointer floatArrayX, Pointer status);
-   }
+    public interface EvalCallback extends Callback {
+        float eval(Pointer floatArrayX, Pointer status);
+    }
 
-   public static native double dominimize(EvalCallback func, int n, double[] pd, double[] xi, double jftol, double[] minVal, int[] status);
+    public static native double dominimize(EvalCallback func, int n, double[] pd, double[] xi, double jftol, double[] minVal, int[] status);
 
-   public static native Pointer nrGetErrorMessage();
+    public static native Pointer nrGetErrorMessage();
 }
