@@ -47,7 +47,8 @@ public class NativeLibraryLoader {
 
     public static class Loader {
         private final List<LibraryDefinition> libs = new ArrayList<>();
-        private final List<PreLibraryLoad> lls = new ArrayList<>();
+        private final List<LibraryLoadCallback> preLoadCallbacks = new ArrayList<>();
+        private final List<LibraryLoadCallback> postLoadCallbacks = new ArrayList<>();
         private File destinationDir = new File(System.getProperty("java.io.tmpdir"));
 
         private static class LibraryDefinition {
@@ -75,13 +76,28 @@ public class NativeLibraryLoader {
             return this;
         }
 
-        public interface PreLibraryLoad {
+        @FunctionalInterface
+        public interface LibraryLoadCallback {
             public void loading(File directory, String libName, String fullLibName);
         }
 
-        public Loader addCallback(final PreLibraryLoad ll) {
-            lls.add(ll);
+        @FunctionalInterface
+        @Deprecated
+        public interface PreLibraryLoad extends LibraryLoadCallback {}
+
+        public Loader addPreLoadCallback(final LibraryLoadCallback ll) {
+            preLoadCallbacks.add(ll);
             return this;
+        }
+
+        public Loader addPostLoadCallback(final LibraryLoadCallback ll) {
+            postLoadCallbacks.add(ll);
+            return this;
+        }
+
+        @Deprecated
+        public Loader addCallback(final PreLibraryLoad ll) {
+            return addPreLoadCallback(ll);
         }
 
         public Loader destinationDir(final String destinationDir) {
@@ -149,9 +165,11 @@ public class NativeLibraryLoader {
                             LOGGER.debug("Native library \"" + ld.libName + "\" is already on the filesystem. Not overwriting.");
                     }
                     if(loadMe) {
-                        lls.stream()
+                        preLoadCallbacks.stream()
                             .forEach(ll -> ll.loading(tmpDir, ld.libName, libFileName));
                         System.load(libFile.getAbsolutePath());
+                        postLoadCallbacks.stream()
+                            .forEach(ll -> ll.loading(tmpDir, ld.libName, libFileName));
                     }
                     loaded.add(ld.libName);
                 });

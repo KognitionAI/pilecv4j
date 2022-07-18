@@ -16,13 +16,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import net.dempsy.utils.test.ConditionPoll;
 
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.ImageFile;
@@ -30,8 +28,6 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.python.KogSys.KogMatResults;
 
 public class TestPython {
-    private static Logger LOGGER = LoggerFactory.getLogger(TestPython.class);
-
     public static final boolean SHOW;
 
     static {
@@ -128,7 +124,7 @@ public class TestPython {
         final AtomicLong frameCount = new AtomicLong(0);
         try(final KogSys pt = new KogSys();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-            final StreamContext c = Ffmpeg.createStreamContext();) {
+            final StreamContext c = Ffmpeg2.createStreamContext();) {
 
             pt.addModulePath("./src/test/resources/python");
 
@@ -151,9 +147,12 @@ public class TestPython {
             // wait for the script to get an image source
             assertTrue(ConditionPoll.poll(o -> pt.sourceIsInitialized()));
 
-            c.setLogLevel(LOGGER)
+            c
                 .addOption("rtsp_flags", "prefer_tcp")
-                .setFrameHandler(f -> {
+                .createMediaDataSource(STREAM)
+                .openChain()
+                .createFirstVideoStreamSelector()
+                .createVideoFrameProcessor(f -> {
                     frameCount.getAndIncrement();
 
                     try(final KogMatResults results = pt.sendMat(f, true);) {
@@ -167,7 +166,8 @@ public class TestPython {
                         }
                     }
                 })
-                .setSource(STREAM)
+                .streamContext()
+                .sync()
                 .play();
 
             pt.eos(); // EOS

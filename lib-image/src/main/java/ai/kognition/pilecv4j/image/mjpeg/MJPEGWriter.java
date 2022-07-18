@@ -27,9 +27,10 @@ import java.util.List;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 
+import net.dempsy.util.CommandLineParser;
+
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
-import ai.kognition.pilecv4j.util.CommandLineParser;
 
 public class MJPEGWriter {
    static {

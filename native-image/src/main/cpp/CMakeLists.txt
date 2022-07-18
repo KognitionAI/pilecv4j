@@ -126,7 +126,7 @@ endif()
 add_library(ai.kognition.pilecv4j.image
   MODULE
   sources/opencv/CvRasterNative.cpp
-  sources/opencv/gstbridge.cpp
+  sources/opencv/imagemaker.cpp
   sources/houghspace/Transform.cpp
   sources/mjpeg/jpegtoavi.cpp)
 

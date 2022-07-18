@@ -11,13 +11,11 @@
     <module>lib-nr</module>
     <module>lib-image</module>
     <module>lib-tf</module>
-    <module>lib-gstreamer</module>
     <module>lib-tracking</module>
     <module>lib-ffmpeg</module>
     <module>lib-python</module>
     <module>native-image</module>
     <module>native-nr</module>
-    <module>native-gstreamer</module>
     <module>native-ffmpeg</module>
     <module>native-python</module>
   </modules>
@@ -25,7 +23,7 @@
   <properties>
     <!-- <downloadBinaries>true</downloadBinaries> -->
     <build.type>release</build.type>
-    <cmake.build.type>Release</cmake.build.type>
+    <cmake.build.type>Debug</cmake.build.type>
     
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
@@ -84,8 +82,8 @@
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
-        <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention>
-        <!-- <opencv-gpu.version-extention></opencv-gpu.version-extention> -->
+        <!-- <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention> -->
+        <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <platform.option></platform.option>
       </properties>
     </profile>
@@ -206,12 +204,6 @@
         <classifier>${platform}</classifier>
         <version>${project.version}</version>
       </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>native-gstreamer</artifactId>
-        <classifier>${platform}</classifier>
-        <version>${project.version}</version>
-      </dependency>
 
       <!-- the version number for all dependencies in this section
            should all be ${project.version} -->
@@ -221,11 +213,6 @@
         <groupId>org.slf4j</groupId>
         <artifactId>jul-to-slf4j</artifactId>
         <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.freedesktop.gstreamer</groupId>
-        <artifactId>gst1-java-core</artifactId>
-        <version>1.4.0</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
