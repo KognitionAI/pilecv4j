@@ -66,6 +66,9 @@ class VideoEncoder {
   int64_t maxBitrate = -1;
   // ==================================
 
+  AVFrame* frame = nullptr;
+  AVPacket output_packet = {0};
+
   // ==================================
   // stupid hack
   uint8_t* streams_original_extradata = nullptr;

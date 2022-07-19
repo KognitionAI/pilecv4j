@@ -209,14 +209,13 @@ uint64_t IMakerManager::createFrameFromMat(const Transform* xform, uint64_t mat,
   int width = xform->w;
   int height = xform->h;
   AVFrame* frame = *ppframe;
-  if (!frame)
+  if (!frame) {
     *ppframe = frame = av_frame_alloc();
-
-  std::vector<uint8_t> framebuf(av_image_get_buffer_size(encoder->pix_fmt, width, height, 1));
-  av_image_fill_arrays(frame->data, frame->linesize, framebuf.data(), encoder->pix_fmt, width, height, 1);
-  frame->width = width;
-  frame->height = height;
-  frame->format = static_cast<int>(encoder->pix_fmt);
+    av_image_alloc(frame->data, frame->linesize, width, height, encoder->pix_fmt, 1);
+    frame->width = width;
+    frame->height = height;
+    frame->format = static_cast<int>(encoder->pix_fmt);
+  }
 
   SwsContext *conversion = xform->conversion;
   const int stride[] = {static_cast<int>(raster.stride)};
@@ -227,6 +226,7 @@ uint64_t IMakerManager::createFrameFromMat(const Transform* xform, uint64_t mat,
 
 void IMakerManager::freeFrame(AVFrame** ppframe) {
   if (ppframe && *ppframe) {
+    av_freep(&(*ppframe)->data);
     av_frame_free(ppframe);
     *ppframe= nullptr;
   }
