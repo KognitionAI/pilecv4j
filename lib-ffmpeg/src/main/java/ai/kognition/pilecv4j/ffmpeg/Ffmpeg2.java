@@ -359,7 +359,7 @@ public class Ffmpeg2 {
      * This is package protected to eliminate any optimization of the strong references
      * required to keep the JNA callbacks from being GCed
      */
-    static class FrameVideoProcessor extends MediaProcessor {
+    public static class FrameVideoProcessor extends MediaProcessor {
         // ======================================================================
         // JNA will only hold a weak reference to the callbacks passed in
         // so if we dynamically allocate them then they will be garbage collected.

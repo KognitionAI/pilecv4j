@@ -155,7 +155,7 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
     return MAKE_P_STAT(FAILED_CREATE_FRAME);
   }
 
-  int returnCode = 0;
+  uint64_t returnCode = 0;
   while (response >= 0 && returnCode == 0)
   {
     // Return decoded output data (into a frame) from a decoder

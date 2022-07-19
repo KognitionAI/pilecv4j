@@ -44,7 +44,11 @@ find_library( SWSCALE_LIBRARY swscale REQUIRED )
 message(STATUS "swscale lib: ${SWSCALE_LIBRARY}")
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-add_definitions( -DLOGGING -D_CRT_NO_VA_START_VALIDATION -DLOGGING )
+add_definitions( -DLOGGING )
+
+if(MSVC)
+  add_definitions( -D_CRT_SECURE_NO_WARNINGS -D_CRT_NO_VA_START_VALIDATION )
+endif()
 
 # build target
 add_library(${PROJECT_NAME} SHARED

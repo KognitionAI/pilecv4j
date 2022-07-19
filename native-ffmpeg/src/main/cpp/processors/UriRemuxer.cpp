@@ -79,7 +79,7 @@ uint64_t UriRemuxer::setupRemux(AVFormatContext* input_format_context) {
   }
 
   stream_index = 0;
-  for (int i = 0; i < input_format_context->nb_streams; i++) {
+  for (unsigned int i = 0; i < input_format_context->nb_streams; i++) {
     AVStream* in_stream = input_format_context->streams[i];
     AVCodecParameters *in_codecpar = in_stream->codecpar;
 

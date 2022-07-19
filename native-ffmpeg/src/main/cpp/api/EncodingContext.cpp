@@ -313,6 +313,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 
   rc = avcodec_send_frame(video_avcc, frame);
   if (rc < 0) {
+    llog(ERROR,"Error while sending frame: %d, %s", (int)rc, av_err2str(rc));
     result = MAKE_AV_STAT(rc);
     goto end;
   }
@@ -332,22 +333,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
       llog(TRACE, "Received valid packet from avcodec_receive_packet.");
 
 
-    // assumed input timebase
-//    AVRational framerate = { fps, 1 };
-//    AVRational input_timebase = av_inv_q(framerate);
-
     output_packet->stream_index = video_avs->index;
-//    output_packet->duration = 1;
-//
-//    if (isEnabled(TRACE)) {
-//      llog(TRACE, "Output Packet Pre[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64,
-//          (int) output_packet->stream_index,
-//          (int64_t)output_packet->pts, (int64_t)output_packet->dts,
-//          (int64_t)output_packet->duration);
-//    }
-//
-//
-//    av_packet_rescale_ts(output_packet, input_timebase, video_avs->time_base);
 
     if (isEnabled(TRACE)) {
       llog(TRACE, "Output Packet Timing[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64 " timebase: [ %d / %d ]",
@@ -357,13 +343,11 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
           (int)video_avs->time_base.num, (int)video_avs->time_base.den);
     }
 
-    llog(TRACE,"WRITING PACKET");
     rc = av_interleaved_write_frame(enc->output_format_context, output_packet);
     if (rc != 0) {
       llog(ERROR,"Error %d while writing packet to output: %s", rc, av_err2str(rc));
       result = MAKE_AV_STAT(rc);
-    } else
-      llog(TRACE,"WROTE PACKET");
+    }
   }
   // ==================================================================
 
@@ -371,7 +355,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   if (frame)
     IMakerManager::freeFrame(&frame);
   if (output_packet) {
-    av_packet_unref(output_packet);
+    //    av_packet_unref(output_packet);
     av_packet_free(&output_packet);
   }
 
@@ -433,7 +417,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_setOutput(uint64_t nativeDef, 
   return enc->setupOutputContext(fmt, uri);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_openVideoEncoder(long nativeDef, const char* video_codec) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_openVideoEncoder(uint64_t nativeDef, const char* video_codec) {
   if (isEnabled(TRACE))
     llog(TRACE, "opening Video Encoder:on EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
@@ -443,7 +427,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_openVideoEncoder(long nativeDe
   return ret;
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_ready(long nativeDef) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_ready(uint64_t nativeDef) {
   if (isEnabled(TRACE))
     llog(TRACE, "Readying EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
@@ -451,7 +435,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_ready(long nativeDef) {
   return ret;
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_stop(long nativeDef) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_stop(uint64_t nativeDef) {
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;

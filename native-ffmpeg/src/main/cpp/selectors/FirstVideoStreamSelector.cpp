@@ -35,7 +35,7 @@ static uint64_t findFirstSupportedVidCodec(AVFormatContext* pFormatContext, AVCo
   // loop though all the streams and print its main information.
   // when we find the first video stream, record the information
   // from it.
-  for (int i = 0; i < pFormatContext->nb_streams; i++)
+  for (unsigned int i = 0; i < pFormatContext->nb_streams; i++)
   {
     AVStream* lStream = pFormatContext->streams[i];
 

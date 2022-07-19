@@ -10,6 +10,7 @@ extern "C" {
 #include <libavutil/log.h>
 }
 
+#define LOGGING_IOSTREAM stderr
 
 // currently (04/28/2022) LOGGING is defined by default in the CMakeLists.txt file.
 #ifdef LOGGING
@@ -53,15 +54,15 @@ void pilecv4j::log(LogLevel llevel, const char* component, const char* fmt, va_l
     size_t tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
     //std::string tidstr = std::to_string(tid);
     sprintf(hex_string, "%lx", (unsigned long)tid);
-    fputs(component, stdout);
-    fputs( ": [", stdout );
-    //fputs( tidstr.c_str(), stdout);
-    fputs(hex_string, stdout);
-    fputs( "] [", stdout);
-    fputs( logLevelNames[llevel], stdout );
-    fputs( "] ", stdout);
-    vfprintf( stdout, fmt, args );
-    fputs( "\n", stdout );
+    fputs(component, LOGGING_IOSTREAM);
+    fputs( ": [", LOGGING_IOSTREAM );
+    //fputs( tidstr.c_str(), LOGGING_IOSTREAM);
+    fputs(hex_string, LOGGING_IOSTREAM);
+    fputs( "] [", LOGGING_IOSTREAM);
+    fputs( logLevelNames[llevel], LOGGING_IOSTREAM );
+    fputs( "] ", LOGGING_IOSTREAM);
+    vfprintf( LOGGING_IOSTREAM, fmt, args );
+    fputs( "\n", LOGGING_IOSTREAM );
   }
 }
 
@@ -73,17 +74,17 @@ void pilecv4j::log(LogLevel llevel, const char* component, const char *fmt, ...)
     //std::string tidstr = std::to_string(tid);
     sprintf(hex_string, "%lx", (unsigned long)tid);
     va_list args;
-    fputs(component, stdout);
-    fputs( ": [", stdout );
-    //fputs( tidstr.c_str(), stdout);
-    fputs(hex_string, stdout);
-    fputs( "] [", stdout);
-    fputs( logLevelNames[llevel], stdout );
-    fputs( "] ", stdout);
+    fputs(component, LOGGING_IOSTREAM);
+    fputs( ": [", LOGGING_IOSTREAM );
+    //fputs( tidstr.c_str(), LOGGING_IOSTREAM);
+    fputs(hex_string, LOGGING_IOSTREAM);
+    fputs( "] [", LOGGING_IOSTREAM);
+    fputs( logLevelNames[llevel], LOGGING_IOSTREAM );
+    fputs( "] ", LOGGING_IOSTREAM);
     va_start( args, fmt );
-    vfprintf( stdout, fmt, args );
+    vfprintf( LOGGING_IOSTREAM, fmt, args );
     va_end( args );
-    fputs( "\n", stdout );
+    fputs( "\n", LOGGING_IOSTREAM );
   }
 }
 

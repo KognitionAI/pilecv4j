@@ -54,7 +54,7 @@ extern "C" {
       }
     }
     char* ret = new char[AV_ERROR_MAX_STRING_SIZE + 1]{0};
-    av_strerror(status, ret, AV_ERROR_MAX_STRING_SIZE);
+    av_strerror((int)status, ret, AV_ERROR_MAX_STRING_SIZE);
     return ret;
   }
 

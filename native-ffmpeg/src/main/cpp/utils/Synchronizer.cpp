@@ -32,7 +32,7 @@ static bool decide(int64_t timeToDiplayFrame, uint64_t maxDelayMillisBeforeDropp
     std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
   }
 
-  else if ((curTime - timeToDiplayFrame) > maxDelayMillisBeforeDroppingFrame) {
+  else if ((uint64_t)(curTime - timeToDiplayFrame) > maxDelayMillisBeforeDroppingFrame) {
     llog(DEBUG, "Throwing away frame because it's %d milliseconds late.",(curTime - timeToDiplayFrame) );
     skipIt=true;
   }

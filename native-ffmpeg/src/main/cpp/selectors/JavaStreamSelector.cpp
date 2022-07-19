@@ -25,20 +25,25 @@ inline static void log(LogLevel llevel, const char *fmt, ...) {
 
 uint64_t JavaStreamSelector::selectStreams(AVFormatContext* formatCtx, bool* useStreams, int numStreams) {
 
-  int32_t selected[numStreams];
+  int32_t* selected = new int32_t[numStreams];
 
   for (int i = 0; i < numStreams; i++)
     selected[i] = 1; // defaulted to selected
 
   uint32_t rc = (*callback)((int32_t)numStreams, selected);
 
-  if (!rc)
-    return MAKE_P_STAT(STREAM_SELECT_FAILED);
+  uint64_t result = 0;
+  if (!rc) {
+    result = MAKE_P_STAT(STREAM_SELECT_FAILED);
+    goto end;
+  }
 
   for (int i = 0; i < numStreams; i++)
     useStreams[i] = selected[i] ? true : false;
 
-  return 0;
+end:
+  delete [] selected;
+  return result;
 }
 
 extern "C" {
