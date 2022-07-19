@@ -311,42 +311,53 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
     goto end;
   }
 
-  rc = avcodec_send_frame(video_avcc, frame);
-  if (rc < 0) {
-    llog(ERROR,"Error while sending frame: %d, %s", (int)rc, av_err2str(rc));
-    result = MAKE_AV_STAT(rc);
-    goto end;
-  }
-  while (rc >= 0) {
-    rc = avcodec_receive_packet(video_avcc, output_packet);
-    if (rc == AVERROR(EAGAIN) || rc == AVERROR_EOF) {
-      if (isEnabled(TRACE))
-        llog(TRACE, "Received non-error but non-success from avcodec_receive_packet: %d : %s", rc, av_err2str(rc));
-      // this isn't considered an error
-      result = 0;
-      break;
-    } else if (rc < 0) {
-      llog(ERROR,"Error while receiving packet from encoder: %d, %s", (int)rc, av_err2str(rc));
-      result = MAKE_AV_STAT(rc);
-      break;
-    } else if (isEnabled(TRACE))
-      llog(TRACE, "Received valid packet from avcodec_receive_packet.");
+  for (bool frameSent = false; ! frameSent; ) {
+    rc = avcodec_send_frame(video_avcc, frame);
+    if (rc == AVERROR(EAGAIN)) {
+      llog(TRACE, "avcodec_send_frame not sent.: (%d : %s). Will try again", rc, av_err2str(rc));
+    } else {
+      if (rc < 0) {
+        llog(ERROR,"Error while sending frame: %d, %s", (int)rc, av_err2str(rc));
+        result = MAKE_AV_STAT(rc);
+        goto end;
+      }
 
-
-    output_packet->stream_index = video_avs->index;
-
-    if (isEnabled(TRACE)) {
-      llog(TRACE, "Output Packet Timing[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64 " timebase: [ %d / %d ]",
-          (int) output_packet->stream_index,
-          (int64_t)output_packet->pts, (int64_t)output_packet->dts,
-          (int64_t)output_packet->duration,
-          (int)video_avs->time_base.num, (int)video_avs->time_base.den);
+      // we didn't get an EAGAIN so we can leave this loop
+      // once the packet is received
+      frameSent = true;
     }
 
-    rc = av_interleaved_write_frame(enc->output_format_context, output_packet);
-    if (rc != 0) {
-      llog(ERROR,"Error %d while writing packet to output: %s", rc, av_err2str(rc));
-      result = MAKE_AV_STAT(rc);
+    while (rc >= 0) {
+      rc = avcodec_receive_packet(video_avcc, output_packet);
+      if (rc == AVERROR(EAGAIN) || rc == AVERROR_EOF) {
+        if (isEnabled(TRACE))
+          llog(TRACE, "avcodec_receive_packet needs more info: %d : %s", rc, av_err2str(rc));
+        // this isn't considered an error
+        result = 0;
+        break;
+      } else if (rc < 0) {
+        llog(ERROR,"Error while receiving packet from encoder: %d, %s", (int)rc, av_err2str(rc));
+        result = MAKE_AV_STAT(rc);
+        break;
+      } else if (isEnabled(TRACE))
+        llog(TRACE, "avcodec_receive_packet - packet received.");
+
+
+      output_packet->stream_index = video_avs->index;
+
+      if (isEnabled(TRACE)) {
+        llog(TRACE, "Output Packet Timing[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64 " timebase: [ %d / %d ]",
+            (int) output_packet->stream_index,
+            (int64_t)output_packet->pts, (int64_t)output_packet->dts,
+            (int64_t)output_packet->duration,
+            (int)video_avs->time_base.num, (int)video_avs->time_base.den);
+      }
+
+      rc = av_interleaved_write_frame(enc->output_format_context, output_packet);
+      if (rc != 0) {
+        llog(ERROR,"Error %d while writing packet to output: %s", rc, av_err2str(rc));
+        result = MAKE_AV_STAT(rc);
+      }
     }
   }
   // ==================================================================
@@ -355,7 +366,8 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   if (frame)
     IMakerManager::freeFrame(&frame);
   if (output_packet) {
-    //    av_packet_unref(output_packet);
+    // free seems to take care of unref
+    // av_packet_unref(output_packet);
     av_packet_free(&output_packet);
   }
 
