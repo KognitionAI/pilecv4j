@@ -292,29 +292,36 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
+  llog(TRACE, "Creating frame from mat at %" PRId64, matRef);
   AVFrame* frame = nullptr;
   result = IMakerManager::createFrameFromMat(&xform, matRef, isRgb, video_avcc, &frame);
-  if (isError(result))
+  if (isError(result)) {
+    llog(TRACE, "Failed creating frame from mat at %" PRId64 " : (%d : %s).", matRef, rc, av_err2str(rc));
     goto end;
+  }
+  llog(TRACE, "Created frame at %" PRId64 " from mat at %" PRId64, (uint64_t)frame, matRef);
 
   // ==================================================================
   // encode the frame
-  //frame->pict_type = AV_PICTURE_TYPE_NONE;
-  //frame->pts = framecount++;
+  llog(TRACE, "rescaling pts for frame at %" PRId64, (uint64_t)frame);
   frame->pts = framecount * av_rescale_q(1, video_avcc->time_base, video_avs->time_base);
   framecount++;
 
+  llog(TRACE, "Allocating output_packet");
   output_packet = av_packet_alloc();
   if (!output_packet) {
     llog(ERROR, "could not allocate memory for output packet");
     result = MAKE_P_STAT(FAILED_CREATE_PACKET);
     goto end;
   }
+  llog(TRACE, "Allocated output_packet at %" PRId64, (uint64_t)output_packet);
 
   for (bool frameSent = false; ! frameSent; ) {
+    llog(TRACE, "avcodec_send_frame sending frame at %" PRId64, (uint64_t) frame);
     rc = avcodec_send_frame(video_avcc, frame);
     if (rc == AVERROR(EAGAIN)) {
       llog(TRACE, "avcodec_send_frame not sent.: (%d : %s). Will try again", rc, av_err2str(rc));
+      rc = 0;
     } else {
       if (rc < 0) {
         llog(ERROR,"Error while sending frame: %d, %s", (int)rc, av_err2str(rc));
@@ -322,6 +329,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
         goto end;
       }
 
+      llog(TRACE, "avcodec_send_frame sent successfully", rc, av_err2str(rc));
       // we didn't get an EAGAIN so we can leave this loop
       // once the packet is received
       frameSent = true;
@@ -363,12 +371,17 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   // ==================================================================
 
   end:
-  if (frame)
+  if (frame) {
+    llog(TRACE, "Freeing frame at %" PRId64, (uint64_t)frame );
     IMakerManager::freeFrame(&frame);
+    llog(TRACE, "Frame Freed ");
+  }
   if (output_packet) {
+    llog(TRACE, "Freeing packet at %" PRId64, (uint64_t)output_packet );
     // free seems to take care of unref
     // av_packet_unref(output_packet);
     av_packet_free(&output_packet);
+    llog(TRACE, "Packet Freed ");
   }
 
   return result;
