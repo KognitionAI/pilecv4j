@@ -14,6 +14,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 /**
  * This is a media processor that will remux all video and audio packets that make
@@ -51,6 +53,7 @@ public:
   virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType);
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _URIREMUXER_H_ */

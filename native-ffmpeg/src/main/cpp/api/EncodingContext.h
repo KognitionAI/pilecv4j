@@ -17,6 +17,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 enum EncoderState {
   ENC_FRESH = 0,
@@ -30,10 +32,12 @@ enum EncoderState {
 enum VideoEncoderState {
   VE_FRESH = 0,
   VE_SET_UP,
+  VE_ENCODING,
   VE_STOPPED
 };
 
 class EncodingContext;
+class Synchronizer;
 
 /**
  * This class is NOT thread safe. ALL calls to the VideoEncoder and the EncodingContext
@@ -74,6 +78,8 @@ class VideoEncoder {
   uint8_t* streams_original_extradata = nullptr;
   int streams_original_extradata_size = 0;
   bool streams_original_set = false;
+
+  Synchronizer* sync = nullptr;
 public:
   inline VideoEncoder(EncodingContext* penc, const char* pvideo_codec) : enc(penc), video_codec(pvideo_codec) { }
   ~VideoEncoder();
@@ -103,11 +109,13 @@ public:
     return 0;
   }
 
-  uint64_t enable(uint64_t matRef, bool isRgb);
+  uint64_t enable(uint64_t matRef, bool isRgb, int dstW, int dstH);
 
-  uint64_t enable(bool isRgb, int width, int height, size_t stride = -1);
+  uint64_t enable(bool isRgb, int width, int height, size_t stride, int dstW, int dstH);
 
   uint64_t encode(uint64_t matRef, bool isRgb);
+
+  uint64_t streaming();
 
   inline uint64_t stop() {
     state = VE_STOPPED;
@@ -148,6 +156,8 @@ public:
 
   uint64_t stop();
 };
+
+}
 
 } /* namespace pilecv4j */
 

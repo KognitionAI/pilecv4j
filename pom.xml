@@ -29,7 +29,7 @@
          OpenCV we're building against matches what we expect. -->
     <opencv-build.version>4.5.2</opencv-build.version>
     <opencv-short.version>452</opencv-short.version>
-    <cuda.version>11.2</cuda.version>
+    <!-- <cuda.version>11.2</cuda.version> -->
 
     <!-- Normally the opencv-base version is the same as the opencv-build version   -->
     <!--  however, the build version needs to be unadulterated by version suffixes -->

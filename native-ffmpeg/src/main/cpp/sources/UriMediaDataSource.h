@@ -12,6 +12,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class UriMediaDataSource: public MediaDataSource
 {
@@ -30,6 +32,7 @@ public:
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _URIMEDIADATASOURCE_H_ */

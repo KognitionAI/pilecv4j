@@ -14,6 +14,7 @@ extern "C" {
 #include <stdint.h>
 
 #include <vector>
+#include <map>
 #include <tuple>
 #include <chrono>
 #include <string>
@@ -29,6 +30,8 @@ extern "C" {
 #endif
 
 namespace pilecv4j
+{
+namespace ffmpeg
 {
 
 // =====================================================
@@ -107,6 +110,24 @@ static inline void buildOptions(const std::vector<std::tuple<std::string,std::st
   }
 }
 
+static inline uint64_t buildOptions(const std::map<std::string,std::string>& options, AVDictionary** opts) {
+  if (options.size() == 0) {
+    *opts = nullptr;
+    return 0;
+  }
+
+  uint64_t result = 0;
+  for (std::map<std::string, std::string>::const_iterator it = options.begin(); it != options.end(); it++) {
+    if (!it->second.empty() && !it->first.empty()) {
+      result = MAKE_AV_STAT(av_dict_set(opts, it->first.c_str(), it->second.c_str(), 0));
+      if (isError(result))
+        return result;
+    }
+  }
+
+  return 0;
+}
+
 static inline bool streamSelected(bool* selectedStreams, int streamIndex) {
   return streamIndex < 0 ? false : (selectedStreams ? selectedStreams[streamIndex] : true);
 }
@@ -125,6 +146,7 @@ static inline bool decoderExists(AVCodecID id) {
 extern AVRational millisecondTimeBase;
 
 // =====================================================
+}
 }
 
 #endif /* SRC_MAIN_CPP_PILECV4J_FFMPEG_UTILS_H_ */

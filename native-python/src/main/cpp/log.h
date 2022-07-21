@@ -10,6 +10,7 @@
 #define MAX_LOG_LEVEL 5
 
 namespace pilecv4j {
+namespace python {
   /**
    * Log levels and log level names.
    */
@@ -34,5 +35,6 @@ namespace pilecv4j {
   inline static void log(...) {}
   inline static void setLogLevel(LogLevel ll) {}
 #endif
+}
 }
 

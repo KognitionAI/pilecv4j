@@ -12,6 +12,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 /**
  * The callback will be passed the number of streams and also a preallocated array
@@ -35,6 +37,7 @@ public:
   virtual uint64_t selectStreams(AVFormatContext* formatCtx, bool* useStreams, int32_t numStreams);
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _JAVASTREAMSELECTOR_H_ */

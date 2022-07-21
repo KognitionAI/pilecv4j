@@ -12,6 +12,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 #define COMPONENT "MPCH"
 
@@ -76,39 +78,41 @@ uint64_t MediaProcessorChain::handlePacket(AVFormatContext* avformatCtx, AVPacke
   return 0;
 }
 
-} /* namespace pilecv4j */
-
 //========================================================================
 // Everything here in this extern "C" section is callable from Java
 //========================================================================
 extern "C" {
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_create() {
-  pilecv4j::MediaProcessorChain* ret = new pilecv4j::MediaProcessorChain();
+  MediaProcessorChain* ret = new MediaProcessorChain();
   return (uint64_t)ret;
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_addProcessor(uint64_t mpc, uint64_t mediaProcessor) {
-  pilecv4j::MediaProcessorChain* c = (pilecv4j::MediaProcessorChain*)mpc;
-  pilecv4j::MediaProcessor* vds = (pilecv4j::MediaProcessor*)mediaProcessor;
-  pilecv4j::llog(pilecv4j::DEBUG, "Adding processor at %" PRId64 " to media processor chain at %" PRId64, mediaProcessor, mpc);
-  return c->addProcessor((pilecv4j::MediaProcessor*)vds);
+  MediaProcessorChain* c = (MediaProcessorChain*)mpc;
+  MediaProcessor* vds = (MediaProcessor*)mediaProcessor;
+  llog(DEBUG, "Adding processor at %" PRId64 " to media processor chain at %" PRId64, mediaProcessor, mpc);
+  return c->addProcessor((MediaProcessor*)vds);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(uint64_t mpc, uint64_t selector) {
-  pilecv4j::MediaProcessorChain* c = (pilecv4j::MediaProcessorChain*)mpc;
-  pilecv4j::StreamSelector* vds = (pilecv4j::StreamSelector*)selector;
-  pilecv4j::llog(pilecv4j::DEBUG, "Adding stream selector at %" PRId64 " to media processor chain at %" PRId64, selector, mpc);
-  return c->setStreamSelector((pilecv4j::StreamSelector*)vds);
+  MediaProcessorChain* c = (MediaProcessorChain*)mpc;
+  StreamSelector* vds = (StreamSelector*)selector;
+  llog(DEBUG, "Adding stream selector at %" PRId64 " to media processor chain at %" PRId64, selector, mpc);
+  return c->setStreamSelector((StreamSelector*)vds);
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_mediaProcessorChain_destroy(uint64_t mpcRef) {
-  if (pilecv4j::isEnabled(pilecv4j::TRACE))
-    pilecv4j::llog(pilecv4j::TRACE, "destroying processor chain %" PRId64, mpcRef);
+  if (isEnabled(TRACE))
+    llog(TRACE, "destroying processor chain %" PRId64, mpcRef);
 
-  pilecv4j::MediaProcessorChain* ret = (pilecv4j::MediaProcessorChain*)mpcRef;
+  MediaProcessorChain* ret = (MediaProcessorChain*)mpcRef;
   if (ret != nullptr)
     delete ret;
 }
 
 }
+
+}
+} /* namespace pilecv4j */
+

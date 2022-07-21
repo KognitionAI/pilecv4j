@@ -12,6 +12,7 @@
 #define KOGNITION_MODULE "pilecv4j"
 
 namespace pilecv4j {
+namespace python {
 
   enum StatusCode {
     OK = 0,
@@ -69,5 +70,6 @@ namespace pilecv4j {
 //    PyObject* getModuleOrNew(const char * moduleName);
 
   };
+}
 }
 

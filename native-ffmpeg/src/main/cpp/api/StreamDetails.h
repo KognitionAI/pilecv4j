@@ -13,6 +13,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 struct StreamDetails {
   int32_t stream_index = -1;
@@ -44,6 +46,7 @@ struct StreamDetails {
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif

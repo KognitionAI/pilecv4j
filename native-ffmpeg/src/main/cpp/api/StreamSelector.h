@@ -16,6 +16,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class StreamSelector
 {
@@ -32,6 +34,7 @@ public:
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _STREAMSELECTOR_H_ */

@@ -20,6 +20,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 /**
  * This class can be used to play back a stream at a natural rate. It needs
@@ -60,10 +62,13 @@ public:
 
   bool throttle(AVFormatContext* fmt, AVPacket* pPacket);
 
+  bool throttle(int64_t pts, AVRational& time_base);
+
 private:
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _SYNCRONIZER_H_ */

@@ -4,24 +4,26 @@
 
 #include <memory>
 
-static ai::kognition::pilecv4j::PixelFormat mapCvType(int cvType, bool isRgb) {
+using namespace ai::kognition::pilecv4j;
+
+static PixelFormat mapCvType(int cvType, bool isRgb) {
 
   switch (cvType) {
   case CV_8UC3:
-    return isRgb ? ai::kognition::pilecv4j::RGB24 : ai::kognition::pilecv4j::BGR24;
+    return isRgb ? RGB24 : BGR24;
   default:
-    return ai::kognition::pilecv4j::UNKNOWN;
+    return UNKNOWN;
   }
 }
 
-class ImageMaker : public ai::kognition::pilecv4j::ImageMaker {
+class ImageMakerImpl : public ImageMaker {
 public:
   virtual uint64_t makeImage(int height, int width, int stride, void* data){
     cv::Mat* cvmat = new cv::Mat(height, width, CV_8UC3, data, stride);
     return (uint64_t)cvmat;
   }
 
-  virtual ai::kognition::pilecv4j::MatAndData allocateImage(int height, int width){
+  virtual MatAndData allocateImage(int height, int width){
     cv::Mat* cvmat = new cv::Mat(height, width, CV_8UC3);
     return {(uint64_t)cvmat, cvmat->data};
   }
@@ -45,7 +47,7 @@ public:
     return rret;
   }
 
-  virtual bool extractImageDetails(uint64_t matRef, bool isRgb, ai::kognition::pilecv4j::RawRaster* rasterToFill) {
+  virtual bool extractImageDetails(uint64_t matRef, bool isRgb, RawRaster* rasterToFill) {
     if (matRef == 0)
       return false;
     if (!rasterToFill)
@@ -66,11 +68,11 @@ public:
   }
 };
 
-static ai::kognition::pilecv4j::ImageMaker* imaker = new ImageMaker();
+static ImageMaker* imaker = new ImageMakerImpl();
 
 extern "C" {
 
-  KAI_EXPORT uint64_t get_im_maker() {
+  KAI_EXPORT uint64_t pilecv4j_image_get_im_maker() {
     return (uint64_t)imaker;
   }
 

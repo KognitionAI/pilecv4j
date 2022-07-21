@@ -13,6 +13,9 @@
 #include "kog_exports.h"
 
 namespace pilecv4j {
+namespace ffmpeg
+{
+
 #define COMPONENT "MPRC"
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
@@ -21,11 +24,10 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
   log( llevel, COMPONENT, fmt, args );
   va_end( args );
 }
-}
 
 static const AVRational UNKNOWN_TIME_BASE{0, 1};
 
-uint64_t pilecv4j::MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCodecContext** codecCtxPtr) {
+uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCodecContext** codecCtxPtr) {
 
   *codecCtxPtr = nullptr;
 
@@ -78,12 +80,15 @@ uint64_t pilecv4j::MediaProcessor::open_codec(AVStream* pStream, AVDictionary** 
 extern "C" {
 
   KAI_EXPORT void pcv4j_ffmpeg2_mediaProcessor_destroy(uint64_t uriSource) {
-    if (pilecv4j::isEnabled(pilecv4j::TRACE))
-      pilecv4j::llog(pilecv4j::TRACE, "destroying vid processor %" PRId64, uriSource);
+    if (isEnabled(TRACE))
+      llog(TRACE, "destroying vid processor %" PRId64, uriSource);
 
-    pilecv4j::MediaProcessor* ret = (pilecv4j::MediaProcessor*)uriSource;
+    MediaProcessor* ret = (MediaProcessor*)uriSource;
     if (ret != nullptr)
       delete ret;
   }
 
+}
+
+}
 }

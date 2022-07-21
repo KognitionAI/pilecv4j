@@ -18,6 +18,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class MediaProcessor
 {
@@ -68,6 +70,7 @@ protected:
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _MEDIAPROCESSOR_H_ */

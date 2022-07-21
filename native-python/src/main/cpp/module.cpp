@@ -5,7 +5,7 @@
 #include "ImageSource.h"
 #include "KogSystem.h"
 
-using namespace pilecv4j;
+using namespace pilecv4j::python;
 
 static void initializePyType(PyTypeObject* type_object)
 {

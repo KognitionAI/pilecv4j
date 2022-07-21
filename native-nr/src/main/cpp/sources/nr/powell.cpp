@@ -1,12 +1,12 @@
 #include <math.h>
 #include "nrutil.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #define TINY 1.0e-25 /*A small number.*/
 #define ITMAX 100000 /*Maximum allowed iterations.*/
+
+namespace pilecv4j {
+namespace nr {
+
 /** 
  * Minimization of a function func of n variables. Input consists of an initial starting point
  * p[1..n]; an initial matrix xi[1..n][1..n], whose columns contain the initial set of directions
@@ -138,6 +138,5 @@ float f1dim(float x,void* udv)
    return f;
 }
 
-#ifdef __cplusplus
 }
-#endif
+}

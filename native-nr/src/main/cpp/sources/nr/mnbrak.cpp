@@ -2,13 +2,14 @@
 #include <stdlib.h>
 #include <math.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
 #define GOLD 1.618034
 #define GLIMIT 100.0
 #define TINY 1.0e-20
 #define SHFT(a,b,c,d) (a)=(b);(b)=(c);(c)=(d);
+
+namespace pilecv4j {
+namespace nr {
+
 /**
  * Here GOLD is the default ratio by which successive intervals are magnified; GLIMIT is the
  * maximum magnification allowed for a parabolic-fit step.
@@ -74,6 +75,6 @@ void mnbrak(float *ax, float *bx, float *cx, float *fa, float *fb, float *fc,
       SHFT(*fa,*fb,*fc,fu)
    }
 }
-#ifdef __cplusplus
+
 }
-#endif
+}

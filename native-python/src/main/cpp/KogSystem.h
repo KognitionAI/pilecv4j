@@ -8,6 +8,7 @@
 #define KOG_PYTORCH_PYTHON_NAME "PyTorch"
 
 namespace pilecv4j {
+namespace python {
   typedef uint64_t (*get_image_source)(uint64_t ptref);
   class ImageSource;
 
@@ -60,5 +61,5 @@ namespace pilecv4j {
   };
 
   KogSystem* convertPyTorch();
-
+}
 }

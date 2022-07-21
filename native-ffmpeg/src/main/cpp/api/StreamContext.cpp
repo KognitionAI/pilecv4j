@@ -12,6 +12,9 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
+
 #define COMPONENT "STRC"
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
@@ -400,6 +403,7 @@ static uint64_t process_frames(StreamContext* c) {
     av_packet_free(&pPacket);
 
   return av_rc < 0 ? MAKE_AV_STAT(av_rc) : MAKE_P_STAT(rc);
+}
 }
 
 } /* namespace pilecv4j */

@@ -35,20 +35,21 @@ static int avLogLevelLookup[] = {
 // =====================================================
 
 namespace pilecv4j {
-  static LogLevel logLevel = INFO;
-}
+namespace ffmpeg
+{
+static LogLevel logLevel = INFO;
 
-bool pilecv4j::isEnabled(LogLevel llevel) {
+bool isEnabled(LogLevel llevel) {
   return logLevel <= llevel;
 }
 
-void pilecv4j::setLogLevel(LogLevel ll) {
+void setLogLevel(LogLevel ll) {
   logLevel = ll;
 
   av_log_set_level(avLogLevelLookup[ll]);
 }
 
-void pilecv4j::log(LogLevel llevel, const char* component, const char* fmt, va_list args) {
+void log(LogLevel llevel, const char* component, const char* fmt, va_list args) {
   if (logLevel <= llevel) {
     char hex_string[1024];
     size_t tid = std::hash<std::thread::id>{}(std::this_thread::get_id());
@@ -66,7 +67,7 @@ void pilecv4j::log(LogLevel llevel, const char* component, const char* fmt, va_l
   }
 }
 
-void pilecv4j::log(LogLevel llevel, const char* component, const char *fmt, ...)
+void log(LogLevel llevel, const char* component, const char *fmt, ...)
 {
   if (logLevel <= llevel) {
     char hex_string[1024];
@@ -91,9 +92,11 @@ void pilecv4j::log(LogLevel llevel, const char* component, const char *fmt, ...)
 extern "C" {
 
 KAI_EXPORT void pcv4j_ffmpeg2_logging_setLogLevel(int32_t plogLevel) {
-  pilecv4j::setLogLevel(static_cast<pilecv4j::LogLevel>(plogLevel));
+  setLogLevel(static_cast<LogLevel>(plogLevel));
 }
 
+}
+}
 }
 
 #endif

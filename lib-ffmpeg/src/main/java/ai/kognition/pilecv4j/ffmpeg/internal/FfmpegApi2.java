@@ -62,7 +62,7 @@ public class FfmpegApi2 {
             Native.register(LIBNAME);
         }
 
-        pcv4j_ffmpeg2_imageMaker_set(ImageAPI.get_im_maker());
+        pcv4j_ffmpeg2_imageMaker_set(ImageAPI.pilecv4j_image_get_im_maker());
     }
 
     // called from Ffmpeg2 to load the class
@@ -275,6 +275,14 @@ public class FfmpegApi2 {
 
     public native static long pcv4j_ffmpeg2_videoEncoder_enable3(final long nativeDef, final int isRgb, final int width, final int height);
 
+    public native static long pcv4j_ffmpeg2_videoEncoder_enable4(final long nativeDef, final long matRef, final int isRgb, final int dstW, final int dstH);
+
+    public native static long pcv4j_ffmpeg2_videoEncoder_enable5(final long nativeDef, final int isRgb, final int width, final int height, final int stride,
+        final int dstW, final int dstH);
+
+    public native static long pcv4j_ffmpeg2_videoEncoder_enable6(final long nativeDef, final int isRgb, final int width, final int height, final int dstW,
+        final int dstH);
+
     public native static void pcv4j_ffmpeg2_videoEncoder_delete(final long nativeDef);
 
     public native static long pcv4j_ffmpeg2_videoEncoder_encode(final long nativeDef, final long matRef, final int isRgb);
@@ -291,6 +299,8 @@ public class FfmpegApi2 {
     public native static long pcv4j_ffmpeg2_videoEncoder_setBitrate2(final long nativeDef, final long pminBitrate);
 
     public native static long pcv4j_ffmpeg2_videoEncoder_stop(final long nativeDef);
+
+    public native static long pcv4j_ffmpeg2_videoEncoder_streaming(final long nativeDef);
 
     // ==========================================================
     // Error codes

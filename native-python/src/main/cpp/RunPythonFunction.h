@@ -3,6 +3,7 @@
 #include <Python.h>
 
 namespace pilecv4j {
+namespace python {
 
   class RunPythonFunction {
     const char * moduleName;
@@ -33,3 +34,5 @@ namespace pilecv4j {
 
   };
 }
+}
+

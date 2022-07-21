@@ -1,8 +1,5 @@
 #include <math.h>
 #include "nrutil.h"
-#ifdef __cplusplus
-extern "C" {
-#endif
 #define ITMAX 100
 #define CGOLD 0.3819660
 #define ZEPS 1.0e-10
@@ -16,6 +13,10 @@ extern "C" {
    the minimum is returned as xmin, and the minimum function value is returned as brent, the
    returned function value.*/
 #define SHFT(a,b,c,d) (a)=(b);(b)=(c);(c)=(d);
+
+namespace pilecv4j {
+namespace nr {
+
 float brent(float ax, float bx, float cx, float (*f)(float, void*), float tol,
             float *xmin, void* userdata)
 {
@@ -81,6 +82,7 @@ float brent(float ax, float bx, float cx, float (*f)(float, void*), float tol,
    *xmin=x; //Never get here.
    return fx;
 }
-#ifdef __cplusplus
+
 }
-#endif
+}
+

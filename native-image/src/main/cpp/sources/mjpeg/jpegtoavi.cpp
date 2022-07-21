@@ -20,8 +20,6 @@
 #define _LARGEFILE_SOURCE
 #define _LARGEFILE64_SOURCE
 
-#include "jpegtoavi.h"
-
 #include <stdio.h>
 #include "avifmt.h"
 #include <string.h>
@@ -43,28 +41,14 @@
 #include <stdlib.h>
 
 #include <list>
+
+#include "kog_exports.h"
 using namespace std;
-
-static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
-                        DWORD width, DWORD height, DWORD riff_sz,
-                        FILE* ofd);
-
-/*
-  spc: indicating file sz in bytes, -1 on error
-*/
-off_t file_sz(const char *fn)
-{
-  struct stat s;
-  if(stat(fn,&s)==-1)
-    return -1;
-  return s.st_size;
-}
-
 
 /*
   spc: printing 4 byte word in little-endian fmt
 */
-void print_quartet(unsigned int i,FILE* ofd)
+static void print_quartet(unsigned int i,FILE* ofd)
 {
   putc(i%0x100,ofd); i/=0x100;
   putc(i%0x100,ofd); i/=0x100;
@@ -72,45 +56,6 @@ void print_quartet(unsigned int i,FILE* ofd)
   putc(i%0x100,ofd);
 }
 
-
-static FILE* ofd = NULL;
-static DWORD width = (DWORD)-1;
-static DWORD height = (DWORD)-1;
-static long f = 0;
-static list<DWORD>* offsets;
-static list<DWORD>* szarray;
-static DWORD prevsz;
-static DWORD prevoffset;
-static unsigned long tnbw = 0;
-static off64_t jpg_sz_64 = 0;
-
-bool mjpeg_initializeMJPEG(const char* filename)
-{
-  DWORD frames=1;
-  DWORD width=1;
-  DWORD height=1;
-//  const off64_t MAX_RIFF_SZ=2147483648; /* 2 Gb limit */
-  DWORD riff_sz = 0;
-  DWORD fps = 1;
-
-  ofd = fopen(filename,"wb");
-
-  if (ofd == NULL)
-  {
-     fprintf(stderr,"Failed to open file %s",filename);
-     return false;
-  }
-
-  DWORD per_usec=1000000/fps;
-
-  writeHeader(per_usec,1, frames,
-              width, height, riff_sz,
-              ofd);
-
-  fwrite("movi",1,4,ofd);
-
-  return true;
-}
 
 static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
                         DWORD width, DWORD height, DWORD riff_sz,
@@ -144,55 +89,55 @@ static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
     /* list strl */
     {
       {
-	{'L','I','S','T'},
-	LILEND4(sizeof(struct AVI_list_strl)-8),
-	{'s','t','r','l'}
+  {'L','I','S','T'},
+  LILEND4(sizeof(struct AVI_list_strl)-8),
+  {'s','t','r','l'}
       },
 
       /* chunk strh */
       {'s','t','r','h'},
       LILEND4(sizeof(struct AVI_strh)),
       {
-	{'v','i','d','s'},
-	{'M','J','P','G'},
-	LILEND4(0),
-	LILEND4(0),
-	LILEND4(0),
-	LILEND4(per_usec),
-	LILEND4(1000000),
-	LILEND4(0),
-	LILEND4(frames),
-	LILEND4(0),
-	LILEND4(0),
-	LILEND4(0)
+  {'v','i','d','s'},
+  {'M','J','P','G'},
+  LILEND4(0),
+  LILEND4(0),
+  LILEND4(0),
+  LILEND4(per_usec),
+  LILEND4(1000000),
+  LILEND4(0),
+  LILEND4(frames),
+  LILEND4(0),
+  LILEND4(0),
+  LILEND4(0)
       },
-      
+
       /* chunk strf */
       {'s','t','r','f'},
       sizeof(struct AVI_strf),
-      {      
-	LILEND4(sizeof(struct AVI_strf)),
-	LILEND4(width),
-	LILEND4(height),
-	LILEND4(1+24*256*256),
-	{'M','J','P','G'},
-	LILEND4(width*height*3),
-	LILEND4(0),
-	LILEND4(0),
-	LILEND4(0),
-	LILEND4(0)
+      {
+  LILEND4(sizeof(struct AVI_strf)),
+  LILEND4(width),
+  LILEND4(height),
+  LILEND4(1+24*256*256),
+  {'M','J','P','G'},
+  LILEND4(width*height*3),
+  LILEND4(0),
+  LILEND4(0),
+  LILEND4(0),
+  LILEND4(0)
       },
 
       /* list odml */
       {
-	{
-	  {'L','I','S','T'},
-	  LILEND4(16),
-	  {'o','d','m','l'}
-	},
-	{'d','m','l','h'},
-	LILEND4(4),
-	LILEND4(frames)
+  {
+    {'L','I','S','T'},
+    LILEND4(16),
+    {'o','d','m','l'}
+  },
+  {'d','m','l','h'},
+  LILEND4(4),
+  LILEND4(frames)
       }
     }
   };
@@ -205,7 +150,7 @@ static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
   /* list hdrl */
   hdrl.avih.us_per_frame=LILEND4(per_usec);
   hdrl.avih.max_bytes_per_sec=LILEND4(1000000*(jpg_sz/frames)
-				      /per_usec);
+              /per_usec);
   hdrl.avih.tot_frames=LILEND4(frames);
   hdrl.avih.width=LILEND4(width);
   hdrl.avih.height=LILEND4(height);
@@ -224,8 +169,61 @@ static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
   return true;
 }
 
-  
-bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
+
+/*
+  spc: indicating file sz in bytes, -1 on error
+*/
+static off_t file_sz(const char *fn)
+{
+  struct stat s;
+  if(stat(fn,&s)==-1)
+    return -1;
+  return s.st_size;
+}
+
+
+
+static FILE* ofd = NULL;
+static DWORD width = (DWORD)-1;
+static DWORD height = (DWORD)-1;
+static long f = 0;
+static list<DWORD>* offsets;
+static list<DWORD>* szarray;
+static DWORD prevsz;
+static DWORD prevoffset;
+static unsigned long tnbw = 0;
+static off64_t jpg_sz_64 = 0;
+
+extern "C" {
+KAI_EXPORT int32_t pilecv4j_image_mjpeg_initializeMJPEG(const char* filename)
+{
+  DWORD frames=1;
+  DWORD width=1;
+  DWORD height=1;
+//  const off64_t MAX_RIFF_SZ=2147483648; /* 2 Gb limit */
+  DWORD riff_sz = 0;
+  DWORD fps = 1;
+
+  ofd = fopen(filename,"wb");
+
+  if (ofd == NULL)
+  {
+     fprintf(stderr,"Failed to open file %s",filename);
+     return false;
+  }
+
+  DWORD per_usec=1000000/fps;
+
+  writeHeader(per_usec,1, frames,
+              width, height, riff_sz,
+              ofd);
+
+  fwrite("movi",1,4,ofd);
+
+  return true;
+}
+
+KAI_EXPORT int32_t pilecv4j_image_mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
 {
    off_t mfsz,remnant;
    char buff[512];
@@ -287,7 +285,9 @@ bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
       return false;
    }
    fwrite(buff,nbr,1,ofd);
-   fread(buff,1,4,fd);
+   if (fread(buff,1,4,fd) != 4) {
+     return false;
+   }
    fwrite("AVI1",4,1,ofd);
    nbw=10;
 
@@ -311,7 +311,7 @@ bool mjpeg_doappendFile(const char* filename, int32_t jwidth, int32_t jheight)
    return true;
 }
 
-bool mjpeg_close(int32_t jfps)
+KAI_EXPORT int32_t pilecv4j_image_mjpeg_close(int32_t jfps)
 {
    unsigned int fps = (unsigned int)jfps;
    const off64_t MAX_RIFF_SZ=2147483648UL; /* 2 Gb limit */
@@ -367,7 +367,7 @@ bool mjpeg_close(int32_t jfps)
    return true;
 }
 
-void mjpeg_cleanUp()
+KAI_EXPORT void pilecv4j_image_mjpeg_cleanUp()
 {
    if (ofd)
    {
@@ -387,5 +387,6 @@ void mjpeg_cleanUp()
    offsets = NULL;
    if (szarray) delete szarray;
    szarray = NULL;
+}
 }
 

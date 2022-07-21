@@ -10,6 +10,8 @@
 #define PO(x) (x == nullptr ? "null" : x)
 
 namespace pilecv4j {
+namespace ffmpeg
+{
   /**
    * Log levels and log level names.
    */
@@ -32,5 +34,7 @@ namespace pilecv4j {
   inline static void setLogLevel(LogLevel ll) {}
   inline static bool isEnabled(...) { return false; }
 #endif
+
+}
 }
 

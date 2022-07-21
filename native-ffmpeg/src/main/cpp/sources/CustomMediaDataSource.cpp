@@ -13,6 +13,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 #define COMPONENT "CMDS"
 
@@ -107,27 +109,25 @@ CustomMediaDataSource::~CustomMediaDataSource()
     free(ioBufferToFillFromJava);
 }
 
-} /* namespace pilecv4j */
-
 //========================================================================
 // Everything here in this extern "C" section is callable from Java
 //========================================================================
 extern "C" {
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_customMediaDataSource_create() {
-  pilecv4j::CustomMediaDataSource* ret = new pilecv4j::CustomMediaDataSource();
+  CustomMediaDataSource* ret = new CustomMediaDataSource();
 
-  return (uint64_t)((pilecv4j::MediaDataSource*)ret);
+  return (uint64_t)((MediaDataSource*)ret);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_customMediaDataSource_set(uint64_t ctx, pilecv4j::fill_buffer callback, pilecv4j::seek_buffer seekCallback) {
-  pilecv4j::CustomMediaDataSource* c = (pilecv4j::CustomMediaDataSource*)ctx;
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_customMediaDataSource_set(uint64_t ctx, fill_buffer callback, seek_buffer seekCallback) {
+  CustomMediaDataSource* c = (CustomMediaDataSource*)ctx;
   c->set(callback, seekCallback);
   return 0;
 }
 
 KAI_EXPORT void* pcv4j_ffmpeg2_customMediaDataSource_buffer(uint64_t ctx) {
-  pilecv4j::CustomMediaDataSource* c = (pilecv4j::CustomMediaDataSource*)ctx;
+  CustomMediaDataSource* c = (CustomMediaDataSource*)ctx;
   return c->ioBufferToFillFromJava;
 }
 
@@ -136,3 +136,7 @@ KAI_EXPORT int32_t pcv4j_ffmpeg2_customMediaDataSource_bufferSize(uint64_t ctx) 
 }
 
 }
+
+}
+} /* namespace pilecv4j */
+

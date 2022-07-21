@@ -17,17 +17,30 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class IMakerManager
 {
 public:
 
   struct Transform {
-    int w = -1;
-    int h = -1;
-    size_t stride = 0;
-    ai::kognition::pilecv4j::PixelFormat origFmt = ai::kognition::pilecv4j::UNKNOWN;
-    AVPixelFormat srcFmt = AV_PIX_FMT_NONE;
+    // ========================================
+    // Source (domain) of the xform
+    int srcW = -1;
+    int srcH = -1;
+    size_t srcS = 0;
+    ai::kognition::pilecv4j::PixelFormat srcPcv4jFmt = ai::kognition::pilecv4j::UNKNOWN;
+    AVPixelFormat srcAvFmt = AV_PIX_FMT_NONE;
+    // ========================================
+
+    // ========================================
+    // Destination (range) of the xform
+    int dstW = -1;
+    int dstH = -1;
+    AVPixelFormat dstAvFmt = AV_PIX_FMT_NONE;
+    // ========================================
+
     SwsContext *conversion = nullptr;
     bool supportsCurFormat = false;
 
@@ -58,7 +71,7 @@ public:
 
   static uint64_t setupTransform(uint64_t mat, bool isRgb, AVCodecContext* encoder, Transform* xform);
 
-  static uint64_t setupTransform(int width, int height, size_t stride, ai::kognition::pilecv4j::PixelFormat pixfmt, AVCodecContext* encoder, Transform* xform);
+  static uint64_t setupTransform(int srcWidth, int srcHeight, size_t srcStride, ai::kognition::pilecv4j::PixelFormat srcPixfmt, AVCodecContext* avcc, int dstW, int dstH, Transform* xform);
 
   static uint64_t createFrameFromMat(const Transform* xform, uint64_t mat, bool isRgb, AVCodecContext* encoder, AVFrame** frame);
 
@@ -67,6 +80,7 @@ public:
   static void freeFrame(AVFrame** frame);
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _IMAKERMANAGER_H_ */

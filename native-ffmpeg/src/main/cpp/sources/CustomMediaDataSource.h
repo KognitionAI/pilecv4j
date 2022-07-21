@@ -16,6 +16,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 /**
  * For custom IO, this will be responsible for reading bytes from the stream
@@ -73,6 +75,7 @@ public:
   }
   };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _CUSTOMMEDIADATASOURCE_H_ */

@@ -2,7 +2,7 @@
 #include "kog_exports.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 
-AVRational pilecv4j::millisecondTimeBase = AVRational{1,1000};
+AVRational pilecv4j::ffmpeg::millisecondTimeBase = AVRational{1,1000};
 
 // status message descriptions corresponding to the custom codes.
 static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
@@ -33,7 +33,7 @@ static const char* totallyUnknownError = "UNKNOWN ERROR";
 
 // =====================================================
 
-using namespace pilecv4j;
+using namespace pilecv4j::ffmpeg;
 
 extern "C" {
 

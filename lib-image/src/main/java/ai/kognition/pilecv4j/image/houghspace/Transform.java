@@ -104,7 +104,7 @@ public class Transform {
          final int colstart = (colstartp < 0) ? 0 : colstartp;
          final int colend = (colendp >= width) ? width - 1 : colendp;
 
-         ImageAPI.Transform_houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
+         ImageAPI.pilecv4j_image_Transform_houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
                mask.mask, mask.mwidth, mask.mheight, mask.maskcr, mask.maskcc,
                gradDirMask.mask, gradDirMask.mwidth, gradDirMask.mheight, gradDirMask.maskcr, gradDirMask.maskcc,
                gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, cb, houghThreshold,

@@ -84,7 +84,7 @@ endif()
 
 add_library(ai.kognition.pilecv4j.util
   MODULE
-  sources/nr/minimizer.c
+  sources/nr/minimizer.cpp
   sources/nr/brent.cpp
   sources/nr/dbrent.cpp
   sources/nr/mnbrak.cpp

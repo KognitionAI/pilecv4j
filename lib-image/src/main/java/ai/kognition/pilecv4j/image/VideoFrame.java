@@ -49,7 +49,7 @@ public class VideoFrame extends CvMat {
 
     public static VideoFrame create(final int rows, final int cols, final int type, final long pointer, final long decodeTimeMillis, final long frameNumber,
         final boolean isRgb) {
-        final long nativeObj = ImageAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+        final long nativeObj = ImageAPI.pilecv4j_image_CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
         if(nativeObj == 0)
             throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
         return VideoFrame.wrapNativeVideoFrame(nativeObj, decodeTimeMillis, frameNumber, isRgb);
@@ -239,7 +239,7 @@ public class VideoFrame extends CvMat {
     }
 
     public VideoFrame shallowCopy() {
-        return new VideoFrame(ImageAPI.CvRaster_copy(nativeObj), decodeTimeMillis, frameNumber, isRgb);
+        return new VideoFrame(ImageAPI.pilecv4j_image_CvRaster_copy(nativeObj), decodeTimeMillis, frameNumber, isRgb);
     }
 
     public static VideoFrame wrapNativeVideoFrame(final long nativeObj, final long decodeTimeMillis, final long frameNumber, final boolean isRgb) {

@@ -26,12 +26,24 @@
 #include "jfloats.h"
 #include "kog_exports.h"
 
+namespace pilecv4j {
+namespace nr {
+
 typedef float32_t (*Func)(float32_t*, int32_t*);
 
 extern void powell(float p[], float **xi, int n, float ftol, int *iter, float *fret,
 		float (*func)(float*, void*), void* overallUd);
 
-static float bridgefunc(float *, void* overallUd);
+struct OverallUd {
+  Func jfunc;
+  int32_t g_status;
+};
+
+static float bridgefunc(float* v, void* udv)
+{
+  struct OverallUd* ud = (struct OverallUd*)udv;
+  return (*(ud->jfunc))((float32_t*) (v + 1), &(ud->g_status));
+}
 
 #if defined(TRACE_ME)
 static void print_vector(const char* hdr, float* v, int start, int end)
@@ -51,19 +63,8 @@ static void print_matix(const char* hdr, float** m, int startrow, int endrow, in
 }
 #endif
 
-struct OverallUd {
-	Func jfunc;
-	int32_t g_status;
-};
-
-//static Func jfunc;
-
-// This status holds the return of the function being minimized. It the function
-//  sets it to non-zero, the iterations end and a non-zero status code is set
-//  as the result of dominimize via p_status
-//static int32_t g_status;
-
-KAI_EXPORT float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float64_t jftol, float64_t* minVal, int32_t* p_status)
+extern "C" {
+KAI_EXPORT float64_t pilecv4j_image_dominimize(Func func, uint32_t n, float64_t* pd, float64_t* xi, float64_t jftol, float64_t* minVal, int32_t* p_status)
 {
    uint32_t pos;
 
@@ -122,10 +123,8 @@ KAI_EXPORT float64_t dominimize(Func func, uint32_t n, float64_t* pd, float64_t*
 
    return (float64_t)fret;
 }
+}
 
-float bridgefunc(float* v, void* udv)
-{
-  struct OverallUd* ud = (struct OverallUd*)udv;
-  return (*(ud->jfunc))((float32_t*) (v + 1), &(ud->g_status));
+}
 }
 

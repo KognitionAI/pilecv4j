@@ -22,11 +22,11 @@ public class PythonAPI {
     public static final int LOG_LEVEL_FATAL = 5;
 
     static {
-    	CvMat.initOpenCv();
-    	
+        CvMat.initOpenCv();
+
         NativeLibraryLoader.loader()
             .library(LIBNAME)
-            .addCallback((dir, libname, oslibname) -> {
+            .addPreLoadCallback((dir, libname, oslibname) -> {
                 if(LIBNAME.equals(libname))
                     NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
             })
@@ -38,51 +38,51 @@ public class PythonAPI {
         public long image_source(long ptRef);
     }
 
-    public static native int initPython();
+    public static native int pilecv4j_python_initPython();
 
-    public static native void addModulePath(String absDir);
+    public static native void pilecv4j_python_addModulePath(String absDir);
 
-    public static native int runPythonFunction(String module, String function, long dictRef);
+    public static native int pilecv4j_python_runPythonFunction(String module, String function, long dictRef);
 
-    public static native long imageSourceSend(long imageSourceRef, long matRef, int rgb);
+    public static native long pilecv4j_python_imageSourceSend(long imageSourceRef, long matRef, int rgb);
 
-    public static native long imageSourcePeek(long imageSourceRef);
+    public static native long pilecv4j_python_imageSourcePeek(long imageSourceRef);
 
-    public static native void imageSourceClose(long imageSourceRef);
+    public static native void pilecv4j_python_imageSourceClose(long imageSourceRef);
 
-    public static native void kogMatResults_close(long nativeObj);
+    public static native void pilecv4j_python_kogMatResults_close(long nativeObj);
 
-    public static native long kogMatResults_getResults(long nativeObj);
+    public static native long pilecv4j_python_kogMatResults_getResults(long nativeObj);
 
-    public static native int kogMatResults_hasResult(long nativeObj);
+    public static native int pilecv4j_python_kogMatResults_hasResult(long nativeObj);
 
-    public static native int kogMatResults_isAbandoned(long nativeObj);
+    public static native int pilecv4j_python_kogMatResults_isAbandoned(long nativeObj);
 
-    public static native Pointer statusMessage(int status);
+    public static native Pointer pilecv4j_python_statusMessage(int status);
 
-    public static native void freeStatusMessage(Pointer pointer);
+    public static native void pilecv4j_python_freeStatusMessage(Pointer pointer);
 
-    public static native long newParamDict();
+    public static native long pilecv4j_python_newParamDict();
 
-    public static native void closeParamDict(long dictRef);
+    public static native void pilecv4j_python_closeParamDict(long dictRef);
 
-    public static native int putStringParamDict(long dictRef, String key, String valRaw);
+    public static native int pilecv4j_python_putStringParamDict(long dictRef, String key, String valRaw);
 
-    public static native int putIntParamDict(long dictRef, String key, long valRaw);
+    public static native int pilecv4j_python_putIntParamDict(long dictRef, String key, long valRaw);
 
-    public static native int putFloatParamDict(long dictRef, String key, double valRaw);
+    public static native int pilecv4j_python_putFloatParamDict(long dictRef, String key, double valRaw);
 
-    public static native int putPytorchParamDict(long dictRef, String key, long nativeObj);
+    public static native int pilecv4j_python_putPytorchParamDict(long dictRef, String key, long nativeObj);
 
-    public static native int putBooleanParamDict(long dict, String key, int i);
+    public static native int pilecv4j_python_putBooleanParamDict(long dict, String key, int i);
 
-    public static native int setLogLevel(int logLevelSet);
+    public static native int pilecv4j_python_setLogLevel(int logLevelSet);
 
-    public static native long makeImageSource(long ptRef);
+    public static native long pilecv4j_python_makeImageSource(long ptRef);
 
-    public static native long initKogSys(get_image_source cb);
+    public static native long pilecv4j_python_initKogSys(get_image_source cb);
 
-    public static native int kogSys_numModelLabels(long ptRef);
+    public static native int pilecv4j_python_kogSys_numModelLabels(long ptRef);
 
-    public static native Pointer kogSys_modelLabel(final long ptRef, final int index);
+    public static native Pointer pilecv4j_python_kogSys_modelLabel(final long ptRef, final int index);
 }

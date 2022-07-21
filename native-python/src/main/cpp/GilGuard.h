@@ -6,6 +6,7 @@
 #include "log.h"
 
 namespace pilecv4j {
+namespace python {
   class CallPythonGuard
   {
     PyGILState_STATE state;
@@ -54,4 +55,5 @@ namespace pilecv4j {
     }
   };
 
+}
 }

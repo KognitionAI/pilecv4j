@@ -273,14 +273,16 @@ public class TestFfmpeg2 extends BaseTest {
             encoder
                 .outputStream(destination.getAbsolutePath())
                 .openVideoEncoder("libx265", "first")
-                .addCodecOptions("preset", "fast")
+                .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
+                .addCodecOptions("flags", "low_delay")
                 .setBufferSize(4 * 16 * MEG)
                 .setBitrate(2 * MEG)
                 .encodingContext()
                 .openVideoEncoder("libx265", "second")
-                .addCodecOptions("preset", "fast")
+                .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
+                .addCodecOptions("flags", "low_delay")
                 .setBufferSize(4 * 16 * MEG)
                 .setBitrate(2 * MEG)
                 .encodingContext()
@@ -368,12 +370,13 @@ public class TestFfmpeg2 extends BaseTest {
             encoder
                 .outputStream("flv", "rtmp://localhost:1935/live/feedly-id")
                 .openVideoEncoder("libx264", "default")
-                .addCodecOptions("profile", "high")
-                .addCodecOptions("preset", "superfast")
-                // .addCodecOptions("x264-params", "keyint=60:min-keyint=60:scenecut=0")
-                // .addCodecOptions("x264-params",
-                // "cabac=1:ref=3:deblock=1:0:0:analyse=0x3:0x113:me=hex:subme=7:psy=1:psy_rd=1.00:0.00:mixed_ref=1:me_range=16:chroma_me=1:trellis=1:8x8dct=1:cqm=0:deadzone=21,11:fast_pskip=1:chroma_qp_offset=-2:threads=11:lookahead_threads=1:sliced_threads=0:nr=0:decimate=1:interlaced=0:bluray_compat=0:constrained_intra=0:bframes=3:b_pyramid=2:b_adapt=1:b_bias=0:direct=1:weightb=1:open_gop=0:weightp=2:keyint=250:keyint_min=25:scenecut=40:intra_refresh=0:rc_lookahead=40:rc=crf:mbtree=1:crf=23.0:qcomp=0.60:qpmin=0:qpmax=69:qpstep=4:ip_ratio=1.40:aq=1:1.00")
+                .addCodecOptions("profile", "baseline")
+                .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("tune", "zerolatency")
+            // .addCodecOptions("flags", "low_delay")
+            // .addCodecOptions("x264-params", "keyint=60:min-keyint=60:scenecut=0")
+            // .addCodecOptions("x264-params",
+            // "cabac=1:ref=3:deblock=1:0:0:analyse=0x3:0x113:me=hex:subme=7:psy=1:psy_rd=1.00:0.00:mixed_ref=1:me_range=16:chroma_me=1:trellis=1:8x8dct=1:cqm=0:deadzone=21,11:fast_pskip=1:chroma_qp_offset=-2:threads=11:lookahead_threads=1:sliced_threads=0:nr=0:decimate=1:interlaced=0:bluray_compat=0:constrained_intra=0:bframes=3:b_pyramid=2:b_adapt=1:b_bias=0:direct=1:weightb=1:open_gop=0:weightp=2:keyint=250:keyint_min=25:scenecut=40:intra_refresh=0:rc_lookahead=40:rc=crf:mbtree=1:crf=23.0:qcomp=0.60:qpmin=0:qpmax=69:qpstep=4:ip_ratio=1.40:aq=1:1.00")
             // .addCodecOptions("x264-params", "bframes=0")
             // .setBufferSize(4 * 16 * MEG)
             // .setBitrate(2 * MEG)
@@ -383,7 +386,7 @@ public class TestFfmpeg2 extends BaseTest {
             final VideoEncoder ve1 = encoder.getVideoEncoder("default");
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
-            final AtomicLong framecount = new AtomicLong(0);
+            // final AtomicLong framecount = new AtomicLong(0);
 
             ctx
                 .createMediaDataSource(STREAM)
@@ -396,9 +399,9 @@ public class TestFfmpeg2 extends BaseTest {
                 .openChain()
                 .createFirstVideoStreamSelector()
                 .createVideoFrameProcessor(f -> {
-                    final long count = framecount.getAndIncrement();
-                    if(count > 300)
-                        ctx.stop();
+                    // final long count = framecount.getAndIncrement();
+                    // if(count > 300)
+                    // ctx.stop();
 
                     if(firstFrame.get()) {
                         firstFrame.set(false);
@@ -413,7 +416,7 @@ public class TestFfmpeg2 extends BaseTest {
                     }
                 })
                 .streamContext()
-                // .sync()
+                .sync()
                 // .optionally(sync, s -> s.sync())
                 .play()
 

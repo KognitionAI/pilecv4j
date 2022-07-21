@@ -18,6 +18,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 // =====================================================
 /**
@@ -183,7 +185,7 @@ private:
 
 };
 
-
+}
 } /* namespace pilecv4j */
 
 #endif /* SRC_MAIN_CPP_STREAMCONTEXT_H_ */

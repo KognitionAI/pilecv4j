@@ -4,6 +4,7 @@
 #include "ImageSource.h"
 
 namespace pilecv4j {
+namespace python {
 
   PyObject* RunPythonFunction::execute()
   {
@@ -44,5 +45,6 @@ namespace pilecv4j {
     return result;
   }
 
+}
 }
 

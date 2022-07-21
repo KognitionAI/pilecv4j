@@ -10,6 +10,11 @@ public class FfmpegException extends RuntimeException {
         this.status = 0;
     }
 
+    public FfmpegException(final String message, final Throwable cause) {
+        super(message, cause);
+        this.status = 0;
+    }
+
     public FfmpegException(final long status, final String message) {
         super((status == 0) ? message : (sanitizeStatus(status) + ", " + message));
         this.status = status;

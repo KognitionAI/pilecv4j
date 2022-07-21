@@ -21,6 +21,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 #define COMPONENT "DEFP"
 
@@ -197,14 +199,16 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
   return returnCode;
 }
 
-} /* namespace pilecv4j */
-
 extern "C" {
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(pilecv4j::push_frame pf) {
-  pilecv4j::DecodedFrameProcessor* ret = new pilecv4j::DecodedFrameProcessor(pf);
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf) {
+  DecodedFrameProcessor* ret = new DecodedFrameProcessor(pf);
 
-  return (uint64_t)((pilecv4j::MediaProcessor*)ret);
+  return (uint64_t)((MediaProcessor*)ret);
 }
 
 }
+
+}
+} /* namespace pilecv4j */
+

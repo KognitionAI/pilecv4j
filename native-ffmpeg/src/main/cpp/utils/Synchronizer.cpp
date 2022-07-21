@@ -13,6 +13,9 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
+
 #define COMPONENT "SYNC"
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
@@ -27,23 +30,29 @@ static bool decide(int64_t timeToDiplayFrame, uint64_t maxDelayMillisBeforeDropp
 
   int64_t curTime = now();
   if (curTime < timeToDiplayFrame) {
+    llog(TRACE, "time to present frame (%" PRId64 ") > now (%" PRId64 ")", timeToDiplayFrame, curTime);
     int64_t sleeptime = (timeToDiplayFrame - curTime);
     llog(TRACE, "Sleeping for %d", sleeptime);
     std::this_thread::sleep_for(std::chrono::milliseconds(sleeptime));
   }
-
   else if ((uint64_t)(curTime - timeToDiplayFrame) > maxDelayMillisBeforeDroppingFrame) {
+    llog(TRACE, "time to present frame (%" PRId64 ") < now (%" PRId64 ")", timeToDiplayFrame, curTime);
     llog(DEBUG, "Throwing away frame because it's %d milliseconds late.",(curTime - timeToDiplayFrame) );
     skipIt=true;
-  }
+  } else
+    llog(TRACE, "time to present frame (%" PRId64 ") slightly < now (%" PRId64 ")", timeToDiplayFrame, curTime);
 
   return skipIt;
 
 }
 
-bool Synchronizer::throttle(AVFormatContext* fmt, AVPacket* pPacket) {
-  bool skipIt = false;
+bool Synchronizer::throttle(int64_t pts, AVRational& time_base) {
+  int64_t timeToDiplayFrame = av_rescale_q(pts, time_base, millisecondTimeBase) + startPlayTime;
 
+  return decide(timeToDiplayFrame, maxDelayMillisBeforeDroppingFrame);
+}
+
+bool Synchronizer::throttle(AVFormatContext* fmt, AVPacket* pPacket) {
   AVRational time_base = fmt->streams[pPacket->stream_index]->time_base;
 
   int64_t pts;
@@ -69,4 +78,5 @@ bool Synchronizer::throttle(AVRational& streamTimeBase, AVFrame *pFrame) {
   return decide(timeToDiplayFrame, maxDelayMillisBeforeDroppingFrame);
 }
 
+}
 } /* namespace pilecv4j */

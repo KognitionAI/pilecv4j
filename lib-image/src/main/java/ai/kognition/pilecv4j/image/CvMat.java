@@ -305,7 +305,7 @@ public class CvMat extends Mat implements QuietCloseable {
      * using {@link CvMat#deepCopy(Mat)}.
      */
     public static CvMat shallowCopy(final Mat mat) {
-        final long newNativeObj = ImageAPI.CvRaster_copy(mat.nativeObj);
+        final long newNativeObj = ImageAPI.pilecv4j_image_CvRaster_copy(mat.nativeObj);
         if(newNativeObj == 0L) {
             // let's do some checking
             if(!mat.isContinuous())
@@ -354,7 +354,7 @@ public class CvMat extends Mat implements QuietCloseable {
      * CvMat returned</b>
      */
     public static CvMat move(final Mat mat) {
-        final var ret = new CvMat(ImageAPI.CvRaster_move(mat.nativeObj));
+        final var ret = new CvMat(ImageAPI.pilecv4j_image_CvRaster_move(mat.nativeObj));
         // if it's a CvMat we can close it now freeing up ALL of the resources
         // rather than just simply the data matrix. Otherwise it will wait for
         // the gc to get around to finalizing
@@ -379,7 +379,7 @@ public class CvMat extends Mat implements QuietCloseable {
         if(mat instanceof CvMat)
             ((CvMat)mat).close();
         else
-            ImageAPI.CvRaster_freeByMove(mat.nativeObj);
+            ImageAPI.pilecv4j_image_CvRaster_freeByMove(mat.nativeObj);
     }
 
     /**
@@ -451,7 +451,7 @@ public class CvMat extends Mat implements QuietCloseable {
      * This implements {@code leftOp = rightOp}
      */
     public static void reassign(final Mat leftOp, final Mat rightOp) {
-        ImageAPI.CvRaster_assign(leftOp.nativeObj, rightOp.nativeObj);
+        ImageAPI.pilecv4j_image_CvRaster_assign(leftOp.nativeObj, rightOp.nativeObj);
     }
 
     /**
@@ -462,7 +462,7 @@ public class CvMat extends Mat implements QuietCloseable {
      * data buffer outlives the {@link CvMat} or you're pretty much guaranteed a core dump.
      */
     public static CvMat create(final int rows, final int cols, final int type, final long pointer) {
-        final long nativeObj = ImageAPI.CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+        final long nativeObj = ImageAPI.pilecv4j_image_CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
         if(nativeObj == 0)
             throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
         return CvMat.wrapNative(nativeObj);

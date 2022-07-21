@@ -7,6 +7,7 @@
 #include <Python.h>
 
 namespace pilecv4j {
+namespace python {
 
   struct KogMatWithResults {
     cv::Mat* mat;
@@ -108,4 +109,5 @@ namespace pilecv4j {
     // it will increment the count. needs to be decremented.
     KogMatWithResults* next();
   };
+}
 }

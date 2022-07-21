@@ -6,6 +6,7 @@ import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_FATAL;
 import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_INFO;
 import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_TRACE;
 import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_WARN;
+import static net.dempsy.util.Functional.chain;
 import static net.dempsy.util.Functional.ignore;
 
 import java.net.URI;
@@ -20,7 +21,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -36,12 +39,14 @@ import org.slf4j.LoggerFactory;
 import net.dempsy.util.Functional;
 import net.dempsy.util.QuietCloseable;
 
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext.StreamDetails;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.fill_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.push_frame_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.seek_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.select_streams_callback;
+import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.VideoFrame;
 
 public class Ffmpeg2 {
@@ -69,6 +74,11 @@ public class Ffmpeg2 {
     public static final int AVMEDIA_TYPE_SUBTITLE = FfmpegApi2.pcv4j_ffmpeg2_mediaType_SUBTITLE();
     public static final int AVMEDIA_TYPE_ATTACHMENT = FfmpegApi2.pcv4j_ffmpeg2_mediaType_ATTACHMENT();
     public static final int AVMEDIA_TYPE_NB = FfmpegApi2.pcv4j_ffmpeg2_mediaType_NB();
+
+    // This needs to be kept in sync with the value in EncodingContext.h
+    public static final int DEFAULT_FPS = 30;
+
+    public static final long DEFAULT_MAX_LATENCY_MILLIS = 500;
 
     static {
         // find the level
@@ -641,10 +651,120 @@ public class Ffmpeg2 {
         return new EncodingContext(nativeRef);
     }
 
+    public static class StreamingEncoder implements QuietCloseable {
+        private static final AtomicLong threadCount = new AtomicLong(0);
+
+        private final VideoEncoder ctx;
+        private boolean deepCopy = false;
+
+        private final AtomicBoolean stopMe = new AtomicBoolean(false);
+        private final AtomicReference<Sample> onDeck = new AtomicReference<>(null);
+        private Thread encoderThread = null;
+
+        private final AtomicReference<RuntimeException> failure = new AtomicReference<>(null);
+
+        private final static class Sample implements QuietCloseable {
+            public final CvMat frame;
+            public final boolean isRgb;
+
+            public Sample(final CvMat frame, final boolean isRgb) {
+                this.frame = frame;
+                this.isRgb = isRgb;
+            }
+
+            @Override
+            public void close() {
+                frame.close();
+            }
+        }
+
+        private StreamingEncoder(final VideoEncoder ctx) {
+            this.ctx = ctx;
+        }
+
+        public StreamingEncoder deepCopy(final boolean deepCopy) {
+            this.deepCopy = deepCopy;
+            return this;
+        }
+
+        public void encode(final Mat frame, final boolean isRgb) {
+
+            final RuntimeException rte = failure.get();
+            if(rte != null)
+                throw new FfmpegException("Error from encoder thread", rte);
+
+            if(frame != null) {
+                try(CvMat copied = deepCopy ? CvMat.deepCopy(frame) : CvMat.shallowCopy(frame);) {
+                    try(var sample = onDeck.getAndSet(new Sample(copied.returnMe(), isRgb));) {}
+                }
+            }
+
+        }
+
+        public EncodingContext encodingContext() {
+            return ctx.encodingContext();
+        }
+
+        @Override
+        public void close() {
+            stopMe.set(true);
+            ignore(() -> encoderThread.join(5000));
+            if(encoderThread.isAlive())
+                LOGGER.warn("Failed to stop the encoder thread.");
+
+            ctx.close();
+        }
+
+        private void start() {
+
+            encoderThread = chain(new Thread(() -> {
+                Sample prev;
+                // wait for at least one.
+                {
+                    Sample curSample;
+                    do {
+                        curSample = onDeck.getAndSet(null);
+                        if(curSample == null)
+                            Thread.yield();
+                    } while(curSample == null && !stopMe.get());
+
+                    prev = curSample;
+                }
+
+                while(!stopMe.get()) {
+
+                    final Sample toEncode;
+                    {
+                        final Sample curSample = onDeck.getAndSet(null);
+                        if(curSample != null) {
+                            prev.close();
+                            toEncode = prev = curSample;
+                        } else
+                            toEncode = prev;
+                    }
+
+                    try {
+                        ctx.encode(toEncode.frame, toEncode.isRgb);
+                    } catch(final RuntimeException rte) {
+                        failure.set(rte);
+                        break;
+                    }
+                }
+
+            }, "Encoding Thread " + threadCount.getAndIncrement()), t -> t.start());
+        }
+
+    }
+
     public static class EncodingContext implements QuietCloseable {
 
         public class VideoEncoder implements QuietCloseable {
             private final long nativeRef;
+            int fps = DEFAULT_FPS;
+            boolean closed = false;
+            boolean enabled = false;
+
+            StreamingEncoder se = null;
 
             private VideoEncoder(final long nativeRef) {
                 this.nativeRef = nativeRef;
@@ -682,16 +802,49 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final Mat frame, final boolean isRgb) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
+                enabled = true;
+                if(se != null)
+                    se.start();
                 return EncodingContext.this;
             }
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable2(nativeRef, isRgb ? 1 : 0, width, height, stride));
+                enabled = true;
+                if(se != null)
+                    se.start();
                 return EncodingContext.this;
             }
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable3(nativeRef, isRgb ? 1 : 0, width, height));
+                enabled = true;
+                if(se != null)
+                    se.start();
+                return EncodingContext.this;
+            }
+
+            public EncodingContext enable(final Mat frame, final boolean isRgb, final int destWidth, final int destHeight) {
+                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable4(nativeRef, frame.nativeObj, isRgb ? 1 : 0, destWidth, destHeight));
+                enabled = true;
+                if(se != null)
+                    se.start();
+                return EncodingContext.this;
+            }
+
+            public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride, final int destWidth, final int destHeight) {
+                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable5(nativeRef, isRgb ? 1 : 0, width, height, stride, destWidth, destHeight));
+                enabled = true;
+                if(se != null)
+                    se.start();
+                return EncodingContext.this;
+            }
+
+            public EncodingContext enable(final boolean isRgb, final int width, final int height, final int destWidth, final int destHeight) {
+                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable6(nativeRef, isRgb ? 1 : 0, width, height, destWidth, destHeight));
+                enabled = true;
+                if(se != null)
+                    se.start();
                 return EncodingContext.this;
             }
 
@@ -703,14 +856,27 @@ public class Ffmpeg2 {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_stop(nativeRef));
             }
 
+            public StreamingEncoder streamingEncoder(final long maxLatencyMillis) {
+                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_streaming(nativeRef));
+                final var r = new StreamingEncoder(this);
+                if(enabled)
+                    r.start();
+                return r;
+            }
+
+            public StreamingEncoder streamingEncoder() {
+                return streamingEncoder(DEFAULT_MAX_LATENCY_MILLIS);
+            }
+
             public EncodingContext encodingContext() {
                 return EncodingContext.this;
             }
 
             @Override
             public void close() {
-                if(nativeRef != 0)
+                if(!closed && nativeRef != 0)
                     FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_delete(nativeRef);
+                closed = true;
             }
         }
 

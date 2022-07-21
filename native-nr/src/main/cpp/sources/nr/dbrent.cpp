@@ -1,18 +1,20 @@
 #include <math.h>
 #include "nrutil.h"
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define ITMAX 100
 #define ZEPS 1.0e-10
 #define MOV3(a,b,c, d,e,f) (a)=(d);(b)=(e);(c)=(f);
+
+namespace pilecv4j {
+namespace nr {
+
+
 float dbrent(float ax, float bx, float cx, float (*f)(float),
              float (*df)(float), float tol, float *xmin)
 /**Given a function f and its derivative function df, and given a bracketing triplet of abscissas ax,
    bx, cx [such that bx is between ax and cx, and f(bx) is less than both f(ax) and f(cx)],
    this routine isolates the minimum to a fractional precision of about tol using a modi.cation of
-   Brent’s method that uses derivatives. The abscissa of the minimum is returned as xmin, and
+   Brentï¿½s method that uses derivatives. The abscissa of the minimum is returned as xmin, and
    the minimum function value is returned as dbrent, the returned function value.*/
 {
    int iter,ok1,ok2; /*Will be used as .ags for whether proposed*/
@@ -38,7 +40,7 @@ float dbrent(float ax, float bx, float cx, float (*f)(float),
          return fx;
       }
       if (fabs(e) > tol1) {
-         d1=2.0*(b-a); //Initialize these d’s to an out-of-bracket value. 
+         d1=2.0*(b-a); //Initialize these dï¿½s to an out-of-bracket value. 
          d2=d1;
          if (dw != dx) d1=(w-x)*dx/(dx-dw); //Secant method with one point.
          if (dv != dx) d2=(v-x)*dx/(dx-dv); //And the other.
@@ -105,6 +107,7 @@ float dbrent(float ax, float bx, float cx, float (*f)(float),
    nrerror("Too many iterations in routine dbrent");
    return 0.0; //Never get here.
 }
-#ifdef __cplusplus
+
 }
-#endif
+}
+

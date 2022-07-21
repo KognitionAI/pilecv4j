@@ -12,6 +12,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class FirstVideoStreamSelector: public StreamSelector
 {
@@ -26,6 +28,7 @@ public:
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _FIRSTVIDEOSTREAMSELECTOR_H_ */

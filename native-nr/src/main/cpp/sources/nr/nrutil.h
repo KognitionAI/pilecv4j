@@ -1,11 +1,10 @@
-#ifndef _NR_UTILS_H_
-#define _NR_UTILS_H_
+#ifndef PILECV4J_NR_UTILS_H_
+#define PILECV4J_NR_UTILS_H_
 
 #include "kog_exports.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace pilecv4j {
+namespace nr {
 
 inline float SQR(const float sqrarg) {
 	return (sqrarg == 0.0 ? 0.0 : sqrarg*sqrarg);
@@ -53,9 +52,6 @@ void nrerror(const char error_text[]);
 /* My custom added methods for error handling */
 void nrerror2(const char error_text[]);
 int nrIsError();
-// this acts as a MOVE operation on the char* returned.
-//  It's then owned by the called.
-KAI_EXPORT char* nrGetErrorMessage();
 /**********************************************/
 float *vector(long nl, long nh);
 int *ivector(long nl, long nh);
@@ -81,8 +77,9 @@ void free_submatrix(float **b, long nrl, long nrh, long ncl, long nch);
 void free_convert_matrix(float **b, long nrl, long nrh, long ncl, long nch);
 void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch,
                    long ndl, long ndh);
-#ifdef __cplusplus
+
 }
-#endif
+}
+
 #endif /* _NR_UTILS_H_ */
 

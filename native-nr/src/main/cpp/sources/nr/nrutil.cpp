@@ -8,9 +8,8 @@
 #define NR_END 1
 #define FREE_ARG char*
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+namespace pilecv4j {
+namespace nr {
 
 static char* errorText = NULL;
 static int errorHappens = 0;
@@ -29,13 +28,6 @@ int nrIsError()
    return errorHappened;
 }
   
-char* nrGetErrorMessage()
-{
-  char* ret = errorText;
-  errorText = NULL;
-  return ret;
-}
-
 void nrerror(const char error_text[])
    /* Numerical Recipes standard error handler */
 {
@@ -274,6 +266,14 @@ void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch,
    free((FREE_ARG) (t+nrl-NR_END));
 }
 
-#ifdef __cplusplus
+extern "C" {
+char* pilecv4j_image_nrGetErrorMessage()
+{
+  char* ret = errorText;
+  errorText = NULL;
+  return ret;
 }
-#endif
+}
+}
+}
+

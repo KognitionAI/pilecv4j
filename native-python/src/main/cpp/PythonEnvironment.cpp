@@ -29,6 +29,7 @@ static const char* totallyUnknownError = "UNKNOWN ERROR";
 //====================================================
 
 namespace pilecv4j {
+namespace python {
   static PythonEnvironment* s_instance = nullptr;
 
   const char* getStatusMessage(uint32_t status) {
@@ -222,4 +223,6 @@ namespace pilecv4j {
     }
   }
 }
+}
+
 

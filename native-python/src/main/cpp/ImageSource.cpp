@@ -24,7 +24,7 @@
 // CV_32F  5
 // CV_64F  6
 // CV_16F  7
-const char* lookupCvTypeNames[] = {
+static const char* lookupCvTypeNames[] = {
      "CV_8U",
      "CV_8S",
      "CV_16U",
@@ -56,7 +56,7 @@ static int* initLookupFromNpToCv() {
 
 static int* lookupFromNpToCv = initLookupFromNpToCv();
 
-const char* lookupCvTypeName(int cvType) {
+static const char* lookupCvTypeName(int cvType) {
   static const char* unknown = "UNKNOWN";
   if (cvType >= LOOKUP_CV_TO_NP_SIZE || cvType < 0)
     return unknown;
@@ -65,6 +65,7 @@ const char* lookupCvTypeName(int cvType) {
 }
 
 namespace pilecv4j {
+namespace python {
 
   ImageSource::ImageSource() : ondeckx(nullptr), eos(false) {
     log(TRACE,"instantiating ImageSource %ld", (uint64_t)this );
@@ -241,4 +242,5 @@ namespace pilecv4j {
       return tmp;
     }
   }
+}
 }

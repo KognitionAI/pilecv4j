@@ -20,6 +20,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class MediaDataSource
 {
@@ -40,6 +42,7 @@ public:
   virtual std::string toString() = 0;
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _MEDIADATASOURCE_H_ */

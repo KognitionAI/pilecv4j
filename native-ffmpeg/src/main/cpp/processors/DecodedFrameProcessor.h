@@ -18,6 +18,8 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 /**
  * This one is what we push decoded frames to.
@@ -49,6 +51,7 @@ public:
   virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType packetMediaType);
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* SRC_MAIN_CPP_DECODEDFRAMEPROCESSOR_H_ */

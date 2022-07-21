@@ -28,7 +28,7 @@ public class MinimizerAPI {
         float eval(Pointer floatArrayX, Pointer status);
     }
 
-    public static native double dominimize(EvalCallback func, int n, double[] pd, double[] xi, double jftol, double[] minVal, int[] status);
+    public static native double pilecv4j_image_dominimize(EvalCallback func, int n, double[] pd, double[] xi, double jftol, double[] minVal, int[] status);
 
-    public static native Pointer nrGetErrorMessage();
+    public static native Pointer pilecv4j_image_nrGetErrorMessage();
 }

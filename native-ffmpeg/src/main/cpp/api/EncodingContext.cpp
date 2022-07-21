@@ -6,6 +6,7 @@
  */
 
 #include <api/EncodingContext.h>
+#include <utils/Synchronizer.h>
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
 
@@ -17,6 +18,8 @@ extern "C" {
 }
 
 namespace pilecv4j
+{
+namespace ffmpeg
 {
 
 #define COMPONENT "ENCC"
@@ -135,7 +138,7 @@ uint64_t EncodingContext::ready() {
   return MAKE_AV_STAT(ret);
 }
 
-uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb) {
+uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
   auto imaker = IMakerManager::getIMaker();
   if (!imaker)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
@@ -144,11 +147,17 @@ uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb) {
   if (!imaker->extractImageDetails(matRef, isRgb, &details))
     return MAKE_P_STAT(FAILED_CREATE_FRAME);
 
-  return enable(isRgb, details.w, details.h, details.stride);
+  return enable(isRgb, details.w, details.h, details.stride, dstW, dstH);
 }
 
-uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) {
+uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, int dstW, int dstH) {
   AVRational framerate = { fps, 1 };
+
+  if (dstW < 0)
+    dstW = width;
+
+  if (dstH < 0)
+    dstH = height;
 
   // the encoding context state needs to be open
   if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
@@ -156,7 +165,14 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
+  if (state != VE_FRESH) {
+    llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d but it's in %d.", (int)VE_FRESH, (int)state);
+    return MAKE_P_STAT(STREAM_BAD_STATE);
+  }
+
   uint64_t result = 0;
+  AVDictionary* opts = nullptr;
+  int avres = 0;
 
   //llog(TRACE, "STEP 3: find codec");
   video_avc = avcodec_find_encoder_by_name(video_codec.c_str());
@@ -179,16 +195,6 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
     goto fail;
   }
 
-  for (std::map<std::string, std::string>::iterator it = options.begin(); it != options.end(); it++) {
-    if (!it->second.empty() && !it->first.empty()) {
-      result = MAKE_AV_STAT(av_opt_set(video_avcc->priv_data, it->first.c_str(), it->second.c_str(), 0));
-      if (isError(result)) {
-        llog(ERROR, "Failed to set option on video encoder.");
-        goto fail;
-      }
-    }
-  }
-
   if (bufferSize >= 0) {
     llog(TRACE, "Encoder buffer size: %ld", (long) bufferSize);
     video_avcc->rc_buffer_size = bufferSize;
@@ -207,9 +213,10 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
   llog(TRACE, "Encoder frame rate: %d / %d", (int)framerate.num, (int)framerate.den);
   video_avcc->codec_tag = 0;
   video_avcc->codec_type = AVMEDIA_TYPE_VIDEO;
-  video_avcc->width = width;
-  video_avcc->height = height;
-  //video_avcc->gop_size = 12;
+  video_avcc->width = dstW;
+  video_avcc->height = dstH;
+  // set with addCodecOption("g","12")
+//  video_avcc->gop_size = 12;
   video_avcc->time_base = av_inv_q(framerate);
   video_avcc->framerate = framerate;
   video_avs->time_base = video_avcc->time_base;
@@ -223,8 +230,6 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
   if (enc->output_format_context->oformat->flags & AVFMT_GLOBALHEADER)
     video_avcc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-  //llog(TRACE, "STEP 6: set_codec_params");
-
   enc->state = ENC_OPEN_STREAMS;
 
   //llog(TRACE, "STEP 7: avcodec_parameters_from_context");
@@ -235,11 +240,27 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
     goto fail;
   }
 
+  //llog(TRACE, "STEP 6: set_codec_params");
+
+  // set the options
+  result = buildOptions(options, &opts);
+  if (isError(result)) {
+    if (opts != nullptr)
+      av_dict_free(&opts);
+    goto fail;
+  }
+
   //llog(TRACE, "STEP 8: avcodec_open2");
 
-  result = MAKE_AV_STAT(avcodec_open2(video_avcc, video_avc, NULL));
+  avres = avcodec_open2(video_avcc, video_avc, &opts);
+  result = MAKE_AV_STAT(avres);
+  if (opts != nullptr)
+    av_dict_free(&opts);
   if (isError(result)) {
-    llog(ERROR, "could not open the codec");
+    if (avres == AVERROR(EINVAL))
+      llog(ERROR, "There was a bad codec option set.");
+    else
+      llog(ERROR, "could not open the codec");
     goto fail;
   }
 
@@ -255,7 +276,7 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
   streams_original_set = true;
   // ======================================
 
-  result = IMakerManager::setupTransform(width, height, stride, isRgb ? ai::kognition::pilecv4j::RGB24 : ai::kognition::pilecv4j::BGR24, video_avcc, &xform);
+  result = IMakerManager::setupTransform(width, height, stride, isRgb ? ai::kognition::pilecv4j::RGB24 : ai::kognition::pilecv4j::BGR24, video_avcc, dstW, dstH, &xform);
   if (isError(result)) {
     llog(ERROR, "Failed to setup transform");
     goto fail;
@@ -272,6 +293,17 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride) 
   return result;
 }
 
+uint64_t VideoEncoder::streaming() {
+  // this should NOT already be encoding.
+  if (state >= VE_ENCODING) {
+    llog(ERROR, "VideoEncoder is in the wrong state. streaming() must be called before encoding. The current state is %d.", (int)state);
+    return MAKE_P_STAT(STREAM_BAD_STATE);
+  }
+
+  sync = new Synchronizer();
+  return 0;
+}
+
 uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   if (!matRef) {
     llog(WARN, "null mat passed to encode. Ignoring");
@@ -286,9 +318,16 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   uint64_t result = 0;
   int rc = 0;
 
-  if (state != VE_SET_UP) {
-    llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d but it's in %d.", (int)VE_SET_UP, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+  // this should usually be in the VE_ENCODING state except on the first call so we want to check for that first.
+  if (state != VE_ENCODING) {
+    if (state == VE_SET_UP) {
+      state = VE_ENCODING;
+      if (sync)
+        sync->start();
+    } else {
+      llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d or %d but it's in %d.", (int)VE_SET_UP, (int)VE_ENCODING, (int)state);
+      return MAKE_P_STAT(STREAM_BAD_STATE);
+    }
   }
 
   llog(TRACE, "Creating frame from mat at %" PRId64, matRef);
@@ -301,9 +340,19 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 
   // ==================================================================
   // encode the frame
-  llog(TRACE, "rescaling pts for frame at %" PRId64, (uint64_t)frame);
-  frame->pts = framecount * av_rescale_q(1, video_avcc->time_base, video_avs->time_base);
-  framecount++;
+  if (sync) {
+    int64_t pts;
+    int64_t oneInterval = av_rescale_q(1, video_avcc->time_base, video_avs->time_base);
+    do {
+      pts = framecount * oneInterval;
+      framecount++;
+    } while(sync->throttle(pts, video_avs->time_base));
+    frame->pts = pts - oneInterval;
+  } else {
+    llog(TRACE, "rescaling pts for frame at %" PRId64, (uint64_t)frame);
+    frame->pts = framecount * av_rescale_q(1, video_avcc->time_base, video_avs->time_base);
+    framecount++;
+  }
 
   av_init_packet(&output_packet);
 
@@ -509,21 +558,42 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable(uint64_t nativeDef, uint64
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(matRef, isRgb ? true : false);
+  return enc->enable(matRef, isRgb ? true : false, -1, -1);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable2(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride) {
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(isRgb ? true : false, width, height, stride);
+  return enc->enable((bool)(isRgb ? true : false), width, height, stride, -1, -1);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable3(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height) {
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(isRgb ? true : false, width, height);
+  return enc->enable(isRgb ? true : false, width, height, -1, -1, -1);
+}
+
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable4(uint64_t nativeDef, uint64_t matRef, int32_t isRgb, int32_t dstW, int32_t dstH) {
+  if (isEnabled(TRACE))
+    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
+  VideoEncoder* enc = (VideoEncoder*)nativeDef;
+  return enc->enable(matRef, isRgb ? true : false, dstW, dstH);
+}
+
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable5(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride, int32_t dstW, int32_t dstH) {
+  if (isEnabled(TRACE))
+    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
+  VideoEncoder* enc = (VideoEncoder*)nativeDef;
+  return enc->enable((bool)(isRgb ? true : false), width, height, stride, dstW, dstH);
+}
+
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable6(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t dstW, int32_t dstH) {
+  if (isEnabled(TRACE))
+    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
+  VideoEncoder* enc = (VideoEncoder*)nativeDef;
+  return enc->enable(isRgb ? true : false, width, height, -1, dstW, dstH);
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_videoEncoder_delete(uint64_t nativeDef) {
@@ -540,7 +610,15 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_stop(uint64_t nativeDef) {
   return enc->stop();
 }
 
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_streaming(uint64_t nativeDef) {
+  if (isEnabled(TRACE))
+    llog(TRACE, "Stopping video encoder at %" PRId64, nativeDef);
+  VideoEncoder* enc = (VideoEncoder*)nativeDef;
+  return enc->streaming();
+}
+
 } /* extern "C" */
+}
 
 } /* namespace pilecv4j */
 

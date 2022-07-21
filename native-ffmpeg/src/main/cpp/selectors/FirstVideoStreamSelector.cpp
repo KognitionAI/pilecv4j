@@ -14,6 +14,9 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
+
 #define COMPONENT "FVSS"
 
 inline static void log(LogLevel llevel, const char *fmt, ...) {
@@ -110,21 +113,22 @@ uint64_t FirstVideoStreamSelector::selectStreams(AVFormatContext* formatCtx, boo
   return 0;
 }
 
-
-} /* namespace pilecv4j */
-
 //========================================================================
 // Everything here in this extern "C" section is callable from Java
 //========================================================================
 extern "C" {
 
   KAI_EXPORT uint64_t pcv4j_ffmpeg2_firstVideoStreamSelector_create() {
-    pilecv4j::FirstVideoStreamSelector* ret = new pilecv4j::FirstVideoStreamSelector();
+    FirstVideoStreamSelector* ret = new FirstVideoStreamSelector();
 
-    if (pilecv4j::isEnabled(pilecv4j::TRACE))
-      pilecv4j::log(pilecv4j::TRACE, "creating vid source %" PRId64, (uint64_t) ret);
+    if (isEnabled(TRACE))
+      log(TRACE, "creating vid source %" PRId64, (uint64_t) ret);
 
-    return (uint64_t)((pilecv4j::StreamSelector*)ret);
+    return (uint64_t)((StreamSelector*)ret);
   }
 }
+
+}
+} /* namespace pilecv4j */
+
 

@@ -13,7 +13,7 @@ int initModule_kognition();
 
 static bool inited = false;
 
-using namespace pilecv4j;
+using namespace pilecv4j::python;
 
 //static void dumpDict(PyObject* module) {
 //  PyObject *key, *value;
@@ -38,19 +38,19 @@ using namespace pilecv4j;
 extern PyObject* convert(KogSystem* pt);
 
 extern "C" {
-  KAI_EXPORT char* statusMessage(uint32_t status) {
+  KAI_EXPORT char* pilecv4j_python_statusMessage(uint32_t status) {
     if (status == 0)
       return nullptr;
 
     return strdup(getStatusMessage(status));
   }
 
-  KAI_EXPORT void freeStatusMessage(char* messageRef) {
+  KAI_EXPORT void pilecv4j_python_freeStatusMessage(char* messageRef) {
     if (messageRef)
       free((void*)messageRef);
   }
 
-  KAI_EXPORT int32_t initPython() {
+  KAI_EXPORT int32_t pilecv4j_python_initPython() {
     static std::mutex initMutex;
 
     log(DEBUG, "initPython called from java.");
@@ -72,32 +72,32 @@ extern "C" {
     return (int32_t)OK;
   }
 
-  KAI_EXPORT uint64_t initKogSys(get_image_source cb) {
+  KAI_EXPORT uint64_t pilecv4j_python_initKogSys(get_image_source cb) {
     return (uint64_t)new KogSystem(cb);
   }
 
-  KAI_EXPORT int32_t kogSys_numModelLabels(uint64_t ptRef) {
+  KAI_EXPORT int32_t pilecv4j_python_kogSys_numModelLabels(uint64_t ptRef) {
     KogSystem* ths = (KogSystem*)ptRef;
     return ths->getNumLabels();
   }
 
-  KAI_EXPORT const char* kogSys_modelLabel(uint64_t ptRef, int32_t index) {
+  KAI_EXPORT const char* pilecv4j_python_kogSys_modelLabel(uint64_t ptRef, int32_t index) {
     KogSystem* ths = (KogSystem*)ptRef;
     return ths->getModelLabel(index);
   }
 
-  KAI_EXPORT int32_t closePyTorch(uint64_t ptRef) {
+  KAI_EXPORT int32_t pilecv4j_python_closePyTorch(uint64_t ptRef) {
     delete (KogSystem*)ptRef;
     return OK;
   }
 
-  KAI_EXPORT int32_t runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
+  KAI_EXPORT int32_t pilecv4j_python_runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
     PyObject* paramDict = (PyObject*)paramDictRef;
     PythonEnvironment* p = PythonEnvironment::instance();
     return p->runModel(moduleName, functionName, paramDict);
   }
 
-  KAI_EXPORT uint64_t imageSourceSend(uint64_t imageSourceRef, uint64_t matRef, int32_t rgbi) {
+  KAI_EXPORT uint64_t pilecv4j_python_imageSourceSend(uint64_t imageSourceRef, uint64_t matRef, int32_t rgbi) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     if (matRef == 0L) {
       is->send(nullptr);
@@ -109,33 +109,33 @@ extern "C" {
     return (uint64_t)km;
   }
 
-  KAI_EXPORT void addModulePath(const char* modPath) {
+  KAI_EXPORT void pilecv4j_python_addModulePath(const char* modPath) {
     PythonEnvironment::instance()->addModulePath(modPath);
   }
 
-  KAI_EXPORT uint64_t makeImageSource(uint64_t pt) {
+  KAI_EXPORT uint64_t pilecv4j_python_makeImageSource(uint64_t pt) {
     KogSystem* ptorch = (KogSystem*)pt;
     return uint64_t(new ImageSource());
   }
 
-  KAI_EXPORT uint64_t imageSourcePeek(uint64_t imageSourceRef) {
+  KAI_EXPORT uint64_t pilecv4j_python_imageSourcePeek(uint64_t imageSourceRef) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     return (uint64_t)(is->peek());
   }
 
-  KAI_EXPORT void imageSourceClose(uint64_t imageSourceRef) {
+  KAI_EXPORT void pilecv4j_python_imageSourceClose(uint64_t imageSourceRef) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     delete is;
   }
 
-  KAI_EXPORT void kogMatResults_close(uint64_t nativeObj) {
+  KAI_EXPORT void pilecv4j_python_kogMatResults_close(uint64_t nativeObj) {
     log(TRACE, "Closing KogMatWithResults at %ld", (long)nativeObj);
     if (nativeObj) {
       ((KogMatWithResults*)nativeObj)->decrement();
     }
   }
 
-  KAI_EXPORT int32_t kogMatResults_hasResult(uint64_t nativeObj) {
+  KAI_EXPORT int32_t pilecv4j_python_kogMatResults_hasResult(uint64_t nativeObj) {
     log(TRACE, "hasResult on %ld", (long)(nativeObj));
 
     if (nativeObj)
@@ -144,14 +144,14 @@ extern "C" {
       return 0;
   }
 
-  KAI_EXPORT int32_t kogMatResults_isAbandoned(uint64_t nativeObj) {
+  KAI_EXPORT int32_t pilecv4j_python_kogMatResults_isAbandoned(uint64_t nativeObj) {
     if (nativeObj)
       return ((KogMatWithResults*)nativeObj)->abandoned ? 1 : 0;
     else
       return 0;
   }
 
-  KAI_EXPORT uint64_t kogMatResults_getResults(uint64_t nativeObj) {
+  KAI_EXPORT uint64_t pilecv4j_python_kogMatResults_getResults(uint64_t nativeObj) {
     if (nativeObj) {
       cv::Mat* results = ((KogMatWithResults*)nativeObj)->results;
       if (results)
@@ -162,17 +162,17 @@ extern "C" {
       return 0L;
   }
 
-  KAI_EXPORT uint64_t newParamDict() {
+  KAI_EXPORT uint64_t pilecv4j_python_newParamDict() {
     CallPythonGuard gg;
     return (uint64_t)(PyObject*) PyDict_New();
   }
 
-  KAI_EXPORT void closeParamDict(uint64_t dictRef) {
+  KAI_EXPORT void pilecv4j_python_closeParamDict(uint64_t dictRef) {
     CallPythonGuard gg;
     Py_DECREF((PyObject*)dictRef);
   }
 
-  KAI_EXPORT int32_t putBooleanParamDict(uint64_t dictRef, const char* key, int32_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_putBooleanParamDict(uint64_t dictRef, const char* key, int32_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -186,7 +186,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  KAI_EXPORT int32_t putIntParamDict(uint64_t dictRef, const char* key, int64_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_putIntParamDict(uint64_t dictRef, const char* key, int64_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -199,7 +199,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  KAI_EXPORT int32_t putFloatParamDict(uint64_t dictRef, const char* key, float64_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_putFloatParamDict(uint64_t dictRef, const char* key, float64_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -213,7 +213,7 @@ extern "C" {
   }
 
 
-  KAI_EXPORT int32_t putStringParamDict(uint64_t dictRef, const char* key, const char* valRaw) {
+  KAI_EXPORT int32_t pilecv4j_python_putStringParamDict(uint64_t dictRef, const char* key, const char* valRaw) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -226,7 +226,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  KAI_EXPORT int32_t putPytorchParamDict(uint64_t dictRef, const char* key, uint64_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_putPytorchParamDict(uint64_t dictRef, const char* key, uint64_t valRef) {
 
     CallPythonGuard gg;
     PythonEnvironment::instance()->loadKognitionModule();
@@ -248,7 +248,7 @@ extern "C" {
     return result;
   }
 
-  KAI_EXPORT int32_t setLogLevel(int32_t plogLevel) {
+  KAI_EXPORT int32_t pilecv4j_python_setLogLevel(int32_t plogLevel) {
     if (plogLevel <= MAX_LOG_LEVEL && plogLevel >= 0)
       setLogLevel(static_cast<LogLevel>(plogLevel));
     else

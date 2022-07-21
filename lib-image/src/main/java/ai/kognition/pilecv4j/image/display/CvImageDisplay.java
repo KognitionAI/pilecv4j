@@ -60,19 +60,19 @@ public class CvImageDisplay extends ImageDisplay {
                     try {
                         if(state.windows.size() > 0) {
                             // then we can check for a key press.
-                            final int key = ImageAPI.CvRaster_fetchEvent(1);
+                            final int key = ImageAPI.pilecv4j_image_CvRaster_fetchEvent(1);
                             final Set<String> toCloseUp = state.callbacks.values().stream()
                                 .map(cb -> cb.keyPressed(key))
                                 .filter(n -> n != null)
                                 .collect(Collectors.toSet());
 
                             toCloseUp.addAll(state.windows.keySet().stream()
-                                .filter(ImageAPI::CvRaster_isWindowClosed)
+                                .filter(ImageAPI::pilecv4j_image_CvRaster_isWindowClosed)
                                 .collect(Collectors.toSet()));
 
                             toCloseUp.forEach(n -> {
                                 // need to close the window and cleanup.
-                                ImageAPI.CvRaster_destroyWindow(n);
+                                ImageAPI.pilecv4j_image_CvRaster_destroyWindow(n);
                                 final CvImageDisplay id = state.windows.get(n);
                                 if(id != null)
                                     id.closeNow.set(true);
@@ -184,7 +184,7 @@ public class CvImageDisplay extends ImageDisplay {
         final CvMat omat = CvMat.shallowCopy(mat);
         uncheck(() -> commands.put(s -> {
             try (CvMat lmat = omat) {
-                ImageAPI.CvRaster_showImage(name, omat.nativeObj);
+                ImageAPI.pilecv4j_image_CvRaster_showImage(name, omat.nativeObj);
                 // if we got here, we're going to assume the windows was created.
                 if(callback != null)
                     s.callbacks.put(name, callback);
@@ -218,7 +218,7 @@ public class CvImageDisplay extends ImageDisplay {
 
             try (final CvMat toUpdate = update.getAndSet(null);) {
                 if(toUpdate != null)
-                    ImageAPI.CvRaster_updateWindow(window.name, toUpdate.nativeObj);
+                    ImageAPI.pilecv4j_image_CvRaster_updateWindow(window.name, toUpdate.nativeObj);
             }
 
             if(keyPressCallback != null && kp >= 0) {

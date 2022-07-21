@@ -17,6 +17,9 @@ extern "C" {
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
+
 #define COMPONENT "URIR"
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
@@ -217,7 +220,6 @@ uint64_t UriRemuxer::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacke
   return ret;
 }
 
-} /* namespace pilecv4j */
 
 //========================================================================
 // Everything here in this extern "C" section is callable from Java
@@ -225,9 +227,12 @@ uint64_t UriRemuxer::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacke
 extern "C" {
 
   KAI_EXPORT uint64_t pcv4j_ffmpeg2_uriRemuxer_create(const char* pfmt, const char* poutputUri, int32_t maxRemuxErrorCount) {
-    pilecv4j::MediaProcessor* ret = new pilecv4j::UriRemuxer(pfmt, poutputUri, maxRemuxErrorCount);
+    MediaProcessor* ret = new UriRemuxer(pfmt, poutputUri, maxRemuxErrorCount);
     return (uint64_t)ret;
   }
 
 }
+
+}
+} /* namespace pilecv4j */
 

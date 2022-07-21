@@ -1,17 +1,17 @@
 /***********************************************************************
  * Legacy Film to DVD Project
  * Copyright (C) 2005 James F. Carroll
- * 
+ *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
@@ -33,105 +33,105 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
 
 public class MJPEGWriter {
-   static {
-      CvMat.initOpenCv();
-   }
+    static {
+        CvMat.initOpenCv();
+    }
 
-   static public File pdir = null;
-   static public String avifile = "out.avi";
-   public static int avifps = 16;
+    static public File pdir = null;
+    static public String avifile = "out.avi";
+    public static int avifps = 16;
 
-   public static void main(final String[] args) {
-      if(!commandLine(args))
-         System.exit(-1);
+    public static void main(final String[] args) {
+        if(!commandLine(args))
+            System.exit(-1);
 
-      // assume args are file names
-      initializeMJPEG(avifile);
-      boolean working = true;
+        // assume args are file names
+        initializeMJPEG(avifile);
+        boolean working = true;
 
-      final File[] files = pdir.listFiles(
+        final File[] files = pdir.listFiles(
             f -> {
-               final String fp = f.getAbsolutePath();
-               return f.isFile() && (fp.endsWith(".jpeg") || fp.endsWith(".JPEG") ||
-                     fp.endsWith("jpg") || fp.endsWith("JPG"));
+                final String fp = f.getAbsolutePath();
+                return f.isFile() && (fp.endsWith(".jpeg") || fp.endsWith(".JPEG") ||
+                    fp.endsWith("jpg") || fp.endsWith("JPG"));
             });
 
-      final List<File> fileList = Arrays.asList(files);
-      Collections.sort(fileList, (o1, o2) -> o1.getName().compareTo(o2.getName()));
+        final List<File> fileList = Arrays.asList(files);
+        Collections.sort(fileList, (o1, o2) -> o1.getName().compareTo(o2.getName()));
 
-      for(final File f: fileList)
-         working = appendFile(f.getAbsolutePath());
+        for(final File f: fileList)
+            working = appendFile(f.getAbsolutePath());
 
-      if(working)
-         close(avifps);
-      else
-         System.out.println("Failed to create AVI - Who knows why!");
+        if(working)
+            close(avifps);
+        else
+            System.out.println("Failed to create AVI - Who knows why!");
 
-      cleanUp();
-   }
+        cleanUp();
+    }
 
-   public static boolean initializeMJPEG(final String filename) {
-      return ImageAPI.mjpeg_initializeMJPEG(filename);
-   }
+    public static boolean initializeMJPEG(final String filename) {
+        return ImageAPI.pilecv4j_image_mjpeg_initializeMJPEG(filename) == 0 ? false : true;
+    }
 
-   public static boolean doappendFile(final String filename, final int width, final int height) {
-      return ImageAPI.mjpeg_doappendFile(filename, width, height);
-   }
+    public static boolean doappendFile(final String filename, final int width, final int height) {
+        return ImageAPI.pilecv4j_image_mjpeg_doappendFile(filename, width, height) == 0 ? false : true;
+    }
 
-   public static boolean close(final int fps) {
-      return ImageAPI.mjpeg_close(fps);
-   }
+    public static boolean close(final int fps) {
+        return ImageAPI.pilecv4j_image_mjpeg_close(fps) == 0 ? false : true;
+    }
 
-   public static void cleanUp() {
-      ImageAPI.mjpeg_cleanUp();
-   }
+    public static void cleanUp() {
+        ImageAPI.pilecv4j_image_mjpeg_cleanUp();
+    }
 
-   private static void usage() {
-      System.out.println("usage: java [javaargs] " + MJPEGWriter.class.getName() + " -pdir parentDir [-avifile out.avi] [-avifps 16]");
-   }
+    private static void usage() {
+        System.out.println("usage: java [javaargs] " + MJPEGWriter.class.getName() + " -pdir parentDir [-avifile out.avi] [-avifps 16]");
+    }
 
-   public static boolean commandLine(final String[] args) {
-      final CommandLineParser cl = new CommandLineParser(args);
-      // see if we are asking for help
-      if(cl.getProperty("help") != null ||
+    public static boolean commandLine(final String[] args) {
+        final CommandLineParser cl = new CommandLineParser(args);
+        // see if we are asking for help
+        if(cl.getProperty("help") != null ||
             cl.getProperty("-help") != null) {
-         usage();
-         return false;
-      }
+            usage();
+            return false;
+        }
 
-      final String parentDir = cl.getProperty("pdir");
-      if(parentDir == null) {
-         usage();
-         return false;
-      }
+        final String parentDir = cl.getProperty("pdir");
+        if(parentDir == null) {
+            usage();
+            return false;
+        }
 
-      pdir = new File(parentDir);
-      if(!pdir.isDirectory()) {
-         System.out.println("\"" + parentDir + "\" is not a directory.");
-         usage();
-         return false;
-      }
+        pdir = new File(parentDir);
+        if(!pdir.isDirectory()) {
+            System.out.println("\"" + parentDir + "\" is not a directory.");
+            usage();
+            return false;
+        }
 
-      String tmps = cl.getProperty("avifile");
-      if(tmps != null)
-         avifile = tmps;
+        String tmps = cl.getProperty("avifile");
+        if(tmps != null)
+            avifile = tmps;
 
-      tmps = cl.getProperty("avifps");
-      if(tmps != null)
-         avifps = Integer.parseInt(tmps);
+        tmps = cl.getProperty("avifps");
+        if(tmps != null)
+            avifps = Integer.parseInt(tmps);
 
-      return true;
-   }
+        return true;
+    }
 
-   static private int width = -1;
-   static private int height = -1;
+    static private int width = -1;
+    static private int height = -1;
 
-   static public boolean appendFile(final String filename) {
-      if(height == -1) {
-         final Mat origImage = Imgcodecs.imread(filename);
-         width = origImage.cols();
-         height = origImage.rows();
-      }
-      return doappendFile(filename, width, height);
-   }
+    static public boolean appendFile(final String filename) {
+        if(height == -1) {
+            final Mat origImage = Imgcodecs.imread(filename);
+            width = origImage.cols();
+            height = origImage.rows();
+        }
+        return doappendFile(filename, width, height);
+    }
 }

@@ -27,16 +27,6 @@ using namespace std;
 
 typedef int32_t (*AddHoughSpaceEntryContributorFunc)(int32_t orow, int32_t ocol,int32_t hsr, int32_t hsc, int32_t hscount);
 
-extern "C" {
-KAI_EXPORT void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImage,
- void* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
- void* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
- float64_t gradientDirSlopDeg, float64_t quantFactor, int16_t* ret, int32_t hswidth, int32_t hsheight,
- AddHoughSpaceEntryContributorFunc hsem, int32_t houghThreshold, int32_t rowstart, int32_t rowend, int32_t colstart, int32_t colend,
- unsigned char EDGE);
-}
-
-
 struct BackMap
 {
   BackMap(int orow, int ocol)
@@ -52,15 +42,96 @@ struct BackMap
 typedef BackMap* BackMapPtr;
 
 
+static inline int smaskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, unsigned char EDGE)
+{
+  return (r >= 0 && r < maskh && c >= 0 && c < maskw) ? (mask[(r * maskw) + c] == EDGE) : 0;
+}
+
+static int maskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, int isBackMapping, unsigned char EDGE)
+{
+  return isBackMapping ?
+    (smaskcheck(mask,maskw,maskh,r,c,EDGE) || smaskcheck(mask,maskw,maskh,r+1,c,EDGE) ||
+     smaskcheck(mask,maskw,maskh,r-1,c,EDGE) || smaskcheck(mask,maskw,maskh,r,c+1,EDGE) ||
+     smaskcheck(mask,maskw,maskh,r,c-1,EDGE)) : smaskcheck(mask,maskw,maskh,r,c,EDGE);
+}
+
 static void sweep(int32_t orow, int32_t ocol, int32_t row, int32_t col, int16_t* houghSpace, int32_t width, int32_t height,
            unsigned char* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
-           unsigned char* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
-           short gradientDirByte, short gradientDirSlopBytePM, double quantFactor, unsigned char EDGE,
-           int houghThreshold = -1, short* interimHoughSpace = NULL, list<BackMapPtr>** backMapList = NULL);
+           unsigned char* gradDirMask, int32_t /*gdmaskw*/, int32_t /*gdmaskh*/, int32_t /*gdmaskcr*/, int32_t /*gdmaskcc*/,
+           short gradientDirByte, short gradientDirSlopBytePM,
+           double /*quantFactor*/, unsigned char EDGE, int houghThreshold = -1,short* interimHoughSpace = NULL,
+           list<BackMapPtr>** backMapListSpace = NULL)
+{
+  int maxbincount = -1;
+  int maxbinpos = -1;
+  int tmpi;
 
-static int maskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, int isBackMapping, unsigned char EDGE);
+  // the mask is already swept so we need to simply
+  //  plop it on the houghSpace centered at r,c
+  for (int r = 0; r < maskh; r++)
+  {
+    int hsr = (row - maskcr) + r;
+    if (hsr >= 0 && hsr < height)
+    {
+      for (int c = 0; c < maskw; c++)
+      {
+        int hsc = (col - maskcc) + c;
+        if (hsc >= 0 && hsc < width &&
+            maskcheck(mask,maskw,maskh,r,c,       // this mask check checks adjacent pixels also
+                      interimHoughSpace != NULL,  //  and has the side affect of smearing the transform
+                      EDGE))
+        {
+          short requiredGradDir = gradDirMask[(r * maskw) + c];
+          short diff = requiredGradDir > gradientDirByte ?
+            (short)(requiredGradDir - gradientDirByte) :
+            (short)(gradientDirByte - requiredGradDir);
 
-void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImageA,
+          if (gradientDirSlopBytePM >= diff ||
+              gradientDirSlopBytePM >= ((short)256 - diff))
+          {
+            if (interimHoughSpace)
+            {
+              tmpi = (hsr * width) + hsc; // tmpi has the index into the hough space in question
+              if (maxbincount < interimHoughSpace[tmpi])
+              {
+                maxbinpos = tmpi;
+                maxbincount = interimHoughSpace[maxbinpos];
+              }
+            }
+            else
+              if (houghSpace)
+                houghSpace[(hsr * width) + hsc]++;
+          }
+        }
+      }
+    }
+  }
+
+  if (interimHoughSpace)
+  {
+    if (maxbinpos >= 0 && (maxbincount > houghThreshold || houghThreshold <= 0))
+    {
+      if (houghSpace)
+        houghSpace[maxbinpos]++;
+
+      if (backMapListSpace)
+      {
+        list<BackMapPtr>* bmlist = backMapListSpace[maxbinpos];
+
+        if (bmlist == NULL)
+        {
+          bmlist = new list<BackMapPtr>;
+          backMapListSpace[maxbinpos] = bmlist;
+        }
+
+        bmlist->push_back(new BackMap(orow,ocol));
+      }
+    }
+  }
+}
+
+extern "C" {
+KAI_EXPORT void pilecv4j_image_Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*height*/, uint64_t gradientDirImageA,
  void* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
  void* gradientDirMask, int32_t gdmaskw, int32_t gdmaskh, int32_t gdmaskcr, int32_t gdmaskcc,
  float64_t gradientDirSlopDeg, float64_t quantFactor, int16_t* ret, int32_t hswidth, int32_t hsheight,
@@ -189,92 +260,5 @@ void Transform_houghTransformNative(uint64_t imageA, int32_t width, int32_t /*he
   delete [] interimht;
 }
 
-static void sweep(int32_t orow, int32_t ocol, int32_t row, int32_t col, int16_t* houghSpace, int32_t width, int32_t height,
-           unsigned char* mask, int32_t maskw, int32_t maskh, int32_t maskcr, int32_t maskcc,
-           unsigned char* gradDirMask, int32_t /*gdmaskw*/, int32_t /*gdmaskh*/, int32_t /*gdmaskcr*/, int32_t /*gdmaskcc*/,
-           short gradientDirByte, short gradientDirSlopBytePM,
-           double /*quantFactor*/, unsigned char EDGE, int houghThreshold,short* interimHoughSpace,
-           list<BackMapPtr>** backMapListSpace)
-{
-  int maxbincount = -1;
-  int maxbinpos = -1;
-  int tmpi;
-
-  // the mask is already swept so we need to simply
-  //  plop it on the houghSpace centered at r,c
-  for (int r = 0; r < maskh; r++)
-  {
-    int hsr = (row - maskcr) + r;
-    if (hsr >= 0 && hsr < height)
-    {
-      for (int c = 0; c < maskw; c++)
-      {
-        int hsc = (col - maskcc) + c;
-        if (hsc >= 0 && hsc < width &&
-            maskcheck(mask,maskw,maskh,r,c,       // this mask check checks adjacent pixels also
-                      interimHoughSpace != NULL,  //  and has the side affect of smearing the transform
-                      EDGE))
-        {
-          short requiredGradDir = gradDirMask[(r * maskw) + c];
-          short diff = requiredGradDir > gradientDirByte ?
-            (short)(requiredGradDir - gradientDirByte) :
-            (short)(gradientDirByte - requiredGradDir);
-
-          if (gradientDirSlopBytePM >= diff ||
-              gradientDirSlopBytePM >= ((short)256 - diff))
-          {
-            if (interimHoughSpace)
-            {
-              tmpi = (hsr * width) + hsc; // tmpi has the index into the hough space in question
-              if (maxbincount < interimHoughSpace[tmpi])
-              {
-                maxbinpos = tmpi;
-                maxbincount = interimHoughSpace[maxbinpos];
-              }
-            }
-            else
-              if (houghSpace)
-                houghSpace[(hsr * width) + hsc]++;
-          }
-        }
-      }
-    }
-  }
-
-  if (interimHoughSpace)
-  {
-    if (maxbinpos >= 0 && (maxbincount > houghThreshold || houghThreshold <= 0))
-    {
-      if (houghSpace)
-        houghSpace[maxbinpos]++;
-
-      if (backMapListSpace)
-      {
-        list<BackMapPtr>* bmlist = backMapListSpace[maxbinpos];
-
-        if (bmlist == NULL)
-        {
-          bmlist = new list<BackMapPtr>;
-          backMapListSpace[maxbinpos] = bmlist;
-        }
-
-        bmlist->push_back(new BackMap(orow,ocol));
-      }
-    }
-  }
-}
-
-
-static inline int smaskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, unsigned char EDGE)
-{
-  return (r >= 0 && r < maskh && c >= 0 && c < maskw) ? (mask[(r * maskw) + c] == EDGE) : 0;
-}
-
-static int maskcheck(unsigned char * mask, int32_t maskw, int32_t maskh, int r, int c, int isBackMapping, unsigned char EDGE)
-{
-  return isBackMapping ?
-    (smaskcheck(mask,maskw,maskh,r,c,EDGE) || smaskcheck(mask,maskw,maskh,r+1,c,EDGE) ||
-     smaskcheck(mask,maskw,maskh,r-1,c,EDGE) || smaskcheck(mask,maskw,maskh,r,c+1,EDGE) ||
-     smaskcheck(mask,maskw,maskh,r,c-1,EDGE)) : smaskcheck(mask,maskw,maskh,r,c,EDGE);
 }
 

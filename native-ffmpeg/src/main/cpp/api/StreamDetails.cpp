@@ -3,6 +3,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDetails** ppdetails, int* nb) {
 
@@ -41,5 +43,5 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
   return 0;
 }
 
-
+}
 } /* namespace pilecv4j */

@@ -14,6 +14,9 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
+
 #define COMPONENT "JASS"
 
 inline static void log(LogLevel llevel, const char *fmt, ...) {
@@ -56,6 +59,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_javaStreamSelector_create(select_streams callb
   return ret;
 }
 
+}
 } /* namespace pilecv4j */
 
 }

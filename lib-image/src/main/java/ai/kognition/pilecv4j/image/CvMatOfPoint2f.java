@@ -82,7 +82,7 @@ public class CvMatOfPoint2f extends MatOfPoint2f implements AutoCloseable {
     }
 
     public static CvMatOfPoint2f move(final MatOfPoint mat) {
-        return new CvMatOfPoint2f(ImageAPI.CvRaster_move(mat.nativeObj));
+        return new CvMatOfPoint2f(ImageAPI.pilecv4j_image_CvRaster_move(mat.nativeObj));
     }
 
     public CvMatOfPoint2f returnMe() {

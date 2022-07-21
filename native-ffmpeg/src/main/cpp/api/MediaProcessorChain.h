@@ -16,6 +16,8 @@
 
 namespace pilecv4j
 {
+namespace ffmpeg
+{
 
 class MediaProcessorChain : public MediaProcessor
 {
@@ -47,6 +49,7 @@ public:
 
 };
 
+}
 } /* namespace pilecv4j */
 
 #endif /* _MEDIAPROCESSORCHAIN_H_ */
