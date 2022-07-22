@@ -1,0 +1,36 @@
+#Eclipse
+.springBeans
+.classpath
+.project
+.settings
+.\#*
+\#*
+
+.metadata
+.pydevproject
+
+# mvn temps
+target
+
+#OSX
+.DS_Store
+
+#log file
+*.log
+
+#Other
+.Rhistory
+.cache-main
+.cache-tests
+.tmpBin
+
+.checkstyle
+.fbExcludeFilterFile
+
+dempsy-commons
+#project build directories
+native/linux-amd64-jiminger/bin
+
+hs_err_*.log
+
+run.sh

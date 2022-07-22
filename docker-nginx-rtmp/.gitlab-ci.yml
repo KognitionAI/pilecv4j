@@ -1,0 +1,15 @@
+image: docker.kognition.ai/kognition/devops/maven:latest
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  MAVEN_OPTS: "-Dmaven.repo.local=/root/.m2/repository"
+
+stages:
+ - build
+
+build:
+  stage: build
+  script:
+    - mvn -U -B clean deploy
+    - downstream
+    

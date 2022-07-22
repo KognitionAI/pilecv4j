@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -103,7 +102,6 @@ public class TestFfmpeg2 extends BaseTest {
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
-                // .createMediaDataSource(uncheck(() -> new URI("file:///tmp/out.mp4")))
                 .load()
                 .peek(s -> {
                     details.ref = s.getStreamDetails();
@@ -200,23 +198,6 @@ public class TestFfmpeg2 extends BaseTest {
         }
     }
 
-    @Ignore
-    @Test
-    public void testRemuxStreaming() throws Exception {
-        try(
-
-            final StreamContext c = Ffmpeg2.createStreamContext();) {
-            c
-                .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .openChain()
-                .createUriRemuxer("flv", "rtmp://localhost:1935/live/feedly-id")
-                .streamContext()
-                .sync()
-                .play();
-        }
-    }
-
     @Test
     public void testRemux() throws Exception {
         final File destination = tempDir.newFile("out.flv");
@@ -259,7 +240,6 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testEncoding() throws Exception {
         final File destination = tempDir.newFile("out.mp4");
-        // final File destination = new File("/tmp/out.mp4");
         if(destination.exists())
             destination.delete();
 
@@ -357,153 +337,10 @@ public class TestFfmpeg2 extends BaseTest {
         }
     }
 
-    @Ignore
-    @Test
-    public void testEncodingStream() throws Exception {
-        try(
-            final EncodingContext encoder = Ffmpeg2.createEncoder();
-            final StreamContext ctx = Ffmpeg2.createStreamContext();
-            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-
-        ) {
-
-            encoder
-                .outputStream("flv", "rtmp://localhost:1935/live/feedly-id")
-                .openVideoEncoder("libx264", "default")
-                .addCodecOptions("profile", "baseline")
-                .addCodecOptions("preset", "ultrafast")
-                .addCodecOptions("tune", "zerolatency")
-            // .addCodecOptions("flags", "low_delay")
-            // .addCodecOptions("x264-params", "keyint=60:min-keyint=60:scenecut=0")
-            // .addCodecOptions("x264-params",
-            // "cabac=1:ref=3:deblock=1:0:0:analyse=0x3:0x113:me=hex:subme=7:psy=1:psy_rd=1.00:0.00:mixed_ref=1:me_range=16:chroma_me=1:trellis=1:8x8dct=1:cqm=0:deadzone=21,11:fast_pskip=1:chroma_qp_offset=-2:threads=11:lookahead_threads=1:sliced_threads=0:nr=0:decimate=1:interlaced=0:bluray_compat=0:constrained_intra=0:bframes=3:b_pyramid=2:b_adapt=1:b_bias=0:direct=1:weightb=1:open_gop=0:weightp=2:keyint=250:keyint_min=25:scenecut=40:intra_refresh=0:rc_lookahead=40:rc=crf:mbtree=1:crf=23.0:qcomp=0.60:qpmin=0:qpmax=69:qpstep=4:ip_ratio=1.40:aq=1:1.00")
-            // .addCodecOptions("x264-params", "bframes=0")
-            // .setBufferSize(4 * 16 * MEG)
-            // .setBitrate(2 * MEG)
-
-            ;
-
-            final VideoEncoder ve1 = encoder.getVideoEncoder("default");
-            final AtomicBoolean firstFrame = new AtomicBoolean(true);
-
-            // final AtomicLong framecount = new AtomicLong(0);
-
-            ctx
-                .createMediaDataSource(STREAM)
-                .load()
-                .peek(s -> {
-                    final var details = s.getStreamDetails();
-                    ve1.setFps(details[0].fps_num / details[0].fps_den);
-
-                })
-                .openChain()
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
-                    // final long count = framecount.getAndIncrement();
-                    // if(count > 300)
-                    // ctx.stop();
-
-                    if(firstFrame.get()) {
-                        firstFrame.set(false);
-                        ve1.enable(f, f.isRgb);
-                        encoder.ready();
-                    }
-                    ve1.encode(f, f.isRgb);
-                    if(id != null) {
-                        try(var bgr = f.bgr(false);) {
-                            id.update(bgr);
-                        }
-                    }
-                })
-                .streamContext()
-                .sync()
-                // .optionally(sync, s -> s.sync())
-                .play()
-
-            ;
-        }
-
-    }
-
-    // @Ignore
-    // @Test
-    // public void testEncodingStreamTest() throws Exception {
-    // try(
-    // final EncodingContext encoder = Ffmpeg2.createEncoder();
-    // final StreamContext ctx = Ffmpeg2.createStreamContext();
-    // final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-    //
-    // ) {
-    //
-    // ;
-    //
-    // // final VideoEncoder ve1 = encoder.getVideoEncoder("default");
-    // final AtomicBoolean firstFrame = new AtomicBoolean(true);
-    //
-    // final AtomicReference<CvMat> ondeck = new AtomicReference<>();
-    //
-    // ctx
-    // .createMediaDataSource(STREAM)
-    // .load()
-    // // .peek(s -> {
-    // // final var details = s.getStreamDetails();
-    // // ve1.setFps(details[0].fps_num / details[0].fps_den);
-    // //
-    // // })
-    // .openChain()
-    // .createFirstVideoStreamSelector()
-    // .createVideoFrameProcessor(f -> {
-    // if(firstFrame.get()) {
-    // LOGGER.trace("FIRST FRAME: {}", f);
-    // firstFrame.set(false);
-    // chain(new Thread(() -> FfmpegApi2.startme(f.nativeObj, f.isRgb ? 1 : 0, new get_frame_callback() {
-    // @Override
-    // public long get_frame() {
-    // LOGGER.trace("in get_frame!");
-    // CvMat toSend = null;
-    // while(toSend == null) {
-    // toSend = ondeck.getAndSet(null);
-    // if(toSend == null)
-    // uncheck(() -> Thread.sleep(1));
-    // }
-    //
-    // if(id != null) {
-    // id.update(toSend);
-    // }
-    //
-    // LOGGER.trace("returning {} from get_frame", toSend.nativeObj);
-    // return toSend.nativeObj;
-    // }
-    // }), "test junk"), t -> t.setDaemon(true), t -> t.start());
-    // uncheck(() -> Thread.sleep(100)); // HACK!
-    // }
-    //
-    // try(CvMat mat = CvMat.shallowCopy(f);
-    // CvMat leftover = ondeck.getAndSet(mat.returnMe());) {
-    //
-    // }
-    //
-    // // if(id != null) {
-    // // try(var bgr = f.bgr(false);) {
-    // // id.update(bgr);
-    // // }
-    // // }
-    // })
-    // .streamContext()
-    // .sync()
-    // // .optionally(sync, s -> s.sync())
-    // .play()
-    //
-    // ;
-    // }
-    //
-    // }
-
     @Test
     public void testEncodingMjpeg() throws Exception {
         final AtomicLong framecount = new AtomicLong(0);
         final File destination = tempDir.newFile("out.mov");
-        // final File destination = new File("/tmp/out.mov");
         if(destination.exists())
             destination.delete();
 
@@ -527,7 +364,6 @@ public class TestFfmpeg2 extends BaseTest {
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
-                // .createMediaDataSource("rtsp://admin:gregormendel1@172.16.2.11:554/")
                 .load()
                 .peek(s -> {
                     final var details = s.getStreamDetails();

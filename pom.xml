@@ -18,6 +18,7 @@
     <module>native-nr</module>
     <module>native-ffmpeg</module>
     <module>native-python</module>
+    <module>docker-nginx-rtmp</module>
   </modules>
 
   <properties>
@@ -51,6 +52,9 @@
     
     <commons.cli.version>1.4</commons.cli.version>
     <tiff-java.version>2.0.1</tiff-java.version>
+    
+    <docker-compose-junit.version>1.5.0</docker-compose-junit.version>
+    
   </properties>
 
   <profiles>
@@ -155,6 +159,12 @@
       </dependency>
 
       <!-- Internal to the product -->
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>docker-nginx-rtmp</artifactId>
+        <type>pom</type>
+        <version>${project.version}</version>
+      </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
         <artifactId>lib-util</artifactId>
@@ -265,6 +275,16 @@
       
       <!-- Testing -->
       <dependency>
+        <groupId>com.palantir.docker.compose</groupId>
+        <artifactId>docker-compose-rule-core</artifactId>
+        <version>${docker-compose-junit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.palantir.docker.compose</groupId>
+        <artifactId>docker-compose-rule-junit4</artifactId>
+        <version>${docker-compose-junit.version}</version>
+      </dependency>
+      <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-log4j12</artifactId>
         <version>${slf4j.version}</version>
@@ -298,6 +318,10 @@
   </distributionManagement>
 
   <repositories>
+    <repository>
+      <id>bintray-palantir</id>
+      <url>https://dl.bintray.com/palantir/releases</url>
+    </repository>
     <repository>
       <id>maven-eclipse-repo</id>
       <url>http://maven-eclipse.github.io/maven</url>
