@@ -10,6 +10,7 @@
   <artifactId>lib-ffmpeg</artifactId>
   <name>lib-ffmpeg (${project.version})</name>
   <description></description>
+  
   <dependencies>
     <dependency>
       <groupId>junit</groupId>
@@ -44,6 +45,24 @@
     <dependency> <!-- Needed for the NativeLibraryLoader -->
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
+    </dependency>
+    
+    <!-- Testing -->
+    <dependency> <!-- we need this built prior to running the tests since it uses the docker container -->
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>docker-nginx-rtmp</artifactId>
+      <type>pom</type>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.palantir.docker.compose</groupId>
+      <artifactId>docker-compose-rule-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.palantir.docker.compose</groupId>
+      <artifactId>docker-compose-rule-junit4</artifactId>
+      <scope>test</scope>
     </dependency>
     <dependency>
       <groupId>net.dempsy</groupId>

@@ -1,0 +1,129 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pilecv4j-parent</artifactId>
+    <groupId>ai.kognition.pilecv4j</groupId>
+    <version>0.16-SNAPSHOT</version>
+  </parent>
+  <artifactId>docker-nginx-rtmp</artifactId>
+  <packaging>pom</packaging>
+
+  <properties>
+    <NGINX_VERSION>1.15.0</NGINX_VERSION>
+    <NGINX_RTMP_MODULE_TAG>v1.2.1</NGINX_RTMP_MODULE_TAG>
+    <docker.kog.registry>pilecv4j</docker.kog.registry>
+    <docker.from.image>alpine:3.7</docker.from.image>
+    <docker.image.name>nginx-rtmp</docker.image.name>
+  </properties>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>io.fabric8</groupId>
+          <artifactId>docker-maven-plugin</artifactId>
+          <version>0.35.0</version>
+          <executions>
+            <execution>
+              <id>buildme</id>
+              <phase>package</phase>
+              <goals>
+                <goal>build</goal>
+              </goals>
+            </execution>
+            <execution>
+              <id>pushme</id>
+              <phase>deploy</phase>
+              <goals>
+                <goal>push</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <!-- Docker plugin -->
+      <plugin>
+        <groupId>io.fabric8</groupId>
+        <artifactId>docker-maven-plugin</artifactId>
+        <configuration>
+          <verbose>true</verbose>
+          <pushRegistry>${docker.kog.registry}</pushRegistry>
+          <images>
+            <image>
+              <name>${docker.image.name}</name>
+              <alias>${project.artifactId}</alias>
+              <build>
+                <tags>
+                  <!-- "latest" is implicitly built -->
+                  <tag>${project.version}</tag>
+                </tags>
+                <from>${docker.from.image}</from>
+                <maintainer>kognition.ai</maintainer>
+                <ports>
+                  <port>80</port>
+                  <port>1935</port>
+                </ports>
+                <assembly> <!-- Copy conf file into the tmp directory to be moved later by a runCmd -->
+                  <targetDir>/tmp</targetDir>
+                  <inline>
+                    <files>
+                      <file>
+                        <source>src/main/docker/conf/nginx.conf</source>
+                        <outputDirectory>/</outputDirectory>
+                      </file>
+                    </files>
+                  </inline>
+                </assembly>
+                <optimise>true</optimise> <!-- required for "cd's" to work in the runCmd -->
+                <runCmds>
+                  <!-- Install dependencies -->
+                  <runCmd>apk update</runCmd>
+                  <runCmd>apk --no-cache add --update alpine-sdk</runCmd>
+                  <runCmd>apk --no-cache add --update openssh</runCmd>
+                  <runCmd>apk --no-cache add --update pcre</runCmd>
+                  <runCmd>apk --no-cache add --update pcre-dev</runCmd>
+                  <runCmd>apk --no-cache add --update openssl</runCmd>
+                  <runCmd>apk --no-cache add --update openssl-dev</runCmd>
+
+                  <!-- Setup the build source code -->
+                  <runCmd>mkdir -p /tmp/docker-build/nginx</runCmd>
+                  <runCmd>cd /tmp/docker-build/nginx</runCmd>
+                  <runCmd>wget https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz</runCmd>
+                  <runCmd>tar xvf nginx-${NGINX_VERSION}.tar.gz </runCmd>
+                  <runCmd>git clone https://github.com/arut/nginx-rtmp-module.git</runCmd>
+                  <runCmd>cd nginx-rtmp-module</runCmd>
+                  <runCmd>git checkout ${NGINX_RTMP_MODULE_TAG}</runCmd>
+                  <runCmd>cd ../nginx-${NGINX_VERSION}</runCmd>
+
+                  <!-- Build nginx with the rtmp module -->
+                  <runCmd>./configure --add-module=../nginx-rtmp-module --with-http_ssl_module --with-debug</runCmd>
+                  <runCmd>make</runCmd>
+                  <runCmd>make install</runCmd>
+
+                  <!-- Setup named volume and configure -->
+                  <runCmd>if [ -f /usr/local/nginx/conf/nginx.conf ]; then rm /usr/local/nginx/conf/nginx.conf; fi</runCmd>
+                  <runCmd>cp /tmp/nginx.conf /usr/local/nginx/conf/nginx.conf</runCmd>
+                  <runCmd>mkdir -p /var/www/media</runCmd>
+
+                  <!-- Cleanup -->
+                  <runCmd>cd /</runCmd>
+                  <runCmd>apk --no-cache del alpine-sdk</runCmd>
+                  <runCmd>rm -rf /tmp/docker-build</runCmd>
+                  <runCmd>rm -f /tmp/nginx.conf</runCmd>
+                </runCmds>
+                <cmd>
+                  <exec>
+                    <args>/usr/local/nginx/sbin/nginx</args>
+                  </exec>
+                </cmd>
+              </build>
+            </image>
+          </images>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

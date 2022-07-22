@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+  <title> Stream Player </title>
+  <link href="node_modules/video.js/dist/video-js.css" rel="stylesheet" type="text/css">
+  <script src="node_modules/video.js/dist/video.js"></script>
+  <script src="node_modules/videojs-flash/dist/videojs-flash.js"></script>
+  <script src="node_modules/videojs-contrib-hls/dist/videojs-contrib-hls.js"></script>
+  <script src="node_modules/dashjs/dist/dash.all.min.js"></script>
+  <script src="node_modules/videojs-contrib-dash/dist/videojs-dash.min.js"></script>
+  <script>videojs.options.flash.swf = "node_modules/videojs-swf/dist/video-js.swf";</script>
+</head>
+<body>
+ <center>
+   <video id="livestream" width="640"
+     class="video-js vjs-default-skin vjs-big-play-centered"
+     autoplay
+          preload="auto"
+          data-setup='{"techOrder": ["flash"]}'>
+     <source src="rtmp://${VIDEO_FEED_SERVER_NAME}/live/${CAMERA_ID}" type="rtmp/mp4">
+   </video>
+
+  <video preload="none" id=example-video width="640" class="video-js vjs-default-skin" autoplay>
+    <source 
+      src="${VIDEO_FEED_HTTP_PREFIX}hls/${CAMERA_ID}/index.m3u8"
+      type="application/x-mpegURL">
+  </video>
+
+  <video id=dash-video width="640" class="video-js vjs-default-skin" autoplay>
+    <source 
+      src="${VIDEO_FEED_HTTP_PREFIX}dash/${CAMERA_ID}/index.mpd"
+      type="application/dash+xml">
+  </video>
+
+ </center>
+
+ <script>
+    var player1 = videojs('example-video');
+    player1.play();
+  </script>
+
+  <script>
+    var player2 = videojs('dash-video');
+    player2.play();
+  </script>
+</body>
+</html>

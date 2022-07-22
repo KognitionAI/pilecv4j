@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+<head>
+  <title> Stream Player </title>
+  <link href="node_modules/video.js/dist/video-js.css" rel="stylesheet" type="text/css">
+  <script src="node_modules/video.js/dist/video.js"></script>
+  <script src="node_modules/dashjs/dist/dash.all.min.js"></script>
+  <script src="node_modules/videojs-contrib-dash/dist/videojs-dash.min.js"></script>
+</head>
+<body>
+ <center>
+  <video id=dash-video width="640" class="video-js vjs-default-skin" autoplay>
+    <source
+      src="http://10.1.1.108:1935/live/od/manifest.mpd"
+      type="application/dash+xml">
+  </video>
+
+ </center>
+
+  <script>
+    var player2 = videojs('dash-video');
+    player2.play();
+  </script>
+</body>
+</html>

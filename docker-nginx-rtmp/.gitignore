@@ -1,0 +1,28 @@
+#Eclipse
+.springBeans
+.classpath
+.project
+.settings
+.\#*
+\#*
+.metadata
+.pydevproject
+
+# mvn temps
+target
+
+#OSX
+.DS_Store
+
+#log file
+*.log
+
+#Other
+.Rhistory
+.cache-main
+.cache-tests
+.tmpBin
+
+.checkstyle
+.fbExcludeFilterFile
+pom.xml.versionsBackup
