@@ -117,10 +117,7 @@ public:
 
   uint64_t streaming();
 
-  inline uint64_t stop() {
-    state = VE_STOPPED;
-    return 0;
-  }
+  uint64_t stop();
 };
 
 
@@ -142,8 +139,12 @@ class EncodingContext
 
   friend class VideoEncoder;
 
+  std::atomic<bool> fake_mutex;
+
 public:
-  inline EncodingContext() = default;
+  inline EncodingContext() {
+    fake_mutex = false;
+  }
   ~EncodingContext();
 
   uint64_t setupOutputContext(const char* lfmt, const char* loutputUri);

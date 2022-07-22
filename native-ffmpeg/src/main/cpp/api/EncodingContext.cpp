@@ -7,6 +7,7 @@
 
 #include <api/EncodingContext.h>
 #include <utils/Synchronizer.h>
+#include "utils/FakeMutexGuard.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
 
@@ -35,6 +36,9 @@ EncodingContext::~EncodingContext()
 {
   stop(); // stop if not already stopped
 
+  // non-recursive so can't cover stop()
+  FakeMutextGuard g(fake_mutex);
+
   if (output_format_context) {
     if (cleanupIoContext) {
       llog(TRACE, "closing io");
@@ -49,6 +53,8 @@ EncodingContext::~EncodingContext()
 }
 
 uint64_t EncodingContext::stop() {
+  FakeMutextGuard g(fake_mutex);
+
   if (state == ENC_STOPPED)
     return 0;
 
@@ -64,6 +70,8 @@ uint64_t EncodingContext::stop() {
 }
 
 uint64_t EncodingContext::setupOutputContext(const char* pfmt, const char* poutputUri) {
+  FakeMutextGuard g(fake_mutex);
+
   fmt = pfmt == nullptr ? "" : pfmt;
   fmtNull = pfmt == nullptr;
   outputUri = poutputUri;
@@ -110,6 +118,8 @@ uint64_t EncodingContext::setupOutputContext(const char* pfmt, const char* poutp
 }
 
 uint64_t EncodingContext::ready() {
+  FakeMutextGuard g(fake_mutex);
+
   if (state != ENC_OPEN_STREAMS) {
     llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_OPEN_STREAMS, (int)state);
     return MAKE_P_STAT(STREAM_BAD_STATE);
@@ -151,6 +161,8 @@ uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
 }
 
 uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, int dstW, int dstH) {
+  FakeMutextGuard g(enc->fake_mutex);
+
   AVRational framerate = { fps, 1 };
 
   if (dstW < 0)
@@ -294,6 +306,8 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
 }
 
 uint64_t VideoEncoder::streaming() {
+  FakeMutextGuard g(enc->fake_mutex);
+
   // this should NOT already be encoding.
   if (state >= VE_ENCODING) {
     llog(ERROR, "VideoEncoder is in the wrong state. streaming() must be called before encoding. The current state is %d.", (int)state);
@@ -305,6 +319,8 @@ uint64_t VideoEncoder::streaming() {
 }
 
 uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
+  FakeMutextGuard g(enc->fake_mutex);
+
   if (!matRef) {
     llog(WARN, "null mat passed to encode. Ignoring");
     return 0;
@@ -418,6 +434,8 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 }
 
 uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
+  FakeMutextGuard g(enc->fake_mutex);
+
   if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
     llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d or %d but it's in %d.", (int)ENC_OPEN_CONTEXT, (int)ENC_OPEN_STREAMS, (int)enc->state);
     return MAKE_P_STAT(STREAM_BAD_STATE);
@@ -435,8 +453,18 @@ uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
   return 0;
 }
 
+uint64_t VideoEncoder::stop() {
+  FakeMutextGuard g(enc->fake_mutex);
+
+  state = VE_STOPPED;
+  return 0;
+}
+
 VideoEncoder::~VideoEncoder() {
   stop(); // stop if not already stopped
+
+  // non-recursive so can't cover stop()
+  FakeMutextGuard g(enc->fake_mutex);
 
   if (frame) {
     llog(TRACE, "Freeing frame at %" PRId64, (uint64_t)frame );
