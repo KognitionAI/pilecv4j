@@ -14,6 +14,7 @@ This project contains several tools for creating image and video processing appl
    1. [lib-util](#lib-util)
    1. [lib-tracker](#lib-tf)
 1. [Building](#building)
+1. [History](#History)
 
 ## Introduction
 
