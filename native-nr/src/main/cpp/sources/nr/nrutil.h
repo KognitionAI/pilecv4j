@@ -7,43 +7,43 @@ namespace pilecv4j {
 namespace nr {
 
 inline float SQR(const float sqrarg) {
-	return (sqrarg == 0.0 ? 0.0 : sqrarg*sqrarg);
+  return (sqrarg == 0.0 ? 0.0 : sqrarg*sqrarg);
 }
 
 inline double DSQR(const double a) {
-	return a == 0.0 ? 0.0 : a*a;
+  return a == 0.0 ? 0.0 : a*a;
 }
 
 inline double DMAX(const double a, const double b) {
-	return a > b ? a : b;
+  return a > b ? a : b;
 }
 
 inline double DMIN(const double a, const double b) {
-	return a < b ? a : b;
+  return a < b ? a : b;
 }
 
 inline float FMAX(const float a, const float b) {
-	return a > b ? a : b;
+  return a > b ? a : b;
 }
 
 inline float FMIN(const float a, const float b) {
-	return a < b ? a : b;
+  return a < b ? a : b;
 }
 
 inline long LMAX(const long a, const long b) {
-	return a > b ? a : b;
+  return a > b ? a : b;
 }
 
 inline long LMIN(const long a, const long b) {
-	return a < b ? a : b;
+  return a < b ? a : b;
 }
 
 inline int IMAX(const int a, const int b) {
-	return a > b ? a : b;
+  return a > b ? a : b;
 }
 
 inline int IMIN(const int a, const int b) {
-	return a < b ? a : b;
+  return a < b ? a : b;
 }
 
 #define SIGN(a,b) ((b) >= 0.0 ? fabs(a) : -fabs(a))

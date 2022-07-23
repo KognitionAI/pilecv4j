@@ -15,11 +15,11 @@ KAI_EXPORT void mnbrak(float *ax, float *bx, float *cx, float *fa, float *fb,
                        float *fc, float (*func)(float, void*), void* userdata);
   
 struct Userdata {
-	int ncom;
-	float* pcom;
-	float* xicom;
-	void* overallUd;
-	float (*nrfunc)(float *, void* overallUd);
+  int ncom;
+  float* pcom;
+  float* xicom;
+  void* overallUd;
+  float (*nrfunc)(float *, void* overallUd);
 };
 
 /**Must accompany linmin.*/
@@ -36,7 +36,7 @@ static float f1dim(float x,void* udv)
    return f;
 }
 
-  #define TOL 2.0e-4 /*Tolerance passed to brent.*/
+#define TOL 2.0e-4 /*Tolerance passed to brent.*/
 /**
  * Given an n-dimensional point p[1..n] and an n-dimensional direction xi[1..n], moves and
  * resets p to where the function func(p) takes on a minimum along the direction xi from p,

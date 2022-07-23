@@ -36,12 +36,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * <p>This class will load native libraries from a jar file as long as they've been packaged appropriately.</p>
- * 
- * <p>If you want to explicitly set a directory to load libraries from for debugging purposes you can 
+ * <p>
+ * This class will load native libraries from a jar file as long as they've been packaged appropriately.
+ * </p>
+ *
+ * <p>
+ * If you want to explicitly set a directory to load libraries from for debugging purposes you can
  * set the environment variable DEBUG_LIB_DIR and the loader will first try to load any library from
  * that directory. You can verify this was picked up because a WARN log message will be printed out
- * identifying the fact that a library is "Loading ... from the debug library directory."</p>
+ * identifying the fact that a library is "Loading ... from the debug library directory."
+ * </p>
  */
 public class NativeLibraryLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(NativeLibraryLoader.class);
@@ -49,7 +53,7 @@ public class NativeLibraryLoader {
     private static Set<String> loaded = new HashSet<>();
 
     private static PlatformDetection platform = new PlatformDetection();
-    
+
     private static final String DEBUG_LIB_DIR = System.getProperty("DEBUG_LIB_DIR");
 
     public static class Loader {
@@ -125,52 +129,52 @@ public class NativeLibraryLoader {
 
                     final String libFileName = System.mapLibraryName(ld.libName);
                     final String libMD5FileName = libFileName + ".MD5";
-                	LOGGER.trace("Native library \"" + ld.libName + "\" platform specific file name is \"" + libFileName + "\"");
-                    
+                    LOGGER.trace("Native library \"" + ld.libName + "\" platform specific file name is \"" + libFileName + "\"");
+
                     boolean loadMe = true;
                     final File libFile;
-                    
-                    if (new File(DEBUG_LIB_DIR, libFileName).exists()) {
-                    	LOGGER.warn("Loading \"{}\" from the debug library directory \"{}\"", libFileName, DEBUG_LIB_DIR);
-                    	loadMe = true;
-                    	libFile = new File(new File(DEBUG_LIB_DIR), libFileName);
-                    } else {
-                    	libFile = new File(tmpDir, libFileName);
-                    	final File libMD5File = new File(tmpDir, libMD5FileName);
-                    	if(!libFile.exists())
-                    		loadMe = copyFromJar(ld, libFileName, libFile, libMD5FileName, libMD5File);
-                    	else {
-                    		final boolean copyMeFromJar;
-                    		final String fileMD5 = rethrowIOException(
-                    				() -> (libMD5File.exists()) ? FileUtils.readFileToString(libMD5File, StandardCharsets.UTF_8.name()) : (String)null,
-                    						libMD5FileName);
-                    		// if the file exists then fileMD5 is set. Otherwise it's null.
-                    		if(fileMD5 != null) {
-                    			// read the MD5 from the jar.
-                    			final String jarMD5 = rethrowIOException(() -> {
-                    				try(InputStream is = getInputStream(platform + "/" + libMD5FileName)) {
-                    					if(is == null) {
-                    						LOGGER.info("The library \"{}\" doesn't appear to have a coresponding MD5. Reloading from jar file.", libFileName);
-                    						return null;
-                    					} else
-                    						return IOUtils.toString(is, StandardCharsets.UTF_8.name());
-                    				}
-                    			}, platform + "/" + libMD5FileName);
-                    			// if the fileMD5 contents doesn't equal the jarMD5 contents then we need to
-                    			// re-copy the library from the jar file.
-                    			copyMeFromJar = (!fileMD5.equals(jarMD5));
-                    		} else {
-                    			// if there is not fileMD5 then we're just going to re-copy from the jar
-                    			LOGGER.warn("Missing MD5 file for \"{}.\" This will result in recopying of the library file every startup." +
-                    					" Consider generating an MD5 file for the library");
-                    			copyMeFromJar = true;
-                    		}
 
-                    		if(copyMeFromJar)
-                    			loadMe = copyFromJar(ld, libFileName, libFile, libMD5FileName, libMD5File);
-                    		else
-                    			LOGGER.debug("Native library \"" + ld.libName + "\" is already on the filesystem. Not overwriting.");
-                    	}
+                    if(new File(DEBUG_LIB_DIR, libFileName).exists()) {
+                        LOGGER.warn("Loading \"{}\" from the debug library directory \"{}\"", libFileName, DEBUG_LIB_DIR);
+                        loadMe = true;
+                        libFile = new File(new File(DEBUG_LIB_DIR), libFileName);
+                    } else {
+                        libFile = new File(tmpDir, libFileName);
+                        final File libMD5File = new File(tmpDir, libMD5FileName);
+                        if(!libFile.exists())
+                            loadMe = copyFromJar(ld, libFileName, libFile, libMD5FileName, libMD5File);
+                        else {
+                            final boolean copyMeFromJar;
+                            final String fileMD5 = rethrowIOException(
+                                () -> (libMD5File.exists()) ? FileUtils.readFileToString(libMD5File, StandardCharsets.UTF_8.name()) : (String)null,
+                                libMD5FileName);
+                            // if the file exists then fileMD5 is set. Otherwise it's null.
+                            if(fileMD5 != null) {
+                                // read the MD5 from the jar.
+                                final String jarMD5 = rethrowIOException(() -> {
+                                    try(InputStream is = getInputStream(platform + "/" + libMD5FileName)) {
+                                        if(is == null) {
+                                            LOGGER.info("The library \"{}\" doesn't appear to have a coresponding MD5. Reloading from jar file.", libFileName);
+                                            return null;
+                                        } else
+                                            return IOUtils.toString(is, StandardCharsets.UTF_8.name());
+                                    }
+                                }, platform + "/" + libMD5FileName);
+                                // if the fileMD5 contents doesn't equal the jarMD5 contents then we need to
+                                // re-copy the library from the jar file.
+                                copyMeFromJar = (!fileMD5.equals(jarMD5));
+                            } else {
+                                // if there is not fileMD5 then we're just going to re-copy from the jar
+                                LOGGER.warn("Missing MD5 file for \"{}.\" This will result in recopying of the library file every startup." +
+                                    " Consider generating an MD5 file for the library");
+                                copyMeFromJar = true;
+                            }
+
+                            if(copyMeFromJar)
+                                loadMe = copyFromJar(ld, libFileName, libFile, libMD5FileName, libMD5File);
+                            else
+                                LOGGER.debug("Native library \"" + ld.libName + "\" is already on the filesystem. Not overwriting.");
+                        }
                     }
                     if(loadMe) {
                         preLoadCallbacks.stream()

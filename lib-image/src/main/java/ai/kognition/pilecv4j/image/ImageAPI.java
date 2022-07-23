@@ -40,8 +40,8 @@ public class ImageAPI {
         LOGGER.debug("Loading the library for opencv with a short version {}", ocvShortVersion);
 
         NativeLibraryLoader.loader()
-	        .optional("opencv_ffmpeg" + ocvShortVersion + "_64")
-	        .optional("opencv_videoio_ffmpeg" + ocvShortVersion + "_64")
+            .optional("opencv_ffmpeg" + ocvShortVersion + "_64")
+            .optional("opencv_videoio_ffmpeg" + ocvShortVersion + "_64")
             .library("opencv_java" + ocvShortVersion)
             .library(LIBNAME)
             .addPreLoadCallback((dir, libname, oslibname) -> {
