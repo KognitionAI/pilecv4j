@@ -44,7 +44,7 @@ KAI_EXPORT void pilecv4j_image_CvRaster_freeByMove(uint64_t native) {
   }
 }
 
-void pilecv4j_image_CvRaster_assign(uint64_t destHandle, uint64_t srcHandle) {
+KAI_EXPORT void pilecv4j_image_CvRaster_assign(uint64_t destHandle, uint64_t srcHandle) {
 	cv::Mat* dst = (cv::Mat*) destHandle;
 	cv::Mat* src = (cv::Mat*) srcHandle;
 
@@ -52,19 +52,19 @@ void pilecv4j_image_CvRaster_assign(uint64_t destHandle, uint64_t srcHandle) {
 }
 
 
-uint64_t pilecv4j_image_CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong) {
+KAI_EXPORT uint64_t pilecv4j_image_CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong) {
 	void* data = (void*) dataLong;
 	cv::Mat* newMat = new cv::Mat(rows, cols, type, data);
 
 	return (uint64_t) newMat;
 }
 
-uint64_t pilecv4j_image_CvRaster_defaultMat() {
+KAI_EXPORT uint64_t pilecv4j_image_CvRaster_defaultMat() {
 	cv::Mat* ret = new cv::Mat();
 	return (uint64_t) ret;
 }
 
-void pilecv4j_image_CvRaster_showImage(const char* name, uint64_t native) {
+KAI_EXPORT void pilecv4j_image_CvRaster_showImage(const char* name, uint64_t native) {
 	cv::Mat* mat = (cv::Mat*) native;
 	cv::String sname(name);
 	cv::namedWindow(sname,cv::WINDOW_NORMAL);
@@ -73,23 +73,23 @@ void pilecv4j_image_CvRaster_showImage(const char* name, uint64_t native) {
 	}
 }
 
-void pilecv4j_image_CvRaster_updateWindow(const char* name, uint64_t native) {
+KAI_EXPORT void pilecv4j_image_CvRaster_updateWindow(const char* name, uint64_t native) {
 	cv::Mat* mat = (cv::Mat*) native;
 	cv::String sname(name);
 	cv::imshow(sname,*mat);
 }
 
-int32_t pilecv4j_image_CvRaster_fetchEvent(int32_t millisToSleep) {
+KAI_EXPORT int32_t pilecv4j_image_CvRaster_fetchEvent(int32_t millisToSleep) {
 	int key = cv::waitKey(millisToSleep);
 	return key;
 }
 
-void pilecv4j_image_CvRaster_destroyWindow(const char* name) {
+KAI_EXPORT void pilecv4j_image_CvRaster_destroyWindow(const char* name) {
 	cv::String sname(name);
 	cv::destroyWindow(sname);
 }
 
-bool pilecv4j_image_CvRaster_isWindowClosed(const char* name) {
+KAI_EXPORT bool pilecv4j_image_CvRaster_isWindowClosed(const char* name) {
 	cv::String sname(name);
 	return cv::getWindowProperty(sname, 0) < 0;
 }
