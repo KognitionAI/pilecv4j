@@ -81,8 +81,8 @@ public class Ffmpeg2 {
     public static final long DEFAULT_MAX_LATENCY_MILLIS = 500;
 
     static {
-    	Logger nativeLogger = LoggerFactory.getLogger(Ffmpeg2.class.getPackageName() + ".native");
-    	
+        final Logger nativeLogger = LoggerFactory.getLogger(Ffmpeg2.class.getPackageName() + ".native");
+
         // find the level
         final int logLevelSet;
         if(nativeLogger.isTraceEnabled())
