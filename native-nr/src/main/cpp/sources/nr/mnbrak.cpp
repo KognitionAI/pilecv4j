@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <math.h>
 
+#include "kog_exports.h"
+
 #define GOLD 1.618034
 #define GLIMIT 100.0
 #define TINY 1.0e-20
@@ -19,7 +21,7 @@ namespace nr {
  * new points ax, bx, cx that bracket a minimum of the function. Also returned are the function
  * values at the three points, fa, fb, and fc.
  */
-void mnbrak(float *ax, float *bx, float *cx, float *fa, float *fb, float *fc,
+KAI_EXPORT void mnbrak(float *ax, float *bx, float *cx, float *fa, float *fb, float *fc,
             float (*func)(float, void*), void* userdata)
 {
    float ulim,u,r,q,fu,dum;

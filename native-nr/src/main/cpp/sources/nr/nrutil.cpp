@@ -5,6 +5,8 @@
 
 #include "nrutil.h"
 
+#include "kog_exports.h"
+
 #define NR_END 1
 #define FREE_ARG char*
 
@@ -13,7 +15,8 @@ namespace nr {
 
 static char* errorText = NULL;
 static int errorHappens = 0;
-void nrerror2(const char error_text[])
+  
+KAI_EXPORT void nrerror2(const char error_text[])
    /* Numerical Recipes standard error handler */
 {
   errorText = (char*)(malloc(sizeof(char) * (strlen(error_text) + 1)));
@@ -21,14 +24,14 @@ void nrerror2(const char error_text[])
   errorHappens = 1;
 }
   
-int nrIsError()
+KAI_EXPORT int nrIsError()
 {
    int errorHappened = errorHappens;
    errorHappens = 0;
    return errorHappened;
 }
   
-void nrerror(const char error_text[])
+KAI_EXPORT void nrerror(const char error_text[])
    /* Numerical Recipes standard error handler */
 {
   /*
@@ -43,7 +46,8 @@ void nrerror(const char error_text[])
    */
   nrerror2(error_text);
 }
-float *vector(long nl, long nh)
+
+KAI_EXPORT float *vector(long nl, long nh)
    /* allocate a float vector with subscript range v[nl..nh] */
 {
    float *v;
@@ -51,7 +55,8 @@ float *vector(long nl, long nh)
    if (!v) nrerror("allocation failure in vector()");
    return v-nl+NR_END;
 }
-int *ivector(long nl, long nh)
+
+KAI_EXPORT int *ivector(long nl, long nh)
    /* allocate an int vector with subscript range v[nl..nh] */
 {
    int *v;
@@ -59,7 +64,8 @@ int *ivector(long nl, long nh)
    if (!v) nrerror("allocation failure in ivector()");
    return v-nl+NR_END;
 }
-unsigned char *cvector(long nl, long nh)
+
+KAI_EXPORT unsigned char *cvector(long nl, long nh)
    /* allocate an unsigned char vector with subscript range v[nl..nh] */
 {
    unsigned char *v;
@@ -67,7 +73,8 @@ unsigned char *cvector(long nl, long nh)
    if (!v) nrerror("allocation failure in cvector()");
    return v-nl+NR_END;
 }
-unsigned long *lvector(long nl, long nh)
+
+KAI_EXPORT unsigned long *lvector(long nl, long nh)
    /* allocate an unsigned long vector with subscript range v[nl..nh] */
 {
    unsigned long *v;
@@ -75,7 +82,8 @@ unsigned long *lvector(long nl, long nh)
    if (!v) nrerror("allocation failure in lvector()");
    return v-nl+NR_END;
 }
-double *dvector(long nl, long nh)
+
+KAI_EXPORT double *dvector(long nl, long nh)
    /* allocate a double vector with subscript range v[nl..nh] */
 {
    double *v;
@@ -83,7 +91,8 @@ double *dvector(long nl, long nh)
    if (!v) nrerror("allocation failure in dvector()");
    return v-nl+NR_END;
 }
-float **matrix(long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT float **matrix(long nrl, long nrh, long ncl, long nch)
    /* allocate a float matrix with subscript range m[nrl..nrh][ncl..nch] */
 {
    long i, nrow=nrh-nrl+1,ncol=nch-ncl+1;
@@ -102,7 +111,8 @@ float **matrix(long nrl, long nrh, long ncl, long nch)
    /* return pointer to array of pointers to rows */
    return m;
 }
-double **dmatrix(long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT double **dmatrix(long nrl, long nrh, long ncl, long nch)
    /* allocate a double matrix with subscript range m[nrl..nrh][ncl..nch] */
 {
    long i, nrow=nrh-nrl+1,ncol=nch-ncl+1;
@@ -121,7 +131,8 @@ double **dmatrix(long nrl, long nrh, long ncl, long nch)
    /* return pointer to array of pointers to rows */
    return m;
 }
-int **imatrix(long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT int **imatrix(long nrl, long nrh, long ncl, long nch)
    /* allocate a int matrix with subscript range m[nrl..nrh][ncl..nch] */
 {
    long i, nrow=nrh-nrl+1,ncol=nch-ncl+1;
@@ -140,7 +151,8 @@ int **imatrix(long nrl, long nrh, long ncl, long nch)
    /* return pointer to array of pointers to rows */
    return m;
 }
-float **submatrix(float **a, long oldrl, long oldrh, long oldcl, long oldch,
+
+KAI_EXPORT float **submatrix(float **a, long oldrl, long oldrh, long oldcl, long oldch,
                   long newrl, long newcl)
    /* point a submatrix [newrl..][newcl..] to a[oldrl..oldrh][oldcl..oldch] */
 {
@@ -156,7 +168,8 @@ float **submatrix(float **a, long oldrl, long oldrh, long oldcl, long oldch,
    /* return pointer to array of pointers to rows */
    return m;
 }
-float **convert_matrix(float *a, long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT float **convert_matrix(float *a, long nrl, long nrh, long ncl, long nch)
    /* allocate a float matrix m[nrl..nrh][ncl..nch] that points to the matrix
    declared in the standard C manner as a[nrow][ncol], where nrow=nrh-nrl+1
    and ncol=nch-ncl+1. The routine should be called with the address
@@ -175,7 +188,8 @@ float **convert_matrix(float *a, long nrl, long nrh, long ncl, long nch)
    /* return pointer to array of pointers to rows */
    return m;
 }
-float ***f3tensor(long nrl, long nrh, long ncl, long nch, long ndl, long ndh)
+
+KAI_EXPORT float ***f3tensor(long nrl, long nrh, long ncl, long nch, long ndl, long ndh)
    /* allocate a float 3tensor with range t[nrl..nrh][ncl..nch][ndl..ndh] */
 {
    long i,j,nrow=nrh-nrl+1,ncol=nch-ncl+1,ndep=ndh-ndl+1;
@@ -204,60 +218,71 @@ float ***f3tensor(long nrl, long nrh, long ncl, long nch, long ndl, long ndh)
    /* return pointer to array of pointers to rows */
    return t;
 }
-void free_vector(float *v, long nl, long nh)
+
+KAI_EXPORT void free_vector(float *v, long nl, long nh)
    /* free a float vector allocated with vector() */
 {
    free((FREE_ARG) (v+nl-NR_END));
 }
-void free_ivector(int *v, long nl, long nh)
+
+KAI_EXPORT void free_ivector(int *v, long nl, long nh)
    /* free an int vector allocated with ivector() */
 {
    free((FREE_ARG) (v+nl-NR_END));
 }
-void free_cvector(unsigned char *v, long nl, long nh)
+
+KAI_EXPORT void free_cvector(unsigned char *v, long nl, long nh)
    /* free an unsigned char vector allocated with cvector() */
 {
    free((FREE_ARG) (v+nl-NR_END));
 }
-void free_lvector(unsigned long *v, long nl, long nh)
+
+KAI_EXPORT void free_lvector(unsigned long *v, long nl, long nh)
    /* free an unsigned long vector allocated with lvector() */
 {
    free((FREE_ARG) (v+nl-NR_END));
 }
-void free_dvector(double *v, long nl, long nh)
+
+KAI_EXPORT void free_dvector(double *v, long nl, long nh)
    /* free a double vector allocated with dvector() */
 {
    free((FREE_ARG) (v+nl-NR_END));
 }
-void free_matrix(float **m, long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT void free_matrix(float **m, long nrl, long nrh, long ncl, long nch)
    /* free a float matrix allocated by matrix() */
 {
    free((FREE_ARG) (m[nrl]+ncl-NR_END));
    free((FREE_ARG) (m+nrl-NR_END));
 }
-void free_dmatrix(double **m, long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT void free_dmatrix(double **m, long nrl, long nrh, long ncl, long nch)
    /* free a double matrix allocated by dmatrix() */
 {
    free((FREE_ARG) (m[nrl]+ncl-NR_END));
    free((FREE_ARG) (m+nrl-NR_END));
 }
-void free_imatrix(int **m, long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT void free_imatrix(int **m, long nrl, long nrh, long ncl, long nch)
    /* free an int matrix allocated by imatrix() */
 {
    free((FREE_ARG) (m[nrl]+ncl-NR_END));
    free((FREE_ARG) (m+nrl-NR_END));
 }
-void free_submatrix(float **b, long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT void free_submatrix(float **b, long nrl, long nrh, long ncl, long nch)
    /* free a submatrix allocated by submatrix() */
 {
    free((FREE_ARG) (b+nrl-NR_END));
 }
-void free_convert_matrix(float **b, long nrl, long nrh, long ncl, long nch)
+
+KAI_EXPORT void free_convert_matrix(float **b, long nrl, long nrh, long ncl, long nch)
    /* free a matrix allocated by convert_matrix() */
 {
    free((FREE_ARG) (b+nrl-NR_END));
 }
-void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch,
+
+KAI_EXPORT void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch,
                    long ndl, long ndh)
    /* free a float f3tensor allocated by f3tensor() */
 {
@@ -267,7 +292,7 @@ void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch,
 }
 
 extern "C" {
-char* pilecv4j_image_nrGetErrorMessage()
+KAI_EXPORT char* pilecv4j_image_nrGetErrorMessage()
 {
   char* ret = errorText;
   errorText = NULL;
