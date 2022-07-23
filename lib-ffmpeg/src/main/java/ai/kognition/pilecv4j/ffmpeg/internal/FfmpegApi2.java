@@ -60,9 +60,9 @@ public class FfmpegApi2 {
                 .load();
 
             Native.register(LIBNAME);
-        }
 
-        pcv4j_ffmpeg2_imageMaker_set(ImageAPI.pilecv4j_image_get_im_maker());
+            pcv4j_ffmpeg2_imageMaker_set(ImageAPI.pilecv4j_image_get_im_maker());
+        }
     }
 
     // called from Ffmpeg2 to load the class

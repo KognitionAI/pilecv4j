@@ -53,11 +53,13 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testCreateContext() {
+    	LOGGER.info("Running test: {}.testCreateContext(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         try(StreamContext c = Ffmpeg2.createStreamContext();) {}
     }
 
     @Test(expected = FfmpegException.class)
     public void testPlayNoSource() {
+    	LOGGER.info("Running test: {}.testPlayNoSource(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         try(StreamContext c = Ffmpeg2.createStreamContext();) {
             c
                 .optionally(sync, s -> s.sync())
@@ -67,6 +69,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testPlayWithStop() {
+    	LOGGER.info("Running test: {}.testPlayWithStop(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
         final AtomicBoolean stopped = new AtomicBoolean(false);
         try(final StreamContext c = Ffmpeg2.createStreamContext();) {
@@ -95,6 +98,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testConsumeFrames() {
+    	LOGGER.info("Running test: {}.testConsumeFrames(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
         final MutableRef<Ffmpeg2.StreamContext.StreamDetails[]> details = new MutableRef<>(null);
         try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
@@ -133,6 +137,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testCustomDataSource() throws Exception {
+    	LOGGER.info("Running test: {}.testCustomDataSource(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
 
         // load the entire file into memory.
@@ -200,7 +205,10 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testRemux() throws Exception {
+    	LOGGER.info("Running test: {}.testRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.flv");
+        if(destination.exists())
+            destination.delete();
         try(
 
             final StreamContext c = Ffmpeg2.createStreamContext();) {
@@ -239,6 +247,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testEncoding() throws Exception {
+    	LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.mp4");
         if(destination.exists())
             destination.delete();
@@ -339,6 +348,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testEncodingMjpeg() throws Exception {
+    	LOGGER.info("Running test: {}.testEncodingMjpeg(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong framecount = new AtomicLong(0);
         final File destination = tempDir.newFile("out.mov");
         if(destination.exists())
