@@ -39,7 +39,7 @@ public class CvRasterTest {
 
     private static String testImagePath = new File(
         CvRasterTest.class.getClassLoader().getResource("test-images/expected-8bit-grey.darkToLight.bmp").getFile())
-            .getPath();
+            .getAbsolutePath();
 
     private static int IMAGE_WIDTH_HEIGHT = 256;
 
