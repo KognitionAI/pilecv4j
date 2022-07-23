@@ -1,11 +1,75 @@
 #include <math.h>
 #include "nrutil.h"
 
+#include "kog_exports.h"
+
 #define TINY 1.0e-25 /*A small number.*/
 #define ITMAX 100000 /*Maximum allowed iterations.*/
 
 namespace pilecv4j {
 namespace nr {
+
+KAI_EXPORT float brent(float ax, float bx, float cx,
+                       float (*f)(float, void*), float tol, float *xmin, void* userdata);
+KAI_EXPORT void mnbrak(float *ax, float *bx, float *cx, float *fa, float *fb,
+                       float *fc, float (*func)(float, void*), void* userdata);
+  
+struct Userdata {
+	int ncom;
+	float* pcom;
+	float* xicom;
+	void* overallUd;
+	float (*nrfunc)(float *, void* overallUd);
+};
+
+/**Must accompany linmin.*/
+static float f1dim(float x,void* udv)
+{
+   int j;
+   float f,*xt;
+   Userdata* ud = (Userdata*)udv;
+   int ncom = ud->ncom;
+   xt=vector(1,ncom);
+   for (j=1;j<=ncom;j++) xt[j]=(ud->pcom)[j]+x*(ud->xicom)[j];
+   f=(*(ud->nrfunc))(xt, ud->overallUd);
+   free_vector(xt,1,ncom);
+   return f;
+}
+
+  #define TOL 2.0e-4 /*Tolerance passed to brent.*/
+/**
+ * Given an n-dimensional point p[1..n] and an n-dimensional direction xi[1..n], moves and
+ * resets p to where the function func(p) takes on a minimum along the direction xi from p,
+ * and replaces xi by the actual vector displacement that p was moved. Also returns as fret
+ * the value of func at the returned location p. This is actually all accomplished by calling the
+ * routines mnbrak and brent.*/
+static void linmin(float p[], float xi[], int n, float *fret, float (*func)(float *, void*), void* overallUd)
+{
+   int j;
+   float xx,xmin,fx,fb,fa,bx,ax;
+   Userdata ud;
+   ud.ncom = n;
+   float* pcom = vector(1,n);
+   float* xicom = vector(1,n);
+   ud.pcom=pcom;
+   ud.xicom=xicom;
+   ud.nrfunc=func;
+   ud.overallUd = overallUd;
+   for (j=1;j<=n;j++) {
+      pcom[j]=p[j];
+      xicom[j]=xi[j];
+   }
+   ax=0.0; /*Initial guess for brackets.*/
+   xx=1.0;
+   mnbrak(&ax,&xx,&bx,&fa,&fx,&fb,f1dim,&ud);
+   *fret=brent(ax,xx,bx,f1dim,TOL,&xmin,&ud);
+   for (j=1;j<=n;j++) { /*Construct the vector results to return.*/
+      xi[j] *= xmin;
+      p[j] += xi[j];
+   }
+   free_vector(xicom,1,n);
+   free_vector(pcom,1,n);
+}
 
 /** 
  * Minimization of a function func of n variables. Input consists of an initial starting point
@@ -15,12 +79,9 @@ namespace nr {
  * output, p is set to the best point found, xi is the then-current direction set, fret is the returned
  * function value at p, and iter is the number of iterations taken. The routine linmin is used.
  */
-void powell(float p[], float **xi, int n, float ftol, int *iter, float *fret,
+KAI_EXPORT void powell(float p[], float **xi, int n, float ftol, int *iter, float *fret,
             float (*func)(float*, void*), void* overallUd)
 {
-   int nrIsError(void);
-   void linmin(float p[], float xi[], int n, float *fret,
-               float (*func)(float *, void*), void*);
    int i,ibig,j;
    float del,fp,fptt,t,*pt,*ptt,*xit;
    nrIsError(); /* reset the global error condition */
@@ -76,67 +137,6 @@ void powell(float p[], float **xi, int n, float ftol, int *iter, float *fret,
    } /*Back for another iteration.*/
 }
 
-struct Userdata {
-	int ncom;
-	float* pcom;
-	float* xicom;
-	void* overallUd;
-	float (*nrfunc)(float *, void* overallUd);
-};
-
-#define TOL 2.0e-4 /*Tolerance passed to brent.*/
-/**
- * Given an n-dimensional point p[1..n] and an n-dimensional direction xi[1..n], moves and
- * resets p to where the function func(p) takes on a minimum along the direction xi from p,
- * and replaces xi by the actual vector displacement that p was moved. Also returns as fret
- * the value of func at the returned location p. This is actually all accomplished by calling the
- * routines mnbrak and brent.*/
-void linmin(float p[], float xi[], int n, float *fret, float (*func)(float *, void*), void* overallUd)
-{
-   float brent(float ax, float bx, float cx,
-               float (*f)(float, void*), float tol, float *xmin, void* userdata);
-   float f1dim(float x,void* ncom);
-   void mnbrak(float *ax, float *bx, float *cx, float *fa, float *fb,
-               float *fc, float (*func)(float, void*), void* userdata);
-   int j;
-   float xx,xmin,fx,fb,fa,bx,ax;
-   Userdata ud;
-   ud.ncom = n;
-   float* pcom = vector(1,n);
-   float* xicom = vector(1,n);
-   ud.pcom=pcom;
-   ud.xicom=xicom;
-   ud.nrfunc=func;
-   ud.overallUd = overallUd;
-   for (j=1;j<=n;j++) {
-      pcom[j]=p[j];
-      xicom[j]=xi[j];
-   }
-   ax=0.0; /*Initial guess for brackets.*/
-   xx=1.0;
-   mnbrak(&ax,&xx,&bx,&fa,&fx,&fb,f1dim,&ud);
-   *fret=brent(ax,xx,bx,f1dim,TOL,&xmin,&ud);
-   for (j=1;j<=n;j++) { /*Construct the vector results to return.*/
-      xi[j] *= xmin;
-      p[j] += xi[j];
-   }
-   free_vector(xicom,1,n);
-   free_vector(pcom,1,n);
-}
-
-/**Must accompany linmin.*/
-float f1dim(float x,void* udv)
-{
-   int j;
-   float f,*xt;
-   Userdata* ud = (Userdata*)udv;
-   int ncom = ud->ncom;
-   xt=vector(1,ncom);
-   for (j=1;j<=ncom;j++) xt[j]=(ud->pcom)[j]+x*(ud->xicom)[j];
-   f=(*(ud->nrfunc))(xt, ud->overallUd);
-   free_vector(xt,1,ncom);
-   return f;
-}
 
 }
 }

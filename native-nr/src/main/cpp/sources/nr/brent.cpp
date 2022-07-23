@@ -1,5 +1,7 @@
 #include <math.h>
 #include "nrutil.h"
+#include "kog_exports.h"
+
 #define ITMAX 100
 #define CGOLD 0.3819660
 #define ZEPS 1.0e-10
@@ -17,7 +19,7 @@
 namespace pilecv4j {
 namespace nr {
 
-float brent(float ax, float bx, float cx, float (*f)(float, void*), float tol,
+KAI_EXPORT float brent(float ax, float bx, float cx, float (*f)(float, void*), float tol,
             float *xmin, void* userdata)
 {
    int iter;

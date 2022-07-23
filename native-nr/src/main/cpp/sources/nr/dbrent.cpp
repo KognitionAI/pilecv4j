@@ -1,6 +1,8 @@
 #include <math.h>
 #include "nrutil.h"
 
+#include "kog_exports.h"
+
 #define ITMAX 100
 #define ZEPS 1.0e-10
 #define MOV3(a,b,c, d,e,f) (a)=(d);(b)=(e);(c)=(f);
@@ -9,7 +11,7 @@ namespace pilecv4j {
 namespace nr {
 
 
-float dbrent(float ax, float bx, float cx, float (*f)(float),
+KAI_EXPORT float dbrent(float ax, float bx, float cx, float (*f)(float),
              float (*df)(float), float tol, float *xmin)
 /**Given a function f and its derivative function df, and given a bracketing triplet of abscissas ax,
    bx, cx [such that bx is between ax and cx, and f(bx) is less than both f(ax) and f(cx)],
