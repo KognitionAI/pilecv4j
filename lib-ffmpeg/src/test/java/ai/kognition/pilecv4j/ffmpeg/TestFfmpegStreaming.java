@@ -6,23 +6,17 @@ import static net.dempsy.utils.test.ConditionPoll.poll;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.net.URI;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.palantir.docker.compose.DockerComposeRule;
-import com.palantir.docker.compose.configuration.ShutdownStrategy;
-import com.palantir.docker.compose.connection.waiting.SuccessOrFailure;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import org.junit.rules.TestRule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import net.dempsy.vfs.Vfs;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.utility.DockerImageName;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
@@ -34,18 +28,17 @@ public class TestFfmpegStreaming extends BaseTest {
     private static final Logger LOGGER = LoggerFactory.getLogger(TestFfmpegStreaming.class);
     final int numFrames = SHOW ? 1000 : 10;
 
-    @Rule public final TestRule docker = DockerComposeRule.builder()
-        .file(uncheck(() -> new Vfs().toFile(new URI("classpath:///pilecv4j-rtmp-docker-compose.yml"))).getAbsolutePath())
-        // .waitingForHostNetworkedPort(8080, p -> p.isHttpRespondingSuccessfully(port -> "http://localhost:" + port + "/", false))
-        .waitingForHostNetworkedPort(8080, p -> p.isListeningNow() ? SuccessOrFailure.success() : SuccessOrFailure.failure("not yet"))
-        .removeConflictingContainersOnStartup(true)
-        .shutdownStrategy(ShutdownStrategy.KILL_DOWN)
-        .build();
+    @Rule public GenericContainer<?> docker = new GenericContainer<>(DockerImageName.parse("pilecv4j/nginx-rtmp:latest"))
+        .withExposedPorts(8080, 1935);
 
     @Rule public final TemporaryFolder tempDir = new TemporaryFolder();
 
     @Test
     public void testRemuxStreaming() throws Exception {
+        final int rtmpPort = docker.getMappedPort(1935);
+
+        Thread.sleep(100);
+
         try(final StreamContext c = Ffmpeg2.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
 
@@ -53,7 +46,7 @@ public class TestFfmpegStreaming extends BaseTest {
             final AtomicBoolean finishedSuccessfully = new AtomicBoolean(false);
             final CountDownLatch checkerLatch = new CountDownLatch(1);
 
-            final Thread checker = startChecker(id, numFrames, checkerLatch, () -> c.stop(), finishedSuccessfully, checkerFailed);
+            final Thread checker = startChecker(id, rtmpPort, numFrames, checkerLatch, () -> c.stop(), finishedSuccessfully, checkerFailed);
 
             c
                 .addOption("rtsp_flags", "prefer_tcp")
@@ -61,7 +54,7 @@ public class TestFfmpegStreaming extends BaseTest {
                 .peek(sc -> sc.load())
                 .peek(sc -> checkerLatch.countDown())
                 .openChain()
-                .createUriRemuxer("flv", "rtmp://localhost:1935/live/feedly-id")
+                .createUriRemuxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
                 .streamContext()
                 .sync()
                 .play();
@@ -75,6 +68,9 @@ public class TestFfmpegStreaming extends BaseTest {
 
     @Test
     public void testEncodingStream() throws Exception {
+        final int rtmpPort = docker.getMappedPort(1935);
+        Thread.sleep(100);
+
         try(
             final EncodingContext encoder = Ffmpeg2.createEncoder();
             final StreamContext ctx = Ffmpeg2.createStreamContext();
@@ -87,10 +83,10 @@ public class TestFfmpegStreaming extends BaseTest {
             final CountDownLatch checkerLatch = new CountDownLatch(1);
             final AtomicBoolean triggerWhenDone = new AtomicBoolean(false);
 
-            final Thread checker = startChecker(id, numFrames, checkerLatch, () -> triggerWhenDone.set(true), finishedSuccessfully, checkerFailed);
+            final Thread checker = startChecker(id, rtmpPort, numFrames, checkerLatch, () -> triggerWhenDone.set(true), finishedSuccessfully, checkerFailed);
 
             encoder
-                .outputStream("flv", "rtmp://localhost:1935/live/feedly-id")
+                .outputStream("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
                 .openVideoEncoder("libx264", "default")
                 .addCodecOptions("profile", "baseline")
                 .addCodecOptions("preset", "ultrafast")
@@ -142,8 +138,8 @@ public class TestFfmpegStreaming extends BaseTest {
 
     }
 
-    private static Thread startChecker(final ImageDisplay id, final int numFrames, final CountDownLatch checkerLatch, final Runnable triggerWhenDone,
-        final AtomicBoolean finishedSuccessfully, final AtomicBoolean checkerFailed) {
+    private static Thread startChecker(final ImageDisplay id, final int rtmpPort, final int numFrames, final CountDownLatch checkerLatch,
+        final Runnable triggerWhenDone, final AtomicBoolean finishedSuccessfully, final AtomicBoolean checkerFailed) {
         final Thread checker = new Thread(() -> {
             try {
                 uncheck(() -> checkerLatch.await());
@@ -157,7 +153,7 @@ public class TestFfmpegStreaming extends BaseTest {
                     sc
                         .addOption("flags", "low_delay")
                         .addOption("fflags", "nobuffer")
-                        .createMediaDataSource("rtmp://localhost:1935/live/feedly-id")
+                        .createMediaDataSource("rtmp://localhost:" + rtmpPort + "/live/feedly-id")
                         .openChain()
                         .createFirstVideoStreamSelector()
                         .createVideoFrameProcessor(m -> {

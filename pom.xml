@@ -1,19 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <groupId>ai.kognition.pilecv4j</groupId>
-  <version>0.16-SNAPSHOT</version>
+  <version>0.16</version>
   <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>pilecv4j-parent</artifactId>
+  <name>PileCv4j</name>
+  <description>An image and video processing library for java.</description>
 
   <modules>
-    <module>lib-util</module>
-    <module>lib-nr</module>
-    <module>lib-image</module>
-    <module>lib-tf</module>
-    <module>lib-tracking</module>
-    <module>lib-ffmpeg</module>
-    <module>lib-python</module>
     <module>native-image</module>
     <module>native-nr</module>
     <module>native-ffmpeg</module>
@@ -38,7 +33,7 @@
     <!-- <opencv-base.version>${opencv-build.version}-rc</opencv-base.version> -->
 
     <!-- The artifact version -->
-    <opencv.version>${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
+    <opencv.version>${project.version}-opencv${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
     <tensorflow-core-api.version>0.4.0</tensorflow-core-api.version>    
     <slf4j.version>1.7.30</slf4j.version>
@@ -47,16 +42,87 @@
     <cmake.generator>${generator}</cmake.generator>
     <cmake.options>${platform.option}</cmake.options>
     
-    <dempsy-commons.version>2.3.4-SNAPSHOT</dempsy-commons.version>
+    <dempsy-commons.version>2.4.0</dempsy-commons.version>
     
     <commons.cli.version>1.4</commons.cli.version>
     <tiff-java.version>2.0.1</tiff-java.version>
     
     <docker-compose-junit.version>1.5.0</docker-compose-junit.version>
-    
   </properties>
 
+  <url>git@github.com:KognitionAI/pilecv4j</url>
+  <developers>
+    <developer>
+      <id>jimfcarroll</id>
+      <name>Jim Carroll</name>
+      <url>https://github.com/jimfcarroll</url>
+      <organization>Very Little</organization>
+      <roles>
+        <role>architect</role>
+        <role>developer</role>
+      </roles>
+      <timezone>America/New_York</timezone>
+    </developer>
+  </developers>
+  
   <profiles>
+    <!-- ====================================== -->
+    <!-- Implement a "build native only" option -->
+    <!-- ====================================== -->
+    <profile>
+      <id>build-non-native</id>
+      <modules>
+        <module>lib-util</module>
+        <module>lib-nr</module>
+        <module>lib-image</module>
+        <module>lib-tf</module>
+        <module>lib-tracking</module>
+        <module>lib-ffmpeg</module>
+        <module>lib-python</module>
+      </modules>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+        <property>
+          <name>!native-only</name>
+        </property>
+      </activation>
+    </profile>
+    <!-- ==================================== -->
+    <!-- docker container selection criteria. -->
+    <!-- ==================================== -->
+    <profile>
+      <id>build-rtmp-test-docker-container-i386</id>
+      <modules>
+        <module>docker-nginx-rtmp</module>
+      </modules>
+      <activation>
+        <os>
+          <family>linux</family>
+          <arch>i386</arch>
+        </os>
+        <property>
+          <name>!native-only</name>
+        </property>
+      </activation>
+    </profile>
+    <profile>
+      <id>build-rtmp-test-docker-container-x86_64</id>
+      <modules>
+        <module>docker-nginx-rtmp</module>
+      </modules>
+      <activation>
+        <os>
+          <family>linux</family>
+          <arch>amd64</arch>
+        </os>
+        <property>
+          <name>!native-only</name>
+        </property>
+      </activation>
+    </profile>
+    <!-- ==================================== -->
+    <!--       Settings based on the OS       -->
+    <!-- ==================================== -->
     <profile>
       <id>linux-x86</id>
       <activation>
@@ -65,9 +131,6 @@
           <arch>i386</arch>
         </os>
       </activation>
-      <modules>
-        <module>docker-nginx-rtmp</module>
-      </modules>
       <properties>
         <swtartifact>org.eclipse.swt.gtk.linux.x86</swtartifact>
         <platform>linux-x86</platform>
@@ -84,9 +147,6 @@
           <arch>amd64</arch>
         </os>
       </activation>
-      <modules>
-        <module>docker-nginx-rtmp</module>
-      </modules>
       <properties>
         <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
         <platform>linux-x86_64</platform>
@@ -160,6 +220,67 @@
         </pluginManagement>
       </build>
     </profile>
+    <!-- ============================================ -->
+    <!-- If we're building to deploy to maven central -->
+    <!-- ============================================ -->
+    <profile>
+      <id>sonatype-oss-release</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-source-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>attach-sources</id>
+                <goals>
+                  <goal>jar-no-fork</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-javadoc-plugin</artifactId>
+            <configuration>
+              <doclint>none</doclint>
+            </configuration>
+            <executions>
+              <execution>
+                <id>attach-javadocs</id>
+                <goals>
+                  <goal>jar</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.plugins</groupId>
+            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <extensions>true</extensions>
+            <configuration>
+              <serverId>ossrh</serverId>
+              <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
+              <autoReleaseAfterClose>false</autoReleaseAfterClose>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- ============================================ -->
   </profiles>
 
   <!-- Make sure all versions are listed in the dependencyManagement section -->
@@ -312,14 +433,9 @@
       
       <!-- Testing -->
       <dependency>
-        <groupId>com.palantir.docker.compose</groupId>
-        <artifactId>docker-compose-rule-core</artifactId>
-        <version>${docker-compose-junit.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>com.palantir.docker.compose</groupId>
-        <artifactId>docker-compose-rule-junit4</artifactId>
-        <version>${docker-compose-junit.version}</version>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers</artifactId>
+        <version>1.17.3</version>
       </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
@@ -334,56 +450,39 @@
     </dependencies>
   </dependencyManagement>
 
+  <licenses>
+    <license>
+      <name>Apache 2</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
 
   <scm>
-    <developerConnection>scm:git:git@github.com:jimfcarroll/utilities.git</developerConnection>
-    <tag>master</tag>
-    <url>https://github.com/jimfcarroll/utilities</url>
+    <connection>scm:git:git@github.com:KognitionAI/pilecv4j.git</connection>
+    <developerConnection>scm:git:git@github.com:KognitionAI/pilecv4j.git</developerConnection>
+    <url>git@github.com:KognitionAI/pilecv4j.git</url>
   </scm>
 
   <distributionManagement>
     <repository>
-      <id>${utilities.distribution.release.repo.id}</id>
-      <name>Utilities release</name>
-      <url>${utilities.distribution.release.repo.url}</url>
+      <id>${pilecv4j.distribution.release.repo.id}</id>
+      <name>Pilecv4j release</name>
+      <url>${pilecv4j.distribution.release.repo.url}</url>
     </repository>
     <snapshotRepository>
-      <id>${utilities.distribution.snapshot.repo.id}</id>
-      <name>Utilities snapshot</name>
-      <url>${utilities.distribution.snapshot.repo.url}</url>
+      <id>${pilecv4j.distribution.snapshot.repo.id}</id>
+      <name>Pilecv4j snapshot</name>
+      <url>${pilecv4j.distribution.snapshot.repo.url}</url>
     </snapshotRepository>
   </distributionManagement>
 
   <repositories>
     <repository>
-      <id>bintray-palantir</id>
-      <url>https://dl.bintray.com/palantir/releases</url>
-    </repository>
-    <repository>
       <id>maven-eclipse-repo</id>
       <url>http://maven-eclipse.github.io/maven</url>
     </repository>
   </repositories>
-  
-  <reporting>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.1.1</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <version>2.5</version>
-        <configuration>
-          <minmemory>128m</minmemory>
-          <maxmemory>512m</maxmemory>
-          <aggregate>true</aggregate>
-        </configuration>
-      </plugin>
-    </plugins>
-  </reporting>
   
   <build>
     <pluginManagement>

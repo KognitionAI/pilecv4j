@@ -3,7 +3,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.16-SNAPSHOT</version>
+    <version>0.16</version>
   </parent>
   <artifactId>docker-nginx-rtmp</artifactId>
   <packaging>pom</packaging>
