@@ -26,10 +26,73 @@ This project will provide a basis for building video processing chains meant for
 
 Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are several to take note of.
 
-1. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) which contains scripts for building an packaging [OpenCV](https://opencv.org/) for use with these libraries. These projects read the native shared libraries out of packaged Jar files. [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) will build and package [OpenCV](https://opencv.org/) itself into a jar file.
-1. [dempsy-commons](https://github.com/Dempsy/dempsy-commons) is normally deployed to maven central but will occasionally (like at the time of this writing) have changes required by the projects here. Currently, to build the `master` branch of this project you will also need to build the `master` branch of [dempsy-commons](https://github.com/Dempsy/dempsy-commons).
 1. [FFMpeg](https://ffmpeg.org/) which probably needs no introduction if you're on this page.
-1. [Python](https://www.python.org/). In this case you'll need the development libraries installed.
+1. [Python](https://www.python.org/). In this case you'll need the development libraries installed for Python3
+
+## Jumping right in
+
+Here is a simple example to get started. We'll write java code that plays a video and does some minimal manupulaiton. To use the video processing include the folloing in your project (or the gradle equivalent).
+
+``` xml
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>lib-ffmpeg</artifactId>
+      <version>0.16</version>
+    </dependency>
+```
+
+We'll need a video file to work with. If you need one you can use the `.mp4` from here: https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/small_bunny_1080p_60fps.mp4
+
+For the purposes of the tutorial we'll assume there's a file at `/tmp/test-video.mp4`.
+
+The following is a simple example that will play display the video to a window (note, there is no audio processing in the library).
+
+``` java
+// Most components are java resources (Closeables)
+try(
+
+    // We will create an ImageDisplay in order to show the frames from the video
+    ImageDisplay window = new ImageDisplay.Builder().windowName("Tutorial 1").build();
+
+    // Create a StreamContext using Ffmpeg2. StreamContexts represent
+    // a source of media data and a set of processing to be done on that data.
+    final StreamContext sctx = Ffmpeg2.createStreamContext()
+
+        // Create a media data source for the StreamContext. In this case the source
+        // of media data will be our file.
+        .createMediaDataSource("file:///tmp/test-video.mp4")
+
+        // We need to open a processing chain. A processing chain is a
+        // grouping of a stream selector, with a series of media stream
+        // processors.
+        .openChain()
+
+        // We are simply going to pick the first video stream from the file.
+        .createFirstVideoStreamSelector()
+
+        // Then we can add a processor. In this case we want the system to call us
+        // with each subsequent frame as an OpenCV Mat.
+        .createVideoFrameProcessor(videoFrame -> {
+
+            // We want to display each frame. PileCV4J extends the OpenCV Mat functionality
+            // for better native resource/memory management. So we can use a try-with-resource.
+            try(CvMat mat = videoFrame.bgr(false);) { // Note, we want to make sure the Mat is BGR
+                // Display the image.
+                window.update(mat);
+            }
+
+        })
+
+        // We need the resulting streaming context returned.
+        .streamContext();
+
+) {
+
+    // play the media stream.
+    sctx.play();
+}
+```
+
 
 ## Project Overview
 
@@ -77,6 +140,8 @@ You probably don't need to worry about `lib-util`. `lib-util` is a library with 
 ### lib-tracker
 
 This is a bit of an oddity but it's basically an abstraction for object tracking in video with several OpenCv implementations.
+
+## 
 
 ## Building
 
