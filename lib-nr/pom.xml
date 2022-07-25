@@ -6,6 +6,7 @@
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-nr</artifactId>
 
@@ -22,8 +23,9 @@
     
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-nr</artifactId>
-      <classifier>${platform}</classifier>
+      <artifactId>native-nr-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>

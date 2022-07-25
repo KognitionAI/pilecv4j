@@ -6,6 +6,7 @@
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-ffmpeg</artifactId>
   <name>lib-ffmpeg (${project.version})</name>
@@ -33,8 +34,9 @@
     </dependency>
       <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-ffmpeg</artifactId>
-      <classifier>${platform}</classifier>
+      <artifactId>native-ffmpeg-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <optional>true</optional>
     </dependency>
   
     <!-- 3rd party test deps -->
@@ -74,6 +76,17 @@
       <artifactId>${swtartifact}</artifactId>
       <scope>test</scope>
       <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-vfs.api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-image-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

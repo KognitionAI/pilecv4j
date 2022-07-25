@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>ai.kognition.pilecv4j</groupId>
+    <artifactId>pilecv4j-settings</artifactId>
+    <version>0.17-SNAPSHOT</version>
+    <relativePath>../settings/pom.xml</relativePath>
+  </parent>
+
+  <packaging>pom</packaging>
+  <artifactId>pilecv4j-parent</artifactId>
+  <name>PileCv4j Parent pom</name>
+  <description>An image and video processing library for java.</description>
+
+  <properties>
+    <tensorflow-core-api.version>0.4.0</tensorflow-core-api.version>    
+    <slf4j.version>1.7.30</slf4j.version>
+
+    <dempsy-commons.version>2.4.0</dempsy-commons.version>
+    
+    <commons.cli.version>1.4</commons.cli.version>
+    <tiff-java.version>2.0.1</tiff-java.version>
+  </properties>
+
+  <!-- Make sure all versions are listed in the dependencyManagement section -->
+  <!-- It is WRONG to have ANY version numbers in pom.xml files below the product level
+       (with the exception of the parent tag) -->
+  <dependencyManagement>
+    <dependencies>
+      <!-- dempsy-commons bom pom import -->
+      <dependency>
+        <groupId>net.dempsy</groupId>
+        <artifactId>dempsy-commons-bom</artifactId>
+        <version>${dempsy-commons.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <dependency>
+        <groupId>ai.kognition.pilecv4j</groupId>
+        <artifactId>opencv-${platform}</artifactId>
+        <classifier>withlib</classifier>
+        <version>${opencv.version}</version>
+      </dependency>
+      
+      <!-- Tensorflow -->
+      <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-api</artifactId>
+        <version>${tensorflow-core-api.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-api</artifactId>
+        <version>${tensorflow-core-api.version}</version>
+        <classifier>linux-x86_64-gpu</classifier>
+      </dependency>
+
+      <!-- Internal to the product -->
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>docker-nginx-rtmp</artifactId>
+        <type>pom</type>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>lib-util</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>lib-nr</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>lib-image</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>lib-ffmpeg</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>lib-tf</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+
+      <!-- the version number for all dependencies in this section
+           should all be ${project.version} -->
+
+      <!-- Third party library versions -->
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>jul-to-slf4j</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency> <!-- Requirement of using the NativeLibraryLoader from Dempsy -->
+        <groupId>commons-io</groupId>
+        <artifactId>commons-io</artifactId>
+        <version>2.9.0</version>
+      </dependency>
+      <dependency> <!-- Needed for the NativeLibraryLoader -->
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.12.0</version>
+      </dependency>
+      <dependency>
+        <groupId>net.java.dev.jna</groupId>
+        <artifactId>jna</artifactId>
+        <version>5.10.0</version>
+      </dependency>
+      <dependency>
+        <groupId>org.eclipse.swt</groupId>
+        <artifactId>${swtartifact}</artifactId>
+        <version>4.6</version>
+      </dependency>
+      <dependency> <!-- This is only necessary if you're going to use TiffUtils -->
+       <groupId>mil.nga</groupId>
+       <artifactId>tiff</artifactId>
+       <version>2.0.0</version>
+      </dependency>
+      <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
+      <dependency>
+        <groupId>com.github.jai-imageio</groupId>
+        <artifactId>jai-imageio-core</artifactId>
+        <version>1.4.0</version>
+      </dependency>
+      <dependency>
+        <groupId>com.github.jai-imageio</groupId>
+        <artifactId>jai-imageio-jpeg2000</artifactId>
+        <version>1.3.0</version>
+      </dependency>
+      <dependency> <!-- These are redundant and so optional but make the system more robust -->
+        <groupId>com.twelvemonkeys.bom</groupId>
+        <artifactId>bom</artifactId>
+        <version>3.4.1</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      
+      <!-- Testing -->
+      <dependency>
+        <groupId>org.testcontainers</groupId>
+        <artifactId>testcontainers</artifactId>
+        <version>1.17.3</version>
+      </dependency>
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-log4j12</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>junit</groupId>
+        <artifactId>junit</artifactId>
+        <version>4.13.1</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>

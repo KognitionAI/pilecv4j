@@ -6,6 +6,7 @@
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <modelVersion>4.0.0</modelVersion>
 
@@ -41,6 +42,17 @@
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-log4j12</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-vfs.api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-image-${platform}</artifactId>
+      <classifier>bin</classifier>
       <scope>test</scope>
     </dependency>
   </dependencies>

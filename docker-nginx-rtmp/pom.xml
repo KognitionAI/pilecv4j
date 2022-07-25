@@ -4,7 +4,9 @@
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../parent/pom.xml</relativePath>
   </parent>
+  
   <artifactId>docker-nginx-rtmp</artifactId>
   <packaging>pom</packaging>
 
@@ -22,7 +24,6 @@
         <plugin>
           <groupId>io.fabric8</groupId>
           <artifactId>docker-maven-plugin</artifactId>
-          <version>0.35.0</version>
           <executions>
             <execution>
               <id>buildme</id>

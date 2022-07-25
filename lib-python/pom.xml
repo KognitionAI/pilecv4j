@@ -6,6 +6,7 @@
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>lib-python</artifactId>
@@ -13,8 +14,9 @@
   <dependencies>
     <dependency>
       <groupId>${project.groupId}</groupId>
-      <artifactId>native-python</artifactId>
-      <classifier>${platform}</classifier>
+      <artifactId>native-python-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <optional>true</optional>
     </dependency>
 
     <dependency>
@@ -57,6 +59,12 @@
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-ffmpeg</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-ffmpeg-${platform}</artifactId>
+      <classifier>bin</classifier>
       <scope>test</scope>
     </dependency>
   </dependencies>

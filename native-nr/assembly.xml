@@ -1,5 +1,5 @@
 <assembly>
-  <id>${platform}</id>
+  <id>bin</id>
   <formats>
     <format>jar</format>
   </formats>
