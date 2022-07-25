@@ -152,13 +152,7 @@ To build this you will need to have built OpenCV using [pilecv4j-opencv-packagin
 On Windows, under MSYS, an example of the command line to build this looks like
 
 ```
-OpenCV_DIR=/c/utils/opencv4.0.1/x64/vc15/staticlib PKG_CONFIG_PATH=/c/gstreamer/1.0/x86_64/lib/pkgconfig mvn -Dgenerator="Visual Studio 15 2017" clean install
-```
-
-NOTE: On Windows, since you'll be building using MSYS bash shell, you'll need to add gstreamer lib directories to your PATH environment variable since, for some reason, MSYS overrides the Windows native PATH. My entry in `.bashrc` looks like the following:
-
-```
-export PATH="$PATH":/c/gstreamer/1.0/x86_64/bin:/c/gstreamer/1.0/x86_64/lib/gstreamer-1.0
+OpenCV_DIR=/c/utils/opencv4.0.1/x64/vc15/staticlib mvn -Dgenerator="Visual Studio 15 2017" clean install
 ```
 
 ## History
