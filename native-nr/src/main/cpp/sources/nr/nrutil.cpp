@@ -5,7 +5,7 @@
 
 #include "nrutil.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #define NR_END 1
 #define FREE_ARG char*

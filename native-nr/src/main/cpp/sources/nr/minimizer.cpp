@@ -23,8 +23,8 @@
 #include <stdlib.h>
 
 #include "nrutil.h"
-#include "jfloats.h"
-#include "kog_exports.h"
+#include "common/jfloats.h"
+#include "common/kog_exports.h"
 
 namespace pilecv4j {
 namespace nr {

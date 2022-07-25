@@ -1,6 +1,6 @@
 #include <opencv2/core/mat.hpp>
-#include "imagemaker.h"
-#include "kog_exports.h"
+#include "common/imagemaker.h"
+#include "common/kog_exports.h"
 
 #include <memory>
 

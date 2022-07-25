@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #define GOLD 1.618034
 #define GLIMIT 100.0

@@ -5,8 +5,7 @@
  *      Author: jim
  */
 
-#include "imagemaker.h"
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #include "utils/log.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"

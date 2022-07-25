@@ -10,9 +10,11 @@
 
 #include <atomic>
 
-namespace pilecv4j
+namespace ai
 {
-namespace ffmpeg
+namespace kognition
+{
+namespace pilecv4j
 {
 
 /**
@@ -43,7 +45,7 @@ public:
 };
 
 
-
+}
 }
 } /* namespace pilecv4j */
 

@@ -1,7 +1,7 @@
 #include <math.h>
 #include "nrutil.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #define ITMAX 100
 #define ZEPS 1.0e-10

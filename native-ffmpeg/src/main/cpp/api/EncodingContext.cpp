@@ -11,12 +11,14 @@
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/opt.h>
 }
+
+using namespace ai::kognition::pilecv4j;
 
 namespace pilecv4j
 {
@@ -153,7 +155,7 @@ uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
   if (!imaker)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
 
-  ai::kognition::pilecv4j::RawRaster details;
+  RawRaster details;
   if (!imaker->extractImageDetails(matRef, isRgb, &details))
     return MAKE_P_STAT(FAILED_CREATE_FRAME);
 

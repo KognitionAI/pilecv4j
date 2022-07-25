@@ -13,7 +13,7 @@ extern "C" {
 #include <libswscale/swscale.h>
 }
 #include <stdint.h>
-#include "imagemaker.h"
+#include "common/imagemaker.h"
 
 namespace pilecv4j
 {

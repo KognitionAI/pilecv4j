@@ -10,9 +10,11 @@
 
 #include "api/MediaDataSource.h"
 
-#include "pilecv4j_utils.h"
+#include "common/pilecv4j_utils.h"
 
 #define PCV4J_CUSTOMIO_BUFSIZE 8192
+
+using namespace ai::kognition::pilecv4j;
 
 namespace pilecv4j
 {

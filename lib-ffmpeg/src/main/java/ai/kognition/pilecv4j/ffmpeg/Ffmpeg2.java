@@ -10,7 +10,6 @@ import static net.dempsy.util.Functional.chain;
 import static net.dempsy.util.Functional.ignore;
 
 import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
@@ -533,17 +532,19 @@ public class Ffmpeg2 {
         // ======================================================================
 
         /**
-         * Create a raw data source from a URI. This sources media data from whatever the
+         * Create a data source from a URI or file name. This sources media data from whatever the
          * URI is pointing to given it's supported by ffmpeg.
-         *
-         * @throws URISyntaxException
          */
-        public StreamContext createMediaDataSource(final String url) throws URISyntaxException {
-            return createMediaDataSource(new URI(url));
+        public StreamContext createMediaDataSource(final String source) {
+            final long nativeVds = FfmpegApi2.pcv4j_ffmpeg2_uriMediaDataSource_create(source);
+            if(nativeVds == 0)
+                throw new FfmpegException("Failed to create a uri based native MediaDataSource");
+
+            return manage(new MediaDataSource(nativeVds));
         }
 
         /**
-         * Create a raw data source from a URI. This sources media data from whatever the
+         * Create a data source from a URI. This sources media data from whatever the
          * URI is pointing to given it's supported by ffmpeg.
          */
         public StreamContext createMediaDataSource(final URI url) {
@@ -565,6 +566,29 @@ public class Ffmpeg2 {
                 uriStr = url.toString();
 
             final long nativeVds = FfmpegApi2.pcv4j_ffmpeg2_uriMediaDataSource_create(uriStr);
+            if(nativeVds == 0)
+                throw new FfmpegException("Failed to create a uri based native MediaDataSource");
+
+            return manage(new MediaDataSource(nativeVds));
+        }
+
+        /**
+         * <p>
+         * Create a data source from a URI or file name and explicitly specify the format. This
+         * sources media data from whatever the URI is pointing to with the explicit format
+         * given it's supported by ffmpeg.
+         * </p>
+         *
+         * <p>
+         * This can be used to specify a device like a web cam. For example, on Linux you
+         * can call {@code createMediaDataSource("video4linux2", "/dev/video0")}.
+         * see {@linkplain https://trac.ffmpeg.org/wiki/Capture/Webcam} for more details
+         * </p>
+         *
+         * @see https://trac.ffmpeg.org/wiki/Capture/Webcam
+         */
+        public StreamContext createMediaDataSource(final String fmt, final String rawFile) {
+            final long nativeVds = FfmpegApi2.pcv4j_ffmpeg2_uriMediaDataSource_create2(fmt, rawFile);
             if(nativeVds == 0)
                 throw new FfmpegException("Failed to create a uri based native MediaDataSource");
 

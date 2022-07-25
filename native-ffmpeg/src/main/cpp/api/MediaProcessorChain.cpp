@@ -7,7 +7,7 @@
 
 #include "api/MediaProcessorChain.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 #include "utils/log.h"
 
 namespace pilecv4j

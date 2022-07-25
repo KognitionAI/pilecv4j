@@ -1,6 +1,6 @@
 #include <math.h>
 #include "nrutil.h"
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #define ITMAX 100
 #define CGOLD 0.3819660
