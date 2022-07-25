@@ -14,7 +14,7 @@ This project contains several tools for creating image and video processing appl
    1. [lib-util](#lib-util)
    1. [lib-tracker](#lib-tf)
 1. [Building](#building)
-1. [History](#History)
+1. [History](#history)
 
 ## Introduction
 
@@ -145,7 +145,7 @@ This is a bit of an oddity but it's basically an abstraction for object tracking
 
 ## Building
 
-See [Prerequisites](#Prerequisites) and make sure they're all installed.
+See [Prerequisites](#prerequisites) and make sure they're all installed.
 
 To build this you will need to have built OpenCV using [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging). The directory where [pilecv4j-opencv-packaging](https://github.com/KognitionAI/pilecv4j-opencv-packaging) installed the build should contain, in a subdirectory somewhere, the CMake configuration file, `OpenCVModules.cmake`. The exact location of this file will depend on what version of OpenCV you're building. For example, for OpenCV 4.0.0, the file is at `[install-location]/x64/vc15/staticlib` on Windows and `[install-location]/lib/cmake/opencv4` on Linux. You need to supply this location to the build via the `OpenCV_DIR` environment variable. See the example below.
 

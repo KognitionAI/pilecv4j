@@ -26,7 +26,7 @@ public class SwtUtils {
             // test if the jar is already on the classpath or is shadded
             boolean onClasspath = false;
             try {
-                final Class<?> clazz = Class.forName("org.eclipse.swt.widgets.Display");
+                Class.forName("org.eclipse.swt.widgets.Display");
                 onClasspath = true;
             } catch(final ClassNotFoundException cnfe) {
                 onClasspath = false;
