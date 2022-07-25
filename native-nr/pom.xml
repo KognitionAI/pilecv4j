@@ -5,16 +5,17 @@
   <modelVersion>4.0.0</modelVersion>
 
   <parent>
-    <artifactId>pilecv4j-parent</artifactId>
+    <artifactId>pilecv4j-settings</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../settings/pom.xml</relativePath>
   </parent>
 
-  <artifactId>native-nr</artifactId>
+  <artifactId>native-nr-${platform}</artifactId>
   <packaging>pom</packaging>
 
   <properties>
-    <common.include>${project.parent.basedir}/native-common-include/include</common.include>
+    <common.include>${project.basedir}/../native-common-include/include</common.include>
   </properties>
 
   <build>

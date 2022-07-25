@@ -4,72 +4,19 @@
   <version>0.17-SNAPSHOT</version>
   <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
-  <artifactId>pilecv4j-parent</artifactId>
-  <name>PileCv4j</name>
+  <artifactId>pilecv4j-aggregator</artifactId>
+  <name>PileCv4j Aggregator</name>
   <description>An image and video processing library for java.</description>
 
-  <modules>
-    <module>native-image</module>
-    <module>native-nr</module>
-    <module>native-ffmpeg</module>
-    <module>native-python</module>
-  </modules>
-
-  <properties>
-    <!-- <downloadBinaries>true</downloadBinaries> -->
-    <build.type>release</build.type>
-    <cmake.build.type>Debug</cmake.build.type>
-    
-    <!-- This property is used in the native build to make sure the version of
-         OpenCV we're building against matches what we expect. -->
-    <opencv-build.version>4.5.2</opencv-build.version>
-    <opencv-short.version>452</opencv-short.version>
-    <!-- <cuda.version>11.2</cuda.version> -->
-
-    <!-- Normally the opencv-base version is the same as the opencv-build version   -->
-    <!--  however, the build version needs to be unadulterated by version suffixes -->
-    <!--  so opencv-base.version of 4.0.0-rc implies a opencv-build version of 4.0.0  -->
-    <opencv-base.version>${opencv-build.version}</opencv-base.version>
-    <!-- <opencv-base.version>${opencv-build.version}-rc</opencv-base.version> -->
-
-    <!-- The artifact version -->
-    <opencv.version>0.16-opencv${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
-
-    <tensorflow-core-api.version>0.4.0</tensorflow-core-api.version>    
-    <slf4j.version>1.7.30</slf4j.version>
-
-    <!-- generator and platform.options are set in the profile -->
-    <cmake.generator>${generator}</cmake.generator>
-    <cmake.options>${platform.option}</cmake.options>
-    
-    <dempsy-commons.version>2.4.0</dempsy-commons.version>
-    
-    <commons.cli.version>1.4</commons.cli.version>
-    <tiff-java.version>2.0.1</tiff-java.version>
-  </properties>
-
-  <url>git@github.com:KognitionAI/pilecv4j</url>
-  <developers>
-    <developer>
-      <id>jimfcarroll</id>
-      <name>Jim Carroll</name>
-      <url>https://github.com/jimfcarroll</url>
-      <organization>Very Little</organization>
-      <roles>
-        <role>architect</role>
-        <role>developer</role>
-      </roles>
-      <timezone>America/New_York</timezone>
-    </developer>
-  </developers>
-  
   <profiles>
     <!-- ====================================== -->
     <!-- Implement a "build native only" option -->
     <!-- ====================================== -->
     <profile>
-      <id>build-non-native</id>
+      <id>include-non-native</id>
       <modules>
+        <module>settings</module>
+        <module>parent</module>
         <module>lib-util</module>
         <module>lib-nr</module>
         <module>lib-image</module>
@@ -79,30 +26,31 @@
         <module>lib-python</module>
       </modules>
       <activation>
-        <activeByDefault>true</activeByDefault>
         <property>
           <name>!native-only</name>
+        </property>
+      </activation>
+    </profile>
+    <!-- ========================================== -->
+    <!-- Implement a "build non-native only" option -->
+    <!-- ========================================== -->
+    <profile>
+      <id>include-native</id>
+      <modules>
+        <module>native-image</module>
+        <module>native-nr</module>
+        <module>native-ffmpeg</module>
+        <module>native-python</module>
+      </modules>
+      <activation>
+        <property>
+          <name>!non-native-only</name>
         </property>
       </activation>
     </profile>
     <!-- ==================================== -->
     <!-- docker container selection criteria. -->
     <!-- ==================================== -->
-    <profile>
-      <id>build-rtmp-test-docker-container-i386</id>
-      <modules>
-        <module>docker-nginx-rtmp</module>
-      </modules>
-      <activation>
-        <os>
-          <family>linux</family>
-          <arch>i386</arch>
-        </os>
-        <property>
-          <name>!native-only</name>
-        </property>
-      </activation>
-    </profile>
     <profile>
       <id>build-rtmp-test-docker-container-x86_64</id>
       <modules>
@@ -118,420 +66,19 @@
         </property>
       </activation>
     </profile>
-    <!-- ==================================== -->
-    <!--       Settings based on the OS       -->
-    <!-- ==================================== -->
-    <profile>
-      <id>linux-x86</id>
-      <activation>
-        <os>
-          <family>linux</family>
-          <arch>i386</arch>
-        </os>
-      </activation>
-      <properties>
-        <swtartifact>org.eclipse.swt.gtk.linux.x86</swtartifact>
-        <platform>linux-x86</platform>
-        <generator>Unix Makefiles</generator>
-        <opencv-gpu.version-extention></opencv-gpu.version-extention>
-        <platform.option></platform.option>
-      </properties>
-    </profile>
-    <profile>
-      <id>linux-64bit</id>
-      <activation>
-        <os>
-          <family>linux</family>
-          <arch>amd64</arch>
-        </os>
-      </activation>
-      <properties>
-        <swtartifact>org.eclipse.swt.gtk.linux.x86_64</swtartifact>
-        <platform>linux-x86_64</platform>
-        <generator>Unix Makefiles</generator>
-        <!-- <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention> -->
-        <opencv-gpu.version-extention></opencv-gpu.version-extention>
-        <platform.option></platform.option>
-      </properties>
-    </profile>
-    <profile>
-      <id>windows-x86_64</id>
-      <activation>
-        <os>
-          <family>windows</family>
-          <arch>amd64</arch>
-        </os>
-      </activation>
-      <properties>
-        <swtartifact>org.eclipse.swt.win32.win32.x86_64</swtartifact>
-        <platform>windows-x86_64</platform>
-        <platform.option>-Ax64</platform.option>
-        <opencv-gpu.version-extention></opencv-gpu.version-extention>
-        <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
-      </properties>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-surefire-plugin</artifactId>
-              <configuration>
-                <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                <excludes>
-                  <exclude>**/*Streaming.java</exclude>
-                </excludes>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-    </profile>
-    <profile>
-      <id>windows-x86</id>
-      <activation>
-        <os>
-          <family>windows</family>
-          <arch>x86</arch>
-        </os>
-      </activation>
-      <properties>
-        <swtartifact>org.eclipse.swt.win32.win32.x86</swtartifact>
-        <platform>windows-x86</platform>
-        <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
-        <opencv-gpu.version-extention></opencv-gpu.version-extention>
-        <platform.option></platform.option>
-      </properties>
-      <build>
-        <pluginManagement>
-          <plugins>
-            <plugin>
-              <groupId>org.apache.maven.plugins</groupId>
-              <artifactId>maven-surefire-plugin</artifactId>
-              <configuration>
-                <redirectTestOutputToFile>false</redirectTestOutputToFile>
-                <excludes>
-                  <exclude>**/*Streaming.java</exclude>
-                </excludes>
-              </configuration>
-            </plugin>
-          </plugins>
-        </pluginManagement>
-      </build>
-    </profile>
-    <!-- ============================================ -->
-    <!-- If we're building to deploy to maven central -->
-    <!-- ============================================ -->
-    <profile>
-      <id>sonatype-oss-release</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-source-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>attach-sources</id>
-                <goals>
-                  <goal>jar-no-fork</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-javadoc-plugin</artifactId>
-            <configuration>
-              <doclint>none</doclint>
-            </configuration>
-            <executions>
-              <execution>
-                <id>attach-javadocs</id>
-                <goals>
-                  <goal>jar</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-          <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
-            <extensions>true</extensions>
-            <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>false</autoReleaseAfterClose>
-            </configuration>
-          </plugin>
-          <plugin>
-            <groupId>org.apache.maven.plugins</groupId>
-            <artifactId>maven-gpg-plugin</artifactId>
-            <executions>
-              <execution>
-                <id>sign-artifacts</id>
-                <phase>verify</phase>
-                <goals>
-                  <goal>sign</goal>
-                </goals>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
     <!-- ============================================ -->
   </profiles>
 
-  <!-- Make sure all versions are listed in the dependencyManagement section -->
-  <!-- It is WRONG to have ANY version numbers in pom.xml files below the product level
-       (with the exception of the parent tag) -->
-  <dependencyManagement>
-    <dependencies>
-      <!-- dempsy-commons bom pom import -->
-      <dependency>
-        <groupId>net.dempsy</groupId>
-        <artifactId>dempsy-commons-bom</artifactId>
-        <version>${dempsy-commons.version}</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      <dependency>
-        <groupId>ai.kognition.pilecv4j</groupId>
-        <artifactId>opencv-${platform}</artifactId>
-        <classifier>withlib</classifier>
-        <version>${opencv.version}</version>
-      </dependency>
-      
-      <!-- Tensorflow -->
-      <dependency>
-        <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow-core-api</artifactId>
-        <version>${tensorflow-core-api.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow-core-api</artifactId>
-        <version>${tensorflow-core-api.version}</version>
-        <classifier>linux-x86_64-gpu</classifier>
-      </dependency>
-
-      <!-- Internal to the product -->
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>docker-nginx-rtmp</artifactId>
-        <type>pom</type>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>lib-util</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>lib-nr</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>lib-image</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>lib-ffmpeg</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>lib-tf</artifactId>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>native-image</artifactId>
-        <classifier>${platform}</classifier>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>native-python</artifactId>
-        <classifier>${platform}</classifier>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>native-ffmpeg</artifactId>
-        <classifier>${platform}</classifier>
-        <version>${project.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>${project.groupId}</groupId>
-        <artifactId>native-nr</artifactId>
-        <classifier>${platform}</classifier>
-        <version>${project.version}</version>
-      </dependency>
-
-      <!-- the version number for all dependencies in this section
-           should all be ${project.version} -->
-
-      <!-- Third party library versions -->
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>jul-to-slf4j</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-api</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency> <!-- Requirement of using the NativeLibraryLoader from Dempsy -->
-        <groupId>commons-io</groupId>
-        <artifactId>commons-io</artifactId>
-        <version>2.9.0</version>
-      </dependency>
-      <dependency> <!-- Needed for the NativeLibraryLoader -->
-        <groupId>org.apache.commons</groupId>
-        <artifactId>commons-lang3</artifactId>
-        <version>3.12.0</version>
-      </dependency>
-      <dependency>
-        <groupId>net.java.dev.jna</groupId>
-        <artifactId>jna</artifactId>
-        <version>5.10.0</version>
-      </dependency>
-      <dependency>
-        <groupId>org.eclipse.swt</groupId>
-        <artifactId>${swtartifact}</artifactId>
-        <version>4.6</version>
-      </dependency>
-      <dependency> <!-- This is only necessary if you're going to use TiffUtils -->
-       <groupId>mil.nga</groupId>
-       <artifactId>tiff</artifactId>
-       <version>2.0.0</version>
-      </dependency>
-      <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
-      <dependency>
-        <groupId>com.github.jai-imageio</groupId>
-        <artifactId>jai-imageio-core</artifactId>
-        <version>1.4.0</version>
-      </dependency>
-      <dependency>
-        <groupId>com.github.jai-imageio</groupId>
-        <artifactId>jai-imageio-jpeg2000</artifactId>
-        <version>1.3.0</version>
-      </dependency>
-      <dependency> <!-- These are redundant and so optional but make the system more robust -->
-        <groupId>com.twelvemonkeys.bom</groupId>
-        <artifactId>bom</artifactId>
-        <version>3.4.1</version>
-        <type>pom</type>
-        <scope>import</scope>
-      </dependency>
-      
-      <!-- Testing -->
-      <dependency>
-        <groupId>org.testcontainers</groupId>
-        <artifactId>testcontainers</artifactId>
-        <version>1.17.3</version>
-      </dependency>
-      <dependency>
-        <groupId>org.slf4j</groupId>
-        <artifactId>slf4j-log4j12</artifactId>
-        <version>${slf4j.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>junit</groupId>
-        <artifactId>junit</artifactId>
-        <version>4.13.1</version>
-      </dependency>
-    </dependencies>
-  </dependencyManagement>
-
-  <licenses>
-    <license>
-      <name>Apache 2</name>
-      <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
-      <distribution>repo</distribution>
-    </license>
-  </licenses>
-
-  <scm>
-    <connection>scm:git:git@github.com:KognitionAI/pilecv4j.git</connection>
-    <developerConnection>scm:git:git@github.com:KognitionAI/pilecv4j.git</developerConnection>
-    <url>git@github.com:KognitionAI/pilecv4j.git</url>
-  </scm>
-
-  <distributionManagement>
-    <repository>
-      <id>${pilecv4j.distribution.release.repo.id}</id>
-      <name>Pilecv4j release</name>
-      <url>${pilecv4j.distribution.release.repo.url}</url>
-    </repository>
-    <snapshotRepository>
-      <id>${pilecv4j.distribution.snapshot.repo.id}</id>
-      <name>Pilecv4j snapshot</name>
-      <url>${pilecv4j.distribution.snapshot.repo.url}</url>
-    </snapshotRepository>
-  </distributionManagement>
-
-  <repositories>
-    <repository>
-      <id>maven-eclipse-repo</id>
-      <url>http://maven-eclipse.github.io/maven</url>
-    </repository>
-  </repositories>
-  
   <build>
-    <pluginManagement>
-      <plugins>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-compiler-plugin</artifactId>
-          <version>3.8.1</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-surefire-plugin</artifactId>
-          <version>2.22.1</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-assembly-plugin</artifactId>
-          <version>3.3.0</version>
-        </plugin>
-        <plugin>
-          <groupId>com.googlecode.cmake-maven-project</groupId>
-          <artifactId>cmake-maven-plugin</artifactId>
-          <version>3.22.1-b1</version>
-        </plugin>
-        <plugin>
-          <groupId>org.apache.maven.plugins</groupId>
-          <artifactId>maven-antrun-plugin</artifactId>
-          <version>3.0.0</version>
-        </plugin>
-      </plugins>
-    </pluginManagement>
     <plugins>
-      <plugin>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>11</source>
-          <target>11</target>
-          <debug>true</debug>
-        </configuration>
-      </plugin>
+      <!-- disable deployment for the aggregator -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-source-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>attach-sources</id>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-          </execution>
-        </executions>
+        <artifactId>maven-deploy-plugin</artifactId>
+        <version>3.0.0-M1</version>
+        <configuration>
+          <skip>true</skip>
+        </configuration>
       </plugin>
     </plugins>
   </build>

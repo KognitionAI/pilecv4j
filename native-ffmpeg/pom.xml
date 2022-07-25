@@ -3,19 +3,31 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
 
   <modelVersion>4.0.0</modelVersion>
-
   <parent>
+    <artifactId>pilecv4j-settings</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <artifactId>pilecv4j-parent</artifactId>
     <version>0.17-SNAPSHOT</version>
+    <relativePath>../settings/pom.xml</relativePath>
   </parent>
 
-  <artifactId>native-ffmpeg</artifactId>
+  <artifactId>native-ffmpeg-${platform}</artifactId>
   <packaging>pom</packaging>
 
   <properties>
-    <common.include>${project.parent.basedir}/native-common-include/include</common.include>
+    <common.include>${project.basedir}/../native-common-include/include</common.include>
   </properties>
+
+  <dependencies>
+    <!-- This is a helper. Any time you're going to use native-ffmpeg -->
+    <!-- you'll also need native-image. In order to facilitate that   -->
+    <!-- this dependency is included as a runtime dep                 -->
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-image-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <scope>runtime</scope>
+    </dependency>
+  </dependencies>
 
   <build>
     <directory>${basedir}/target/${platform}-${build.type}</directory>
