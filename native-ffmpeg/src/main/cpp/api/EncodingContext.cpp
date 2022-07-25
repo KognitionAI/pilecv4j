@@ -7,7 +7,7 @@
 
 #include <api/EncodingContext.h>
 #include <utils/Synchronizer.h>
-#include "utils/FakeMutexGuard.h"
+#include "common/FakeMutexGuard.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
 
