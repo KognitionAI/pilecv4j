@@ -8,7 +8,12 @@
 #include "api/StreamContext.h"
 #include "api/StreamDetails.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
+#ifdef PILECV4J_FFMPEG_DEVICE_SUPPORT
+extern "C" {
+#include "libavdevice/avdevice.h"
+}
+#endif
 
 namespace pilecv4j
 {
@@ -35,6 +40,9 @@ static uint64_t process_frames(StreamContext* ctx);
 // ===========================================================
 
 uint64_t StreamContext::open() {
+#ifdef PILECV4J_FFMPEG_DEVICE_SUPPORT
+  avdevice_register_all();
+#endif
 
   advanceStateTo(FRESH);
 

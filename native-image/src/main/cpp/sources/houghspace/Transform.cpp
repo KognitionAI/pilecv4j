@@ -20,8 +20,8 @@
 #include <cstdint>
 #include <stdio.h>
 #include <list>
-#include "jfloats.h"
-#include "kog_exports.h"
+#include "common/jfloats.h"
+#include "common/kog_exports.h"
 
 using namespace std;
 

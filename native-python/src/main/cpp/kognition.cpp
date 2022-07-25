@@ -1,13 +1,13 @@
 
 #include <stdint.h>
 #include <mutex>
-#include "jfloats.h"
+#include "common/jfloats.h"
 #include "PythonEnvironment.h"
 #include "ImageSource.h"
 #include "GilGuard.h"
 #include "KogSystem.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 int initModule_kognition();
 

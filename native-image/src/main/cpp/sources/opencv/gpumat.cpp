@@ -3,8 +3,8 @@
 //#include <opencv2/cudaoptflow.hpp>
 //#include <opencv2/cudaimgproc.hpp>
 //#include <opencv2/cudaarithm.hpp>
-//#include "jfloats.h"
-//#include "kog_exports.h"
+//#include "common/jfloats.h"
+//#includecommon/ "kog_exports.h"
 //
 //extern "C" {
 //  KAI_EXPORT uint64_t GpuMat_create(uint64_t native);

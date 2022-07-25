@@ -1,5 +1,5 @@
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 
 AVRational pilecv4j::ffmpeg::millisecondTimeBase = AVRational{1,1000};
@@ -23,7 +23,8 @@ static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "Failed to create codec.",
     "Option already set.",
     "The underlying stream seems to have changed in some important dimension.",
-    "The stream selection failed."
+    "The stream selection failed.",
+    "No input format"
 };
 
 /**

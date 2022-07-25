@@ -43,6 +43,21 @@ message(STATUS "avformat lib: ${AVFORMAT_LIBRARY}")
 find_library( SWSCALE_LIBRARY swscale REQUIRED )
 message(STATUS "swscale lib: ${SWSCALE_LIBRARY}")
 
+find_library( AVDEVICE_LIBRARY avdevice)
+message(STATUS "avdevice lib: ${AVDEVICE_LIBRARY}")
+
+if (AVDEVICE_LIBRARY)
+  message(STATUS "Including devices such as web cams")
+  add_definitions( -DPILECV4J_FFMPEG_DEVICE_SUPPORT )
+endif()
+
+#get_cmake_property(_variableNames VARIABLES)
+#list (SORT _variableNames)
+#foreach (_variableName ${_variableNames})
+#   message(STATUS "${_variableName}=${${_variableName}}")
+#endforeach()
+#execute_process(COMMAND "${CMAKE_COMMAND}" "-E" "environment")
+
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
 add_definitions( -DLOGGING )
 
@@ -73,4 +88,9 @@ add_library(${PROJECT_NAME} SHARED
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE . PUBLIC ${AVCODEC_INCLUDE_DIR})
+if (AVDEVICE_LIBRARY)
+target_link_libraries(${PROJECT_NAME} ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} ${SWSCALE_LIBRARY} ${AVDEVICE_LIBRARY})
+else()
 target_link_libraries(${PROJECT_NAME} ${AVCODEC_LIBRARY} ${AVUTIL_LIBRARY} ${AVFORMAT_LIBRARY} ${SWSCALE_LIBRARY})
+endif()
+

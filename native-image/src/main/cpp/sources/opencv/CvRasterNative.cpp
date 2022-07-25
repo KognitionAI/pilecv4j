@@ -4,8 +4,8 @@
 #include <opencv2/core/mat.hpp>
 #include <opencv2/highgui.hpp>
 
-#include "jfloats.h"
-#include "kog_exports.h"
+#include "common/jfloats.h"
+#include "common/kog_exports.h"
 
 extern "C" {
   KAI_EXPORT void* pilecv4j_image_CvRaster_getData(uint64_t native) {

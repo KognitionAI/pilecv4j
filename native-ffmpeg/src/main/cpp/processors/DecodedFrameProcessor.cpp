@@ -10,7 +10,7 @@
 #include "utils/IMakerManager.h"
 #include "utils/log.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 extern "C" {
 #include <libavutil/opt.h>

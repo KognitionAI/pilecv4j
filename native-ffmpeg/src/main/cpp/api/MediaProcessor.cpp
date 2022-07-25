@@ -10,7 +10,7 @@
 #include <stdint.h>
 
 #include "utils/log.h"
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 namespace pilecv4j {
 namespace ffmpeg

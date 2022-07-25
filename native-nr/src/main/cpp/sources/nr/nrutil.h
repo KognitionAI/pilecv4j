@@ -1,7 +1,7 @@
 #ifndef PILECV4J_NR_UTILS_H_
 #define PILECV4J_NR_UTILS_H_
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 namespace pilecv4j {
 namespace nr {

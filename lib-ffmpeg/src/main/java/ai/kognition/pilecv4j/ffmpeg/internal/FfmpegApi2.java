@@ -165,6 +165,8 @@ public class FfmpegApi2 {
      */
     public static native long pcv4j_ffmpeg2_uriMediaDataSource_create(final String sourceUri);
 
+    public static native long pcv4j_ffmpeg2_uriMediaDataSource_create2(final String fmt, final String source);
+
     public static native long pcv4j_ffmpeg2_customMediaDataSource_create();
 
     public static native long pcv4j_ffmpeg2_customMediaDataSource_set(final long nativeRef, final fill_buffer_callback vds, seek_buffer_callback seek);

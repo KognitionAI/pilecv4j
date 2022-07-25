@@ -6,7 +6,7 @@
  */
 
 #include "utils/log.h"
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #define __INSIDE_CUSTOM_MEDIA_DATA_SOURCE_CPP
 #include "sources/CustomMediaDataSource.h"

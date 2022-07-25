@@ -1,7 +1,7 @@
 #include <math.h>
 #include "nrutil.h"
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 #define TINY 1.0e-25 /*A small number.*/
 #define ITMAX 100000 /*Maximum allowed iterations.*/

@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 
 extern "C"
 {

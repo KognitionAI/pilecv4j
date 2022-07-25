@@ -42,7 +42,7 @@
 
 #include <list>
 
-#include "kog_exports.h"
+#include "common/kog_exports.h"
 using namespace std;
 
 /*
