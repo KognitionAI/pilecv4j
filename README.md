@@ -37,9 +37,22 @@ Here is a simple example to get started. We'll write java code that plays a vide
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-ffmpeg</artifactId>
-      <version>0.16</version>
+      <version>0.17</version>
     </dependency>
 ```
+
+You'll also need the platform specific native libraries. For linux you can use:
+
+``` xml
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-ffmpeg-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <version>0.17</version>
+    </dependency>
+```
+
+The currently supported `platform` values include: `linux-x86_64` and `windows-x86_64`
 
 We'll need a video file to work with. If you need one you can use the `.mp4` from here: https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/small_bunny_1080p_60fps.mp4
 
@@ -92,7 +105,6 @@ try(
     sctx.play();
 }
 ```
-
 
 ## Project Overview
 
