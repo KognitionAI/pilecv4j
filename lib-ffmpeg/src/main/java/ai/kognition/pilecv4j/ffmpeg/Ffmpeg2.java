@@ -146,11 +146,27 @@ public class Ffmpeg2 {
         public boolean select(boolean[] selection);
     }
 
+    /**
+     * You can implement a stream selector in java by passing a StreamSelectorCallback
+     * to {@link MediaProcessingChain#createStreamSelector(StreamSelectorCallback)}.
+     */
     @FunctionalInterface
     public static interface StreamSelectorCallback {
+        /**
+         * The details for all of the streams will be passed to you and you need to fill out
+         * the selection array. {@code true} means you want the stream data passed to
+         * the processing.
+         *
+         * @return {@code true} on success. {@code false} on failure.
+         */
         public boolean select(StreamDetails[] details, boolean[] selection);
     }
 
+    /**
+     * Calling {@link Ffmpeg2.StreamContext#openChain(String)} returns a {@link Ffmpeg2.MediaProcessingChain}
+     * which represents a selection of streams and a number of processes that operate on those
+     * streams.
+     */
     public static class MediaProcessingChain extends MediaProcessor {
 
         private StreamSelector selector = null;
@@ -229,7 +245,7 @@ public class Ffmpeg2 {
             });
         }
 
-        public MediaProcessingChain createStreamSelector(final RawStreamSelectorCallback callback) {
+        private MediaProcessingChain createStreamSelector(final RawStreamSelectorCallback callback) {
             final var ssc = new select_streams_callback() {
 
                 @Override
@@ -391,6 +407,73 @@ public class Ffmpeg2 {
         return new StreamContext(nativeRef);
     }
 
+    /**
+     * <p>
+     * A {@link StreamContext} represents the coupling of an input source to a set of
+     * processing on the media streams in that source. It's also a builder for declaring
+     * the media source and that processing to be done.
+     * </p>
+     * <p align="center">
+     * Fig 1.
+     * </p>
+     * <p align="center">
+     * <img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/Stream%20Context.png" width="500">
+     * </p>
+     *
+     * <p>
+     * <ul>
+     * <li><b>MediaDataSource:</b> The MediaDataSource is responsible for connecting to
+     * a source of media data. There are two main types of MediaDataSource.
+     * <ul>
+     * <li>The first is a simple URI based input which is instantiated when you use
+     * {@link #createMediaDataSource(String)}. This is the same as the {@code -i} option
+     * passed to the {@code ffmpeg} command line.</li>
+     * <li>The second is a custom data source where you can supply raw media stream data
+     * dynamically by supplying a {@link MediaDataSupplier} callback implementation and
+     * optionally a {@link MediaDataSeek} implementation. These will be called by the
+     * system in order to fetch more data or, when a {@link MediaDataSeek} is supplied,
+     * move around in the stream.</li>
+     * </ul>
+     * </li>
+     * <li><b>MediaProcessingChain:</b> Data packets from the MediaDataSource are passed
+     * to a series of {@link MediaProcessingChain}s. {@link MediaProcessingChain}s are added
+     * to a {@link StreamContext} using the {@link #openChain(String)} call.
+     * {@link MediaProcessingChain}s couple a means of selecting which media streams from
+     * the MediaDataSource are to be processed with the series of processing.
+     * <ul>
+     * <li><em>StreamSelector:</em> A {@link StreamSelector} sets up a simple filter that will only
+     * allow packets from the selected streams through to be processed by the {@link MediaProcessor}s.
+     * A {@link StreamSelector} is added to a {@link MediaProcessingChain} by calling one of the
+     * {@code create*StreamSelector(...)} methods.</li>
+     * <li><em>MediaProcessor:</em> A set of {@link MediaProcessor}s can then process the packets
+     * that make it through the selection filter. There are currently two main processors but this
+     * will likely grow in the future:
+     * <ul>
+     * <li>A uri remuxer: This will allow the packets to be remuxed and output to a given URI.
+     * You add a remuxer using the call {@link MediaProcessingChain#createUriRemuxer(String)}</li>
+     * <li>A frame processor: The packets will be fully decoded and the frames will be passed
+     * to the callback provided. A frame processor can be added by calling
+     * {@link MediaProcessingChain#createVideoFrameProcessor(VideoFrameConsumer)}</li>
+     * </ul>
+     * </li>
+     * </ul>
+     * </li>
+     * </ul>
+     * </p>
+     * <p>
+     * The processing can then be kicked off by calling {@link #play()} on the fully configured
+     * {@link StreamContext}
+     * </p>
+     * <h3>Additional Information</h3>
+     * <p>
+     * A {@link StreamContext} goes through the following internal states:
+     * <ul>
+     * <li>FRESH - When a context is instantiated, it's in this state.</li>
+     * <li>OPEN - The media data source is opened
+     * (<a href="https://ffmpeg.org/doxygen/3.4/group__lavf__decoding.html#ga31d601155e9035d5b0e7efedc894ee49">avformat_open_input</a>).</li>
+     * </ul>
+     * </p>
+     */
     public static class StreamContext implements QuietCloseable {
         private final long nativeRef;
 
@@ -639,6 +722,9 @@ public class Ffmpeg2 {
         // MEDIA PROCESSING SUPPORT
         // ======================================================================
 
+        /**
+         * Create if it doesn't exist, or return the existing, {@link MediaProcessingChain} with the given name.
+         */
         public MediaProcessingChain openChain(final String chainName) {
             final MediaProcessingChain cur = mediaProcesingChainsMap.get(chainName);
             if(cur != null)
@@ -650,6 +736,16 @@ public class Ffmpeg2 {
             return manage(new MediaProcessingChain(chainName, nativeRef, this));
         }
 
+        /**
+         * Because it's confusing as to whether or not you're always opening a new chain
+         * when you call this, you should be explicit and use {@link #openChain(String)}
+         *
+         * @deprecated use {@link #openChain(String)}
+         * @return if it doesn't already exist, a newly created {@link MediaProcessingChain}
+         * with the name {@link Ffmpeg2#DEFAULT_CHAIN_NAME}. If it does exist it will
+         * return that already created {@link MediaProcessingChain}
+         */
+        @Deprecated
         public MediaProcessingChain openChain() {
             return openChain(DEFAULT_CHAIN_NAME);
         }
@@ -680,7 +776,7 @@ public class Ffmpeg2 {
     public static class StreamingEncoder implements QuietCloseable {
         private static final AtomicLong threadCount = new AtomicLong(0);
 
-        private final VideoEncoder ctx;
+        private final VideoEncoder videoEncoder;
         private boolean deepCopy = false;
 
         private final AtomicBoolean stopMe = new AtomicBoolean(false);
@@ -705,7 +801,7 @@ public class Ffmpeg2 {
         }
 
         private StreamingEncoder(final VideoEncoder ctx) {
-            this.ctx = ctx;
+            this.videoEncoder = ctx;
         }
 
         public StreamingEncoder deepCopy(final boolean deepCopy) {
@@ -728,7 +824,7 @@ public class Ffmpeg2 {
         }
 
         public EncodingContext encodingContext() {
-            return ctx.encodingContext();
+            return videoEncoder.encodingContext();
         }
 
         @Override
@@ -738,7 +834,7 @@ public class Ffmpeg2 {
             if(encoderThread.isAlive())
                 LOGGER.warn("Failed to stop the encoder thread.");
 
-            ctx.close();
+            videoEncoder.close();
         }
 
         private void start() {
@@ -770,7 +866,7 @@ public class Ffmpeg2 {
                     }
 
                     try {
-                        ctx.encode(toEncode.frame, toEncode.isRgb);
+                        videoEncoder.encode(toEncode.frame, toEncode.isRgb);
                     } catch(final RuntimeException rte) {
                         failure.set(rte);
                         break;
@@ -786,6 +882,8 @@ public class Ffmpeg2 {
 
         public class VideoEncoder implements QuietCloseable {
             private final long nativeRef;
+            boolean inputIsRgb = false;
+
             int fps = DEFAULT_FPS;
             boolean closed = false;
             boolean enabled = false;
@@ -828,6 +926,7 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final Mat frame, final boolean isRgb) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
+                inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
                     se.start();
@@ -835,7 +934,9 @@ public class Ffmpeg2 {
             }
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride) {
+                inputIsRgb = isRgb;
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable2(nativeRef, isRgb ? 1 : 0, width, height, stride));
+                inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
                     se.start();
@@ -844,6 +945,7 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable3(nativeRef, isRgb ? 1 : 0, width, height));
+                inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
                     se.start();
@@ -852,6 +954,7 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final Mat frame, final boolean isRgb, final int destWidth, final int destHeight) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable4(nativeRef, frame.nativeObj, isRgb ? 1 : 0, destWidth, destHeight));
+                inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
                     se.start();
@@ -860,6 +963,7 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride, final int destWidth, final int destHeight) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable5(nativeRef, isRgb ? 1 : 0, width, height, stride, destWidth, destHeight));
+                inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
                     se.start();
@@ -868,6 +972,7 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int destWidth, final int destHeight) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable6(nativeRef, isRgb ? 1 : 0, width, height, destWidth, destHeight));
+                inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
                     se.start();
@@ -876,6 +981,10 @@ public class Ffmpeg2 {
 
             public void encode(final Mat frame, final boolean isRgb) {
                 throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
+            }
+
+            public void encode(final Mat frame) {
+                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, inputIsRgb ? 1 : 0));
             }
 
             public void stop() {

@@ -53,7 +53,7 @@ public class TestFfmpegStreaming extends BaseTest {
                 .createMediaDataSource(STREAM)
                 .peek(sc -> sc.load())
                 .peek(sc -> checkerLatch.countDown())
-                .openChain()
+                .openChain("default")
                 .createUriRemuxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
                 .streamContext()
                 .sync()
@@ -107,7 +107,7 @@ public class TestFfmpegStreaming extends BaseTest {
                     ve1.setFps(details[0].fps_num / details[0].fps_den);
 
                 })
-                .openChain()
+                .openChain("default")
                 .createFirstVideoStreamSelector()
                 .createVideoFrameProcessor(f -> {
                     if(firstFrame.get()) {
@@ -154,7 +154,7 @@ public class TestFfmpegStreaming extends BaseTest {
                         .addOption("flags", "low_delay")
                         .addOption("fflags", "nobuffer")
                         .createMediaDataSource("rtmp://localhost:" + rtmpPort + "/live/feedly-id")
-                        .openChain()
+                        .openChain("default")
                         .createFirstVideoStreamSelector()
                         .createVideoFrameProcessor(m -> {
                             if(id != null) {

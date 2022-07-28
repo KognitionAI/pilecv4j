@@ -6,6 +6,7 @@ import java.net.URI;
 import net.dempsy.vfs.Vfs;
 
 public class BaseTest {
+    public static final int MEG = 1024 * 1024;
 
     public static final boolean SHOW;
 

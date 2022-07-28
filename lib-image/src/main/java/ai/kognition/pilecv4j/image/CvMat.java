@@ -19,7 +19,7 @@ import net.dempsy.util.QuietCloseable;
  * <p>
  * This class is an easier (perhaps) and more efficient interface to an OpenCV
  * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
- * than the one available through the offical Java wrapper. It includes more efficient resource
+ * than the one available through the official Java wrapper. It includes more efficient resource
  * management as an {@link AutoCloseable} and the ability to do more <em>"zero-copy"</em>
  * image manipulations than is typically available in OpenCVs default Java API.
  * </p>
@@ -48,8 +48,8 @@ import net.dempsy.util.QuietCloseable;
  * <p>
  * This is why, as you may have experienced if you've used OpenCV's Java API in a larger
  * video system, you can rapidly run out of memory. Creating a Mat for each high resolution
- * video frame but lettingthe JVM garbage collector decide when to delete these objects as
- * you create will eventually (usually rapidly) fill the available system memory since the
+ * video frame but letting the JVM garbage collector decide when to delete these objects as
+ * you create will eventually (sometimes rapidly) fill the available system memory since the
  * garbage collector is unaware of how much of that computer memory is actually being
  * utilized by these <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>s.
  * </p>

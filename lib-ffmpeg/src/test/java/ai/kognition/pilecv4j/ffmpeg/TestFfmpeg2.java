@@ -75,7 +75,7 @@ public class TestFfmpeg2 extends BaseTest {
         try(final StreamContext c = Ffmpeg2.createStreamContext();) {
             c
                 .createMediaDataSource(STREAM)
-                .openChain()
+                .openChain("default")
                 .createFirstVideoStreamSelector()
                 .createVideoFrameProcessor(f -> {
                     if(frameCount.getAndIncrement() > 50L) {
@@ -111,7 +111,7 @@ public class TestFfmpeg2 extends BaseTest {
                     details.ref = s.getStreamDetails();
                     System.out.println(Arrays.toString(details.ref));
                 })
-                .openChain()
+                .openChain("default")
                 .createFirstVideoStreamSelector()
                 .createVideoFrameProcessor(f -> {
                     frameCount.getAndIncrement();
@@ -180,12 +180,12 @@ public class TestFfmpeg2 extends BaseTest {
                             return -1;
                         return pos.val;
                     })
-                .openChain()
+                .openChain("default")
                 .createFirstVideoStreamSelector()
 
                 // test the double open
                 .streamContext()
-                .openChain()
+                .openChain("default")
 
                 .createVideoFrameProcessor(f -> {
                     frameCount.getAndIncrement();
@@ -215,7 +215,7 @@ public class TestFfmpeg2 extends BaseTest {
             c
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
-                .openChain()
+                .openChain("default")
                 .createUriRemuxer(destination.getAbsolutePath())
                 .streamContext()
                 .optionally(sync, s -> s.sync())
@@ -231,7 +231,7 @@ public class TestFfmpeg2 extends BaseTest {
                 final StreamContext c = Ffmpeg2.createStreamContext();) {
                 c
                     .createMediaDataSource(destination.toURI())
-                    .openChain()
+                    .openChain("default")
                     .createFirstVideoStreamSelector()
                     .createVideoFrameProcessor(f -> {
                         try(final CvMat rgb = f.bgr(false);) {
@@ -292,7 +292,7 @@ public class TestFfmpeg2 extends BaseTest {
                     ve2.setFps(details[0].fps_num / details[0].fps_den);
 
                 })
-                .openChain()
+                .openChain("default")
                 .createFirstVideoStreamSelector()
                 .createVideoFrameProcessor(f -> {
                     if(firstFrame.get()) {
@@ -331,7 +331,7 @@ public class TestFfmpeg2 extends BaseTest {
                 final StreamContext c = Ffmpeg2.createStreamContext();) {
                 c
                     .createMediaDataSource(destination.toURI())
-                    .openChain()
+                    .openChain("default")
                     // with the following commented out, all streams will be selected.
                     // .createFirstVideoStreamSelector()
                     .createVideoFrameProcessor(f -> {
@@ -379,7 +379,7 @@ public class TestFfmpeg2 extends BaseTest {
                     final var details = s.getStreamDetails();
                     ve1.setEncodingParameters(details[0].fps_num / details[0].fps_den, 4 * 16 * MEG, 8 * MEG, 8 * MEG);
                 })
-                .openChain()
+                .openChain("default")
                 .createStreamSelector((sd, res) -> {
                     boolean found = false;
                     for(int i = 0; i < sd.length; i++) {
@@ -424,7 +424,7 @@ public class TestFfmpeg2 extends BaseTest {
                 final StreamContext c = Ffmpeg2.createStreamContext();) {
                 c
                     .createMediaDataSource(destination.toURI())
-                    .openChain()
+                    .openChain("default")
                     .createFirstVideoStreamSelector()
                     .createVideoFrameProcessor(f -> {
                         try(final CvMat rgb = f.bgr(false);) {
