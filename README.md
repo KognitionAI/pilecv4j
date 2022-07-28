@@ -199,7 +199,8 @@ As an example of using OpenCv Mat's as Java resource (ie `Closeable`s), here is 
 try(final CvMat mat = CvMat.move(Imgcodecs.imread(IMAGE_FILE_NAME, Imgcodecs.IMREAD_UNCHANGED));) {
     // Do something with the loaded mat. For example, flip it around the X axis:
     Core.flip(mat, mat, 0);
-} // <- At this point all of the mat resources will be freed. It wont wait for the garbage collector and finalizer.
+} // <- At this point all of the mat resources will be freed.
+  // It wont wait for the garbage collector and finalizer.
 ```
 
 A `CvMat` is a Pilecv4j class that inherits from OpenCv's `Mat` so it can be used directly in any OpenCv API method. 
@@ -214,7 +215,8 @@ public CvMat getFlippedMat(final String filename) {
         // Do something with the loaded mat. For example, flip it around the X axis:
         Core.flip(mat, mat, 0);
         return mat.returnMe();
-    } // <- At this point all of the mat resources will be freed. It wont wait for the garbage collector and finalizer.
+    } // <- At this point all of the mat resources will be freed.
+      // It wont wait for the garbage collector and finalizer.
 }
 ```
 
@@ -306,6 +308,7 @@ If the underlying source of data is seekable, you can optionally supply an imple
 ```
 
 The values for `whence` can be `Ffmpeg2.SEEK_SET`, `Ffmpeg2.SEEK_CUR`, or `Ffmpeg2.SEEK_END`. These values are synonymous with the C language stdio parameters to the function [fseek()](https://man7.org/linux/man-pages/man3/fseek.3.html). From the man page:
+
 > The [...] function sets the [...] position indicator for the
 > stream [...].  The new position, measured in bytes, is obtained
 > by adding offset bytes to the position specified by whence.
@@ -324,11 +327,11 @@ To process media data you need to add at least one `MediaProcessingChain` using 
         ...
 ```
 
-The string passed to `openChain` can be anything you wand and is simply for disambiguation later on. You can re-open any given chain by passing the same string to the `openChain` call again.
+The string passed to `openChain` can be anything you want and is simply for disambiguation later on. You can re-open any given chain by passing the same string to the `openChain` call again.
 
 A `MediaProcessingChain` contains at most one `StreamSelector` and one or more `MediaProcessor`s. 
 
-Sources for media data, for example, an MP4 file, contain multiple streams of media data. Video streams, audio streams, subtitle streams, and data streams. A `StreamSelector` sets up a simple filter that determines which streams are going to be processed in this `MediaProcessingChain`. A `StreamSelector` is added to a `MediaProcessingChain` by calling one of the `create*StreamSelector(...)` methods.
+Since sources for media data, for example, an MP4 file, contain multiple streams (video streams, audio streams, subtitle streams, data streams). A `StreamSelector` sets up a simple filter that determines which streams are going to be processed in this `MediaProcessingChain`. A `StreamSelector` is added to a `MediaProcessingChain` by calling one of the `create*StreamSelector(...)` methods.
 
 The simplest stream selector currently available is one that will simply take the first decodable video stream in the source. To use this selector in your chain you call `createFirstVideoStreamSelector()` on an open chain:
 
@@ -354,6 +357,8 @@ You can supply a more sophisticated selection criteria by supplying a callback t
         })
         ...
 ```
+
+If you don't supply a `StreamSelector` then all packets from all streams in the media source will be selected.
 
 Finally we need to decide what we want to do with the media data that's been selected in this chain. We do that by adding a set of (at least one) `MediaProcessor`s to the chain. There are currently two different processor types that can be added to a chain. 
 
