@@ -184,15 +184,13 @@ This is a bit of an oddity but it's basically an abstraction for object tracking
 
 In OpenCV's C/C++ API, the developer is responsible for managing the resources. The Mat class in C++ references the underlying memory resources for the image data. When a C++ Mat is deleted, memory is freed (that is, as long as other Mat's aren't referring to the same image data memory, in which case when the last one is deleted, the memory is freed). This gives the developer using the C++ API fine grained control over the compute resources.
 
-However, for Java developers, it's not typical for the developer to manage memory or explicitly delete objects or free resources. Instead, they typically rely on garbage collection or *try-with-resource*. The problem with doing that in OpenCV's Java API is that the Java VM and it's garbage collector *can't see* the image memory referred to by the Mat. This memory is ["off-heap"](https://dev.to/jeissonflorez29/off-heap-memory-in-java-4dd1) from the perspective of the Java VM.
+OpenCv's Java Mat's manage native resource and rely on the class's finalizer and therefore the garbage collector, to eventually clean up those resources. This includes the raw image data. The problem with doing this is that the Java VM and it's garbage collector *can't see* the image memory referred to by the Mat. This memory is ["off-heap"](https://dev.to/jeissonflorez29/off-heap-memory-in-java-4dd1) from the perspective of the Java VM.
 
-`lib-image` is an augmentation for [OpenCv](https://opencv.org/) Java API. It's primary purpose is to allow the user to handle [OpenCv](https://opencv.org/) [Mat](https://docs.opencv.org/4.5.3/d3/d63/classcv_1_1Mat.html)s as Java resources.
-
-If you're familiar with the OpenCv Java API, then the examples in this section will be easy to follow.
+`lib-image` is an augmentation for [OpenCv](https://opencv.org/)'s Java API. It's primary purpose is to allow the user to handle [OpenCv](https://opencv.org/) [Mat](https://docs.opencv.org/4.5.3/d3/d63/classcv_1_1Mat.html)s as Java resources (that is `Closable`s).
 
 ## OpenCv Mat Resource Management
 
-As an example of using OpenCv Mat's as Java resource (ie `Closeable`s), here is an example of loading an image from disk using OpenCV's api:
+Here is an example of loading an image from disk using OpenCV's api but handling the results as a Java resource.:
 
 ``` java
 // A CvMat is an OpenCV Mat.
@@ -277,7 +275,9 @@ The first is a simple URI based data source which is defined through `StreamCont
         ...
 ```
 
-The second type of media data source is a custom data source, where you can supply raw media stream data dynamically. Using this source of media data you could, for example, play an MP4 file out of system memory. You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaDataSeek` callback. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream. You pass these callbacks to `StreamContext.createMediaDataSource(MediaDataSupplier[, MediaDataSeek])`.
+The second type of media data source is a custom data source, where you can supply raw media stream data dynamically. Using this source of media data you could, for example, play an MP4 file out of system memory. 
+
+You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaDataSeek` callback. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream. You pass these callbacks to `StreamContext.createMediaDataSource(MediaDataSupplier[, MediaDataSeek])`.
 
 ``` java
     try (final StreamContext sctx = Ffmpeg2.createStreamContext()
