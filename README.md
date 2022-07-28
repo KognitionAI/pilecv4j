@@ -531,9 +531,9 @@ After that you can start sending frames to the encoder using the `encode()` meth
         .setFps(10)
         .enable(firstFrame, false);)
     {
-        VideoEncoder encoder = ectx.getVideoEncoder("my encoder");
-        ectx.read();
+        ectx.ready();
 
+        VideoEncoder encoder = ectx.getVideoEncoder("my encoder");
         for (int i = 0; i < numberOfFrames; i++) {
             Mat frameToEncode = getImageToEncode(i);
             encoder.encode(frameToEncode);
