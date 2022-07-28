@@ -277,7 +277,7 @@ The first is a simple URI based data source which is defined through `StreamCont
         ...
 ```
 
-The second type of media data source is a custom data source, where you can supply raw media stream data dynamically by supplying a `MediaDataSupplier` callback implementation and optionally a `MediaDataSeek` callback implementation. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream.
+The second type of media data source is a custom data source, where you can supply raw media stream data dynamically. Using this source of media data you could, for example, play an MP4 file out of system memory. You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaDataSeek` callback. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream. You pass these callbacks to `StreamContext.createMediaDataSource(MediaDataSupplier[, MediaDataSeek])`.
 
 ``` java
     try (final StreamContext sctx = Ffmpeg2.createStreamContext()
@@ -292,13 +292,15 @@ The second type of media data source is a custom data source, where you can supp
 
 ```
 
-If the underlying source of data is seekable, you can optionally supply an implementation of the `MediaDataSeek` callback.
+If the underlying source of data is seekable, you can also supply an implementation of `MediaDataSeek`.
 
 ``` java
     try (final StreamContext sctx = Ffmpeg2.createStreamContext()
         .createMediaDataSource( 
+            // MediaDataSupplier
             (ByteBuffer buf, int numBytes) -> {...},
             
+            //MediaDataSeek
             (final long offset, final int whence)) -> {
                 /* move the current position in the data stream */
                 /*    to the location implied in the parameters */
@@ -307,7 +309,7 @@ If the underlying source of data is seekable, you can optionally supply an imple
         ...
 ```
 
-The values for `whence` can be `Ffmpeg2.SEEK_SET`, `Ffmpeg2.SEEK_CUR`, or `Ffmpeg2.SEEK_END`. These values are synonymous with the C language stdio parameters to the function [fseek()](https://man7.org/linux/man-pages/man3/fseek.3.html). From the man page:
+The values for `whence` that will be passed to the callback will be either `Ffmpeg2.SEEK_SET`, `Ffmpeg2.SEEK_CUR`, or `Ffmpeg2.SEEK_END`. These values are synonymous with the C language stdio parameters to the function [fseek()](https://man7.org/linux/man-pages/man3/fseek.3.html). From the man page:
 
 > The [...] function sets the [...] position indicator for the
 > stream [...].  The new position, measured in bytes, is obtained
