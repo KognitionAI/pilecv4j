@@ -681,7 +681,7 @@ public class Utils {
         // of the entire
         // destination channel (either 8-bits or 16-bits).
         final double numerator = (bitsInChannel == 0) ? maxPixelValue : ((maxPixelValue - 1) / ((1 << bitsInChannel) - 1));
-        // The denominator is basically the right-shift of the mased values so that the
+        // The denominator is basically the right-shift of the masked values so that the
         // actual channel value ends up in the LSbs of the pixel channel value
         final double factor = (numerator * additionalScaling) / divisor;
         // Convert to the correct depth and apply the adjustment
