@@ -267,7 +267,7 @@ A `StreamContext` is a Java *resource* so we should manage it using a *try-with-
 
 ### Defining The Source of Media Data
 
-There are two supported types of media data sources.
+A `StreamContext` needs exactly our source of media data. There are two supported types of media data sources.
 
 The first is a simple URI based data source which is defined through `StreamContext.createMediaDataSource(String)`. This is the same as the `-i` option passed to the `ffmpeg` command line.
 
