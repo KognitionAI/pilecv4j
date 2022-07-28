@@ -193,6 +193,7 @@ If you're familiar with the OpenCv Java API, then the examples in this section w
 ## OpenCv Mat Resource Management
 
 As an example of using OpenCv Mat's as Java resource (ie `Closeable`s), here is an example of loading an image from disk using OpenCV's api:
+
 ``` java
 // A CvMat is an OpenCV Mat.
 try(final CvMat mat = CvMat.move(Imgcodecs.imread(IMAGE_FILE_NAME, Imgcodecs.IMREAD_UNCHANGED));) {
@@ -200,11 +201,13 @@ try(final CvMat mat = CvMat.move(Imgcodecs.imread(IMAGE_FILE_NAME, Imgcodecs.IMR
     Core.flip(mat, mat, 0);
 } // <- At this point all of the mat resources will be freed. It wont wait for the garbage collector and finalizer.
 ```
+
 A `CvMat` is a Pilecv4j class that inherits from OpenCv's `Mat` so it can be used directly in any OpenCv API method. 
 
 The `CvMat.move()` method conceptually follows the [C++ move semantics](https://www.cprogramming.com/c++11/rvalue-references-and-move-semantics-in-c++11.html). In short this mean DO NOT try to use the instance that was passed to `CvMat.move()` after the call.
 
 What if I want to return a CvMat from inside of a *try-with-resource* block? You can use the `CvMat.returnMe()` method. This method should ONLY be used on the very line you're actually returning the `CvMat`. 
+
 ``` java
 public CvMat getFlippedMat(final String filename) {
     try(final CvMat mat = CvMat.move(Imgcodecs.imread(IMAGE_FILE_NAME, Imgcodecs.IMREAD_UNCHANGED));) {
@@ -213,6 +216,16 @@ public CvMat getFlippedMat(final String filename) {
         return mat.returnMe();
     } // <- At this point all of the mat resources will be freed. It wont wait for the garbage collector and finalizer.
 }
+```
+
+There are some helper methods that allow you to easily make *shallow* or *deep* copies of `Mat`s. 
+
+``` java
+public CvMat copyMe(Mat src, boolean deepCopy) {
+    try (CvMat ret = deepCopy ? CvMat.deepCopy(src) : CvMat.shallowCopy(src);) {
+        return ret.returnMe();
+    }
+} 
 ```
 
 ## Direct Bulk Access To Pixel Data From Java
@@ -261,6 +274,7 @@ The first is a simple URI based data source which is defined through `StreamCont
         .createMediaDataSource("[media uri]")
         ...
 ```
+
 The second type of media data source is a custom data source, where you can supply raw media stream data dynamically by supplying a `MediaDataSupplier` callback implementation and optionally a `MediaDataSeek` callback implementation. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream.
 
 ``` java
@@ -275,6 +289,7 @@ The second type of media data source is a custom data source, where you can supp
         ...
 
 ```
+
 If the underlying source of data is seekable, you can optionally supply an implementation of the `MediaDataSeek` callback.
 
 ``` java
@@ -308,14 +323,15 @@ To process media data you need to add at least one `MediaProcessingChain` using 
         .openChain("default")
         ...
 ```
+
 The string passed to `openChain` can be anything you wand and is simply for disambiguation later on. You can re-open any given chain by passing the same string to the `openChain` call again.
 
 A `MediaProcessingChain` contains at most one `StreamSelector` and one or more `MediaProcessor`s. 
 
-
 Sources for media data, for example, an MP4 file, contain multiple streams of media data. Video streams, audio streams, subtitle streams, and data streams. A `StreamSelector` sets up a simple filter that determines which streams are going to be processed in this `MediaProcessingChain`. A `StreamSelector` is added to a `MediaProcessingChain` by calling one of the `create*StreamSelector(...)` methods.
 
 The simplest stream selector currently available is one that will simply take the first decodable video stream in the source. To use this selector in your chain you call `createFirstVideoStreamSelector()` on an open chain:
+
 
 ``` java
     try (final StreamContext sctx = Ffmpeg2.createStreamContext()
@@ -324,7 +340,9 @@ The simplest stream selector currently available is one that will simply take th
         .createFirstVideoStreamSelector()
         ...
 ```
+
 You can supply a more sophisticated selection criteria by supplying a callback that will be passed the details of each stream and needs to return `true` if the stream is to be processed; `false` otherwise.
+
 
 ``` java
     try (final StreamContext sctx = Ffmpeg2.createStreamContext()
@@ -349,6 +367,7 @@ The first is a remuxer that will remux the selected input stream to a given outp
         .createUriRemuxer(DESTINATION_URI)
         ...
 ```
+
 where the `DESTINATION_URI` is a string pointing to any output supported by ffmpeg including a file or a stream. When pointing to a stream you can explicitly define the format to use. For example:
 
 ``` java
@@ -356,6 +375,7 @@ where the `DESTINATION_URI` is a string pointing to any output supported by ffmp
        .createUriRemuxer("flv", "rtmp://myhost:1935/live...")
        ...
 ```
+
 The second type of `MediaProcessor` provides access to video frames from the selected video feeds. You supply a callback that will be given `VideoFrame`s.
 
 ``` java
@@ -370,6 +390,7 @@ The second type of `MediaProcessor` provides access to video frames from the sel
 ```
 
 A `VideoFrame` is a `CvMat` and so is also an OpenCV `Mat` and therefore can be used in any OpenCV Java API that supports Mat's. It's also coupled with a flag that tells if the color format of the data in the Mat is BGR, which is the OpenCV standard, or RGB, which is pretty much everyone else's standard. The underlying media source does the least amount of conversion necessary but will prefer RGB over BGR because most non-OpenCV (most deep learning models for example) prefer that format. However, there are a few convenience methods for handling this:
+
 ``` java
     ...
     .createVideoFrameProcessor((VideoFrame frame) -> {
@@ -434,13 +455,17 @@ You need to select at least one encoder to add to the context. You can do that w
         .openVideoEncoder("libx264", "my encoder")
         ...
 ```
+
 The first parameter is the name of an FFMpeg support encoder. The second parameter is an arbitrary name to distinguish multiple encoders. There's a convenience method that takes just one parameter and set the name and codec to the same value.
+
 ``` java
         ...
         .openVideoEncoder("libx264")
         ...
 ```
+
 You can fine tune the parameters for the codec using `addCodecOption`. You can add as many options as you want. These options are often codec specific and documented in the Ffmpeg documentation.
+
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
         .outputStream(OUTPUT_FILE_OR_STREAM_URI)
@@ -449,7 +474,9 @@ You can fine tune the parameters for the codec using `addCodecOption`. You can a
         .addCodecOptions("crf", "40")
         ...
 ```
+
 You should set the encoder's frame rate explicitly using `setFps`. If you don't it will default to 30.
+
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
         .outputStream(OUTPUT_FILE_OR_STREAM_URI)
@@ -457,13 +484,17 @@ You should set the encoder's frame rate explicitly using `setFps`. If you don't 
         .setFps(10)
         ...
 ```
+
 You need to initialize (`enable`) the encoder with the appropriate details of what the encoder will see and should produce. This should be done AFTER all of the `addCodecOptions` are applied. Once the encoder is "enabled" it will fail if you try to add more options.
 
 Enabling the encoder applies the options and sets up the transform necessary to convert the input to the output. The main `enable` call takes the following:
+
 ``` java
-enable(final boolean isRgb, final int inputImageWidth, final int inputImageHeight, final int inputImageStride,
+enable(final boolean isRgb, final int inputImageWidth, 
+       final int inputImageHeight, final int inputImageStride,
        final int destWidth, final int destHeight)
 ```
+
 - isRgb - this should be true if the input `Mat`s will be RGB. If BGR, it should be false., 
 - inputImageWidth - the width of the input images
 - inputImageHeight - the height of the input images
@@ -472,9 +503,11 @@ enable(final boolean isRgb, final int inputImageWidth, final int inputImageHeigh
 - destHeight - the height of the encoded video's frames
 
 There are several convenience methods that take a `Mat` and will assume the input and output dimensions are the same. The `enable` with the shortest signature is:
+
 ``` java
 enable(final Mat mat, final boolean isRgb)
 ```
+
 This call will assume the mat is a frame from the input and use those dimensions. It will also assume that the input and the output are the same. There are several other overloaded `enable` methods. See the javadocs for more details.
 
 Once each of the `VideoEncoder`s are *enabled*, the `EncodingContext` can be told using the `ready()` method.
