@@ -37,26 +37,11 @@ public class UtilsForTesting {
         return lookup[(ret > 255 ? 255 : (int)ret)];
     }
 
-    // static void getLinearRGB8TosRGB8LUT(final int[] l8Tos8) {
-    // float input, output;
-    // // algorithm for linear RGB to nonlinear sRGB conversion
-    // // is from the IEC 61966-2-1 International Standard,
-    // // Colour Management - Default RGB colour space - sRGB,
-    // // First Edition, 1999-10,
-    // // available for order at http://www.iec.ch
-    // for(int i = 0; i <= 255; i++) {
-    // input = (i) / 255.0f;
-    // if(input <= 0.0031308f) {
-    // output = input * 12.92f;
-    // } else {
-    // output = 1.055f * ((float)Math.pow(input, (1.0 / 2.4)))
-    // - 0.055f;
-    // }
-    // l8Tos8[i] = Math.min(255, Math.round(output * 255.0f));
-    // }
-    // }
-
     public static void compare(final CvMat mat, final BufferedImage im) {
+        compare(mat, im, -1);
+    }
+
+    public static void compare(final CvMat mat, final BufferedImage im, final int tol) {
         final boolean hasAlpha = im.getColorModel().hasAlpha();
 
         final int[] lookup = new int[256];
@@ -81,11 +66,12 @@ public class UtilsForTesting {
         }
 
         final Integer pixDeltaInt = biTypeToPixDelta.get(im.getType());
-        final int pixDelta = Math.max(2, Math.min(2, pixDeltaInt == null ? IntStream.range(0, lookup.length - 1)
-            .map(i -> lookup[i + 1] - lookup[i])
-            .max()
-            .getAsInt()
-            : pixDeltaInt.intValue()));
+        final int pixDelta = tol != -1 ? tol
+            : Math.max(2, Math.min(2, pixDeltaInt == null ? IntStream.range(0, lookup.length - 1)
+                .map(i -> lookup[i + 1] - lookup[i])
+                .max()
+                .getAsInt()
+                : pixDeltaInt.intValue()));
 
         final int channels = mat.channels();
         assertTrue(hasAlpha ? channels > 3 || channels == 2 : true);
