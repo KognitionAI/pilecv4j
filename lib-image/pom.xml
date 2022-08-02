@@ -5,7 +5,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>0.17</version>
+    <version>0.18-SNAPSHOT</version>
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-image</artifactId>
@@ -91,14 +91,31 @@
       <artifactId>jai-imageio-jpeg2000</artifactId>
       <optional>true</optional>
     </dependency>
+    
+    <!-- Twelvemonkey's ImageIO plugins -->
     <dependency>
       <groupId>com.twelvemonkeys.imageio</groupId>
-      <artifactId>imageio-tiff</artifactId>
+      <artifactId>imageio-bmp</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>com.twelvemonkeys.imageio</groupId>
-      <artifactId>imageio-bmp</artifactId>
+      <artifactId>imageio-hdr</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-icns</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-iff</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-jpeg</artifactId>
       <optional>true</optional>
     </dependency>
     <dependency>
@@ -108,10 +125,54 @@
     </dependency>
     <dependency>
       <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-pdf</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
       <artifactId>imageio-pict</artifactId>
       <optional>true</optional>
     </dependency>
-    
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-pnm</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-psd</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-sgi</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-tga</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-thumbsdb</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-tiff</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-webp</artifactId>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>com.twelvemonkeys.imageio</groupId>
+      <artifactId>imageio-xwd</artifactId>
+      <optional>true</optional>
+    </dependency>
     
     <!-- Testing -->
     <dependency>
