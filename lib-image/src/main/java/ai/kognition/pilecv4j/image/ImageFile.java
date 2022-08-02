@@ -27,6 +27,8 @@ import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.ImageWriteParam;
 import javax.imageio.ImageWriter;
+import javax.imageio.spi.IIORegistry;
+import javax.imageio.spi.ImageReaderSpi;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageOutputStream;
 
@@ -38,21 +40,73 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.opencv.core.Mat;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import net.dempsy.util.Functional;
+import net.dempsy.util.MutableInt;
+
 public class ImageFile {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
+
+    private static List<String> readerClassPrefixOrder = List.of("com.twelvemonkeys.imageio", "com.github.jaiimageio.");
+
     static {
         CvMat.initOpenCv();
-    }
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
+        final Map<String, Long> lookupIndex = new HashMap<>();
+        final MutableInt count = new MutableInt(0);
+        for(final String prefix: readerClassPrefixOrder) {
+            lookupIndex.put(prefix, count.val);
+            count.val += 10000;
+        }
+
+        final var registry = IIORegistry.getDefaultInstance();
+
+        LOGGER.trace("Sorted ImageIO ImageReaderSpis:");
+        final var spis = Functional.iteratorAsStream(registry.getServiceProviders(ImageReaderSpi.class, true))
+            .map(r -> {
+                final String readerClassName = r.getClass().getName();
+                // find the string from the list that starts the classname of the reader.
+                final String lookup = readerClassPrefixOrder.stream()
+                    .filter(s -> readerClassName.startsWith(s))
+                    .findFirst()
+                    .orElse(null);
+
+                final long rank;
+                if(lookup == null)
+                    rank = count.val++;
+                else {
+                    rank = lookupIndex.get(lookup);
+                    // replace the index to compensate for more readers that have the same prefix
+                    lookupIndex.put(lookup, rank + 1);
+                }
+
+                return Pair.of(rank, r);
+            })
+            .sorted((l, r) -> l.getLeft().intValue() - r.getLeft().intValue())
+            .map(p -> p.getRight())
+            .peek(i -> LOGGER.trace("   {}", i))
+            .collect(Collectors.toList());
+
+        ImageReaderSpi prev = null;
+        for(final var c: spis) {
+            if(prev != null)
+                registry.setOrdering(ImageReaderSpi.class, prev, c);
+            prev = c;
+        }
+
+    }
 
     /**
      * <p>
@@ -93,7 +147,6 @@ public class ImageFile {
      * </p>
      */
     public static BufferedImage readBufferedImageFromFile(final String filename, final int imageNumber) throws IOException, IndexOutOfBoundsException {
-        LOGGER.trace("Reading BufferedImage from {}", filename);
         return doReadBufferedImageFromFile(filename, true, imageNumber);
     }
 
@@ -223,7 +276,8 @@ public class ImageFile {
         if(!f.exists())
             throw new FileNotFoundException(filename);
 
-        try(final CvMat mat = CvMat.move(Imgcodecs.imread(filename, mode));) {
+        final Mat omat = Imgcodecs.imread(filename, mode);
+        try(final CvMat mat = omat == null || omat.dataAddr() == 0 ? null : CvMat.move(omat);) {
             if(tryOther && (mat == null || (mat.rows() == 0 && mat.cols() == 0))) {
                 LOGGER.warn("OCV Failed to read '" + filename + "' using OpenCV");
                 try {
@@ -288,15 +342,14 @@ public class ImageFile {
             throw new FileNotFoundException(filename);
 
         Exception lastException = null;
-        int cur = 1;
+        int cur = 0;
         while(true) {
             try(ReaderAndStream ras = getNextReaderAndStream(f, cur)) {
                 if(ras != null) {
                     final ImageReader reader = ras.reader;
                     final ImageReadParam param = reader.getDefaultReadParam();
                     try {
-                        System.out.println(reader);
-                        LOGGER.trace("IIO attempt {}. Trying to read {} using reader {}", cur, filename, reader);
+                        LOGGER.trace("IIO attempt {}. Using reader {} to read {} ", cur, reader, filename);
                         final BufferedImage image = reader.read(imageNumber, param);
                         return image;
                     } catch(final IndexOutOfBoundsException ioob) {
@@ -348,6 +401,148 @@ public class ImageFile {
         LOGGER.trace("IIO Read {} from {}", ret, filename);
         return ret;
     }
+
+    // private static class ReadersAndStream implements AutoCloseable {
+    // public final List<ImageReader> readers;
+    // private ImageInputStream stream;
+    // private final File file;
+    //
+    // public ReadersAndStream(final List<ImageReader> readers, final ImageInputStream stream, final File source) {
+    // this.readers = readers;
+    // this.stream = stream;
+    // this.file = source;
+    // }
+    //
+    // public ImageInputStream initReader(final ImageReader r) throws IOException {
+    // if(stream == null)
+    // stream = ImageIO.createImageInputStream(file);
+    //
+    // final ImageInputStream ret = stream;
+    // stream = null;
+    // r.setInput(ret, true, true);
+    // return ret;
+    // }
+    //
+    // @Override
+    // public void close() throws IOException {
+    // if(stream != null)
+    // stream.close();
+    // }
+    // }
+    //
+    // private static ReadersAndStream getReadersAndStream(final File f, final List<String> order) throws IOException {
+    // final ImageInputStream input = ImageIO.createImageInputStream(f);
+    //
+    // final Map<String, Long> lookupIndex = new HashMap<>();
+    // final MutableInt count = new MutableInt(0);
+    // for(final String prefix: order) {
+    // lookupIndex.put(prefix, count.val);
+    // count.val += 10000;
+    // }
+    //
+    // final Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+    //
+    // final List<ImageReader> retReaders = Functional.iteratorAsStream(readers)
+    // .map(r -> {
+    // final String readerClassName = r.getClass().getName();
+    // // find the string from the list that starts the classname of the reader.
+    // final String lookup = order.stream()
+    // .filter(s -> readerClassName.startsWith(s))
+    // .findFirst()
+    // .orElse(null);
+    //
+    // final long rank;
+    // if(lookup == null)
+    // rank = count.val++;
+    // else {
+    // rank = lookupIndex.get(lookup);
+    // // replace the index to compensate for more readers that have the same prefix
+    // lookupIndex.put(lookup, rank + 1);
+    // }
+    //
+    // return Pair.of(rank, r);
+    // })
+    // .sorted((l, r) -> l.getLeft().intValue() - r.getLeft().intValue())
+    // .map(p -> p.getRight())
+    // .collect(Collectors.toList());
+    //
+    // return new ReadersAndStream(retReaders, input, f);
+    // }
+    //
+    // private static BufferedImage doReadBufferedImageFromFile(final String filename, final boolean tryOther, final int imageNumber) throws IOException {
+    // final File f = new File(filename);
+    // if(!f.exists())
+    // throw new FileNotFoundException(filename);
+    //
+    // try (final ImageInputStream input = ImageIO.createImageInputStream(f);) {
+    //
+    // }
+    //
+    //
+    // Exception lastException = null;
+    // try(ReadersAndStream ras = getReadersAndStream(f, readerClassPrefixOrder)) {
+    // if(ras.readers.size() > 0) {
+    // int cur = 0;
+    // for(final ImageReader reader: ras.readers) {
+    // try(var q = ras.initReader(reader);) {
+    // final ImageReadParam param = reader.getDefaultReadParam();
+    // try {
+    // LOGGER.trace("IIO attempt {}. Trying to read {} using reader {}", cur, filename, reader);
+    // final BufferedImage image = reader.read(imageNumber, param);
+    // return image;
+    // } catch(final IndexOutOfBoundsException ioob) {
+    // // TODO: distinguish between IndexOutOfBoundsException because imageNumber is
+    // // too high and IndexOutOfBoundsException for some other reason.
+    // // if(imageNumber == 0) { // then this is certainly NOT because the imageNumber is too high
+    // LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioob);
+    // lastException = ioob;
+    // // }
+    // // else {
+    // // throw ioob; // for now, assume the reason this happened is because the imageNumber is too
+    // // // high but there needs to be a better solution. Perhaps distinguish between
+    // // // IndexOutOfBoundsException and ArrayIndexOutOfBoundsException for example
+    // // }
+    // } catch(final IOException | RuntimeException ioe) {
+    // LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioe);
+    // lastException = ioe;
+    // } finally {
+    // reader.dispose();
+    // }
+    // }
+    // cur++;
+    // }
+    // } else
+    // LOGGER.debug("IIO No ImageIO reader's available for {}", filename);
+    // }
+    //
+    // // LOGGER.debug("IIO No more ImageIO readers to try for {}", filename);
+    //
+    // LOGGER.info("IIO Failed to read '{}' using ImageIO", filename);
+    // if(!tryOther)
+    // throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in ImageIO");
+    //
+    // BufferedImage ret = null;
+    // try(final CvMat mat = doReadMatFromFile(filename, false, IMREAD_UNCHANGED);) {
+    // if(mat == null) {
+    // if(lastException != null)
+    // throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in either ImageIO or OpenCv", lastException);
+    // else {
+    // // Last ditch effort
+    // final TIFFImage tim = TiffReader.readTiff(f);
+    // final List<FileDirectory> directories = tim.getFileDirectories();
+    // final FileDirectory directory = directories.get(0);
+    // final Rasters rasters = directory.readRasters();
+    // Utils.mat2Img(TiffUtils.createCvMatFromTiffRasters(rasters));
+    // throw new IllegalArgumentException("Can't read '" + filename + "' as an image. No codec worked in either ImageIO or OpenCv");
+    // }
+    // }
+    // // if(filename.endsWith(".jp2") && CvType.channels(mat.channels()) > 1)
+    // // Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
+    // ret = Utils.mat2Img(mat);
+    // }
+    // LOGGER.trace("IIO Read {} from {}", ret, filename);
+    // return ret;
+    // }
 
     private static boolean doWrite(final BufferedImage ri, final String filename) throws IOException {
         LOGGER.trace("Writing image {} to {}", ri, filename);
