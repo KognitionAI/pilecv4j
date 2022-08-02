@@ -5,7 +5,7 @@
   <parent>
     <groupId>ai.kognition.pilecv4j</groupId>
     <artifactId>pilecv4j-settings</artifactId>
-    <version>0.17</version>
+    <version>0.18-SNAPSHOT</version>
     <relativePath>../settings/pom.xml</relativePath>
   </parent>
 
@@ -18,7 +18,7 @@
     <tensorflow-core-api.version>0.4.0</tensorflow-core-api.version>    
     <slf4j.version>1.7.30</slf4j.version>
 
-    <dempsy-commons.version>2.4.0</dempsy-commons.version>
+    <dempsy-commons.version>2.4.1-SNAPSHOT</dempsy-commons.version>
     
     <commons.cli.version>1.4</commons.cli.version>
     <tiff-java.version>2.0.1</tiff-java.version>
@@ -127,7 +127,7 @@
       <dependency> <!-- This is only necessary if you're going to use TiffUtils -->
        <groupId>mil.nga</groupId>
        <artifactId>tiff</artifactId>
-       <version>2.0.0</version>
+       <version>3.0.0</version>
       </dependency>
       <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
       <dependency>
@@ -143,7 +143,7 @@
       <dependency> <!-- These are redundant and so optional but make the system more robust -->
         <groupId>com.twelvemonkeys.bom</groupId>
         <artifactId>bom</artifactId>
-        <version>3.4.1</version>
+        <version>3.8.2</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>
