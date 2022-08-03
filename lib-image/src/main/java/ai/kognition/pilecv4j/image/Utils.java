@@ -323,11 +323,16 @@ public class Utils {
     }
 
     /**
-     * You can use this method to dump the contents of a {@link CvRaster} to the
-     * {@link PrintStream}.
-     * Please note this is a really bad idea for large images but can help with
-     * debugging problems when
-     * you're using OpenCV for it's linear-algebra/matrix capabilities.
+     * <p>
+     * You can use this method to dump the contents of a
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to
+     * the {@link PrintStream}.
+     * </p>
+     *
+     * <p>
+     * Please note this is a really bad idea for large images but can help with debugging
+     * problems when you're using OpenCV for it's linear-algebra/matrix capabilities.
+     * </p>
      *
      * @param mat to dump print to the {@link PrintStream}
      * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
@@ -340,18 +345,42 @@ public class Utils {
         CvMat.rasterAp(mat, raster -> dump(raster, out, numRows, numCols));
     }
 
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
     public static CvMat letterbox(final Mat mat, final Size networkDim) {
         return letterbox(mat, networkDim, DEFAULT_PADDING);
     }
 
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
     public static CvMat letterbox(final Mat mat, final int dim) {
         return letterbox(mat, new Size(dim, dim), DEFAULT_PADDING);
     }
 
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
     public static CvMat letterbox(final Mat mat, final int dim, final Scalar padding) {
         return letterbox(mat, new Size(dim, dim), padding);
     }
 
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
     public static CvMat letterbox(final Mat mat, final Size networkDim, final Scalar padding) {
         // may want to return these
         final int top, bottom, left, right;
@@ -421,12 +450,16 @@ public class Utils {
     }
 
     /**
+     * <p>
      * You can use this method to dump the contents of a
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to
      * the {@link PrintStream}.
-     * Please note this is a really bad idea for large images but can help with
-     * debugging problems when
-     * you're using OpenCV for it's linear-algebra/matrix capabilities.
+     * </p>
+     *
+     * <p>
+     * Please note this is a really bad idea for large images but can help with debugging
+     * problems when you're using OpenCV for it's linear-algebra/matrix capabilities.
+     * </p>
      *
      * @param raster to dump print to the {@link PrintStream}
      * @param out is the {@link PrintStream} to dump the {@link CvRaster} to.
@@ -660,7 +693,6 @@ public class Utils {
                         // System.out.println("CxK:");
                         // dump(c, 1, 51);
                         // })
-                        // TODO, change 255 to the right number depending on the size.
                         .map(c -> chain(c, m -> Core.multiply(m, new Scalar(1.0D / maxValue), m)))
                         // .peek(c -> {
                         // System.out.println("CxK/255:");
@@ -671,7 +703,6 @@ public class Utils {
                         // System.out.println("CxK/255 masked:");
                         // dump(c, 1, 51);
                         // })
-                        // TODO, change CvType.CV_8U to the right number depending on the size.
                         .map(c -> chain(c, m -> m.convertTo(c, CvType.makeType(pcmykMat.depth(), 1))))
                         // .peek(c -> {
                         // System.out.println("CxK/255 -> 8U:");
@@ -968,117 +999,6 @@ public class Utils {
         }
     }
 
-    // All DirectColorModel values are stored RGBA. We want them reorganized a BGRA
-    private static int[] bgraOrderDcm = {2,1,0,3};
-
-    private static void dePreMultiplyAlpha(final Mat ret, final double maxValue, final int componentDepth) {
-        try(Closer c = new Closer();) {
-            final List<Mat> channels = new ArrayList<>(4);
-            Core.split(ret, channels);
-            channels.forEach(ch -> c.addMat(ch));
-            dePreMultiplyAlpha(channels, 255.0, CvType.CV_8U);
-            Core.merge(channels, ret);
-        }
-    }
-
-    private static void dePreMultiplyAlpha(final List<Mat> channels, final double maxValue, final int componentDepth) {
-        final Mat alpha = channels.get(3);
-        // dump(alpha, 64, 64);
-        for(int ch = 0; ch < 3; ch++) {
-            final Mat cur = channels.get(ch);
-            Core.divide(cur, alpha, cur, maxValue);
-            cur.convertTo(cur, CvType.makeType(componentDepth, 1));
-        }
-        alpha.convertTo(alpha, CvType.makeType(componentDepth, 1));
-    }
-
-    // The DirectColorModel mask array is returned as R,G,B,A. This method expects
-    // it in that order.
-    private static CvMat transformDirect(final CvMat rawMat, final boolean hasAlpha, final boolean isAlphaPremultiplied, final int[] rgbaMasks) {
-        if(LOGGER.isTraceEnabled())
-            LOGGER.trace("transformDirect: {} and has alpha {}", rawMat, hasAlpha);
-        final int numChannels = rgbaMasks.length;
-
-        // According to the docs on DirectColorModel the type MUST be TYPE_RGB which
-        // means 3 channels or 4 if there's an alpha.
-        final int expectedNumberOfChannels = hasAlpha ? 4 : 3;
-        if(expectedNumberOfChannels != numChannels)
-            throw new IllegalArgumentException("The DirectColorModel doesn't seem to contain either 3 or 4 channels. It has " + numChannels);
-
-        // Fetch the masks and bitsPerChannel in the OCV BGRA order.
-        final int[] bgraMasks = new int[hasAlpha ? 4 : 3];
-        final int[] bitsPerChannel = new int[hasAlpha ? 4 : 3];
-        for(int rgbch = 0; rgbch < bgraMasks.length; rgbch++) {
-            final int mask = rgbaMasks[rgbch];
-            bgraMasks[bgraOrderDcm[rgbch]] = mask;
-            bitsPerChannel[bgraOrderDcm[rgbch]] = Integer.bitCount(mask);
-        }
-        final int[] shifts = determineShifts(bgraMasks);
-
-        // check if any channel has a bits-per-channel > 16
-        if(Arrays.stream(bitsPerChannel)
-            .filter(v -> v > 16)
-            .findAny()
-            .isPresent())
-            throw new IllegalArgumentException("The image with the DirectColorModel has a channel with more than 16 bits " + bitsPerChannel);
-
-        double maxValue = 255.0D;
-        int componentDepth = CV_8U;
-        for(int i = 0; i < bitsPerChannel.length; i++) {
-            final int n = bitsPerChannel[i];
-            if(n > 8) {
-                componentDepth = CV_16U;
-                maxValue = 65535.0D;
-                break;
-            }
-        }
-
-        // System.out.println("Raw Mat");
-        // dump(rawMat, 5, 5);
-
-        try(final CvMat remergedMat = new CvMat();
-            Closer closer = new Closer()) {
-
-            // we're going to separate the channels into separate Mat's by masking
-            final List<Mat> channels = new ArrayList<>(numChannels);
-
-            for(int ch = 0; ch < numChannels; ch++) {
-                try(CvMat tmpCurChannel = new CvMat();) {
-                    bitwiseUnsignedRightShiftAndMask(rawMat, tmpCurChannel, shifts[ch], bitsPerChannel[ch]);
-                    // if the bits don't take up the entire channel then we need to scale them.
-                    // for example, if we have a 4/4/4 image we need to scale the results to 8 bits.
-
-                    final CvMat curChannel = closer.add(new CvMat());
-                    tmpCurChannel.convertTo(curChannel, CvType.makeType(componentDepth, 1));
-
-                    // System.out.println("Channel " + ch + " pre scaled:");
-                    // dump(curChannel, 3, 27);
-
-                    // This will scale the maximum value given the field to the maximum value
-                    // of the final field.
-                    final double scale = maxValue / ((1 << bitsPerChannel[ch]) - 1);
-                    Core.multiply(curChannel, new Scalar(scale), curChannel);
-
-                    // System.out.println("Channel " + ch + " scaled by " + scale);
-                    // dump(curChannel, 5, 5);
-
-                    channels.add(curChannel);
-                }
-            }
-
-            if(isAlphaPremultiplied)
-                dePreMultiplyAlpha(channels, maxValue, componentDepth);
-
-            // now merge the channels
-            Core.merge(channels, remergedMat);
-
-            // System.out.println("Remerged Mat: ");
-            // dump(remergedMat, 5, 5);
-
-            return remergedMat.returnMe();
-        }
-    }
-
     public static CvMatWithColorInformation img2CvMat(final BufferedImage bufferedImage) {
         final ColorModel colorModel = bufferedImage.getColorModel();
 
@@ -1094,7 +1014,6 @@ public class Utils {
             } else {
                 LOGGER.trace("There's an unknown color model: {}. (img type: {}, color space: {})", colorModel.getClass().getName(), bufferedImage.getType(),
                     CvMatWithColorInformation.colorSpaceTypeName(colorModel.getColorSpace().getType()));
-                // bufferedImage.getRGB(3, 4);
                 throw new IllegalArgumentException("Can't handle a BufferedImage with a " + colorModel.getClass().getSimpleName() + " color model.");
             }
         }
@@ -1504,6 +1423,117 @@ public class Utils {
         return new SimplePoint((c * perpRefY) + x.y(), (c * perpRefX) + x.x());
     }
 
+    // All DirectColorModel values are stored RGBA. We want them reorganized a BGRA
+    private static int[] bgraOrderDcm = {2,1,0,3};
+
+    private static void dePreMultiplyAlpha(final Mat ret, final double maxValue, final int componentDepth) {
+        try(Closer c = new Closer();) {
+            final List<Mat> channels = new ArrayList<>(4);
+            Core.split(ret, channels);
+            channels.forEach(ch -> c.addMat(ch));
+            dePreMultiplyAlpha(channels, 255.0, CvType.CV_8U);
+            Core.merge(channels, ret);
+        }
+    }
+
+    private static void dePreMultiplyAlpha(final List<Mat> channels, final double maxValue, final int componentDepth) {
+        final Mat alpha = channels.get(3);
+        // dump(alpha, 64, 64);
+        for(int ch = 0; ch < 3; ch++) {
+            final Mat cur = channels.get(ch);
+            Core.divide(cur, alpha, cur, maxValue);
+            cur.convertTo(cur, CvType.makeType(componentDepth, 1));
+        }
+        alpha.convertTo(alpha, CvType.makeType(componentDepth, 1));
+    }
+
+    // The DirectColorModel mask array is returned as R,G,B,A. This method expects
+    // it in that order.
+    private static CvMat transformDirect(final CvMat rawMat, final boolean hasAlpha, final boolean isAlphaPremultiplied, final int[] rgbaMasks) {
+        if(LOGGER.isTraceEnabled())
+            LOGGER.trace("transformDirect: {} and has alpha {}", rawMat, hasAlpha);
+        final int numChannels = rgbaMasks.length;
+
+        // According to the docs on DirectColorModel the type MUST be TYPE_RGB which
+        // means 3 channels or 4 if there's an alpha.
+        final int expectedNumberOfChannels = hasAlpha ? 4 : 3;
+        if(expectedNumberOfChannels != numChannels)
+            throw new IllegalArgumentException("The DirectColorModel doesn't seem to contain either 3 or 4 channels. It has " + numChannels);
+
+        // Fetch the masks and bitsPerChannel in the OCV BGRA order.
+        final int[] bgraMasks = new int[hasAlpha ? 4 : 3];
+        final int[] bitsPerChannel = new int[hasAlpha ? 4 : 3];
+        for(int rgbch = 0; rgbch < bgraMasks.length; rgbch++) {
+            final int mask = rgbaMasks[rgbch];
+            bgraMasks[bgraOrderDcm[rgbch]] = mask;
+            bitsPerChannel[bgraOrderDcm[rgbch]] = Integer.bitCount(mask);
+        }
+        final int[] shifts = determineShifts(bgraMasks);
+
+        // check if any channel has a bits-per-channel > 16
+        if(Arrays.stream(bitsPerChannel)
+            .filter(v -> v > 16)
+            .findAny()
+            .isPresent())
+            throw new IllegalArgumentException("The image with the DirectColorModel has a channel with more than 16 bits " + bitsPerChannel);
+
+        double maxValue = 255.0D;
+        int componentDepth = CV_8U;
+        for(int i = 0; i < bitsPerChannel.length; i++) {
+            final int n = bitsPerChannel[i];
+            if(n > 8) {
+                componentDepth = CV_16U;
+                maxValue = 65535.0D;
+                break;
+            }
+        }
+
+        // System.out.println("Raw Mat");
+        // dump(rawMat, 5, 5);
+
+        try(final CvMat remergedMat = new CvMat();
+            Closer closer = new Closer()) {
+
+            // we're going to separate the channels into separate Mat's by masking
+            final List<Mat> channels = new ArrayList<>(numChannels);
+
+            for(int ch = 0; ch < numChannels; ch++) {
+                try(CvMat tmpCurChannel = new CvMat();) {
+                    bitwiseUnsignedRightShiftAndMask(rawMat, tmpCurChannel, shifts[ch], bitsPerChannel[ch]);
+                    // if the bits don't take up the entire channel then we need to scale them.
+                    // for example, if we have a 4/4/4 image we need to scale the results to 8 bits.
+
+                    final CvMat curChannel = closer.add(new CvMat());
+                    tmpCurChannel.convertTo(curChannel, CvType.makeType(componentDepth, 1));
+
+                    // System.out.println("Channel " + ch + " pre scaled:");
+                    // dump(curChannel, 3, 27);
+
+                    // This will scale the maximum value given the field to the maximum value
+                    // of the final field.
+                    final double scale = maxValue / ((1 << bitsPerChannel[ch]) - 1);
+                    Core.multiply(curChannel, new Scalar(scale), curChannel);
+
+                    // System.out.println("Channel " + ch + " scaled by " + scale);
+                    // dump(curChannel, 5, 5);
+
+                    channels.add(curChannel);
+                }
+            }
+
+            if(isAlphaPremultiplied)
+                dePreMultiplyAlpha(channels, maxValue, componentDepth);
+
+            // now merge the channels
+            Core.merge(channels, remergedMat);
+
+            // System.out.println("Remerged Mat: ");
+            // dump(remergedMat, 5, 5);
+
+            return remergedMat.returnMe();
+        }
+    }
+
     private static Field getStaticField(final String fieldName, final Class<?>... classes) {
         final Field field = Arrays.stream(classes)
             .map(c -> {
@@ -1728,54 +1758,6 @@ public class Utils {
             Core.bitwise_xor(ret, mask, ret);
             return ret.returnMe();
         }
-
-        // final short[][] bankdata = bb.getBankData();
-        // if(bankdata.length == 1) {
-        // try(final CvMat mat = new CvMat(h, w, CvType.makeType(CvType.CV_16S, numChannels));) {
-        // final short[] inpixels = bb.getData();
-        // mat.put(0, 0, inpixels);
-        // if(rgbType) {
-        // if(numChannels == 3)
-        // Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGB2BGR);
-        // if(numChannels == 4)
-        // Imgproc.cvtColor(mat, mat, Imgproc.COLOR_RGBA2BGRA);
-        // if(numChannels > 4) {
-        // // ugh!
-        // try(Closer c = new Closer();) {
-        // final List<Mat> channels = new ArrayList<>();
-        // Core.split(mat, channels);
-        // channels.forEach(ch -> c.addMat(ch));
-        // final ArrayList<Mat> newChannels = new ArrayList<>(channels);
-        // newChannels.set(0, channels.get(2));
-        // newChannels.set(2, channels.get(0));
-        // Core.merge(newChannels, mat);
-        // }
-        // }
-        // }
-        // return mat.returnMe();
-        // }
-        // } else {
-        // // bank data must correspond to the channels.
-        // final int[] lookup = rgbType ? (numChannels == 4 ? argb2bgra : (numChannels == 3 ? rgb2bgr : null)) : null;
-        // if(numChannels != bankdata.length)
-        // throw new IllegalStateException("Can't handle a BufferedImage where the data is in banks but it's not 1 per channel. The number of channels is "
-        // + numChannels + " while the number of banks is " + bankdata.length);
-        //
-        // try(Closer closer = new Closer();
-        // CvMat ret = new CvMat();) {
-        // final List<Mat> channels = new ArrayList<>(numChannels);
-        // for(int ch = 0; ch < numChannels; ch++) {
-        // final CvMat cur = closer.add(new CvMat(h, w, CvType.CV_16SC1));
-        // if(lookup == null)
-        // cur.put(0, 0, bankdata[ch]);
-        // else
-        // cur.put(0, 0, bankdata[lookup[ch]]);
-        // channels.add(cur);
-        // }
-        // Core.merge(channels, ret);
-        // return ret.returnMe();
-        // }
-        // }
     }
 
     private static CvMat dataBufferByteToMat(final DataBufferByte bb, final int h, final int w, final int numChannels, final boolean rgbType) {

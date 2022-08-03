@@ -21,6 +21,9 @@ This project contains several tools for creating image and video processing appl
 - [Image Processing](#image-processing)
   - [OpenCv Mat Resource Management](#opencv-mat-resource-management)
   - [Direct Bulk Access To Pixel Data From Java](#direct-bulk-access-to-pixel-data-from-java)
+  - [Image Display](#image-display)
+  - [Other Image Processing and Image Handling](#other-image-processing-and-image-handling)
+    - [OpenCV Mat and Java's BufferedImage](#opencv-mat-and-javas-bufferedimage)
 - [Video Processing](#video-processing)
   - [Reading And Processing Media](#reading-and-processing-media)
     - [The Stream Context](#the-stream-context)
@@ -244,6 +247,83 @@ The cleanest way work with the raw `ByteBuffer` of pixel data is to use the `CvM
         ...
     });
 ```
+
+## Image Display
+
+As seen in the example and quick start, there's a handy `ImageDisplay`.
+
+``` java
+    try (ImageDisplay display = new ImageDisplay.Builder().build();) {
+        display.update(mat);
+    }
+```
+
+`ImageDisplay` is very basic and not really meant for developing sophisticated Java based GUIs in but it does support some rudimentary event handling. You can set a callback for:
+
+- **select** when someone clicks in the display. The callback should return a `boolean` telling the display whether or not to `close`. Returning `true` will close the display.
+``` java
+    builder.selectCallback((Point pointClicked) -> { 
+        ... 
+        return shouldIClose;
+    });
+```
+**Note:** *This callback is ignored when using OpenCV's HighGUI implementation which is the default.*
+- **key press** when someone types while in the display. Again, returning `true` will cause the window to close.
+``` java
+    builder.keyPressHandler((int key) -> { 
+        ... 
+        return shouldIClose;
+    });
+```
+- **close** you can set this callback to be notified when the window closes. It's just a Java `Runnable`
+``` java
+    builder.closeCallback(() -> {...});
+```
+
+ The default implementation of the `ImageDisplay` is OpenCV's HighGUI but there's also two flavor's of Eclipse SWT. A resizable window which will stretch the image to fit the window when it changes or a scrollable window which will add scroll bars when the image is larger than the display area.
+
+``` java
+    try (ImageDisplay display = new ImageDisplay.Builder()
+        .implementation(Implementation.SWT)
+        .build();) {
+            ...
+    }
+```
+
+The implementation can be:
+- HIGHGUI - This is the default
+- SWT_SCROLLABLE - A display with scrollbars when the image is larger than the display area
+- SWT_RESIZABLE - A display that rescales the image to fit the display area
+- SWT - this defaults to `SWT_SCROLLABLE`
+
+If you're going to use the SWT implementation you need to explicitly add the dependency to your project.
+
+``` xml
+  <dependency> <!-- Used for the SwtImageDisplay -->
+    <groupId>org.eclipse.swt</groupId>
+    <artifactId>${swtartifact}</artifactId>
+    <version></version>
+  </dependency>
+
+  <repositories>
+    <repository>
+      <id>maven-eclipse-repo</id>
+      <url>http://maven-eclipse.github.io/maven</url>
+    </repository>
+  </repositories>
+
+```
+
+*swtartifact* is platform specific. For 64-bit Linux it's `org.eclipse.swt.gtk.linux.x86_64`. For 64-bit Windows it's `org.eclipse.swt.win32.win32.x86_64`
+
+## Other Image Processing and Image Handling
+
+### OpenCV Mat and Java's BufferedImage
+
+The `Utils` class has several methods for translating back and forth between Java's `BufferedImage`s and OpenCV `Mat`s. There is an attempt to preserve as much information as possible from the source images. For example, if the source image of a translation from a `BufferedImage` to a `Mat` has 5 16-bit channels, then the resulting `Mat` will have 5 16-bit channels.
+
+**Note:** Currently translating color images from `Mat` to `BufferedImage` only works with `Mat`s of 8-bit depth.
+
 # Video Processing
 
 ## Reading And Processing Media
