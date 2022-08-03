@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Jim Carroll
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ai.kognition.pilecv4j.image.display;
 
 import static net.dempsy.util.Functional.ignore;
@@ -183,7 +199,7 @@ public class CvImageDisplay extends ImageDisplay {
         // There is a problem with resource management since the mat is being passed to another thread
         final CvMat omat = CvMat.shallowCopy(mat);
         uncheck(() -> commands.put(s -> {
-            try (CvMat lmat = omat) {
+            try(CvMat lmat = omat) {
                 ImageAPI.pilecv4j_image_CvRaster_showImage(name, omat.nativeObj);
                 // if we got here, we're going to assume the windows was created.
                 if(callback != null)
@@ -216,7 +232,7 @@ public class CvImageDisplay extends ImageDisplay {
                 shownSet = true;
             }
 
-            try (final CvMat toUpdate = update.getAndSet(null);) {
+            try(final CvMat toUpdate = update.getAndSet(null);) {
                 if(toUpdate != null)
                     ImageAPI.pilecv4j_image_CvRaster_updateWindow(window.name, toUpdate.nativeObj);
             }

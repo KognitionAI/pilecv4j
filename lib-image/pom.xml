@@ -73,12 +73,6 @@
       <artifactId>${swtartifact}</artifactId>
       <optional>true</optional>
     </dependency>
-    <!-- This is only necessary if you're going to use TiffUtils -->
-    <dependency> 
-      <groupId>mil.nga</groupId>
-      <artifactId>tiff</artifactId>
-      <optional>true</optional>
-    </dependency>
     
     <!-- These are runtime dependencies that add the jpeg2000 codec to ImageIO -->
     <dependency>

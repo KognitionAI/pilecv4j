@@ -24,6 +24,8 @@ This project contains several tools for creating image and video processing appl
   - [Image Display](#image-display)
   - [Other Image Processing and Image Handling](#other-image-processing-and-image-handling)
     - [OpenCV Mat and Java's BufferedImage](#opencv-mat-and-javas-bufferedimage)
+    - [Image Reading and Writing](#image-reading-and-writing)
+    - [Miscellaneous](#miscellaneous)
 - [Video Processing](#video-processing)
   - [Reading And Processing Media](#reading-and-processing-media)
     - [The Stream Context](#the-stream-context)
@@ -323,6 +325,17 @@ If you're going to use the SWT implementation you need to explicitly add the dep
 The `Utils` class has several methods for translating back and forth between Java's `BufferedImage`s and OpenCV `Mat`s. There is an attempt to preserve as much information as possible from the source images. For example, if the source image of a translation from a `BufferedImage` to a `Mat` has 5 16-bit channels, then the resulting `Mat` will have 5 16-bit channels.
 
 **Note:** Currently translating color images from `Mat` to `BufferedImage` only works with `Mat`s of 8-bit depth.
+
+### Image Reading and Writing
+
+Pilecv4j can read a wider range of images than OpenCV can directly. It can often preserve more of the source information in the resulting `Mat`. If you use Pilecv4j's `ImageFile` to read images from disk into a `CvMat` (see `ImageFile.readMatFromFile`), it will go through a series of fallbacks in the case that OpenCV's `Imgcodecs.imread` fails to read the file. The main fallback is to attempt to read the image using `javax.imageio` with an ordered set of third party (followed by built-in) ImageReaders.
+
+There's a custom `MJPEGWriter` which can take a series of JPG images and dump them into a playable `.avi` file.
+
+### Miscellaneous
+
+- Generalized Hough Transform - The package `ai.kognition.pilecv4j.image.houghspace` contains code for a [Generalized Hough Transform](https://en.wikipedia.org/wiki/Generalised_Hough_transform)
+- 3D Gradient Calculation - `Operations.gradient` will calculate the gradient of a 1 channel image. The results will include 3 images. The gradient magnitude in the x-axis direction in a 16-bit signed image, the gradient magnitude in the y-axis direction in a 16-bit signed image, and an 8-bit unsigned image that represents the gradient direction, with 0 being *up* and 127 being *down*.
 
 # Video Processing
 

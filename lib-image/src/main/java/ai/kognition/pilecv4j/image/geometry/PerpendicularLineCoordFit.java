@@ -1,22 +1,18 @@
-/***********************************************************************
-    Legacy Film to DVD Project
-    Copyright (C) 2005 James F. Carroll
-
-    This program is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation; either version 2 of the License, or
-    (at your option) any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-****************************************************************************/
-
+/*
+ * Copyright 2022 Jim Carroll
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package ai.kognition.pilecv4j.image.geometry;
 
 import java.util.ArrayList;
@@ -26,11 +22,15 @@ import java.util.List;
 import ai.kognition.pilecv4j.nr.Minimizer;
 
 /**
- * <p> This class can be used to find the best line through a set of points where the
- * result is a line in "perpendicular line coordinates." (yes, I made that term up)</p>
- * 
- * <p>A line defined in "perpendicular line coordinates" is expressed as a single point. This point
- * is a reference for the line that's perpendicular to the line drawn from the origin to that point.</p>  
+ * <p>
+ * This class can be used to find the best line through a set of points where the
+ * result is a line in "perpendicular line coordinates." (yes, I made that term up)
+ * </p>
+ *
+ * <p>
+ * A line defined in "perpendicular line coordinates" is expressed as a single point. This point
+ * is a reference for the line that's perpendicular to the line drawn from the origin to that point.
+ * </p>
  */
 public class PerpendicularLineCoordFit implements Minimizer.Func {
     private final List<AwtPoint> points;
@@ -42,23 +42,24 @@ public class PerpendicularLineCoordFit implements Minimizer.Func {
     private boolean awtp = false;
 
     /**
-     * This constructor takes either a list of java.awt.Point's or a list of {@link AwtPoint}. If you pass it another list the Fit will fail with a RuntimeException dealing with class casting.
-     * 
+     * This constructor takes either a list of java.awt.Point's or a list of {@link AwtPoint}. If you pass it another list the Fit will fail with a
+     * RuntimeException dealing with class casting.
+     *
      * @param points
-     *            is either a {@link AwtPoint} or java.awt.Points
+     *     is either a {@link AwtPoint} or java.awt.Points
      * @param weighted
-     *            is whether or not the points are weighted.
+     *     is whether or not the points are weighted.
      */
     @SuppressWarnings("unchecked")
     public PerpendicularLineCoordFit(final List<?> points, final boolean weighted) {
         this.points = new ArrayList<AwtPoint>();
         final Object o = points.get(0);
-        if (o instanceof java.awt.Point) {
-            for (int i = 0; i < points.size(); i++)
-                this.points.add(new AwtPoint((java.awt.Point) points.get(i)));
+        if(o instanceof java.awt.Point) {
+            for(int i = 0; i < points.size(); i++)
+                this.points.add(new AwtPoint((java.awt.Point)points.get(i)));
             awtp = true;
         } else
-            this.points.addAll((List<AwtPoint>) points);
+            this.points.addAll((List<AwtPoint>)points);
 
         this.weighted = weighted;
     }
@@ -87,18 +88,18 @@ public class PerpendicularLineCoordFit implements Minimizer.Func {
         double ret = 0.0;
         maxErrSq = -1.0;
 
-        for (final Point p : points) {
+        for(final Point p: points) {
             final double y1 = p.getRow();
             final double x1 = p.getCol();
 
             final double xdotxi = (y1 * x[1]) + (x1 * x[0]);
             double err = (xmag - (xdotxi / xmag));
-            if (weighted)
-                err *= ((WeightedPoint) p).getWeight();
+            if(weighted)
+                err *= ((WeightedPoint)p).getWeight();
 
             final double errSq = err * err;
 
-            if (maxErrSq < errSq) {
+            if(maxErrSq < errSq) {
                 worst = p;
                 maxErrSq = errSq;
             }
@@ -115,7 +116,7 @@ public class PerpendicularLineCoordFit implements Minimizer.Func {
 
         final List<Object> ret = new ArrayList<Object>();
 
-        for (final Iterator<AwtPoint> iter = points.iterator(); iter.hasNext();) {
+        for(final Iterator<AwtPoint> iter = points.iterator(); iter.hasNext();) {
             final Point p = iter.next();
 
             final double y1 = p.getRow();
@@ -124,8 +125,8 @@ public class PerpendicularLineCoordFit implements Minimizer.Func {
             final double xdotxi = (y1 * x[1]) + (x1 * x[0]);
             final double err = Math.abs((xmag - (xdotxi / xmag)));
 
-            if (err > maxDist) {
-                ret.add(awtp ? (Object) (((AwtPoint) p).p) : (Object) p);
+            if(err > maxDist) {
+                ret.add(awtp ? (Object)(((AwtPoint)p).p) : (Object)p);
                 iter.remove();
             }
         }
