@@ -330,7 +330,9 @@ The `Utils` class has several methods for translating back and forth between Jav
 
 Pilecv4j can read a wider range of images than OpenCV can directly. It can often preserve more of the source information in the resulting `Mat`. If you use Pilecv4j's `ImageFile` to read images from disk into a `CvMat` (see `ImageFile.readMatFromFile`), it will go through a series of fallbacks in the case that OpenCV's `Imgcodecs.imread` fails to read the file. The main fallback is to attempt to read the image using `javax.imageio` with an ordered set of third party (followed by built-in) ImageReaders.
 
-There's a custom `MJPEGWriter` which can take a series of JPG images and dump them into a playable `.avi` file.
+There's a custom `MJPEGWriter` which can take a series of JPG images and dump them into a playable `.avi` file. 
+
+**Note:**  *`MJPEGWriter` is based on [jpegtoavi.c](https://sourceforge.net/projects/jpegtoavi/files/jpegtoavi/) which carries a different license than the rest of Pilecv4j*
 
 ### Miscellaneous
 
