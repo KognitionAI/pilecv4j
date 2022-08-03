@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Jim Carroll
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ai.kognition.pilecv4j.image.houghspace;
 
 import java.util.Arrays;
@@ -24,7 +40,7 @@ public class SegmentModel implements Model {
     final private double shiftcol;
 
     public SegmentModel(final Collection<LineSegment> segments) {
-        if (segments == null || segments.size() == 0)
+        if(segments == null || segments.size() == 0)
             throw new IllegalArgumentException();
 
         final LineSegment[] array = segments.stream().toArray(LineSegment[]::new);
@@ -32,25 +48,25 @@ public class SegmentModel implements Model {
         // this.num = this.segments.length;
 
         final List<Point> points = segments.stream()
-                .map(l -> Arrays.asList(l.p1, l.p2))
-                .flatMap(ps -> ps.stream())
-                .collect(Collectors.toList());
+            .map(l -> Arrays.asList(l.p1, l.p2))
+            .flatMap(ps -> ps.stream())
+            .collect(Collectors.toList());
 
         double minX = Double.POSITIVE_INFINITY;
         double maxX = Double.NEGATIVE_INFINITY;
         double minY = Double.POSITIVE_INFINITY;
         double maxY = Double.NEGATIVE_INFINITY;
 
-        for (final Point p : points) {
+        for(final Point p: points) {
             final double x = p.x();
-            if (x < minX)
+            if(x < minX)
                 minX = x;
-            if (x > maxX)
+            if(x > maxX)
                 maxX = x;
             final double y = p.y();
-            if (y < minY)
+            if(y < minY)
                 minY = y;
-            if (y > maxY)
+            if(y > maxY)
                 maxY = y;
         }
 
@@ -71,9 +87,9 @@ public class SegmentModel implements Model {
         final double y = shiftrow + oy;
 
         double minDist = Double.POSITIVE_INFINITY;
-        for (final LineSegment seg : segments) {
+        for(final LineSegment seg: segments) {
             final double dist = seg.distance(new SimplePoint(y, x));
-            if (dist < minDist)
+            if(dist < minDist)
                 minDist = dist;
         }
         return minDist;
@@ -104,9 +120,9 @@ public class SegmentModel implements Model {
     private LineSegment closest(final double ox, final double oy, final double scale) {
         double minDist = Double.POSITIVE_INFINITY;
         LineSegment nearest = null;
-        for (final LineSegment seg : segments) {
+        for(final LineSegment seg: segments) {
             final double dist = seg.distance(new SimplePoint(oy, ox));
-            if (dist < minDist) {
+            if(dist < minDist) {
                 minDist = dist;
                 nearest = seg;
             }

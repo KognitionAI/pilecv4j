@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Jim Carroll
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ai.kognition.pilecv4j.image.display.swt;
 
 import org.eclipse.swt.SWT;
@@ -32,10 +48,10 @@ public class ScrollableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
         ImageDisplay.syncExec(() -> {
 
             canvas.addListener(SWT.Paint, e -> {
-                try (final CvMat lcurrentImageMat = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
+                try(final CvMat lcurrentImageMat = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
                     if(lcurrentImageMat != null) {
                         final Image lcurrentImage = new Image(display, convertToDisplayableSWT(lcurrentImageMat));
-                        try (QuietCloseable qc = () -> lcurrentImage.dispose();) {
+                        try(QuietCloseable qc = () -> lcurrentImage.dispose();) {
                             // Draw the image into the current graphics context at the current position
                             final GC gc = e.gc;
                             gc.drawImage(lcurrentImage, this.origin.x, this.origin.y);
@@ -78,7 +94,7 @@ public class ScrollableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
             final ScrollBar hBar = canvas.getHorizontalBar();
             hBar.addListener(SWT.Selection, e -> {
-                try (final CvMat currentImage = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
+                try(final CvMat currentImage = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
                     if(currentImage != null) {
                         final int hSelection = hBar.getSelection();
                         final int destX = -hSelection - origin.x;
@@ -91,7 +107,7 @@ public class ScrollableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
 
             final ScrollBar vBar = canvas.getVerticalBar();
             vBar.addListener(SWT.Selection, e -> {
-                try (final CvMat currentImage = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
+                try(final CvMat currentImage = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
                     if(currentImage != null) {
                         final int vSelection = vBar.getSelection();
                         final int destY = -vSelection - origin.y;
@@ -103,7 +119,7 @@ public class ScrollableSwtCanvasImageDisplay extends SwtCanvasImageDisplay {
             });
 
             canvas.addListener(SWT.Resize, e -> {
-                try (final CvMat currentImage = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
+                try(final CvMat currentImage = Functional.applyIfExistsAndReturnResult(currentImageRef, CvMat::shallowCopy);) {
                     if(currentImage != null) {
                         final Rectangle rect = new Rectangle(0, 0, currentImage.width(), currentImage.height());
                         final Rectangle client = canvas.getClientArea();

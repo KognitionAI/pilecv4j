@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Jim Carroll
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ai.kognition.pilecv4j.image.geometry;
 
 import static org.junit.Assert.assertEquals;
@@ -19,10 +35,11 @@ import org.junit.runners.Parameterized;
 import org.opencv.core.Mat;
 import org.opencv.core.Size;
 
+import net.dempsy.vfs.Vfs;
+
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.geometry.transform.GaussianBlur;
-import net.dempsy.vfs.Vfs;
 
 @RunWith(Parameterized.class)
 public class GaussianBlurTest {
@@ -70,14 +87,14 @@ public class GaussianBlurTest {
 
     public GaussianBlurTest(final URL imageToTransform, final URL expectedImageResult, final Size size, final double sigmaX, final double sigmaY,
         final int borderType) throws IOException, URISyntaxException {
-    	try (var vfs = new Vfs();) {
-	        this.imageToTransform = vfs.toFile(imageToTransform.toURI());
-	        this.expectedImageResult = vfs.toFile(expectedImageResult.toURI());
-	        this.size = size;
-	        this.sigmaX = sigmaX;
-	        this.sigmaY = sigmaY;
-	        this.borderType = borderType;
-    	}
+        try(var vfs = new Vfs();) {
+            this.imageToTransform = vfs.toFile(imageToTransform.toURI());
+            this.expectedImageResult = vfs.toFile(expectedImageResult.toURI());
+            this.size = size;
+            this.sigmaX = sigmaX;
+            this.sigmaY = sigmaY;
+            this.borderType = borderType;
+        }
     }
 
     @Test

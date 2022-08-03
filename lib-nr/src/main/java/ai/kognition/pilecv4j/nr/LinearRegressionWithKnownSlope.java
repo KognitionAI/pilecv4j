@@ -1,3 +1,19 @@
+/*
+ * Copyright 2022 Jim Carroll
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ai.kognition.pilecv4j.nr;
 
 import ai.kognition.pilecv4j.nr.Minimizer.Func;
@@ -8,7 +24,7 @@ import ai.kognition.pilecv4j.nr.Minimizer.Func;
  * between the points provided to the constructor and the line specified
  * by y = m[0]x + m[1]
  * </p>
- * 
+ *
  * <p>
  * NOTE: The error term is calculated using the vertical distance. That is
  * it minimizes the error in the 'y' term only. This is more robust for determining
@@ -20,26 +36,26 @@ import ai.kognition.pilecv4j.nr.Minimizer.Func;
  * </p>
  */
 public class LinearRegressionWithKnownSlope implements Func {
-   private final double[] y;
-   private final double[] x;
-   private double slope = 0.0;
+    private final double[] y;
+    private final double[] x;
+    private double slope = 0.0;
 
-   public LinearRegressionWithKnownSlope(final double slope, final double[] x, final double[] y) {
-      this.x = x;
-      this.y = y;
-      this.slope = slope;
-   }
+    public LinearRegressionWithKnownSlope(final double slope, final double[] x, final double[] y) {
+        this.x = x;
+        this.y = y;
+        this.slope = slope;
+    }
 
-   @Override
-   public double func(final double[] m) {
-      double error2 = 0.0;
-      for(int i = 0; i < x.length; i++) {
-         final double ycur = (slope * x[i] + m[0]);
-         final double ecur = ycur - y[i];
-         error2 += (ecur * ecur);
-      }
+    @Override
+    public double func(final double[] m) {
+        double error2 = 0.0;
+        for(int i = 0; i < x.length; i++) {
+            final double ycur = (slope * x[i] + m[0]);
+            final double ecur = ycur - y[i];
+            error2 += (ecur * ecur);
+        }
 
-      return error2;
-   }
+        return error2;
+    }
 
 }
