@@ -28,7 +28,7 @@
     <!-- <opencv-base.version>${opencv-build.version}-rc</opencv-base.version> -->
 
     <!-- The artifact version -->
-    <opencv.version>0.16-opencv${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
+    <opencv.version>0.17-opencv${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
     <!-- generator and platform.options are set in the profile -->
     <cmake.generator>${generator}</cmake.generator>
@@ -206,6 +206,39 @@
     <!-- ==================================== -->
     <!--       Settings based on the OS       -->
     <!-- ==================================== -->
+    <profile>
+      <id>linux-aarch64</id>
+      <activation>
+        <os>
+          <family>linux</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <swtartifact>org.eclipse.swt.gtk.linux.aarch64</swtartifact>
+        <platform>linux-aarch64</platform>
+        <generator>Unix Makefiles</generator>
+        <opencv-gpu.version-extention></opencv-gpu.version-extention>
+        <platform.option></platform.option>
+      </properties>
+      <!-- block Streaming tests on this platform -->
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-surefire-plugin</artifactId>
+              <configuration>
+                <redirectTestOutputToFile>false</redirectTestOutputToFile>
+                <excludes>
+                  <exclude>**/*Streaming.java</exclude>
+                </excludes>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
     <profile>
       <id>linux-x86</id>
       <activation>
