@@ -29,6 +29,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.IntStream;
@@ -42,6 +43,13 @@ public class UtilsForTesting {
     static {
         biTypeToPixDelta.put(TYPE_USHORT_555_RGB, 1);
         biTypeToPixDelta.put(TYPE_USHORT_565_RGB, 1);
+    }
+
+    public static void findAll(final File file, final List<File> files) {
+        if(file.isDirectory())
+            Arrays.stream(file.list()).forEach(f -> findAll(new File(file, f), files));
+        else
+            files.add(file);
     }
 
     public static String translateClasspath(final String classpathPath) {

@@ -83,12 +83,12 @@ struct StreamContext {
 
   inline StreamContext() : state(FRESH), stopMe(false) {
     if (isEnabled(TRACE))
-      log(TRACE, "STRM", "In StreamContext() for %" PRId64, (uint64_t)this);
+      log(TRACE, "STRC", "In StreamContext() for %" PRId64, (uint64_t)this);
   }
 
   inline ~StreamContext() {
     if (isEnabled(TRACE))
-      log(TRACE,"STRM", "In ~StreamContext() for %" PRId64, (uint64_t)this);
+      log(TRACE, "STRC", "In ~StreamContext() for %" PRId64, (uint64_t)this);
     if (formatCtx != nullptr)
       avformat_free_context(formatCtx);
     if (streamTypes != nullptr)
@@ -124,17 +124,6 @@ struct StreamContext {
   inline uint64_t addOption(const char* key, const char* val) {
     options.push_back(std::tuple<std::string, std::string>(key, val));
     return 0;
-  }
-
-  inline void buildOptions(AVDictionary** opts) {
-    if (options.size() == 0) {
-      *opts = nullptr;
-      return;
-    }
-
-    for (auto o : options) {
-      av_dict_set(opts, std::get<0>(o).c_str(), std::get<1>(o).c_str(), 0 );
-    }
   }
 
   // ==============================================

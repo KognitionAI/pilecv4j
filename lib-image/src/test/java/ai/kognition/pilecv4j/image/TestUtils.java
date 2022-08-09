@@ -17,6 +17,7 @@
 package ai.kognition.pilecv4j.image;
 
 import static ai.kognition.pilecv4j.image.UtilsForTesting.compare;
+import static ai.kognition.pilecv4j.image.UtilsForTesting.findAll;
 import static ai.kognition.pilecv4j.image.UtilsForTesting.translateClasspath;
 import static net.dempsy.util.Functional.uncheck;
 import static org.junit.Assert.assertEquals;
@@ -116,9 +117,6 @@ public class TestUtils {
     }
 
     final public static Set<String> notWorkingTestAgain = new HashSet<>(Arrays.asList(
-    // "TYPE_0/img48.tif", // Component model with bits per channel { 24, 24, 24 }
-    // "TYPE_0/img49.tif", // Component model with bits per channel { 32, 32, 32 }
-    // "TYPE_0/img57.tif" // Component model with bits per channel { 24, 24, 24 }
 
     ));
 
@@ -190,13 +188,6 @@ public class TestUtils {
                     System.gc();
                 });
         }
-    }
-
-    private static void findAll(final File file, final List<File> files) {
-        if(file.isDirectory())
-            Arrays.stream(file.list()).forEach(f -> findAll(new File(file, f), files));
-        else
-            files.add(file);
     }
 
     @Test

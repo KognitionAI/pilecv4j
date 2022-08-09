@@ -95,6 +95,10 @@ public class FfmpegApi2 {
         public long seek_buffer(final long offset, final int whence);
     }
 
+    public static interface write_buffer_callback extends Callback {
+        public long write_buffer(final int numBytesToWrite);
+    }
+
     // ==========================================================
     // frame processing callback declarations
     // ==========================================================
@@ -207,14 +211,25 @@ public class FfmpegApi2 {
 
     public static native long pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame_callback cb);
 
-    /**
-     * Get a Uri based MediaDataSource source.
-     *
-     * @return a reference to a native MediaDataSource built from a source uri that
-     * finds the first decodable video stream and pushes decoded frames to the
-     * given callback.
-     */
-    public static native long pcv4j_ffmpeg2_uriRemuxer_create(final String fmt, final String uri, int maxRemuxErrorCount);
+    public static native long pcv4j_ffmpeg2_remuxer_create(final int maxRemuxErrorCount);
+
+    public static native void pcv4j_ffmpeg2_remuxer_setOutput(final long remuxRef, final long outputRef);
+
+    // ==========================================================
+    // MediaOutput methods
+    // ==========================================================
+
+    public static native long pcv4j_ffmpeg2_uriOutput_create(final String pfmt, final String poutputUri);
+
+    public static native void pcv4j_ffmpeg2_mediaOutput_delete(final long outputRef);
+
+    public static native long pcv4j_ffmpeg2_customOutput_create(final String pfmt, final String poutputUri);
+
+    public static native long pcv4j_ffmpeg2_customOutput_set(final long ctx, final write_buffer_callback callback);
+
+    public static native Pointer pcv4j_ffmpeg2_customOutput_buffer(final long ctx);
+
+    public static native int pcv4j_ffmpeg2_customOutput_bufferSize(final long ctx);
 
     // ==========================================================
     // MediaProcessorChain methods

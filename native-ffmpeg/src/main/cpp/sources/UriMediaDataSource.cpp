@@ -38,7 +38,7 @@ uint64_t UriMediaDataSource::open(AVFormatContext* preallocatedAvFormatCtx, AVDi
 
   if (lfmt && !ifmt) {
     llog(ERROR, "Failed to find the input format \"%s\"", lfmt);
-    return MAKE_P_STAT(NO_INPUT_FORMAT);
+    return MAKE_P_STAT(NO_FORMAT);
   }
 
   // according to the docs for avformat_open_input, "a user-supplied AVFormatContext will be freed on failure."

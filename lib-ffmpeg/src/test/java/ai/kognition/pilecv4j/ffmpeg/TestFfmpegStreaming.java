@@ -70,7 +70,7 @@ public class TestFfmpegStreaming extends BaseTest {
                 .peek(sc -> sc.load())
                 .peek(sc -> checkerLatch.countDown())
                 .openChain("default")
-                .createUriRemuxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
+                .createRemuxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
                 .streamContext()
                 .sync()
                 .play();
