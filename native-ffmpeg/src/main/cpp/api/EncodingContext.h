@@ -41,7 +41,8 @@ class Synchronizer;
 
 /**
  * This class is NOT thread safe. ALL calls to the VideoEncoder and the EncodingContext
- * should be done from the same thread.
+ * should be done from the same thread. The one exception is EncodingContext::stop which
+ * can be called from a separate thread.
  */
 class VideoEncoder {
   EncodingContext* enc;
@@ -123,7 +124,8 @@ public:
 
 /**
  * This class is NOT thread safe. ALL calls to the VideoEncoder and the EncodingContext
- * should be done from the same thread.
+ * should be done from the same thread. The one exception is EncodingContext::stop which
+ * can be called from a separate thread.
  */
 class EncodingContext
 {
@@ -153,6 +155,9 @@ public:
     return new VideoEncoder(this, video_codec);
   }
 
+  /**
+   * Tell the EncodingContext that all of the encoders are configured and ready
+   */
   uint64_t ready();
 
   uint64_t stop();

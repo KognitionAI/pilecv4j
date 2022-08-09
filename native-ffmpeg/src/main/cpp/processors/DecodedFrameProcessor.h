@@ -44,11 +44,13 @@ class DecodedFrameProcessor: public MediaProcessor
 
 public:
   inline DecodedFrameProcessor(push_frame pcallback) : callback(pcallback) {}
-  virtual ~DecodedFrameProcessor();
+  virtual ~DecodedFrameProcessor() = default;
 
   virtual uint64_t setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams);
   virtual uint64_t preFirstFrame(AVFormatContext* avformatCtx);
   virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType packetMediaType);
+
+  virtual uint64_t close();
 };
 
 }

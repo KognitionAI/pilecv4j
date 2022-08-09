@@ -32,8 +32,10 @@ typedef int32_t (*fill_buffer)(int32_t numBytesMax);
 typedef int64_t (*seek_buffer)(int64_t offset, int whence);
 
 #ifdef __INSIDE_CUSTOM_MEDIA_DATA_SOURCE_CPP
+class CustomMediaDataSource;
 static int read_packet_from_custom_source(void *opaque, uint8_t *buf, int buf_size);
 static int64_t seek_in_custom_source(void *opaque, int64_t offset, int whence);
+static inline void* fetchBuffer(CustomMediaDataSource*);
 #endif
 
 class CustomMediaDataSource: public MediaDataSource
@@ -46,14 +48,15 @@ class CustomMediaDataSource: public MediaDataSource
    */
   AVIOContext* ioContext = nullptr;
   uint8_t* ioBuffer = nullptr;
+  uint8_t* ioBufferToFillFromJava = nullptr;
 
 #ifdef __INSIDE_CUSTOM_MEDIA_DATA_SOURCE_CPP
   friend int read_packet_from_custom_source(void *opaque, uint8_t *buf, int buf_size);
   friend int64_t seek_in_custom_source(void *opaque, int64_t offset, int whence);
+  friend void* fetchBuffer(CustomMediaDataSource*);
 #endif
 
 public:
-  uint8_t* ioBufferToFillFromJava = nullptr;
 
   inline CustomMediaDataSource() {
     ioBufferToFillFromJava = (uint8_t*)malloc(PCV4J_CUSTOMIO_BUFSIZE * sizeof(uint8_t));
@@ -76,6 +79,12 @@ public:
     return seekCallback != nullptr;
   }
   };
+
+#ifdef __INSIDE_CUSTOM_MEDIA_DATA_SOURCE_CPP
+static inline void* fetchBuffer(CustomMediaDataSource* c) {
+  return c->ioBufferToFillFromJava;
+}
+#endif
 
 }
 } /* namespace pilecv4j */

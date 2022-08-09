@@ -45,6 +45,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.opencv.core.Mat;
+import org.opencv.core.MatOfByte;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
@@ -52,6 +53,8 @@ import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.Functional;
 import net.dempsy.util.MutableInt;
+
+import ai.kognition.pilecv4j.image.CvRaster.Closer;
 
 public class ImageFile {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
@@ -103,6 +106,27 @@ public class ImageFile {
             prev = c;
         }
 
+    }
+
+    public static byte[] encodeToImageData(final Mat mat, final String ext) {
+        try(Closer closer = new Closer();) {
+            final MatOfByte mobOut = closer.addMat(new MatOfByte());
+            Imgcodecs.imencode(".jpg", mat, mobOut);
+            return mobOut.toArray();
+        }
+    }
+
+    /**
+     * Given the imageData byte array contains an encoded image, decode the image
+     * into a Mat.
+     */
+    public static CvMat decodeImageData(final byte[] imageData) {
+        try(Closer closer = new Closer();) {
+            final MatOfByte mobOut = closer.addMat(new MatOfByte(imageData));
+            try(CvMat cvmat = CvMat.move(Imgcodecs.imdecode(mobOut, Imgcodecs.IMREAD_UNCHANGED));) {
+                return cvmat.returnMe();
+            }
+        }
     }
 
     /**

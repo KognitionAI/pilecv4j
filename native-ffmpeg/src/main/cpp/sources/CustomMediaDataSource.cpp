@@ -128,7 +128,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_customMediaDataSource_set(uint64_t ctx, fill_b
 
 KAI_EXPORT void* pcv4j_ffmpeg2_customMediaDataSource_buffer(uint64_t ctx) {
   CustomMediaDataSource* c = (CustomMediaDataSource*)ctx;
-  return c->ioBufferToFillFromJava;
+  return fetchBuffer(c);
 }
 
 KAI_EXPORT int32_t pcv4j_ffmpeg2_customMediaDataSource_bufferSize(uint64_t ctx) {

@@ -48,15 +48,17 @@ struct CodecDetails {
 
   AVMediaType mediaType;
 
-  inline ~CodecDetails() {
+  inline void close() {
     if (colorCvrt != nullptr)
       sws_freeContext(colorCvrt);
     if (codecCtx != nullptr)
       avcodec_free_context(&codecCtx);
   }
+
+  inline ~CodecDetails() = default;
 };
 
-DecodedFrameProcessor::~DecodedFrameProcessor() {
+uint64_t DecodedFrameProcessor::close() {
   if (codecs) {
     for (int i = 0; i < numStreams; i++) {
       CodecDetails* cd = codecs[i];
@@ -67,7 +69,9 @@ DecodedFrameProcessor::~DecodedFrameProcessor() {
     }
 
     delete [] codecs;
+    codecs = nullptr;
   }
+  return 0;
 }
 
 uint64_t DecodedFrameProcessor::setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams) {

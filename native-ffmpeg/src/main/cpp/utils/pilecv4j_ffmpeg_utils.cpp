@@ -24,7 +24,8 @@ static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "Option already set.",
     "The underlying stream seems to have changed in some important dimension.",
     "The stream selection failed.",
-    "No input format"
+    "No format context",
+    "There's no output set"
 };
 
 /**

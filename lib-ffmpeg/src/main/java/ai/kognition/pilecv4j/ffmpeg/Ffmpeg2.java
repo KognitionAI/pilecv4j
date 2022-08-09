@@ -61,6 +61,7 @@ import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.fill_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.push_frame_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.seek_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.select_streams_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.write_buffer_callback;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.VideoFrame;
 
@@ -155,11 +156,11 @@ public class Ffmpeg2 {
     }
 
     /**
-     * This interface is used for defining stream selectors in java
+     * This interface is used for remuxing (TODO: or encoding) to java memory
      */
     @FunctionalInterface
-    public static interface RawStreamSelectorCallback {
-        public boolean select(boolean[] selection);
+    public static interface WritePacket {
+        public void handle(ByteBuffer packet, int len);
     }
 
     /**
@@ -188,6 +189,8 @@ public class Ffmpeg2 {
         private StreamSelector selector = null;
         private final StreamContext ctx;
         private final List<MediaProcessor> processors = new ArrayList<>();
+        // package to avoid it being optimized away
+        final List<MediaOutput> outputs = new ArrayList<>();
         private final String name;
 
         private MediaProcessingChain(final String name, final long nativeRef, final StreamContext ctx) {
@@ -261,31 +264,6 @@ public class Ffmpeg2 {
             });
         }
 
-        private MediaProcessingChain createStreamSelector(final RawStreamSelectorCallback callback) {
-            final var ssc = new select_streams_callback() {
-
-                @Override
-                public int select_streams(final int numStreams, final Pointer selected) {
-                    final IntBuffer buf = selected.getByteBuffer(0, Integer.BYTES * numStreams).asIntBuffer();
-
-                    final boolean[] res = new boolean[numStreams];
-                    for(int i = 0; i < numStreams; i++)
-                        res[i] = buf.get(i) == 0 ? false : true;
-
-                    if(!callback.select(res))
-                        return 0;
-
-                    for(int i = 0; i < numStreams; i++)
-                        buf.put(i, res[i] ? 1 : 0);
-
-                    return 1;
-                }
-
-            };
-
-            return manage(new CallbackStreamSelector(FfmpegApi2.pcv4j_ffmpeg2_javaStreamSelector_create(ssc), ssc));
-        }
-
         /**
          * Create a video processor that takes the first decodable video stream.
          */
@@ -326,26 +304,106 @@ public class Ffmpeg2 {
             return manage(new FrameVideoProcessor(nativeRef, pfc));
         }
 
-        public MediaProcessingChain createUriRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
-            return manage(new MediaProcessor(FfmpegApi2.pcv4j_ffmpeg2_uriRemuxer_create(fmt, outputUri, maxRemuxErrorCount)));
+        public MediaProcessingChain createRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
+            final long remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(maxRemuxErrorCount);
+            final long outputRef = FfmpegApi2.pcv4j_ffmpeg2_uriOutput_create(fmt, outputUri);
+            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(remuxerRef, outputRef);
+            return manage(new MediaProcessor(remuxerRef));
         }
 
-        public MediaProcessingChain createUriRemuxer(final String outputUri, final int maxRemuxErrorCount) {
-            return createUriRemuxer(null, outputUri, maxRemuxErrorCount);
+        public MediaProcessingChain createRemuxer(final String outputUri, final int maxRemuxErrorCount) {
+            return createRemuxer(null, outputUri, maxRemuxErrorCount);
         }
 
-        public MediaProcessingChain createUriRemuxer(final String fmt, final String outputUri) {
-            return createUriRemuxer(fmt, outputUri, DEFAULT_MAX_REMUX_ERRORS);
+        public MediaProcessingChain createRemuxer(final String fmt, final String outputUri) {
+            return createRemuxer(fmt, outputUri, DEFAULT_MAX_REMUX_ERRORS);
         }
 
-        public MediaProcessingChain createUriRemuxer(final String outputUri) {
-            return createUriRemuxer(null, outputUri, DEFAULT_MAX_REMUX_ERRORS);
+        public MediaProcessingChain createRemuxer(final String outputUri) {
+            return createRemuxer(null, outputUri, DEFAULT_MAX_REMUX_ERRORS);
+        }
+
+        private static class CustomOutput extends MediaOutput {
+            // ======================================================================
+            // JNA will only hold a weak reference to the callbacks passed in
+            // so if we dynamically allocate them then they will be garbage collected.
+            // In order to prevent that, we're keeping strong references to them.
+            // These are not private in order to avoid any possibility that the
+            // JVM optimized them out since they aren't read anywhere in this code.
+            @SuppressWarnings("unused") public write_buffer_callback strongRefW = null;
+            // ======================================================================
+
+            private CustomOutput(final long nativeRef) {
+                super(nativeRef);
+            }
+
+            private ByteBuffer customBuffer() {
+                final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_customOutput_buffer(nativeRef);
+                final int bufSize = FfmpegApi2.pcv4j_ffmpeg2_customOutput_bufferSize(nativeRef);
+                return value.getByteBuffer(0, bufSize);
+            }
+
+            private void set(final write_buffer_callback write) {
+                strongRefW = write;
+                FfmpegApi2.pcv4j_ffmpeg2_customOutput_set(nativeRef, write);
+            }
+        }
+
+        public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer) {
+
+            final var remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(DEFAULT_MAX_REMUX_ERRORS);
+            final var outputRef = FfmpegApi2.pcv4j_ffmpeg2_customOutput_create(outputFormat, null);
+            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(remuxerRef, outputRef);
+            final var output = new CustomOutput(outputRef);
+
+            final ByteBuffer bb = output.customBuffer();
+
+            output.set(numBytes -> {
+                writer.handle(bb, numBytes);
+                return 0L;
+            });
+
+            // hold onto it but do nothing else. This is to maintain any strong references required.
+            // Currently the media processor (Remuxer) will call close when it's closed.
+            outputs.add(output);
+
+            return manage(new MediaProcessor(remuxerRef));
         }
 
         public MediaProcessingChain optionally(final boolean doIt, final Consumer<MediaProcessingChain> ctxWork) {
             if(doIt)
                 ctxWork.accept(this);
             return this;
+        }
+
+        @FunctionalInterface
+        private static interface RawStreamSelectorCallback {
+            public boolean select(boolean[] selection);
+        }
+
+        private MediaProcessingChain createStreamSelector(final RawStreamSelectorCallback callback) {
+            final var ssc = new select_streams_callback() {
+
+                @Override
+                public int select_streams(final int numStreams, final Pointer selected) {
+                    final IntBuffer buf = selected.getByteBuffer(0, Integer.BYTES * numStreams).asIntBuffer();
+
+                    final boolean[] res = new boolean[numStreams];
+                    for(int i = 0; i < numStreams; i++)
+                        res[i] = buf.get(i) == 0 ? false : true;
+
+                    if(!callback.select(res))
+                        return 0;
+
+                    for(int i = 0; i < numStreams; i++)
+                        buf.put(i, res[i] ? 1 : 0);
+
+                    return 1;
+                }
+
+            };
+
+            return manage(new CallbackStreamSelector(FfmpegApi2.pcv4j_ffmpeg2_javaStreamSelector_create(ssc), ssc));
         }
 
         private MediaProcessingChain manage(final MediaProcessor newProc) {
@@ -369,7 +427,7 @@ public class Ffmpeg2 {
      * that processes packets.
      */
     private static class MediaProcessor implements QuietCloseable {
-        protected final long nativeRef;
+        final long nativeRef;
 
         private MediaProcessor(final long nativeRef) {
             this.nativeRef = nativeRef;
@@ -379,6 +437,14 @@ public class Ffmpeg2 {
         public void close() {
             if(nativeRef != 0L)
                 FfmpegApi2.pcv4j_ffmpeg2_mediaProcessor_destroy(nativeRef);
+        }
+    }
+
+    private static class MediaOutput {
+        final long nativeRef;
+
+        private MediaOutput(final long nativeRef) {
+            this.nativeRef = nativeRef;
         }
     }
 
@@ -466,7 +532,7 @@ public class Ffmpeg2 {
      * will likely grow in the future:
      * <ul>
      * <li>A uri remuxer: This will allow the packets to be remuxed and output to a given URI.
-     * You add a remuxer using the call {@link MediaProcessingChain#createUriRemuxer(String)}</li>
+     * You add a remuxer using the call {@link MediaProcessingChain#createRemuxer(String)}</li>
      * <li>A frame processor: The packets will be fully decoded and the frames will be passed
      * to the callback provided. A frame processor can be added by calling
      * {@link MediaProcessingChain#createVideoFrameProcessor(VideoFrameConsumer)}</li>

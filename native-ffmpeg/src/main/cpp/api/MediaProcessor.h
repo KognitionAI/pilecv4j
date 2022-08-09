@@ -47,6 +47,11 @@ public:
    */
   virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType packetMediaType) = 0;
 
+  /**
+   * Free resources prior to delete.
+   */
+  virtual uint64_t close() = 0;
+
 protected:
 
   // Helper methods for implementing sub classes.

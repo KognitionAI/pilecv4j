@@ -59,7 +59,8 @@ endif()
 #execute_process(COMMAND "${CMAKE_COMMAND}" "-E" "environment")
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-add_definitions( -DLOGGING )
+add_definitions( -DLOGGING -DPILECV4J_ENABLE_TRACE_API )
+#add_definitions( -DLOGGING )
 
 if(MSVC)
   add_definitions( -D_CRT_SECURE_NO_WARNINGS -D_CRT_NO_VA_START_VALIDATION )
@@ -79,12 +80,15 @@ add_library(${PROJECT_NAME} SHARED
   api/StreamSelector.cpp
   api/StreamDetails.cpp
   api/EncodingContext.cpp
+  api/MediaOutput.cpp
   sources/UriMediaDataSource.cpp
   sources/CustomMediaDataSource.cpp
   processors/DecodedFrameProcessor.cpp
-  processors/UriRemuxer.cpp
+  processors/Remuxer.cpp
   selectors/FirstVideoStreamSelector.cpp
   selectors/JavaStreamSelector.cpp
+  output/CustomOutput.cpp
+  output/UriOutput.cpp
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE . PUBLIC ${AVCODEC_INCLUDE_DIR})

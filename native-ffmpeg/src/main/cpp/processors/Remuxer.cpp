@@ -5,7 +5,8 @@
  *      Author: jim
  */
 
-#include "processors/UriRemuxer.h"
+#include "processors/Remuxer.h"
+#include "api/MediaOutput.h"
 
 #include "utils/log.h"
 
@@ -20,7 +21,8 @@ namespace pilecv4j
 namespace ffmpeg
 {
 
-#define COMPONENT "URIR"
+#define COMPONENT "RMUX"
+#define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_list args;
@@ -29,49 +31,39 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_end( args );
 }
 
-UriRemuxer::~UriRemuxer() {
-  if (output_format_context) {
-    //https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga7f14007e7dc8f481f054b21614dfec13
-    av_write_trailer(output_format_context);
-
-    if (cleanupIoContext) {
-      avio_closep(&output_format_context->pb);
-      output_format_context->pb = nullptr;
-    }
-    avformat_free_context(output_format_context);
-  }
+Remuxer::~Remuxer() {
 }
 
-uint64_t UriRemuxer::setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams) {
+uint64_t Remuxer::close() {
+  PILECV4J_TRACE;
+  if (output)
+    return output->close();
+  return 0;
+}
+
+uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams) {
+  PILECV4J_TRACE;
   // ==================================================
   // Create and setup the output_format_context if we're remuxing
   // ==================================================
 
-  return setupRemux(avformatCtx);
-  // ==================================================
-}
+  if (!output)
+    return MAKE_P_STAT(NO_OUTPUT);
 
-// sets output_format_context, cleanupIoContext, and streams_list
-uint64_t UriRemuxer::setupRemux(AVFormatContext* input_format_context) {
   int ret = 0;
-  output_format_context = nullptr;
-  const char* loutputUri = outputUri.c_str();
+  uint64_t iret = 0;
   int number_of_streams = -1;
   int stream_index = 0;
 
-  const char* lfmt = fmtNull ? nullptr : fmt.c_str();
+  AVFormatContext* output_format_context = nullptr;
+  iret = output->allocateOutputContext(&output_format_context);
+  if (!output_format_context || isError(iret))
+    return iret;
 
-  llog(DEBUG, "UriRemuxer: [%s, %s]", PO(lfmt), PO(loutputUri));
-
-  ret = avformat_alloc_output_context2(&output_format_context, nullptr, lfmt, loutputUri);
-  if (!output_format_context) {
-    llog(ERROR, "Failed to allocate output format context using a format of \"%s\" and an output file of \"%s\"",
-        lfmt == nullptr ? "[NULL]" : lfmt, loutputUri);
-    return ret < 0 ? MAKE_AV_STAT(ret) : MAKE_AV_STAT(AVERROR_UNKNOWN);
-  }
-
-  if (ret < 0)
+  if (ret < 0) {
+    llog(ERROR, "Failed to allocateOutputContext: %ld", (long)iret);
     goto fail;
+  }
 
   number_of_streams = input_format_context->nb_streams;
   streams_list = new int[number_of_streams];
@@ -119,19 +111,17 @@ uint64_t UriRemuxer::setupRemux(AVFormatContext* input_format_context) {
     }
   }
 
-  // https://ffmpeg.org/doxygen/trunk/group__lavf__misc.html#gae2645941f2dc779c307eb6314fd39f10
-  av_dump_format(output_format_context, 0, loutputUri, 1);
+  {
+    AVDictionary* opts = nullptr;
+    buildOptions(options, &opts);
+    iret = output->openOutput(&opts);
+    if (opts != nullptr)
+      av_dict_free(&opts);
+  }
 
-  // unless it's a no file (we'll talk later about that) write to the disk (FLAG_WRITE)
-  // but basically it's a way to save the file to a buffer so you can store it
-  // wherever you want.
-  if (!(output_format_context->oformat->flags & AVFMT_NOFILE)) {
-    ret = avio_open(&output_format_context->pb, loutputUri, AVIO_FLAG_WRITE);
-    if (ret < 0) {
-      llog(ERROR, "Could not open output file '%s'", loutputUri);
-      goto fail;
-    }
-    cleanupIoContext = true; // we need to close what we opened.
+  if (isError(iret)) {
+    llog(ERROR, "Failed to openOutput: %ld", (long)iret);
+    goto fail;
   }
 
   // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
@@ -146,24 +136,29 @@ uint64_t UriRemuxer::setupRemux(AVFormatContext* input_format_context) {
   fail:
   if (streams_list != nullptr)
     delete [] streams_list;
-  if (output_format_context != nullptr) {
-    if (cleanupIoContext) {
-      avio_closep(&output_format_context->pb);
-      output_format_context->pb = nullptr;
-    }
-    cleanupIoContext = false;
-    avformat_free_context(output_format_context);
-    output_format_context = nullptr;
-  }
-  return MAKE_AV_STAT(ret);
+  if (output_format_context != nullptr)
+    output->fail();
+  return isError(iret) ? iret : MAKE_AV_STAT(ret);
 }
 
-uint64_t UriRemuxer::preFirstFrame(AVFormatContext* avformatCtx) {
+uint64_t Remuxer::preFirstFrame(AVFormatContext* avformatCtx) {
   startTime = now();
   return 0;
 }
 
-uint64_t UriRemuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * inPacket) {
+uint64_t Remuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * inPacket) {
+  PILECV4J_TRACE;
+
+  if (!output) {
+    llog(ERROR, "Can't remux packet without a destination (output) set");
+    return MAKE_P_STAT(NO_OUTPUT);
+  }
+
+  AVFormatContext* output_format_context = output->getFormatContext();
+  if (!output_format_context) {
+    llog(ERROR, "Can't remux packet without an output AVFormatContext");
+    return MAKE_P_STAT(NO_OUTPUT);
+  }
 
   int input_stream_index = inPacket->stream_index;
   if (streams_list[input_stream_index] < 0)
@@ -179,12 +174,9 @@ uint64_t UriRemuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * in
   }
   // if the input stream has no valid pts (like when reading the live feed from milestone)
   // then we're going to calculate it.
-  llog(TRACE, "        ->pPacket,ofc %" PRId64 ", %d / %d", pPacket, time_base.num, time_base.den);
   if (pPacket->pts == AV_NOPTS_VALUE) {
     pPacket->pts = av_rescale_q((int64_t)(now() - startTime), millisecondTimeBase, time_base);
     pPacket->dts = pPacket->pts;
-
-    llog(TRACE, "calced  ->pts,dts %" PRId64 ",%" PRId64, pPacket->pts, pPacket->dts);
   }
 
   AVStream* out_stream = output_format_context->streams[0];
@@ -195,8 +187,7 @@ uint64_t UriRemuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * in
   // https://ffmpeg.org/doxygen/trunk/structAVPacket.html#ab5793d8195cf4789dfb3913b7a693903
   pPacket->pos = -1;
   if (isEnabled(TRACE))
-    llog(TRACE, "rescaled  pts,dts %" PRId64 ",%" PRId64 ", outstream time_base: %d/%d",
-        pPacket->pts, pPacket->dts, out_stream->time_base.num, out_stream->time_base.den);
+    logPacket(TRACE, COMPONENT, "Rescaled Packet", pPacket, output_format_context);
 
   int ret = av_interleaved_write_frame(output_format_context, pPacket);
   av_packet_free(&pPacket);
@@ -205,7 +196,8 @@ uint64_t UriRemuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * in
   return MAKE_AV_STAT(ret);
 }
 
-uint64_t UriRemuxer::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType) {
+uint64_t Remuxer::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType) {
+  PILECV4J_TRACE;
   uint64_t ret = remuxPacket(avformatCtx,pPacket);
   if (ret != 0) {
     remuxErrorCount++;
@@ -220,16 +212,23 @@ uint64_t UriRemuxer::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacke
   return ret;
 }
 
-
 //========================================================================
 // Everything here in this extern "C" section is callable from Java
 //========================================================================
 extern "C" {
 
-  KAI_EXPORT uint64_t pcv4j_ffmpeg2_uriRemuxer_create(const char* pfmt, const char* poutputUri, int32_t maxRemuxErrorCount) {
-    MediaProcessor* ret = new UriRemuxer(pfmt, poutputUri, maxRemuxErrorCount);
-    return (uint64_t)ret;
-  }
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_remuxer_create(int32_t maxRemuxErrorCount) {
+  PILECV4J_TRACE;
+  MediaProcessor* ret = new Remuxer(maxRemuxErrorCount);
+  return (uint64_t)ret;
+}
+
+KAI_EXPORT void pcv4j_ffmpeg2_remuxer_setOutput(uint64_t remuxRef, uint64_t outputRef) {
+  PILECV4J_TRACE;
+  Remuxer* ths = (Remuxer*)remuxRef;
+  MediaOutput* output = (MediaOutput*)outputRef;
+  ths->setMediaOutput(output);
+}
 
 }
 

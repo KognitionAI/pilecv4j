@@ -26,6 +26,7 @@ import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
+import org.opencv.imgproc.Imgproc;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -331,6 +332,15 @@ public class CvMat extends Mat implements QuietCloseable {
             return null;
         }
         return new CvMat(newNativeObj);
+    }
+
+    public static CvMat flipRedBlue(final Mat mat) {
+        if(mat.channels() != 3 && mat.channels() != 4)
+            throw new IllegalArgumentException("Cannot flip the red and blue channels of a " + mat.channels() + " channel image.");
+        try(CvMat ret = new CvMat();) {
+            Imgproc.cvtColor(mat, ret, mat.channels() == 3 ? Imgproc.COLOR_RGB2BGR : Imgproc.COLOR_RGBA2BGRA);
+            return ret.returnMe();
+        }
     }
 
     /**

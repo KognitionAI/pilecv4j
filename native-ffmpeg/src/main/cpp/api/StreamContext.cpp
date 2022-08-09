@@ -32,7 +32,7 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 //========================================================================
 // Local function defs.
 //========================================================================
-static uint64_t process_frames(StreamContext* ctx);
+static uint64_t process_packets(StreamContext* ctx);
 //========================================================================
 
 // ===========================================================
@@ -66,7 +66,7 @@ uint64_t StreamContext::open() {
 
   {
     AVDictionary* opts = nullptr;
-    buildOptions(&opts);
+    buildOptions(options, &opts);
     rc = mediaDataSource->open(formatCtx, &opts);
     if (opts != nullptr)
       av_dict_free(&opts);
@@ -230,7 +230,7 @@ uint64_t StreamContext::play() {
   if (isError(rc))
     return rc;
 
-  rc  = process_frames(this);
+  rc  = process_packets(this);
   state = ENDED;
 
   if (isError(rc))
@@ -345,7 +345,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_load(uint64_t ctx) {
 
 }
 
-static uint64_t process_frames(StreamContext* c) {
+static uint64_t process_packets(StreamContext* c) {
   int remuxErrorCount = 0; // if this count goes above MAX_REMUX_ERRORS then process_frames will fail.
 
   if (c->state != PROCESSORS_SETUP) {
@@ -384,12 +384,13 @@ static uint64_t process_frames(StreamContext* c) {
   // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
   while ((av_rc = av_read_frame(pFormatContext, pPacket)) >= 0 && !c->stopMe)
   {
-    const int streamIndex = (int)pPacket->stream_index;
-    llog(TRACE, "AVPacket->stream_index,pts,dts %d %" PRId64 ",%" PRId64, streamIndex, pPacket->pts, pPacket->dts);
+    logPacket(TRACE, COMPONENT, "Packet", pPacket, pFormatContext);
 
+    const int streamIndex = (int)pPacket->stream_index;
+    const AVMediaType mediaType = c->streamTypes[streamIndex];
     if (!throttle || !throttle->throttle(pFormatContext, pPacket)) {
       for (auto o : c->mediaProcessors) {
-        rc = o->handlePacket(pFormatContext, pPacket, c->streamTypes[streamIndex]);
+        rc = o->handlePacket(pFormatContext, pPacket, mediaType);
 
         if (isError(rc))
           break;

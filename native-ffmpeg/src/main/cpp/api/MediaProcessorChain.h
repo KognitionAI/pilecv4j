@@ -35,6 +35,10 @@ public:
   virtual uint64_t preFirstFrame(AVFormatContext* avformatCtx);
   virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType);
 
+  virtual inline uint64_t close() {
+    return 0;
+  }
+
   inline uint64_t addProcessor(MediaProcessor* vds) {
     if (vds == nullptr)
       return MAKE_P_STAT(NO_PROCESSOR_SET);

@@ -84,8 +84,10 @@ extern "C" {
       llog(TRACE, "destroying vid processor %" PRId64, uriSource);
 
     MediaProcessor* ret = (MediaProcessor*)uriSource;
-    if (ret != nullptr)
+    if (ret != nullptr) {
+      ret->close();
       delete ret;
+    }
   }
 
 }

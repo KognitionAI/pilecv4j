@@ -98,9 +98,6 @@ uint64_t EncodingContext::setupOutputContext(const char* pfmt, const char* poutp
     return ret < 0 ? MAKE_AV_STAT(ret) : MAKE_AV_STAT(AVERROR_UNKNOWN);
   }
 
-  // unless it's a no file (we'll talk later about that) write to the disk (FLAG_WRITE)
-  // but basically it's a way to save the file to a buffer so you can store it
-  // wherever you want.
   if (!(output_format_context->oformat->flags & AVFMT_NOFILE)) {
     llog(TRACE, "Opening AVIOContext for %s", outputUri.c_str());
     //llog(TRACE, "STEP 2: avio_open2( ctx->pb, %s, AVIO_FLAG_WRITE, null, null )", PO(outputUri.c_str()));

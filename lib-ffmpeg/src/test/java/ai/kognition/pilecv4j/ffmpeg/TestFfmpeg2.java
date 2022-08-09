@@ -16,11 +16,15 @@
 
 package ai.kognition.pilecv4j.ffmpeg;
 
+import static net.dempsy.util.Functional.uncheck;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.OutputStream;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -232,7 +236,7 @@ public class TestFfmpeg2 extends BaseTest {
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
                 .openChain("default")
-                .createUriRemuxer(destination.getAbsolutePath())
+                .createRemuxer(destination.getAbsolutePath())
                 .streamContext()
                 .optionally(sync, s -> s.sync())
                 .play();
@@ -255,7 +259,57 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     })
                     .streamContext()
-                    .optionally(sync, s -> s.sync())
+                    // .optionally(sync, s -> s.sync())
+                    .play();
+            }
+        }
+    }
+
+    @Test
+    public void testCustomRemux() throws Exception {
+        LOGGER.info("Running test: {}.testCustomRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        final File destination = new File("/tmp/out.ts"); // tempDir.newFile("out.ts");
+        if(destination.exists())
+            destination.delete();
+        try(
+
+            final StreamContext c = Ffmpeg2.createStreamContext();
+            OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
+
+        ) {
+            c
+                .addOption("rtsp_flags", "prefer_tcp")
+                .createMediaDataSource(STREAM)
+                .openChain("default")
+                .createRemuxer("mpegts", (packet, numBytes) -> {
+                    packet.rewind();
+                    final byte[] pkt = new byte[numBytes];
+                    packet.get(pkt);
+                    uncheck(() -> os.write(pkt));
+                })
+                .streamContext()
+                .optionally(sync, s -> s.sync())
+                .play();
+        }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        if(SHOW) {
+            try(final ImageDisplay id = new ImageDisplay.Builder().build();
+                final StreamContext c = Ffmpeg2.createStreamContext();) {
+                c
+                    .createMediaDataSource(destination.toURI())
+                    .openChain("default")
+                    .createFirstVideoStreamSelector()
+                    .createVideoFrameProcessor(f -> {
+                        try(final CvMat rgb = f.bgr(false);) {
+                            id.update(rgb);
+                        }
+                    })
+                    .streamContext()
+                    // .optionally(sync, s -> s.sync())
                     .play();
             }
         }
@@ -356,7 +410,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     })
                     .streamContext()
-                    .optionally(sync, s -> s.sync())
+                    // .optionally(sync, s -> s.sync())
                     .play();
             }
         }
@@ -448,7 +502,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     })
                     .streamContext()
-                    .optionally(sync, s -> s.sync())
+                    // .optionally(sync, s -> s.sync())
                     .play();
             }
         }
