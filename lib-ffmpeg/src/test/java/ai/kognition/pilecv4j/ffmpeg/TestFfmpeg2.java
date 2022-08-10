@@ -268,7 +268,7 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testCustomRemux() throws Exception {
         LOGGER.info("Running test: {}.testCustomRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        final File destination = new File("/tmp/out.ts"); // tempDir.newFile("out.ts");
+        final File destination = tempDir.newFile("out.ts");
         if(destination.exists())
             destination.delete();
         try(
