@@ -189,7 +189,7 @@ This is a bit of an oddity but it's basically an abstraction for object tracking
 
 In OpenCV's C/C++ API, the developer is responsible for managing the resources. The Mat class in C++ references the underlying memory resources for the image data. When a C++ Mat is deleted, memory is freed (that is, as long as other Mat's aren't referring to the same image data memory, in which case when the last one is deleted, the memory is freed). This gives the developer using the C++ API fine grained control over the compute resources.
 
-OpenCv's Java Mat's manage native resource and rely on the class's finalizer and therefore the garbage collector, to eventually clean up those resources. This includes the raw image data. The problem with doing this is that the Java VM and it's garbage collector *can't see* the image memory referred to by the Mat. This memory is ["off-heap"](https://dev.to/jeissonflorez29/off-heap-memory-in-java-4dd1) from the perspective of the Java VM.
+OpenCv's Java Mat's manage native resource and rely on the class' finalizer and therefore the garbage collector, to eventually clean up those resources. This includes the raw image data. The problem with doing this is that the Java VM and it's garbage collector *can't see* the image memory referred to by the Mat. This memory is ["off-heap"](https://dev.to/jeissonflorez29/off-heap-memory-in-java-4dd1) from the perspective of the Java VM.
 
 `lib-image` is an augmentation for [OpenCv](https://opencv.org/)'s Java API. It's primary purpose is to allow the user to handle [OpenCv](https://opencv.org/) [Mat](https://docs.opencv.org/4.5.3/d3/d63/classcv_1_1Mat.html)s as Java resources (that is `Closable`s).
 
