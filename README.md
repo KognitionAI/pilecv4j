@@ -380,7 +380,7 @@ You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaD
             // you need to respond to this callback by filling the byte buffer with *up to*
             // the `numBytes` requested
             ...
-            but.put(/* put data in the byte buffer */...);
+            buf.put(/* put data in the byte buffer */...);
             return numOfBytesAddedToBuffer;
         })
         ...
