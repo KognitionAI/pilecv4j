@@ -77,11 +77,21 @@ uint64_t UriOutput::openOutput(AVDictionary** opts) {
     ret = avio_open(&output_format_context->pb, loutputUri, AVIO_FLAG_WRITE);
     if (ret < 0) {
       llog(ERROR, "Could not open output file '%s'", loutputUri);
+      fail();
       return MAKE_AV_STAT(ret);
     }
     cleanupIoContext = true; // we need to close what we opened.
   } else
     llog(INFO, "AVFMT_NOFILE flag is set");
+
+  // write the header
+  // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
+  ret = avformat_write_header(output_format_context, nullptr);
+  if (ret < 0) {
+    llog(ERROR, "Error occurred when opening output file\n");
+    fail();
+    return MAKE_AV_STAT(ret);
+  }
 
   return 0;
 }
@@ -100,10 +110,10 @@ void UriOutput::cleanup(bool writeTrailer) {
     }
 
     if (cleanupIoContext) {
+      cleanupIoContext = false;
       avio_closep(&output_format_context->pb);
       output_format_context->pb = nullptr;
     }
-    cleanupIoContext = false;
 
     avformat_free_context(output_format_context);
     setFormatContext(nullptr);
@@ -112,9 +122,6 @@ void UriOutput::cleanup(bool writeTrailer) {
 
 uint64_t UriOutput::close() {
   PILECV4J_TRACE;
-  // we cannot delegate to MediaOutput::close because
-  // it will av_write_trailer and then free the format context.
-  // but in between those operations we need to avio_closep
   if (!isClosed()) {
     cleanup(true);
     return MediaOutput::close();

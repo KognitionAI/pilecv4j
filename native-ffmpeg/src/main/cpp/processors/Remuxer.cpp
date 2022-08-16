@@ -31,69 +31,136 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_end( args );
 }
 
-Remuxer::~Remuxer() {
+Remuxer::~Remuxer() {}
+
+void Remuxer::setMediaOutput(MediaOutput* poutput) {
+  PILECV4J_TRACE;
+  output = poutput;
+  if (alreadySetup)
+    setupStreams();
 }
 
 uint64_t Remuxer::close() {
   PILECV4J_TRACE;
-  if (output)
-    return output->close();
+  // we're NOT going to close the output since the responsibility for that will be left up to java
+  if (in_codecparpp) {
+    for (int i = 0; i < number_of_streams; i++) {
+      if (in_codecparpp[i])
+        avcodec_parameters_free(&(in_codecparpp[i]));
+    }
+    delete [] in_codecparpp;
+    in_codecparpp = nullptr;
+  }
   return 0;
 }
 
-uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams) {
+uint64_t Remuxer::setupStreams() {
   PILECV4J_TRACE;
-  // ==================================================
-  // Create and setup the output_format_context if we're remuxing
-  // ==================================================
+  int stream_index = 0;
+  uint64_t iret = 0;
+  bool skipOutput = false;
 
   if (!output)
     return MAKE_P_STAT(NO_OUTPUT);
 
-  int ret = 0;
-  uint64_t iret = 0;
-  int number_of_streams = -1;
-  int stream_index = 0;
-
   AVFormatContext* output_format_context = nullptr;
   iret = output->allocateOutputContext(&output_format_context);
-  if (!output_format_context || isError(iret))
-    return iret;
-
-  if (ret < 0) {
+  if (!output_format_context || isError(iret)) {
     llog(ERROR, "Failed to allocateOutputContext: %ld", (long)iret);
+    skipOutput = true;
     goto fail;
   }
 
-  number_of_streams = input_format_context->nb_streams;
   streams_list = new int[number_of_streams];
 
   if (!streams_list) {
     llog(ERROR, "Failed to allocate a simple array of ints.");
-    return MAKE_AV_STAT(AVERROR(ENOMEM));
+    iret = MAKE_AV_STAT(AVERROR(ENOMEM));
+    goto fail;
   }
 
   stream_index = 0;
+  for (unsigned int i = 0; i < number_of_streams; i++) {
+    AVCodecParameters *in_codecpar = in_codecparpp[i];
+    streams_list[i] = -1;
+    if (!in_codecpar)
+      continue;
+
+    streams_list[i] = stream_index++;
+    AVStream* out_stream = avformat_new_stream(output_format_context, nullptr);
+    if (!out_stream) {
+      llog(ERROR, "Failed allocating output stream");
+      iret = MAKE_AV_STAT(AVERROR_UNKNOWN);
+      goto fail;
+    }
+    iret = MAKE_AV_STAT(avcodec_parameters_copy(out_stream->codecpar, in_codecpar));
+    if (isError(iret)) {
+      llog(ERROR, "Failed to copy codec parameters");
+      goto fail;
+    }
+  }
+
+  llog(TRACE, "Number of streams: %d", stream_index);
+
+  {
+    AVDictionary* opts = nullptr;
+    buildOptions(options, &opts);
+    iret = output->openOutput(&opts);
+    if (opts != nullptr)
+      av_dict_free(&opts);
+    if (isError(iret)) {
+      skipOutput = true;
+      llog(ERROR, "Failed to openOutput: %ld", (long)iret);
+      return iret;
+    }
+  }
+
+  return 0;
+
+  fail:
+  if (streams_list != nullptr) {
+    delete [] streams_list;
+    streams_list = nullptr;
+  }
+
+  if (!skipOutput)
+    output->fail();
+
+  return iret;
+
+}
+
+uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector<std::tuple<std::string,std::string> >& poptions, bool* selectedStreams) {
+  PILECV4J_TRACE;
+  uint64_t iret = 0;
+
+  // save off the options
+  options = poptions;
+
+  // set up the output streams
+  number_of_streams = input_format_context->nb_streams;
+  in_codecparpp = new AVCodecParameters*[number_of_streams];
+
   for (unsigned int i = 0; i < input_format_context->nb_streams; i++) {
+    in_codecparpp[i] = nullptr;
+
     AVStream* in_stream = input_format_context->streams[i];
     AVCodecParameters *in_codecpar = in_stream->codecpar;
 
     // only video, audio, and subtitles will be remuxed.
     if (in_codecpar->codec_type != AVMEDIA_TYPE_AUDIO &&
         in_codecpar->codec_type != AVMEDIA_TYPE_VIDEO &&
-        in_codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE) {
-      streams_list[i] = -1;
+        in_codecpar->codec_type != AVMEDIA_TYPE_SUBTITLE)
       continue;
+
+    in_codecparpp[i] = avcodec_parameters_alloc();
+    if (in_codecparpp[i] == nullptr) {
+      llog(ERROR, "Failed to allocate a new AVCodecParameters");
+      goto fail;
     }
-    streams_list[i] = stream_index++;
-    AVStream* out_stream = avformat_new_stream(output_format_context, NULL);
-    if (!out_stream) {
-      llog(ERROR, "Failed allocating output stream");
-      delete [] streams_list;
-      return MAKE_AV_STAT(AVERROR_UNKNOWN);
-    }
-    ret = avcodec_parameters_copy(out_stream->codecpar, in_codecpar);
-    if (ret < 0) {
+
+    iret = MAKE_AV_STAT(avcodec_parameters_copy(in_codecparpp[i], in_codecpar));
+    if (isError(iret)) {
       llog(ERROR, "Failed to copy codec parameters");
       goto fail;
     }
@@ -107,41 +174,32 @@ uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector
         setTag = false;
       }
       if (setTag)
-        out_stream->codecpar->codec_tag = tag;
+        in_codecparpp[i]->codec_tag = tag;
     }
   }
 
-  {
-    AVDictionary* opts = nullptr;
-    buildOptions(options, &opts);
-    iret = output->openOutput(&opts);
-    if (opts != nullptr)
-      av_dict_free(&opts);
-  }
-
-  if (isError(iret)) {
-    llog(ERROR, "Failed to openOutput: %ld", (long)iret);
+  iret = setupStreams();
+  if (isError(iret))
     goto fail;
-  }
 
-  // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
-  ret = avformat_write_header(output_format_context, nullptr);
-  if (ret < 0) {
-    llog(ERROR, "Error occurred when opening output file\n");
-    goto fail;
-  }
-
+  alreadySetup = true;
   return 0;
 
   fail:
-  if (streams_list != nullptr)
-    delete [] streams_list;
-  if (output_format_context != nullptr)
-    output->fail();
-  return isError(iret) ? iret : MAKE_AV_STAT(ret);
+  if (in_codecparpp) {
+    for (int i = 0; i < number_of_streams; i++) {
+      if (in_codecparpp[i])
+        avcodec_parameters_free(&(in_codecparpp[i]));
+    }
+    delete [] in_codecparpp;
+    in_codecparpp = nullptr;
+  }
+
+  return iret;
 }
 
 uint64_t Remuxer::preFirstFrame(AVFormatContext* avformatCtx) {
+  PILECV4J_TRACE;
   startTime = now();
   return 0;
 }
