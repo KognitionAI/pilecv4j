@@ -189,8 +189,6 @@ public class Ffmpeg2 {
         private StreamSelector selector = null;
         private final StreamContext ctx;
         private final List<MediaProcessor> processors = new ArrayList<>();
-        // package to avoid it being optimized away
-        final List<MediaOutput> outputs = new ArrayList<>();
         private final String name;
 
         private MediaProcessingChain(final String name, final long nativeRef, final StreamContext ctx) {
@@ -305,10 +303,8 @@ public class Ffmpeg2 {
         }
 
         public MediaProcessingChain createRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
-            final long remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(maxRemuxErrorCount);
-            final long outputRef = FfmpegApi2.pcv4j_ffmpeg2_uriOutput_create(fmt, outputUri);
-            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(remuxerRef, outputRef);
-            return manage(new MediaProcessor(remuxerRef));
+            final MediaOutput output = new MediaOutput(FfmpegApi2.pcv4j_ffmpeg2_uriOutput_create(fmt, outputUri));
+            return manage(new MediaProcessorWithCustomOutput(FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(maxRemuxErrorCount), output));
         }
 
         public MediaProcessingChain createRemuxer(final String outputUri, final int maxRemuxErrorCount) {
@@ -352,9 +348,7 @@ public class Ffmpeg2 {
         public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer) {
 
             final var remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(DEFAULT_MAX_REMUX_ERRORS);
-            final var outputRef = FfmpegApi2.pcv4j_ffmpeg2_customOutput_create(outputFormat, null);
-            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(remuxerRef, outputRef);
-            final var output = new CustomOutput(outputRef);
+            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_customOutput_create(outputFormat, null));
 
             final ByteBuffer bb = output.customBuffer();
 
@@ -363,11 +357,7 @@ public class Ffmpeg2 {
                 return 0L;
             });
 
-            // hold onto it but do nothing else. This is to maintain any strong references required.
-            // Currently the media processor (Remuxer) will call close when it's closed.
-            outputs.add(output);
-
-            return manage(new MediaProcessor(remuxerRef));
+            return manage(new MediaProcessorWithCustomOutput(remuxerRef, output));
         }
 
         public MediaProcessingChain optionally(final boolean doIt, final Consumer<MediaProcessingChain> ctxWork) {
@@ -440,11 +430,49 @@ public class Ffmpeg2 {
         }
     }
 
-    private static class MediaOutput {
+    private static class MediaProcessorWithCustomOutput extends MediaProcessor {
+        private MediaOutput output;
+
+        private MediaProcessorWithCustomOutput(final long nativeRef) {
+            this(nativeRef, null);
+        }
+
+        private MediaProcessorWithCustomOutput(final long nativeRef, final MediaOutput output) {
+            super(nativeRef);
+            this.output = output;
+            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(nativeRef, output.nativeRef);
+        }
+
+        /**
+         * Set the current MediaOutput and return the previous one
+         */
+        private MediaOutput setOutput(final MediaOutput output) {
+            final MediaOutput ret = this.output;
+            this.output = output;
+            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(nativeRef, output.nativeRef);
+            return ret;
+        }
+
+        @Override
+        public void close() {
+            if(output != null)
+                output.close();
+
+            super.close();
+        }
+    }
+
+    private static class MediaOutput implements QuietCloseable {
         final long nativeRef;
 
         private MediaOutput(final long nativeRef) {
             this.nativeRef = nativeRef;
+        }
+
+        @Override
+        public void close() {
+            if(nativeRef != 0L)
+                FfmpegApi2.pcv4j_ffmpeg2_mediaOutput_delete(nativeRef);
         }
     }
 

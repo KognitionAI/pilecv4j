@@ -115,6 +115,7 @@ uint64_t CustomOutput::allocateOutputContext(AVFormatContext** ofcpp) {
   if (!(*ofcpp)) {
     llog(ERROR, "Failed to allocate output format context using a format of \"%s\" and an output file of \"%s\"",
         lfmt == nullptr ? "[NULL]" : lfmt, loutputUri);
+    fail();
     return ret < 0 ? MAKE_AV_STAT(ret) : MAKE_AV_STAT(AVERROR_UNKNOWN);
   }
   setFormatContext(*ofcpp);
@@ -140,6 +141,7 @@ uint64_t CustomOutput::openOutput(AVDictionary** opts) {
   // check if open was called already
   if (ioBuffer != nullptr) {
     llog(ERROR, "It appears the open has been called twice on the CustomOutputRemuxer");
+    fail();
     return MAKE_P_STAT(ALREADY_SET);
   }
 
@@ -157,6 +159,16 @@ uint64_t CustomOutput::openOutput(AVDictionary** opts) {
   llog(TRACE, "AVFMT_NOFILE set: %s", (output_format_context->flags & AVFMT_NOFILE) ? "true" : "false");
   output_format_context->pb = ioContext;
   //output_format_context->flags |= AVFMT_FLAG_CUSTOM_IO;
+
+  // write the header
+  // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
+  ret = avformat_write_header(output_format_context, nullptr);
+  if (ret < 0) {
+    llog(ERROR, "Error occurred when opening output file\n");
+    fail();
+    return MAKE_AV_STAT(ret);
+  }
+
   return 0;
 }
 

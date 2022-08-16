@@ -35,6 +35,13 @@ class Remuxer: public MediaProcessor
   uint64_t remuxPacket(AVFormatContext* formatCtx,  const AVPacket * inPacket);
 
   MediaOutput* output = nullptr;
+  AVCodecParameters** in_codecparpp = nullptr;
+  int number_of_streams = -1;
+  std::vector<std::tuple<std::string,std::string> > options;
+
+  bool alreadySetup = false;
+
+  uint64_t setupStreams();
 
 protected:
 
@@ -44,9 +51,7 @@ public:
 
   virtual ~Remuxer();
 
-  inline void setMediaOutput(MediaOutput* poutput) {
-    output = poutput;
-  }
+  void setMediaOutput(MediaOutput* poutput);
 
   virtual uint64_t close();
 
