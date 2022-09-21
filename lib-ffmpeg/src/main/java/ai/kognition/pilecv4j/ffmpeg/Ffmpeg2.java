@@ -58,6 +58,7 @@ import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext.StreamDetails;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.fill_buffer_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.packet_filter_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.push_frame_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.seek_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.select_streams_callback;
@@ -179,6 +180,14 @@ public class Ffmpeg2 {
         public boolean select(StreamDetails[] details, boolean[] selection);
     }
 
+    public static interface PacketFilterCallback {
+        /**
+         * @return given the details, should this packet be let through
+         */
+        public boolean filter(final int mediaType, final int stream_index, final int packetNumBytes, final boolean isKeyFrame, final long pts, final long dts,
+            final int tbNum, final int tbDen);
+    }
+
     /**
      * Calling {@link Ffmpeg2.StreamContext#openChain(String)} returns a {@link Ffmpeg2.MediaProcessingChain}
      * which represents a selection of streams and a number of processes that operate on those
@@ -189,6 +198,7 @@ public class Ffmpeg2 {
         private StreamSelector selector = null;
         private final StreamContext ctx;
         private final List<MediaProcessor> processors = new ArrayList<>();
+        private final List<PacketFilter> packetFilters = new ArrayList<>();
         private final String name;
 
         private MediaProcessingChain(final String name, final long nativeRef, final StreamContext ctx) {
@@ -206,6 +216,10 @@ public class Ffmpeg2 {
 
             Functional.reverseRange(0, processors.size())
                 .mapToObj(i -> processors.get(i))
+                .forEach(p -> p.close());
+
+            Functional.reverseRange(0, packetFilters.size())
+                .mapToObj(i -> packetFilters.get(i))
                 .forEach(p -> p.close());
 
             if(selector != null)
@@ -238,6 +252,27 @@ public class Ffmpeg2 {
             private CallbackStreamSelector(final long nativeRef, final select_streams_callback selector) {
                 super(nativeRef);
                 ssc = selector;
+            }
+
+        }
+
+        /**
+         * This is package protected to eliminate any optimization of the strong references
+         * required to keep the JNA callbacks from being GCed
+         */
+        static class CallbackPacketFilter extends PacketFilter {
+            // ======================================================================
+            // JNA will only hold a weak reference to the callbacks passed in
+            // so if we dynamically allocate them then they will be garbage collected.
+            // In order to prevent that we're keeping strong references to them.
+            // These are not private in order to avoid any possibility that the
+            // JVM optimized them out since they aren't read anywhere in this code.
+            public packet_filter_callback pfcb;
+            // ======================================================================
+
+            private CallbackPacketFilter(final long nativeRef, final packet_filter_callback selector) {
+                super(nativeRef);
+                pfcb = selector;
             }
 
         }
@@ -366,6 +401,20 @@ public class Ffmpeg2 {
             return this;
         }
 
+        public MediaProcessingChain createPacketFilter(final PacketFilterCallback cb) {
+            final packet_filter_callback rcb = new packet_filter_callback() {
+
+                @Override
+                public int packet_filter(final int mediaType, final int stream_index, final int packetNumBytes, final int isKeyFrame, final long pts,
+                    final long dts, final int tbNum, final int tbDen) {
+                    return cb.filter(mediaType, stream_index, packetNumBytes, isKeyFrame == 0 ? false : true, pts, dts, tbNum, tbDen) ? 1 : 0;
+                }
+
+            };
+
+            return manage(new CallbackPacketFilter(FfmpegApi2.pcv4j_ffmpeg2_javaPacketFilter_create(rcb), rcb));
+        }
+
         @FunctionalInterface
         private static interface RawStreamSelectorCallback {
             public boolean select(boolean[] selection);
@@ -399,6 +448,12 @@ public class Ffmpeg2 {
         private MediaProcessingChain manage(final MediaProcessor newProc) {
             throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_mediaProcessorChain_addProcessor(this.nativeRef, newProc.nativeRef));
             processors.add(newProc);
+            return this;
+        }
+
+        private MediaProcessingChain manage(final PacketFilter newProc) {
+            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(this.nativeRef, newProc.nativeRef));
+            packetFilters.add(newProc);
             return this;
         }
 
@@ -480,6 +535,20 @@ public class Ffmpeg2 {
         final long nativeRef;
 
         private StreamSelector(final long nativeRef) {
+            this.nativeRef = nativeRef;
+        }
+
+        @Override
+        public void close() {
+            if(nativeRef != 0)
+                FfmpegApi2.pcv4j_ffmpeg2_streamSelector_destroy(nativeRef);
+        }
+    }
+
+    private static class PacketFilter implements QuietCloseable {
+        final long nativeRef;
+
+        private PacketFilter(final long nativeRef) {
             this.nativeRef = nativeRef;
         }
 

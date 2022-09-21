@@ -236,6 +236,10 @@ public class TestFfmpeg2 extends BaseTest {
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
                 .openChain("default")
+                .createPacketFilter((mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen) -> {
+                    System.out.println(isKeyFrame ? "keyframe" : "not keyframe");
+                    return true;
+                })
                 .createRemuxer(destination.getAbsolutePath())
                 .streamContext()
                 .optionally(sync, s -> s.sync())

@@ -18,10 +18,12 @@ namespace pilecv4j
 {
 namespace ffmpeg
 {
+class PacketFilter;
 
 class MediaProcessorChain : public MediaProcessor
 {
   StreamSelector* selector = nullptr;
+  std::vector<PacketFilter*> packetFilters;
   std::vector<MediaProcessor*> mediaProcessors;
 
   bool* selectedStreams = nullptr;
@@ -43,6 +45,13 @@ public:
     if (vds == nullptr)
       return MAKE_P_STAT(NO_PROCESSOR_SET);
     mediaProcessors.push_back(vds);
+    return 0;
+  }
+
+  inline uint64_t addPacketFilter(PacketFilter* vds) {
+    if (vds == nullptr)
+      return MAKE_P_STAT(NO_PROCESSOR_SET);
+    packetFilters.push_back(vds);
     return 0;
   }
 

@@ -78,6 +78,7 @@ add_library(${PROJECT_NAME} SHARED
   api/MediaProcessor.cpp
   api/MediaProcessorChain.cpp
   api/StreamSelector.cpp
+  api/PacketFilter.cpp
   api/StreamDetails.cpp
   api/EncodingContext.cpp
   api/MediaOutput.cpp
@@ -87,6 +88,7 @@ add_library(${PROJECT_NAME} SHARED
   processors/Remuxer.cpp
   selectors/FirstVideoStreamSelector.cpp
   selectors/JavaStreamSelector.cpp
+  filters/JavaPacketFilter.cpp
   output/CustomOutput.cpp
   output/UriOutput.cpp
   )

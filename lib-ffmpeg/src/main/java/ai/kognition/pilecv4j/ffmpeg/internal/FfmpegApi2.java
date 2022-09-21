@@ -113,6 +113,11 @@ public class FfmpegApi2 {
         public int select_streams(final int numStreams, Pointer selected);
     }
 
+    public static interface packet_filter_callback extends Callback {
+        public int packet_filter(final int mediaType, final int stream_index, final int packetNumBytes, final int isKeyFrame, final long pts, final long dts,
+            final int tbNum, final int tbDen);
+    }
+
     // ==========================================================
     // Utilities
     // ==========================================================
@@ -241,6 +246,8 @@ public class FfmpegApi2 {
 
     public static native long pcv4j_ffmpeg2_mediaProcessorChain_addProcessor(long mpc, long mp);
 
+    public static native long pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(long mpc, long pf);
+
     public static native long pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(long mpc, long ss);
 
     // ==========================================================
@@ -252,6 +259,8 @@ public class FfmpegApi2 {
     public static native long pcv4j_ffmpeg2_firstVideoStreamSelector_create();
 
     public static native long pcv4j_ffmpeg2_javaStreamSelector_create(select_streams_callback callback);
+
+    public static native long pcv4j_ffmpeg2_javaPacketFilter_create(packet_filter_callback callback);
 
     // ==========================================================
     // Stream Context setup methods
