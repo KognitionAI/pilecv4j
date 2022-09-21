@@ -6,6 +6,7 @@
  */
 
 #include "api/MediaProcessorChain.h"
+#include "api/PacketFilter.h"
 
 #include "common/kog_exports.h"
 #include "utils/log.h"
@@ -70,6 +71,11 @@ uint64_t MediaProcessorChain::handlePacket(AVFormatContext* avformatCtx, AVPacke
   if (!streamSelected(selectedStreams, pPacket->stream_index))
     return 0L;
 
+  for (auto f : packetFilters) {
+    if (!f->filter(avformatCtx, pPacket, streamMediaType))
+      return 0L;
+  }
+
   for (auto o : mediaProcessors) {
     uint64_t rc = o->handlePacket(avformatCtx, pPacket, streamMediaType);
     if (isError(rc))
@@ -93,6 +99,13 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_addProcessor(uint64_t mpc,
   MediaProcessor* vds = (MediaProcessor*)mediaProcessor;
   llog(DEBUG, "Adding processor at %" PRId64 " to media processor chain at %" PRId64, mediaProcessor, mpc);
   return c->addProcessor((MediaProcessor*)vds);
+}
+
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(uint64_t mpc, uint64_t packetFilter) {
+  MediaProcessorChain* c = (MediaProcessorChain*)mpc;
+  PacketFilter* vds = (PacketFilter*)packetFilter;
+  llog(DEBUG, "Adding packet filter at %" PRId64 " to media processor chain at %" PRId64, packetFilter, mpc);
+  return c->addPacketFilter((PacketFilter*)vds);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(uint64_t mpc, uint64_t selector) {
