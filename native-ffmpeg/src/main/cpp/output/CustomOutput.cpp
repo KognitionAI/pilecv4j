@@ -149,7 +149,7 @@ uint64_t CustomOutput::openOutput(AVDictionary** opts) {
 
   // according to the docs on avformat_open_input:
   //     @note If you want to use custom IO, preallocate the format context and set its pb field.
-  // So we're assuming the if the formatCtx->pb is set then the url can be null
+  // So we're assuming that if the formatCtx->pb is set then the url can be null
   ioContext = avio_alloc_context(ioBuffer,PCV4J_CUSTOMIO_OUTPUT_BUFSIZE,AVIO_FLAG_WRITE,this,
           nullptr,
           write_packet_to_custom_source,

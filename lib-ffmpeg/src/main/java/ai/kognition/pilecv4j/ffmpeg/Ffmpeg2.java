@@ -486,7 +486,7 @@ public class Ffmpeg2 {
     }
 
     private static class MediaProcessorWithCustomOutput extends MediaProcessor {
-        private MediaOutput output;
+        private final MediaOutput output;
 
         private MediaProcessorWithCustomOutput(final long nativeRef) {
             this(nativeRef, null);
@@ -496,16 +496,6 @@ public class Ffmpeg2 {
             super(nativeRef);
             this.output = output;
             FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(nativeRef, output.nativeRef);
-        }
-
-        /**
-         * Set the current MediaOutput and return the previous one
-         */
-        private MediaOutput setOutput(final MediaOutput output) {
-            final MediaOutput ret = this.output;
-            this.output = output;
-            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(nativeRef, output.nativeRef);
-            return ret;
         }
 
         @Override
@@ -1313,5 +1303,4 @@ public class Ffmpeg2 {
                 .getString(0);
         }
     }
-
 }
