@@ -16,14 +16,10 @@
 
 package ai.kognition.pilecv4j.image;
 
-import static net.dempsy.util.Functional.chain;
-import static net.dempsy.util.Functional.uncheck;
-
 import java.awt.color.ColorSpace;
 import java.awt.color.ICC_ColorSpace;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -78,8 +74,10 @@ public class CvMatWithColorInformation extends CvMat {
         csTypeName.put(ColorSpace.CS_GRAY, "CS_GRAY");
     }
 
-    private static final Method isLinearRGBspaceMethod = chain(uncheck(() -> ColorModel.class.getDeclaredMethod("isLinearRGBspace", ColorSpace.class)),
-        m -> m.setAccessible(true));
+    // this is copied from ColorModel.class source code.
+    public static boolean isLinearRGBspace(final ColorSpace cs) {
+        return cs == ColorSpace.getInstance(ColorSpace.CS_LINEAR_RGB);
+    }
 
     public static String colorSpaceTypeName(final int colorSpaceType) {
         final String ret = csTypeName.get(colorSpaceType);
@@ -136,10 +134,6 @@ public class CvMatWithColorInformation extends CvMat {
             }
             return ret.returnMe();
         }
-    }
-
-    public static boolean isLinearRGBspace(final ColorSpace colorSpace) {
-        return (Boolean)(uncheck(() -> isLinearRGBspaceMethod.invoke(null, colorSpace)));
     }
 
     @Override
