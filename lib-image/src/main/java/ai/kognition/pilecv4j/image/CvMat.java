@@ -90,7 +90,7 @@ public class CvMat extends Mat implements QuietCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(CvMat.class);
     public static final boolean TRACK_MEMORY_LEAKS;
 
-    private boolean skipCloseOnceForReturn = false;
+    protected boolean skipCloseOnceForReturn = false;
 
     static {
         ImageAPI._init();

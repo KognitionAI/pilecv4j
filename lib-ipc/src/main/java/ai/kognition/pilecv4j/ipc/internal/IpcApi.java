@@ -2,6 +2,10 @@ package ai.kognition.pilecv4j.ipc.internal;
 
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
+import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.LongByReference;
+import com.sun.jna.ptr.PointerByReference;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -73,16 +77,33 @@ public class IpcApi {
 
     public static native void pilecv4j_ipc_destroy_shmQueue(long nativeRef);
 
-    public static native int pilecv4j_ipc_shmQueue_create(long nativeRef, long size, int owner);
+    public static native long pilecv4j_ipc_shmQueue_create(long nativeRef, long size, int owner);
 
-    public static native int pilecv4j_ipc_shmQueue_open(long nativeRef, int owner);
+    public static native long pilecv4j_ipc_shmQueue_open(long nativeRef, int owner);
 
-    public static native long pilecv4j_ipc_shmQueue_tryGetWriteView_asMat(long nativeRef, long numElements, int cvtype);
+    public static native long pilecv4j_ipc_shmQueue_buffer(long nativeRef, long offset, PointerByReference owner);
 
-    public static native long pilecv4j_ipc_shmQueue_tryGetReadView_asMat(long nativeRef, long numElements, int cvtype);
+    public static native long pilecv4j_ipc_shmQueue_bufferSize(long nativeRef, LongByReference owner);
 
-    public static native int pilecv4j_ipc_shmQueue_markWritten(long nativeRef);
+    public static native long pilecv4j_ipc_shmQueue_lock(long nativeRef, long millis, int aggressive);
 
-    public static native int pilecv4j_ipc_shmQueue_markRead(long nativeRef);
+    public static native long pilecv4j_ipc_shmQueue_unlock(long nativeRef);
+
+    public static native long pilecv4j_ipc_shmQueue_postMessage(long nativeRef);
+
+    public static native long pilecv4j_ipc_shmQueue_unpostMessage(long nativeRef);
+
+    public static native long pilecv4j_ipc_shmQueue_isMessageAvailable(long nativeRef, IntByReference result);
+
+    /*
+     * Error handling
+     */
+    public static native Pointer pcv4j_ipc_errHandling_errString(long code);
+
+    public static native void pcv4j_ipc_errHandling_freeErrString(Pointer errStr);
+
+    public static native long pcv4j_ipc_errHandling_getEAGAIN();
+
+    public static native long pcv4j_ipc_errHandling_getOK();
 
 }

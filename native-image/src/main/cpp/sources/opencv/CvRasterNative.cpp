@@ -14,7 +14,7 @@ extern "C" {
     if (!mat->isContinuous())
       return NULL;
 
-    return mat->ptr(0);
+    return mat->data;
   }
 
   KAI_EXPORT uint64_t pilecv4j_image_CvRaster_copy(uint64_t native) {

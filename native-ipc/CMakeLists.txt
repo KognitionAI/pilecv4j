@@ -91,7 +91,8 @@ add_definitions( -DTIMING )
 
 set(SOURCE_FILES
   src/utils/log.cpp
-  src/utils/ShmQueue.cpp
+  src/utils/errHandling.cpp
+  src/utils/SharedMemory.cpp
   )
 
 include_directories("src")
