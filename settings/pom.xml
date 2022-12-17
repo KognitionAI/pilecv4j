@@ -110,6 +110,12 @@
         <classifier>bin</classifier>
         <version>${project.version}</version>
       </dependency>
+      <dependency>
+        <groupId>${project.groupId}</groupId>
+        <artifactId>native-ipc-${platform}</artifactId>
+        <classifier>bin</classifier>
+        <version>${project.version}</version>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+  <bean id="visionlabs-builder" class="ai.kognition.visionlabs.Visionlabs$Builder2" autowire="constructor">
+    <property name="downloadModel">
+      <bean class="ai.kognition.visionlabs.Visionlabs$DownloadDetails">
+        <constructor-arg ref="Vfs"/>
+        <!-- Should be kept in sync with code since variable names and defaults are logged there. -->
+        <constructor-arg
+                value="${visionlabs.model-repo-uri:https://nexus.kognition.ai/repository/kognition-models/visionlabs/v$(visionlabs-sdk.version)/visionlabs-models.tar.gz}"/>
+      </bean>
+    </property>
+    <!-- Should be kept in sync with code since variable names and defaults are logged there. -->
+    <property name="infraRed" value="${visionlabs.infra-red:false}" />
+    <property name="includeEstimation" value="${visionlabs.include-estimation:false}"/>
+    <property name="enableTimingMeasurements" value="${visionlabs.enable-timing:false}"/>
+    <property name="modelFolder" value="${visionlabs.model-folder:/tmp/visionlabs-models}" />
+    <property name="lazyInit" value="${visionlabs.lazy-init:false}" />
+  </bean>
+  
+  <bean id="visionlabs" class="ai.kognition.visionlabs.Visionlabs" factory-bean="visionlabs-builder" factory-method="build" destroy-method="close"/>
+</beans>

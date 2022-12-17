@@ -24,6 +24,7 @@
         <module>lib-tracking</module>
         <module>lib-ffmpeg</module>
         <module>lib-python</module>
+        <module>lib-ipc</module>
       </modules>
       <activation>
         <property>
@@ -41,6 +42,7 @@
         <module>native-nr</module>
         <module>native-ffmpeg</module>
         <module>native-python</module>
+        <module>native-ipc</module>
       </modules>
       <activation>
         <property>

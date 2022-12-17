@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd" xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <artifactId>pilecv4j-parent</artifactId>
+    <groupId>ai.kognition.pilecv4j</groupId>
+    <version>0.18-SNAPSHOT</version>
+    <relativePath>../parent/pom.xml</relativePath>
+  </parent>
+  <artifactId>lib-ipc</artifactId>
+
+  <dependencies>
+    
+    <!-- Third party deps -->
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-ipc-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-image-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <optional>true</optional>
+    </dependency>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>lib-image</artifactId>
+    </dependency>
+
+    <dependency> <!-- Not forced scoping -->
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-log4j12</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-test-utils</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency> <!-- Used in VarSubPropReader in the config stuff -->
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-distconfig.apachevfs</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>net.dempsy</groupId>
+      <artifactId>dempsy-vfs.api</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+
+</project>
