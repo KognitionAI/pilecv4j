@@ -627,8 +627,6 @@ public abstract class CvRaster implements AutoCloseable {
         switch(depth) {
             case CvType.CV_8S:
             case CvType.CV_8U:
-                // we can only handle 16bit FP as raw bytes
-            case CvType.CV_16F:
                 return new CvRaster(mat) {
                     final byte[] zeroPixel = new byte[channels()];
                     ByteBuffer bb = currentBuffer;
