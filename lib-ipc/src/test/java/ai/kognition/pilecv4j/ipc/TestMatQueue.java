@@ -1,5 +1,6 @@
 package ai.kognition.pilecv4j.ipc;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
@@ -8,7 +9,6 @@ import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.Test;
-import org.opencv.core.CvType;
 
 import net.dempsy.utils.test.ConditionPoll;
 import net.dempsy.vfs.Vfs;
@@ -18,33 +18,53 @@ import ai.kognition.pilecv4j.image.ImageFile;
 
 public class TestMatQueue {
 
-    public static final String TEST_IMAGE = "celebs/albert-einstein.jpg";
+//    public static final String TEST_IMAGE = "celebs/albert-einstein.jpg";
+    public static final String TEST_IMAGE = "resized.bmp";
 
     @Test
     public void testSimple() throws Exception {
-        try(MatQueue matqueue = new MatQueue("TEST");) {
-            assertTrue(matqueue.create(100000, false));
-            assertTrue(matqueue.open(false));
+        try(ShmQueue matqueue = new ShmQueue("TEST");) {
+            matqueue.create(100000, true);
+            matqueue.open(false);
+            assertEquals(100000L, matqueue.getBufferSize());
+        }
+    }
+
+    @Test
+    public void testSimpleReadWrite() throws Exception {
+        try(final ShmQueue queue = new ShmQueue("TEST");) {
+            queue.create(Long.BYTES, true);
+            assertTrue(queue.tryAccess(bb -> bb.putLong(0x0123456789L)));
+            assertTrue(queue.tryAccess(bb -> {
+                assertEquals(0x0123456789L, bb.getLong());
+            }));
         }
     }
 
     @Test
     public void testPass() throws Exception {
-        try(MatQueue matqueue = new MatQueue("TEST");
+        try(ShmQueue matqueue = new ShmQueue("TEST");
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
-            assertTrue(matqueue.create(mat, true));
-            try(CvMat shm = matqueue.tryGetWriteView(mat.total() * mat.elemSize(), CvType.makeType(mat.depth(), 1));) {
+            matqueue.create(mat, true);
+
+            try(var shm = matqueue.tryAccessAsMat(mat.rows(), mat.cols(), mat.type());) {
                 assertNotNull(shm);
                 mat.copyTo(shm);
+                shm.post();
             }
 
-            try(CvMat result = matqueue.tryGetReadView(mat.total() * mat.channels(), CvType.makeType(mat.depth(), 1));
-                CvMat reshaped = result == null ? null : CvMat.move(mat.reshape(mat.channels(), mat.rows()));) {
-                assertNotNull(reshaped);
-                assertTrue(mat.rasterOp(matRaster -> reshaped.rasterOp(resRaster -> matRaster.equals(resRaster))));
+            assertTrue(matqueue.isMessageAvailable());
+
+            try(var result = matqueue.tryAccessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                assertTrue(matqueue.isMessageAvailable());
+                assertNotNull(result);
+                assertTrue(mat.rasterOp(matRaster -> result.rasterOp(resRaster -> matRaster.equals(resRaster))));
+                result.unpost();
             }
+
+            assertFalse(matqueue.isMessageAvailable());
         }
     }
 
@@ -53,32 +73,42 @@ public class TestMatQueue {
     @Test
     public void testClientServer() throws Exception {
         long size = -1;
-        long numElements = -1;
         int type = -1;
+        int rows = -1;
+        int cols = -1;
         try(final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
             size = mat.total() * mat.elemSize();
-            numElements = mat.total();
             type = mat.type();
+            rows = mat.rows();
+            cols = mat.cols();
             System.out.println("Mat:" + mat);
             System.out.println("data size:" + size);
         }
 
         final long fsize = size;
-        final long fnumElements = numElements;
         final int ftype = type;
+        final int frows = rows;
+        final int fcols = cols;
 
         final AtomicBoolean serverException = new AtomicBoolean(false);
 
         final var server = new Thread(() -> {
-            try(final MatQueue matqueue = new MatQueue("TEST");
-                final CvMat result = new CvMat();) {
-                assertTrue(matqueue.create(fsize, true));
+            try(final ShmQueue matqueue = new ShmQueue("TEST");) {
+                matqueue.create(fsize, true);
                 long startTime = 0;
                 int count = 0;
                 for(int i = 0; i < NUM_MESSAGES; i++) {
-                    try(var m = matqueue.copyReadView(fnumElements, ftype);) {
+                    while(!matqueue.isMessageAvailable())
+                        Thread.yield();
+                    try(var m = matqueue.accessAsMat(frows, fcols, ftype);) {
+                        assertTrue(matqueue.isMessageAvailable());
                         assertNotNull(m);
+                        // copy the data
+                        try(CvMat copy = new CvMat();) {
+                            m.copyTo(copy);
+                            m.unpost();
+                        }
                     }
                     if(count == 0)
                         startTime = System.currentTimeMillis();
@@ -94,7 +124,7 @@ public class TestMatQueue {
         });
         server.start();
 
-        try(final MatQueue matqueue = new MatQueue("TEST");
+        try(final ShmQueue matqueue = new ShmQueue("TEST");
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
@@ -102,7 +132,12 @@ public class TestMatQueue {
             final long startTime = System.currentTimeMillis();
             int count = 0;
             for(int i = 0; i < NUM_MESSAGES; i++) {
-                assertTrue(matqueue.copyWriteView(mat));
+                while(matqueue.isMessageAvailable()) // we want there to be a space for the message
+                    Thread.yield();
+                try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                    mat.copyTo(m);
+                    m.post();
+                }
                 count++;
             }
             final long endTime = System.currentTimeMillis();
