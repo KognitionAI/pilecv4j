@@ -13,9 +13,26 @@
 
 #include "utils/cvtypes.h"
 
-
 #define COMPONENT "SHMQ"
 #define PCV4K_IPC_TRACE RAW_PCV4J_IPC_TRACE(COMPONENT)
+
+// =========================================================
+// shorthand for some ubiquitos checks
+#define MAILBOX_CHECK(h, x) if (x >= h->numMailboxes) { \
+  log(ERROR, COMPONENT, "There are only %d mailboxes. You referenced mailbox %d", (int)header->numMailboxes, x); \
+  return fromErrno(EINVAL); \
+}
+
+#define OPEN_CHECK(x)   if (! isOpen) { \
+    log(ERROR, COMPONENT, "Cannot " x " until the shm segment is open"); \
+    return fromErrorCode(NOT_OPEN); \
+  }
+
+#define NULL_CHECK(nr) if (nr == 0) { \
+  log(ERROR, COMPONENT, "Null ShmQueue native reference passed"); \
+  return fromErrorCode(NULL_REF); \
+}
+// =========================================================
 
 using namespace std::chrono_literals;
 using namespace ai::kognition::pilecv4j;
@@ -32,9 +49,9 @@ struct Header {
   std::size_t totalSize = 0;
   std::size_t numBytes = 0;
   std::size_t offset = 0;
-  std::size_t messageAvailable = 0;
+  std::size_t numMailboxes = 0;
+  std::size_t messageAvailable[0];
 };
-
 
 SharedMemory::~SharedMemory() {
   if (addr && totalSize >= 0) {
@@ -57,12 +74,13 @@ SharedMemory::~SharedMemory() {
   }
 }
 
-uint64_t SharedMemory::create(std::size_t numBytes, bool powner) {
+uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t numMailboxes) {
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "Creating shared mem queue for %ld bytes. Owner: %s", (long)numBytes, powner ? "true": "false" );
 
   Header* hptr;
   std::string errMsg;
+  std::size_t offsetToBuffer;
 
   fd = shm_open(name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
   if (fd == -1){
@@ -71,11 +89,11 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner) {
   }
 
   // we need to round UP to the nearest 64 byte boundary
-  dataOffset = align64(sizeof(Header));
+  offsetToBuffer = align64(sizeof(Header) + (numMailboxes * sizeof(std::size_t)));
 
-  totalSize = align64(numBytes + dataOffset);
+  totalSize = align64(numBytes + offsetToBuffer);
   if (isEnabled(DEBUG))
-    log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)dataOffset);
+    log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)offsetToBuffer);
   if (ftruncate(fd, totalSize) == -1)
     goto error;
 
@@ -96,12 +114,14 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner) {
   // set the sizes
   hptr->totalSize = totalSize;
   hptr->numBytes = numBytes;
-  hptr->offset = dataOffset;
-  hptr->messageAvailable = 0; // false - no message available yet.
+  hptr->offset = offsetToBuffer;
+  hptr->numMailboxes = numMailboxes;
+  for (std::size_t i = 0; i < numMailboxes; i++)
+    hptr->messageAvailable[i] = 0;
 
-  data = ((uint8_t*)addr) + dataOffset;
+  data = ((uint8_t*)addr) + offsetToBuffer;
   if (isEnabled(DEBUG))
-    log(DEBUG, COMPONENT, "Allocated shared mem at 0x%lx with offset to data of %d bytes putting the data at 0x%lx", (long)addr, (int)dataOffset, (long)data);
+    log(DEBUG, COMPONENT, "Allocated shared mem at 0x%lx with offset to data of %d bytes putting the data at 0x%lx", (long)addr, (int)offsetToBuffer, (long)data);
 
   // don't reorder writes across this line
   std::atomic_thread_fence(std::memory_order_release);
@@ -172,8 +192,7 @@ uint64_t SharedMemory::open(bool powner) {
   this->addr = mmap(NULL, lheader.totalSize, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
   if (this->addr == MAP_FAILED)
     goto error;
-  this->dataOffset = lheader.offset;
-  this->data = ((uint8_t*)this->addr) + this->dataOffset;
+  this->data = ((uint8_t*)this->addr) + lheader.offset;
   this->totalSize = lheader.totalSize;
   this->isOpen = true;
 
@@ -189,10 +208,8 @@ uint64_t SharedMemory::open(bool powner) {
 }
 
 uint64_t SharedMemory::getBufferSize(std::size_t& out) {
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot get buffer size until the shm segment is open");
-    return fromErrorCode(NOT_OPEN);
-  }
+  PCV4K_IPC_TRACE;
+  OPEN_CHECK("get buffer size");
 
   Header* header = (Header*)addr;
   out = (std::size_t)header->numBytes;
@@ -201,10 +218,7 @@ uint64_t SharedMemory::getBufferSize(std::size_t& out) {
 
 uint64_t SharedMemory::getBuffer(std::size_t offset, void*& out) {
   PCV4K_IPC_TRACE;
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot get buffer size until the shm segment is open");
-    return fromErrorCode(NOT_OPEN);
-  }
+  OPEN_CHECK("get buffer");
 
   out = this->data;
   if (isEnabled(TRACE))
@@ -212,42 +226,36 @@ uint64_t SharedMemory::getBuffer(std::size_t offset, void*& out) {
   return OK_RET;
 }
 
-uint64_t SharedMemory::postMessage() {
+uint64_t SharedMemory::postMessage(std::size_t mailbox) {
   PCV4K_IPC_TRACE;
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot get buffer size until the shm segment is open");
-    return fromErrorCode(NOT_OPEN);
-  }
+  OPEN_CHECK("post a message");
 
   Header* header = (Header*)addr;
+  MAILBOX_CHECK(header, mailbox);
   std::atomic_thread_fence(std::memory_order_release);
-  header->messageAvailable = 1;
+  header->messageAvailable[mailbox] = 1;
   return OK_RET;
 }
 
-uint64_t SharedMemory::unpostMessage() {
+uint64_t SharedMemory::unpostMessage(std::size_t mailbox) {
   PCV4K_IPC_TRACE;
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot get buffer size until the shm segment is open");
-    return fromErrorCode(NOT_OPEN);
-  }
+  OPEN_CHECK("unpost a message");
 
   Header* header = (Header*)addr;
+  MAILBOX_CHECK(header, mailbox);
   std::atomic_thread_fence(std::memory_order_release);
-  header->messageAvailable = 0;
+  header->messageAvailable[mailbox] = 0;
   return OK_RET;
 }
 
-uint64_t SharedMemory::isMessageAvailable(bool& out) {
+uint64_t SharedMemory::isMessageAvailable(bool& out, std::size_t mailbox) {
   PCV4K_IPC_TRACE;
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot get buffer size until the shm segment is open");
-    return fromErrorCode(NOT_OPEN);
-  }
+  OPEN_CHECK("check if a message is available");
 
   Header* header = (Header*)addr;
+  MAILBOX_CHECK(header, mailbox);
 
-  out = header->messageAvailable ? true : false;
+  out = header->messageAvailable[mailbox] ? true : false;
   std::atomic_thread_fence(std::memory_order_acquire);
   return OK_RET;
 }
@@ -316,10 +324,7 @@ static uint64_t unlockMe(sem_t* sem) {
 }
 
 uint64_t SharedMemory::lock(int64_t millis, bool aggressive) {
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot send a cv::Mat unless the MapQueue is opened first");
-    return fromErrorCode(NOT_OPEN);
-  }
+  OPEN_CHECK("lock the shared memory segment");
 
   Header* header = (Header*)addr;
 
@@ -327,10 +332,7 @@ uint64_t SharedMemory::lock(int64_t millis, bool aggressive) {
 }
 
 uint64_t SharedMemory::unlock() {
-  if (! isOpen) {
-    log(ERROR, COMPONENT, "Cannot send a cv::Mat unless the MapQueue is opened first");
-    return fromErrorCode(NOT_OPEN);
-  }
+  OPEN_CHECK("unlock the shared memory segment");
 
   Header* header = (Header*)addr;
 
@@ -338,11 +340,6 @@ uint64_t SharedMemory::unlock() {
 }
 
 extern "C" {
-
-#define NULL_CHECK(nr) if (nr == 0) { \
-  log(ERROR, COMPONENT, "Null ShmQueue native reference passed"); \
-  return fromErrorCode(NULL_REF); \
-}
 
 KAI_EXPORT uint64_t pilecv4j_ipc_create_shmQueue(const char* name) {
   PCV4K_IPC_TRACE;
@@ -355,10 +352,10 @@ KAI_EXPORT void pilecv4j_ipc_destroy_shmQueue(uint64_t nativeRef) {
     delete (SharedMemory*)nativeRef;
 }
 
-KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_create(uint64_t nativeRef, uint64_t size, int32_t owner) {
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_create(uint64_t nativeRef, uint64_t size, int32_t owner, int32_t numMailboxes) {
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
-  return ((SharedMemory*)nativeRef)->create(size, owner == 0 ? false : true);
+  return ((SharedMemory*)nativeRef)->create(size, owner == 0 ? false : true, (std::size_t)numMailboxes);
 }
 
 KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_open(uint64_t nativeRef, int32_t owner) {
@@ -397,29 +394,30 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_unlock(uint64_t nativeRef) {
   return ((SharedMemory*)nativeRef)->unlock();
 }
 
-KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_isMessageAvailable(uint64_t nativeRef, int32_t* ret) {
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_isMessageAvailable(uint64_t nativeRef, int32_t* ret, int32_t mailbox) {
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
   if (!ret)
     return fromErrno(EINVAL);
   bool isAvail = false;
-  auto aret = (uint64_t)((SharedMemory*)nativeRef)->isMessageAvailable(isAvail);
+  auto aret = (uint64_t)((SharedMemory*)nativeRef)->isMessageAvailable(isAvail, (std::size_t)mailbox);
   *ret = isAvail ? 1 : 0;
   return aret;
 }
 
-KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_postMessage(uint64_t nativeRef) {
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_postMessage(uint64_t nativeRef, int32_t mailbox) {
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
-  return ((SharedMemory*)nativeRef)->postMessage();
+  std::size_t resultingMessageNumber;
+  uint64_t ret = ((SharedMemory*)nativeRef)->postMessage((std::size_t)mailbox);
+  return ret;
 }
 
-KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_unpostMessage(uint64_t nativeRef) {
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_unpostMessage(uint64_t nativeRef, int32_t mailbox) {
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
-  return ((SharedMemory*)nativeRef)->unpostMessage();
+  return ((SharedMemory*)nativeRef)->unpostMessage((std::size_t)mailbox);
 }
-
 
 }
 }
