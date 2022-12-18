@@ -41,13 +41,21 @@ public class ShmQueue implements QuietCloseable {
         IpcApi.pilecv4j_ipc_destroy_shmQueue(nativeRef);
     }
 
-    public void create(final long size, final boolean owner) {
-        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_create(nativeRef, size, owner ? 1 : 0), true);
+    public void create(final long size, final boolean owner, final int numMailboxes) {
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_create(nativeRef, size, owner ? 1 : 0, numMailboxes), true);
         this.size = size;
     }
 
+    public void create(final long size, final boolean owner) {
+        create(size, owner, 1);
+    }
+
+    public void create(final Mat mat, final boolean owner, final int numMailboxes) {
+        create(mat.total() * mat.elemSize(), owner, numMailboxes);
+    }
+
     public void create(final Mat mat, final boolean owner) {
-        create(mat.total() * mat.elemSize(), owner);
+        create(mat, owner, 1);
     }
 
     public boolean open(final boolean owner) {
@@ -98,14 +106,32 @@ public class ShmQueue implements QuietCloseable {
             }
         }
 
+        public void post(final int mailbox) {
+            throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_postMessage(nativeRef, mailbox), true);
+        }
+
         public void post() {
-            throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_postMessage(nativeRef), true);
+            post(0);
+        }
+
+        public void unpost(final int mailbox) {
+            throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_unpostMessage(nativeRef, mailbox), true);
         }
 
         public void unpost() {
-            throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_unpostMessage(nativeRef), true);
+            unpost(0);
         }
 
+    }
+
+    public boolean isMessageAvailable(final int mailbox) {
+        final IntByReference result = new IntByReference();
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_isMessageAvailable(nativeRef, result, mailbox), true);
+        return result.getValue() == 0 ? false : true;
+    }
+
+    public boolean isMessageAvailable() {
+        return isMessageAvailable(0);
     }
 
     public ShmQueueCvMat accessAsMat(final int rows, final int cols, final int type, final long millis) {
@@ -125,12 +151,6 @@ public class ShmQueue implements QuietCloseable {
 
     public ShmQueueCvMat tryAccessAsMat(final int rows, final int cols, final int type) {
         return accessAsMat(rows, cols, type, TRY_LOCK);
-    }
-
-    public boolean isMessageAvailable() {
-        final IntByReference result = new IntByReference();
-        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_isMessageAvailable(nativeRef, result), true);
-        return result.getValue() == 0 ? false : true;
     }
 
     public long getRawBuffer() {

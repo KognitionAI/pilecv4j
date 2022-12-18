@@ -14,37 +14,36 @@ namespace ipc {
 
 class SharedMemory {
   std::string name;
-  std::size_t dataOffset;
-  std::size_t totalSize;
-  int fd;
-  void* addr;
-  void* data;
-  bool isOpen;
-  bool owner;
+  int fd = -1;
+  void* addr = nullptr;
+  bool isOpen = false;
+  bool owner = false;
 
+  // these are just helpers but could be recalculated from the header.
+  std::size_t totalSize = -1;
+  void* data = nullptr;
 public:
-  inline SharedMemory(const char* pname) : dataOffset(-1), totalSize(-1), fd(-1), addr(nullptr),
-                                       data(nullptr), isOpen(false), owner(false) {
+  inline SharedMemory(const char* pname) {
     if (pname)
       name = pname;
   }
 
   virtual ~SharedMemory();
 
-  uint64_t create(std::size_t numBytes, bool owner);
+  uint64_t create(std::size_t numBytes, bool owner, std::size_t numMailboxes);
   uint64_t open(bool owner);
 
   uint64_t getBufferSize(std::size_t& out);
   uint64_t getBuffer(std::size_t offset, void*& out);
 
   // set message available to be read
-  uint64_t postMessage();
+  uint64_t postMessage(std::size_t mailbox);
 
   // mark message as having been read.
-  uint64_t unpostMessage();
+  uint64_t unpostMessage(std::size_t mailbox);
 
   // you should have the lock when calling this.
-  uint64_t isMessageAvailable(bool& available);
+  uint64_t isMessageAvailable(bool& available, std::size_t mailbox);
 
   /**
    * Returns EAGAIN if the the timeout occurs before the lock is obtained.

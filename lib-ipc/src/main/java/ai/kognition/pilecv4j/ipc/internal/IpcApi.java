@@ -77,7 +77,7 @@ public class IpcApi {
 
     public static native void pilecv4j_ipc_destroy_shmQueue(long nativeRef);
 
-    public static native long pilecv4j_ipc_shmQueue_create(long nativeRef, long size, int owner);
+    public static native long pilecv4j_ipc_shmQueue_create(long nativeRef, long size, int owner, int numMailboxes);
 
     public static native long pilecv4j_ipc_shmQueue_open(long nativeRef, int owner);
 
@@ -89,11 +89,11 @@ public class IpcApi {
 
     public static native long pilecv4j_ipc_shmQueue_unlock(long nativeRef);
 
-    public static native long pilecv4j_ipc_shmQueue_postMessage(long nativeRef);
+    public static native long pilecv4j_ipc_shmQueue_postMessage(long nativeRef, int mailbox);
 
-    public static native long pilecv4j_ipc_shmQueue_unpostMessage(long nativeRef);
+    public static native long pilecv4j_ipc_shmQueue_unpostMessage(long nativeRef, int mailbox);
 
-    public static native long pilecv4j_ipc_shmQueue_isMessageAvailable(long nativeRef, IntByReference result);
+    public static native long pilecv4j_ipc_shmQueue_isMessageAvailable(long nativeRef, IntByReference result, int mailbox);
 
     /*
      * Error handling
