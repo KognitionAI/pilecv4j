@@ -20,9 +20,8 @@ import ai.kognition.pilecv4j.image.ImageFile;
 @Ignore
 public class TestMatQueueDuplex2Procs {
 
-//    public static final String TEST_IMAGE = "celebs/albert-einstein.jpg";
     public static final String TEST_IMAGE = "resized.bmp";
-    public static final long NUM_MESSAGES = 50000;
+    public static final long NUM_MESSAGES = 500000;
 
     @Test
     public void testServer() throws Exception {
@@ -58,9 +57,10 @@ public class TestMatQueueDuplex2Procs {
                     }
                 }
                 // write a response
-                while(matqueue.isMessageAvailable(1)) // we want there to be a space for the message
+                while(!matqueue.canWriteMessage(1)) // we want there to be a space for the response message
                     Thread.yield();
                 try(var m = matqueue.accessAsMat(1, 1, CvType.CV_64FC1);) {
+                    assertTrue(matqueue.canWriteMessage(1));
                     m.put(0, 0, (double)count);
                     m.post(1);
                 }
@@ -84,9 +84,10 @@ public class TestMatQueueDuplex2Procs {
             final long startTime = System.currentTimeMillis();
             int count = 0;
             for(int i = 0; i < NUM_MESSAGES; i++) {
-                while(matqueue.isMessageAvailable(0)) // we want there to be a space for the message
+                while(!matqueue.canWriteMessage(0)) // we want there to be a space for the message
                     Thread.yield();
                 try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                    assertTrue(matqueue.canWriteMessage(0));
                     mat.copyTo(m);
                     m.post(0);
                 }

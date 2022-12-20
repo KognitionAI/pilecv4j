@@ -8,6 +8,7 @@ import static org.junit.Assert.assertTrue;
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.opencv.core.CvType;
 
@@ -19,7 +20,6 @@ import ai.kognition.pilecv4j.image.ImageFile;
 
 public class TestMatQueue {
 
-//    public static final String TEST_IMAGE = "celebs/albert-einstein.jpg";
     public static final String TEST_IMAGE = "resized.bmp";
 
     @Test
@@ -39,6 +39,19 @@ public class TestMatQueue {
             assertTrue(queue.tryAccess(bb -> {
                 assertEquals(0x0123456789L, bb.getLong());
             }));
+        }
+    }
+
+    @Ignore // there currently is no actual locking
+    @Test
+    public void testBlocking() {
+        try(final ShmQueue queue = new ShmQueue("TEST");) {
+            queue.create(Long.BYTES, true);
+            assertTrue(queue.tryAccess(bb -> {
+                assertFalse(queue.tryLock());
+                queue.unlock();
+            }));
+
         }
     }
 
