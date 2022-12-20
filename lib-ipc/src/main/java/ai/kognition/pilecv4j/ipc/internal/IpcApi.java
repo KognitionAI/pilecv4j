@@ -83,7 +83,7 @@ public class IpcApi {
 
     public static native long pilecv4j_ipc_shmQueue_buffer(long nativeRef, long offset, PointerByReference owner);
 
-    public static native long pilecv4j_ipc_shmQueue_bufferSize(long nativeRef, LongByReference owner);
+    public static native long pilecv4j_ipc_shmQueue_bufferSize(long nativeRef, LongByReference bufSizeOut);
 
     public static native long pilecv4j_ipc_shmQueue_lock(long nativeRef, long millis, int aggressive);
 
@@ -94,6 +94,8 @@ public class IpcApi {
     public static native long pilecv4j_ipc_shmQueue_unpostMessage(long nativeRef, int mailbox);
 
     public static native long pilecv4j_ipc_shmQueue_isMessageAvailable(long nativeRef, IntByReference result, int mailbox);
+
+    public static native long pilecv4j_ipc_shmQueue_canWriteMessage(long nativeRef, IntByReference result, int mailbox);
 
     /*
      * Error handling

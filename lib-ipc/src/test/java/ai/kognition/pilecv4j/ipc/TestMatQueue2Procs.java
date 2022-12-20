@@ -19,7 +19,7 @@ import ai.kognition.pilecv4j.image.ImageFile;
 public class TestMatQueue2Procs {
 
     public static final String TEST_IMAGE = "resized.bmp";
-    public static final long NUM_MESSAGES = 50000;
+    public static final long NUM_MESSAGES = 500000;
 
     @Test
     public void testServer() throws Exception {
@@ -38,7 +38,7 @@ public class TestMatQueue2Procs {
         }
 
         try(final ShmQueue matqueue = new ShmQueue("TEST");) {
-            matqueue.create(size, true);
+            assertTrue(ConditionPoll.poll(60000, o -> matqueue.open(false)));
             long startTime = 0;
             int count = 0;
             for(int i = 0; i < NUM_MESSAGES; i++) {
@@ -55,6 +55,7 @@ public class TestMatQueue2Procs {
                 }
                 if(count == 0)
                     startTime = System.currentTimeMillis();
+//                System.out.println(count);
                 count++;
             }
             final long endTime = System.currentTimeMillis();
@@ -69,16 +70,20 @@ public class TestMatQueue2Procs {
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
-            assertTrue(ConditionPoll.poll(60000, o -> matqueue.open(false)));
-            final long startTime = System.currentTimeMillis();
+            matqueue.create(mat.total() * mat.elemSize(), true);
+            long startTime = 0;
             int count = 0;
             for(int i = 0; i < NUM_MESSAGES; i++) {
-                while(matqueue.isMessageAvailable()) // we want there to be a space for the message
+                while(!matqueue.canWriteMessage()) // we want there to be a space for the message
                     Thread.yield();
                 try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                    assertTrue(matqueue.canWriteMessage());
                     mat.copyTo(m);
                     m.post();
                 }
+                if(count == 0)
+                    startTime = System.currentTimeMillis();
+//                System.out.println(count);
                 count++;
             }
             final long endTime = System.currentTimeMillis();

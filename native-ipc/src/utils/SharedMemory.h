@@ -36,14 +36,26 @@ public:
   uint64_t getBufferSize(std::size_t& out);
   uint64_t getBuffer(std::size_t offset, void*& out);
 
-  // set message available to be read
+  // set message available to be read. Lock should already be held.
   uint64_t postMessage(std::size_t mailbox);
 
-  // mark message as having been read.
+  // mark message as having been read. Lock should already be held.
   uint64_t unpostMessage(std::size_t mailbox);
 
-  // you should have the lock when calling this.
+  /**
+   * Checks if a message is available to be read.
+   */
   uint64_t isMessageAvailable(bool& available, std::size_t mailbox);
+
+  /**
+   * Checks if space for a message is available.
+   */
+  inline uint64_t canWriteMessage(bool& canWrite, std::size_t mailbox) {
+    bool available;
+    uint64_t ret = isMessageAvailable(available, mailbox);
+    canWrite = !available;
+    return ret;
+  }
 
   /**
    * Returns EAGAIN if the the timeout occurs before the lock is obtained.

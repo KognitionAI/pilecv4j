@@ -22,6 +22,28 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
 import ai.kognition.pilecv4j.ipc.internal.IpcApi;
 
+/**
+ * <p>
+ * The class can be used to do IPC through shared memory.
+ * </p>
+ *
+ * <p>
+ * It's specifically optimized for a single writer and a single reader
+ * and so shouldn't be used anything other than one-to-one configuration though
+ * it can run <em>duplex</em> for request-response cases.
+ * </p>
+ *
+ * <p>
+ * <b>NOTE:</b> This functionality is built on POSIX shared memory so if
+ * that's not available on your platform then it wont compile there.
+ * </p>
+ *
+ * <p>
+ * <b>NOTE:</b>This class is NOT THREAD SAFE. If you want to use this across threads then
+ * instantiate another one on the same shared memory segment.
+ * </p>
+ *
+ */
 public class ShmQueue implements QuietCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(ShmQueue.class);
 
@@ -31,6 +53,12 @@ public class ShmQueue implements QuietCloseable {
     public static final long INFINITE = -1;
 
     private long size = -1; // until it's open this is unset
+
+    // Oddly, because we spin on these, many get instantiated stressing the memory/gc. So we're going to reuse the
+    // same one over and over. This class is not thread safe.
+    private final IntByReference intResult = new IntByReference();
+    private final LongByReference longResult = new LongByReference();
+    private final PointerByReference ptrResult = new PointerByReference();
 
     public ShmQueue(final String name) {
         nativeRef = IpcApi.pilecv4j_ipc_create_shmQueue(name);
@@ -125,13 +153,21 @@ public class ShmQueue implements QuietCloseable {
     }
 
     public boolean isMessageAvailable(final int mailbox) {
-        final IntByReference result = new IntByReference();
-        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_isMessageAvailable(nativeRef, result, mailbox), true);
-        return result.getValue() == 0 ? false : true;
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_isMessageAvailable(nativeRef, intResult, mailbox), true);
+        return intResult.getValue() == 0 ? false : true;
     }
 
     public boolean isMessageAvailable() {
         return isMessageAvailable(0);
+    }
+
+    public boolean canWriteMessage(final int mailbox) {
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_canWriteMessage(nativeRef, intResult, mailbox), true);
+        return intResult.getValue() == 0 ? false : true;
+    }
+
+    public boolean canWriteMessage() {
+        return canWriteMessage(0);
     }
 
     public ShmQueueCvMat accessAsMat(final int rows, final int cols, final int type, final long millis) {
@@ -154,15 +190,13 @@ public class ShmQueue implements QuietCloseable {
     }
 
     public long getRawBuffer() {
-        final var ret = new PointerByReference();
-        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, 0, ret), true);
-        return Pointer.nativeValue(ret.getValue());
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, 0, ptrResult), true);
+        return Pointer.nativeValue(ptrResult.getValue());
     }
 
     public ByteBuffer getBuffer() {
-        final var buf = new PointerByReference();
-        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, 0, buf), true);
-        final Pointer data = buf.getValue();
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, 0, ptrResult), true);
+        final Pointer data = ptrResult.getValue();
         if(Pointer.nativeValue(data) == 0)
             throw new IpcException("Null data buffer");
         return data.getByteBuffer(0, size);
@@ -176,7 +210,7 @@ public class ShmQueue implements QuietCloseable {
         return lock(INFINITE);
     }
 
-    public boolean tryLockWrite() {
+    public boolean tryLock() {
         return lock(TRY_LOCK);
     }
 
@@ -185,9 +219,8 @@ public class ShmQueue implements QuietCloseable {
     }
 
     public long getBufferSize() {
-        final var ret = new LongByReference();
-        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_bufferSize(nativeRef, ret), true);
-        return ret.getValue();
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_bufferSize(nativeRef, longResult), true);
+        return longResult.getValue();
     }
 
     private CvMat getUnlockedBufferAsMat(final int rows, final int cols, final int type) {

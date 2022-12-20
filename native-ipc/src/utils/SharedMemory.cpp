@@ -17,7 +17,12 @@
 #define PCV4K_IPC_TRACE RAW_PCV4J_IPC_TRACE(COMPONENT)
 
 // =========================================================
-// shorthand for some ubiquitos checks
+// shorthand for some ubiquitous checks
+#ifdef NO_CHECKS
+#define MAILBOX_CHECK(h, x)
+#define OPEN_CHECK(x)
+#define NULL_CHECK(nr)
+#else
 #define MAILBOX_CHECK(h, x) if (x >= h->numMailboxes) { \
   log(ERROR, COMPONENT, "There are only %d mailboxes. You referenced mailbox %d", (int)header->numMailboxes, x); \
   return fromErrno(EINVAL); \
@@ -32,6 +37,7 @@
   log(ERROR, COMPONENT, "Null ShmQueue native reference passed"); \
   return fromErrorCode(NULL_REF); \
 }
+#endif
 // =========================================================
 
 using namespace std::chrono_literals;
@@ -40,18 +46,92 @@ using namespace ai::kognition::pilecv4j;
 namespace pilecv4j {
 namespace ipc {
 
-static uint64_t OK_RET = fromErrorCode(OK);
+static const uint64_t OK_RET = fromErrorCode(OK);
+
+#define std_atomic_fence(x) std::atomic_thread_fence(x)
 
 #define SHM_HEADER_MAGIC 0xBADFADE0CAFEF00D
 struct Header {
   uint64_t magic = SHM_HEADER_MAGIC;
+#ifdef LOCKING
   sem_t sem;
+#endif
   std::size_t totalSize = 0;
   std::size_t numBytes = 0;
   std::size_t offset = 0;
   std::size_t numMailboxes = 0;
   std::size_t messageAvailable[0];
 };
+
+#ifdef LOCKING
+static uint64_t lockMe(sem_t* sem, int64_t millis, bool aggressive) {
+  PCV4K_IPC_TRACE;
+  // ===========================================
+  // try lockWrite
+  if (millis == 0) {
+    // try once performance boost
+    if (sem_trywait(sem) == -1) {
+      // this is okay if errno is EAGAIN
+      int err = errno;
+      if (err != EAGAIN) {
+        char erroStr[256];
+        const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
+        erroStr[sizeof(erroStr) - 1] = (char)0;
+        log(ERROR, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
+      }
+      return fromErrno(err);
+    } else
+      return OK_RET;
+  }
+  // ===========================================
+
+  // if it's not just a poll, set up a timeout (which may be infinite).
+  EndTime<std::chrono::milliseconds> endTime;
+  if (millis > 0)
+    endTime.set(std::chrono::milliseconds(millis));
+  else
+    endTime.setInfinite();
+
+  while(!endTime.isTimePast()) {
+    if (sem_trywait(sem) == -1) {
+      // this is okay if errno is EAGAIN
+      int err = errno;
+      if (err != EAGAIN) {
+        char erroStr[256];
+        const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
+        erroStr[sizeof(erroStr) - 1] = (char)0;
+        log(ERROR, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
+        return fromErrno(err);
+      } else { // EAGAIN
+        if (aggressive)
+          std::this_thread::yield();
+        else
+          std::this_thread::sleep_for(1ms);
+      }
+    } else
+      return OK_RET;
+  }
+  // if we got here, we timed out.
+  return fromErrno(EAGAIN);
+}
+
+static uint64_t unlockMe(sem_t* sem) {
+  PCV4K_IPC_TRACE;
+  if (sem_post(sem) == -1) {
+    int err = errno;
+    char erroStr[256];
+    const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
+    erroStr[sizeof(erroStr) - 1] = (char)0;
+    log(ERROR, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
+    return fromErrno(err);
+  }
+
+  return OK_RET;
+}
+#else
+#define unlockMe(x) OK_RET
+#define lockMe(x,y,z) OK_RET
+#endif
 
 SharedMemory::~SharedMemory() {
   if (addr && totalSize >= 0) {
@@ -106,10 +186,12 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   this->owner = powner;
 
   hptr = (Header*)addr;
+#ifdef LOCKING
   if (sem_init(&(hptr->sem), 1, 1) == -1) {
     errMsg = "Failed to init semaphore";
     goto error;
   }
+#endif
 
   // set the sizes
   hptr->totalSize = totalSize;
@@ -123,7 +205,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "Allocated shared mem at 0x%lx with offset to data of %d bytes putting the data at 0x%lx", (long)addr, (int)offsetToBuffer, (long)data);
 
-  // don't reorder writes across this line
+  // don't reorder any write operation below this with any read/write operations above this line
   std::atomic_thread_fence(std::memory_order_release);
   // set the magic number
   hptr->magic = SHM_HEADER_MAGIC;
@@ -169,17 +251,14 @@ uint64_t SharedMemory::open(bool powner) {
   while(header->magic != SHM_HEADER_MAGIC && !endTime.isTimePast())
     std::this_thread::yield();
 
-  // don't reorder reads across this.
-  std::atomic_thread_fence(std::memory_order_acquire);
-
   if (header->magic != SHM_HEADER_MAGIC) {
     if (isEnabled(DEBUG))
       log(DEBUG, COMPONENT, "Timed out waiting for the serving size to setup the semaphore");
     return fromErrno(EAGAIN);
   }
 
-  // don't reorder reads across this.
-  std::atomic_thread_fence(std::memory_order_acquire);
+  // don't reorder the read above this with any read/write below this
+  std::atomic_thread_fence(std::memory_order_release);
 
   // okay, it's set up. re-map it to the correct size.
   lheader = *header; // copy the header
@@ -232,7 +311,8 @@ uint64_t SharedMemory::postMessage(std::size_t mailbox) {
 
   Header* header = (Header*)addr;
   MAILBOX_CHECK(header, mailbox);
-  std::atomic_thread_fence(std::memory_order_release);
+  // don't reorder any write operation below this with any read/write operations above this line
+  std_atomic_fence(std::memory_order_release);
   header->messageAvailable[mailbox] = 1;
   return OK_RET;
 }
@@ -243,7 +323,8 @@ uint64_t SharedMemory::unpostMessage(std::size_t mailbox) {
 
   Header* header = (Header*)addr;
   MAILBOX_CHECK(header, mailbox);
-  std::atomic_thread_fence(std::memory_order_release);
+  // don't reorder any write operation below this with any read/write operations above this line
+  std_atomic_fence(std::memory_order_release);
   header->messageAvailable[mailbox] = 0;
   return OK_RET;
 }
@@ -256,70 +337,8 @@ uint64_t SharedMemory::isMessageAvailable(bool& out, std::size_t mailbox) {
   MAILBOX_CHECK(header, mailbox);
 
   out = header->messageAvailable[mailbox] ? true : false;
-  std::atomic_thread_fence(std::memory_order_acquire);
-  return OK_RET;
-}
-
-static uint64_t lockMe(sem_t* sem, int64_t millis, bool aggressive) {
-  // ===========================================
-  // try lockWrite
-  if (millis == 0) {
-    // try once performance boost
-    if (sem_trywait(sem) == -1) {
-      // this is okay if errno is EAGAIN
-      int err = errno;
-      if (err != EAGAIN) {
-        char erroStr[256];
-        const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-        erroStr[sizeof(erroStr) - 1] = (char)0;
-        log(ERROR, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
-      }
-      return fromErrno(err);
-    } else
-      return OK_RET;
-  }
-  // ===========================================
-
-  // if it's not just a poll, set up a timeout (which may be infinite).
-  EndTime<std::chrono::milliseconds> endTime;
-  if (millis > 0)
-    endTime.set(std::chrono::milliseconds(millis));
-  else
-    endTime.setInfinite();
-
-  while(!endTime.isTimePast()) {
-    if (sem_trywait(sem) == -1) {
-      // this is okay if errno is EAGAIN
-      int err = errno;
-      if (err != EAGAIN) {
-        char erroStr[256];
-        const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-        erroStr[sizeof(erroStr) - 1] = (char)0;
-        log(ERROR, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
-        return fromErrno(err);
-      } else { // EAGAIN
-        if (aggressive)
-          std::this_thread::yield();
-        else
-          std::this_thread::sleep_for(1ms);
-      }
-    } else
-      return OK_RET;
-  }
-  // if we got here, we timed out.
-  return fromErrno(EAGAIN);
-}
-
-static uint64_t unlockMe(sem_t* sem) {
-  if (sem_post(sem) == -1) {
-    int err = errno;
-    char erroStr[256];
-    const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-    erroStr[sizeof(erroStr) - 1] = (char)0;
-    log(ERROR, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
-    return fromErrno(err);
-  }
-
+  // don't reorder the read above this with any read/write below this
+  std_atomic_fence(std::memory_order_acquire);
   return OK_RET;
 }
 
@@ -401,6 +420,17 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_isMessageAvailable(uint64_t nativeRef,
     return fromErrno(EINVAL);
   bool isAvail = false;
   auto aret = (uint64_t)((SharedMemory*)nativeRef)->isMessageAvailable(isAvail, (std::size_t)mailbox);
+  *ret = isAvail ? 1 : 0;
+  return aret;
+}
+
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_canWriteMessage(uint64_t nativeRef, int32_t* ret, int32_t mailbox) {
+  PCV4K_IPC_TRACE;
+  NULL_CHECK(nativeRef);
+  if (!ret)
+    return fromErrno(EINVAL);
+  bool isAvail = false;
+  auto aret = (uint64_t)((SharedMemory*)nativeRef)->canWriteMessage(isAvail, (std::size_t)mailbox);
   *ret = isAvail ? 1 : 0;
   return aret;
 }
