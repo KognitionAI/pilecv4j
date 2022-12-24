@@ -6,7 +6,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.net.URI;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opencv.core.CvType;
 
@@ -17,7 +16,7 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 
 // This needs to be run manually by starting the testClient and testServer tests in separate processes.
-@Ignore
+//@Ignore
 public class TestMatQueueDuplex2Procs {
 
     public static final String TEST_IMAGE = "resized.bmp";
@@ -47,7 +46,7 @@ public class TestMatQueueDuplex2Procs {
                 // read the message
                 while(!matqueue.isMessageAvailable(0))
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(rows, cols, type);) {
+                try(var m = matqueue.accessAsMat(0, rows, cols, type);) {
                     assertTrue(matqueue.isMessageAvailable(0));
                     assertNotNull(m);
                     // copy the data
@@ -59,7 +58,7 @@ public class TestMatQueueDuplex2Procs {
                 // write a response
                 while(!matqueue.canWriteMessage(1)) // we want there to be a space for the response message
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(1, 1, CvType.CV_64FC1);) {
+                try(var m = matqueue.accessAsMat(0, 1, 1, CvType.CV_64FC1);) {
                     assertTrue(matqueue.canWriteMessage(1));
                     m.put(0, 0, (double)count);
                     m.post(1);
@@ -86,7 +85,7 @@ public class TestMatQueueDuplex2Procs {
             for(int i = 0; i < NUM_MESSAGES; i++) {
                 while(!matqueue.canWriteMessage(0)) // we want there to be a space for the message
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                try(var m = matqueue.accessAsMat(0, mat.rows(), mat.cols(), mat.type());) {
                     assertTrue(matqueue.canWriteMessage(0));
                     mat.copyTo(m);
                     m.post(0);
@@ -94,7 +93,7 @@ public class TestMatQueueDuplex2Procs {
                 // wait for response
                 while(!matqueue.isMessageAvailable(1))
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(1, 1, CvType.CV_64FC1);) {
+                try(var m = matqueue.accessAsMat(0, 1, 1, CvType.CV_64FC1);) {
                     assertTrue(matqueue.isMessageAvailable(1));
                     assertNotNull(m);
                     final long resp = (long)m.get(0, 0)[0];

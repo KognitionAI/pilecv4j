@@ -61,9 +61,9 @@ public class TestMatQueue {
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
-            matqueue.create(mat, true);
+            matqueue.create(mat.total() * mat.elemSize(), true);
 
-            try(var shm = matqueue.tryAccessAsMat(mat.rows(), mat.cols(), mat.type());) {
+            try(var shm = matqueue.tryAccessAsMat(0, mat.rows(), mat.cols(), mat.type());) {
                 assertNotNull(shm);
                 mat.copyTo(shm);
                 shm.post();
@@ -71,7 +71,7 @@ public class TestMatQueue {
 
             assertTrue(matqueue.isMessageAvailable());
 
-            try(var result = matqueue.tryAccessAsMat(mat.rows(), mat.cols(), mat.type());) {
+            try(var result = matqueue.tryAccessAsMat(0, mat.rows(), mat.cols(), mat.type());) {
                 assertTrue(matqueue.isMessageAvailable());
                 assertNotNull(result);
                 assertTrue(mat.rasterOp(matRaster -> result.rasterOp(resRaster -> matRaster.equals(resRaster))));
@@ -115,7 +115,7 @@ public class TestMatQueue {
                 for(int i = 0; i < NUM_MESSAGES; i++) {
                     while(!matqueue.isMessageAvailable())
                         Thread.yield();
-                    try(var m = matqueue.accessAsMat(frows, fcols, ftype);) {
+                    try(var m = matqueue.accessAsMat(0, frows, fcols, ftype);) {
                         assertTrue(matqueue.isMessageAvailable(0));
                         assertNotNull(m);
                         // copy the data
@@ -126,7 +126,7 @@ public class TestMatQueue {
                     }
                     while(matqueue.isMessageAvailable(1)) // we want there to be a space for the message
                         Thread.yield();
-                    try(var m = matqueue.accessAsMat(1, 1, CvType.CV_64FC1);) {
+                    try(var m = matqueue.accessAsMat(0, 1, 1, CvType.CV_64FC1);) {
                         m.put(0, 0, (double)count);
                         m.post(1);
                     }
@@ -154,14 +154,14 @@ public class TestMatQueue {
             for(int i = 0; i < NUM_MESSAGES; i++) {
                 while(matqueue.isMessageAvailable(0)) // we want there to be a space for the message
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                try(var m = matqueue.accessAsMat(0, mat.rows(), mat.cols(), mat.type());) {
                     mat.copyTo(m);
                     m.post(0);
                 }
                 // wait for response
                 while(!matqueue.isMessageAvailable(1))
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(1, 1, CvType.CV_64FC1);) {
+                try(var m = matqueue.accessAsMat(0, 1, 1, CvType.CV_64FC1);) {
                     assertTrue(matqueue.isMessageAvailable(1));
                     assertNotNull(m);
                     final long resp = (long)m.get(0, 0)[0];
@@ -210,7 +210,7 @@ public class TestMatQueue {
                 for(int i = 0; i < NUM_MESSAGES; i++) {
                     while(!matqueue.isMessageAvailable())
                         Thread.yield();
-                    try(var m = matqueue.accessAsMat(frows, fcols, ftype);) {
+                    try(var m = matqueue.accessAsMat(0, frows, fcols, ftype);) {
                         assertTrue(matqueue.isMessageAvailable());
                         assertNotNull(m);
                         // copy the data
@@ -243,7 +243,7 @@ public class TestMatQueue {
             for(int i = 0; i < NUM_MESSAGES; i++) {
                 while(matqueue.isMessageAvailable()) // we want there to be a space for the message
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                try(var m = matqueue.accessAsMat(0, mat.rows(), mat.cols(), mat.type());) {
                     mat.copyTo(m);
                     m.post();
                 }
