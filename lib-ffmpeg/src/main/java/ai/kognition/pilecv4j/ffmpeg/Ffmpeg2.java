@@ -52,6 +52,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.Functional;
+import net.dempsy.util.MutableRef;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
@@ -297,11 +298,8 @@ public class Ffmpeg2 {
             });
         }
 
-        /**
-         * Create a video processor that takes the first decodable video stream.
-         */
-        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer consumer) {
-            final var pfc = new push_frame_callback() {
+        private push_frame_callback wrap(final VideoFrameConsumer consumer) {
+            return new push_frame_callback() {
 
                 final AtomicLong frameNumber = new AtomicLong(0);
 
@@ -332,9 +330,32 @@ public class Ffmpeg2 {
                     }
                 }
             };
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer consumer) {
+            final var pfc = wrap(consumer);
 
             final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(pfc);
             return manage(new FrameVideoProcessor(nativeRef, pfc));
+        }
+
+        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
+            final var pfc = wrap(handler);
+
+            final MutableRef<FrameVideoProcessor> proc = new MutableRef<>();
+            final var init = wrap(vf -> {
+                initializer.handle(vf);
+                proc.ref.replace(pfc);
+                handler.handle(vf);
+            });
+
+            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(init);
+            final var fm = new FrameVideoProcessor(nativeRef, init);
+            proc.ref = fm;
+            return manage(fm);
         }
 
         public MediaProcessingChain createRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
@@ -568,6 +589,11 @@ public class Ffmpeg2 {
         private FrameVideoProcessor(final long nativeRef, final push_frame_callback consumer) {
             super(nativeRef);
             pfc = consumer;
+        }
+
+        public void replace(final push_frame_callback consumer) {
+            pfc = consumer;
+            FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_replace(super.nativeRef, consumer);
         }
     }
 
