@@ -38,6 +38,14 @@ public class ImageAPI {
 
     static void _init() {}
 
+    // needs to match LogLevel enum in the C++ code.
+    public static final int LOG_LEVEL_TRACE = 0;
+    public static final int LOG_LEVEL_DEBUG = 1;
+    public static final int LOG_LEVEL_INFO = 2;
+    public static final int LOG_LEVEL_WARN = 3;
+    public static final int LOG_LEVEL_ERROR = 4;
+    public static final int LOG_LEVEL_FATAL = 5;
+
     static {
         // read a properties file from the classpath.
         final Properties ocvVersionProps = new Properties();
@@ -79,6 +87,9 @@ public class ImageAPI {
     public static native Pointer pilecv4j_image_CvRaster_getData(long nativeMatHandle);
 
     public static native long pilecv4j_image_CvRaster_makeMatFromRawDataReference(int rows, int cols, int type, long dataLong);
+
+    // "sizes" is a literal uint32_t* to match java
+    public static native long pilecv4j_image_CvRaster_makeMdMatFromRawDataReference(int ndims, Pointer sizes, int type, long dataLong);
 
     public static native long pilecv4j_image_CvRaster_defaultMat();
 
@@ -131,19 +142,6 @@ public class ImageAPI {
 
     // =========================================================
 
-    // public static native long GpuMat_create(long nativeObject);
-    //
-    // public static native void GpuMat_destroy(long nativeObject);
-    //
-    // public static native long Gpu_createSparsePyrLKOpticalFlowEngine();
-    //
-    // public static native void Gpu_destroySparsePyrLKOpticalFlowEngine(long ptrL);
-    //
-    // public static native long Gpu_createGoodFeaturesToTrackDetector(int srcType, int maxCorners, double qualityLevel, double minDistance, int blockSize,
-    // boolean useHarrisDetector, double harrisK);
-    //
-    // public static native void Gpu_destroyGoodFeaturesToTrackDetector(long ptrL);
-    //
-    // public static native void Gpu_GoodFeaturesToTrackDetector_detect(long detectorPtrL, long imageL, long cornersL, long maskL);
+    public native static void pilecv4j_image_setLogLevel(int logLevel);
 
 }

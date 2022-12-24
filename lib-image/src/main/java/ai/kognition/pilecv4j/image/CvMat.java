@@ -16,11 +16,22 @@
 
 package ai.kognition.pilecv4j.image;
 
+import static ai.kognition.pilecv4j.image.ImageAPI.LOG_LEVEL_DEBUG;
+import static ai.kognition.pilecv4j.image.ImageAPI.LOG_LEVEL_ERROR;
+import static ai.kognition.pilecv4j.image.ImageAPI.LOG_LEVEL_FATAL;
+import static ai.kognition.pilecv4j.image.ImageAPI.LOG_LEVEL_INFO;
+import static ai.kognition.pilecv4j.image.ImageAPI.LOG_LEVEL_TRACE;
+import static ai.kognition.pilecv4j.image.ImageAPI.LOG_LEVEL_WARN;
+
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.function.Consumer;
 import java.util.function.Function;
+
+import com.sun.jna.Memory;
+import com.sun.jna.Pointer;
 
 import org.opencv.core.Core;
 import org.opencv.core.Mat;
@@ -105,6 +116,25 @@ public class CvMat extends Mat implements QuietCloseable {
 
         if(TRACK_MEMORY_LEAKS)
             LOGGER.info("Tracking memory leaks in {} enabled.", CvMat.class.getSimpleName());
+
+        final Logger nativeLogger = LoggerFactory.getLogger(CvMat.class.getPackageName() + ".native");
+
+        // find the level
+        final int logLevelSet;
+        if(nativeLogger.isTraceEnabled())
+            logLevelSet = LOG_LEVEL_TRACE;
+        else if(nativeLogger.isDebugEnabled())
+            logLevelSet = LOG_LEVEL_DEBUG;
+        else if(nativeLogger.isInfoEnabled())
+            logLevelSet = LOG_LEVEL_INFO;
+        else if(nativeLogger.isWarnEnabled())
+            logLevelSet = LOG_LEVEL_WARN;
+        else if(nativeLogger.isErrorEnabled())
+            logLevelSet = LOG_LEVEL_ERROR;
+        else
+            logLevelSet = LOG_LEVEL_FATAL;
+
+        ImageAPI.pilecv4j_image_setLogLevel(logLevelSet);
     }
 
     public static void initOpenCv() {}
@@ -170,6 +200,38 @@ public class CvMat extends Mat implements QuietCloseable {
     public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
         super(rows, cols, type, data);
         stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
+    }
+
+    /**
+     * Construct a {@link CvMat} and preallocate the multidimensional tensor space.
+     * This simply calls the parent classes equivalent constructor.
+     *
+     * @param sizes array of the sizes of each dimension.
+     * @param type type of the {@link CvMat}. See
+     *     <a href="https://docs.opencv.org/4.0.1/javadoc/org/opencv/core/CvType.html">CvType</a>
+     */
+    public CvMat(final int[] sizes, final int type) {
+        super(sizes, type);
+        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
+    }
+
+    /**
+     * This is equivalent to getting the full size array in C++
+     * using:
+     * <p>
+     * <code>
+     * auto sz = mat.size();<br>
+     * ... sz[dim] ..;
+     * </code>
+     * </p>
+     */
+    public int[] dimSizes() {
+        final int ndims = dims();
+        final int[] ret = new int[ndims];
+        for(int i = 0; i < ndims; i++) {
+            ret[i] = size(i);
+        }
+        return ret;
     }
 
     /**
@@ -474,7 +536,7 @@ public class CvMat extends Mat implements QuietCloseable {
     }
 
     /**
-     * This implements {@code leftOp = rightOp}
+     * This implements the C++ {@code leftOp = rightOp}.
      */
     public static void reassign(final Mat leftOp, final Mat rightOp) {
         ImageAPI.pilecv4j_image_CvRaster_assign(leftOp.nativeObj, rightOp.nativeObj);
@@ -489,6 +551,26 @@ public class CvMat extends Mat implements QuietCloseable {
      */
     public static CvMat create(final int rows, final int cols, final int type, final long pointer) {
         final long nativeObj = ImageAPI.pilecv4j_image_CvRaster_makeMatFromRawDataReference(rows, cols, type, pointer);
+        if(nativeObj == 0)
+            throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
+        return CvMat.wrapNative(nativeObj);
+    }
+
+    /**
+     * You can use this method to create a {@link CvMat}
+     * given a native pointer to the location of the raw data, and the metadata for the
+     * {@code Mat}. Since the data is being passed to the underlying {@code Mat}, the {@code Mat}
+     * will not be the "owner" of the data. That means YOU need to make sure that the native
+     * data buffer outlives the {@link CvMat} or you're pretty much guaranteed a core dump.
+     */
+    public static CvMat create(final int[] sizes, final int type, final long pointer) {
+        final int ndims = sizes.length;
+        final long numBytes = ndims * Integer.BYTES;
+        final Pointer ptr = new Memory(numBytes);
+        final ByteBuffer bb = ptr.getByteBuffer(0, numBytes).order(ByteOrder.nativeOrder());
+        for(final int sz: sizes)
+            bb.putInt(sz);
+        final long nativeObj = ImageAPI.pilecv4j_image_CvRaster_makeMdMatFromRawDataReference(ndims, ptr, type, pointer);
         if(nativeObj == 0)
             throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
         return CvMat.wrapNative(nativeObj);
