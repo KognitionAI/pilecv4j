@@ -144,14 +144,35 @@ SharedMemory::~SharedMemory() {
     }
   }
   if (owner && fd >= 0) {
-    if (shm_unlink(name.c_str())) {
-      int err = errno;
-      char erroStr[256];
-      const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-      erroStr[sizeof(erroStr) - 1] = (char)0;
-      log(ERROR, COMPONENT, "Failed to unlink the shared memory segment. Error %d: %s", err, msg);
-    }
+    unlink();
   }
+}
+
+uint64_t SharedMemory::unlink() {
+  if (isEnabled(TRACE))
+    log(TRACE,COMPONENT,"unlinking the shared memory segment %s.", name.c_str());
+
+  if (fd < 0 || !isOpen) {
+    log(ERROR, COMPONENT, "Attempt to unlink the shared memory segment \"%s\" but it's not currently open", name.c_str());
+    return fromErrorCode(NOT_OPEN);
+  }
+
+  if (!owner)
+    log(WARN, COMPONENT, "unlinking the shared memory segment \"%s\" though I'm not the owner.", name.c_str());
+
+  if (shm_unlink(name.c_str())) {
+    int err = errno;
+    char erroStr[256];
+    const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
+    erroStr[sizeof(erroStr) - 1] = (char)0;
+    log(ERROR, COMPONENT, "Failed to unlink the shared memory segment. Error %d: %s", err, msg);
+    return fromErrno(err);
+  }
+
+  fd = -1;
+  isOpen = false;
+
+  return OK_RET;
 }
 
 uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t numMailboxes) {
@@ -162,20 +183,29 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   std::string errMsg;
   std::size_t offsetToBuffer;
 
-  fd = shm_open(name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
-  if (fd == -1){
-    errMsg = "Failed to open shared memory segment";
-    goto error;
-  }
-
   // we need to round UP to the nearest 64 byte boundary
   offsetToBuffer = align64(sizeof(Header) + (numMailboxes * sizeof(std::size_t)));
 
   totalSize = align64(numBytes + offsetToBuffer);
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)offsetToBuffer);
+
+  fd = shm_open(name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <---+
+  if (fd == -1){                                       //                 |
+    errMsg = "Failed to open shared memory segment";   //                 |
+    goto error;                                        //                 |
+  }                                                    //                 |
+  //       There is a race condition here which is "fixed" with a STUPID hack.
+  //       The other process can open the shm segment now and mmap it before
+  //       this process ftruncates it in which case access to the mapped memory
+  //       will cause a seg fault. Therefore there's a stupid SLEEP in there
+  //  +--- to minimize this gap.
+  //  |
+  //  v
   if (ftruncate(fd, totalSize) == -1)
     goto error;
+
+  this->owner = powner;
 
   // map shared memory to process address space
   addr = mmap(NULL, totalSize, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
@@ -183,7 +213,6 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     errMsg = "Failed to map memory segment";
     goto error;
   }
-  this->owner = powner;
 
   hptr = (Header*)addr;
 #ifdef LOCKING
@@ -237,6 +266,11 @@ uint64_t SharedMemory::open(bool powner) {
       return fromErrno(EAGAIN);
     goto error;
   }
+
+  // see the above described race condition. We need to allow the other process enough
+  // time to get from shm_open to ftruncate. Other than tests, open is called infrequently
+  // so this shouldn't be an overall performance hit.
+  std::this_thread::sleep_for(200ms);
 
   // map just the header so we can see what the total size is.
   header = (Header*)mmap(nullptr, sizeof(Header), PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
@@ -299,7 +333,7 @@ uint64_t SharedMemory::getBuffer(std::size_t offset, void*& out) {
   PCV4K_IPC_TRACE;
   OPEN_CHECK("get buffer");
 
-  out = this->data;
+  out = ((uint8_t*)this->data + offset);
   if (isEnabled(TRACE))
     log(TRACE, COMPONENT, "getBuffer is returning buffer at 0x%lx", (long)out);
   return OK_RET;
@@ -381,6 +415,12 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_open(uint64_t nativeRef, int32_t owner
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
   return ((SharedMemory*)nativeRef)->open(owner == 0 ? false : true);
+}
+
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_unlink(uint64_t nativeRef) {
+  PCV4K_IPC_TRACE;
+  NULL_CHECK(nativeRef);
+  return ((SharedMemory*)nativeRef)->unlink();
 }
 
 KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_bufferSize(uint64_t nativeRef, uint64_t* ret) {
