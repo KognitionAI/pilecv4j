@@ -96,7 +96,10 @@ if(NOT DEFINED ENV{COMMON_INCLUDE})
   message(FATAL_ERROR "You need to define the environment variable COMMON_INCLUDE to point to '[pilecv4j-root]/native-common-include/include' or build from the pom file which sets it correctly.")
 endif()
 
-include_directories(sources/include)
+#add_definitions( -DLOGGING -DENABLE_TRACE_API )
+add_definitions( -DLOGGING )
+
+include_directories(sources)
 include_directories($ENV{COMMON_INCLUDE})
 
 if(MSVC)
@@ -128,7 +131,8 @@ add_library(ai.kognition.pilecv4j.image
   sources/opencv/CvRasterNative.cpp
   sources/opencv/imagemaker.cpp
   sources/houghspace/Transform.cpp
-  sources/mjpeg/jpegtoavi.cpp)
+  sources/mjpeg/jpegtoavi.cpp
+  sources/utils/log.cpp)
 
 target_link_libraries(ai.kognition.pilecv4j.image
   ${OPENCV_STATIC_LIB})
