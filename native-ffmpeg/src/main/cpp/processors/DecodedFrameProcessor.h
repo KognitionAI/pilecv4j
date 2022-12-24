@@ -51,6 +51,10 @@ public:
   virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType packetMediaType);
 
   virtual uint64_t close();
+
+  inline void replace(push_frame pf) {
+    callback = pf;
+  }
 };
 
 }

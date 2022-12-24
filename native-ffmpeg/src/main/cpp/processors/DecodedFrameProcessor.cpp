@@ -211,6 +211,11 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf) {
   return (uint64_t)((MediaProcessor*)ret);
 }
 
+KAI_EXPORT void pcv4j_ffmpeg2_decodedFrameProcessor_replace(uint64_t native, push_frame pf) {
+  DecodedFrameProcessor* ths = dynamic_cast<DecodedFrameProcessor*>((MediaProcessor*)native);
+  ths->replace(pf);
+}
+
 }
 
 }
