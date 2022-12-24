@@ -30,6 +30,10 @@ public:
 
   virtual ~SharedMemory();
 
+  inline bool isOwner() {
+    return owner;
+  }
+
   uint64_t create(std::size_t numBytes, bool owner, std::size_t numMailboxes);
   uint64_t open(bool owner);
 
@@ -74,11 +78,18 @@ public:
    */
   uint64_t unlock();
 
+  /**
+   * Explicitly unlink the shared memory segment if it's not already unlinked.
+   * This will be done automatically in the destructor if we are the owner and
+   * if not done explicitly prior to that.
+   */
+  uint64_t unlink();
+
 };
 
 template <typename T>
 static inline T align64(T x) {
-  return (x & (T)0x1f) ? (((x >> 5) + 1) << 5) : x;
+  return (x & (T)63) ? (((x >> 6) + 1) << 6) : x;
 }
 
 }

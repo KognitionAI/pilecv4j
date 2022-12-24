@@ -5,7 +5,7 @@ if (DEFINED ENV{CMAKE_BUILD_TYPE})
    set(CMAKE_BUILD_TYPE $ENV{CMAKE_BUILD_TYPE})
 endif()
 
-set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Debug)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -13,8 +13,8 @@ endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 
 if (UNIX)
-  set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
-  set(CMAKE_C_FLAGS_RELEASE "-Ofast")
+  set(CMAKE_CXX_FLAGS_RELEASE "-O")
+  set(CMAKE_C_FLAGS_RELEASE "-O")
   set(CMAKE_CXX_FLAGS_DEBUG "-g")
   set(CMAKE_C_FLAGS_DEBUG "-g")
 endif()
@@ -85,8 +85,8 @@ find_package(xtensor REQUIRED)
 #############
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-add_definitions( -DLOGGING -DENABLE_TRACE_API )
-#add_definitions( -DLOGGING )
+#add_definitions( -DLOGGING -DENABLE_TRACE_API )
+add_definitions( -DLOGGING )
 add_definitions( -DTIMING )
 
 set(SOURCE_FILES
