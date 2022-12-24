@@ -44,7 +44,7 @@ public class TestMatQueue2Procs {
             for(int i = 0; i < NUM_MESSAGES; i++) {
                 while(!matqueue.isMessageAvailable())
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(rows, cols, type);) {
+                try(var m = matqueue.accessAsMat(0, rows, cols, type);) {
                     assertTrue(matqueue.isMessageAvailable());
                     assertNotNull(m);
                     // copy the data
@@ -76,7 +76,7 @@ public class TestMatQueue2Procs {
             for(int i = 0; i < NUM_MESSAGES; i++) {
                 while(!matqueue.canWriteMessage()) // we want there to be a space for the message
                     Thread.yield();
-                try(var m = matqueue.accessAsMat(mat.rows(), mat.cols(), mat.type());) {
+                try(var m = matqueue.accessAsMat(0, mat.rows(), mat.cols(), mat.type());) {
                     assertTrue(matqueue.canWriteMessage());
                     mat.copyTo(m);
                     m.post();

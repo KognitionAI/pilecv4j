@@ -81,6 +81,8 @@ public class IpcApi {
 
     public static native long pilecv4j_ipc_shmQueue_open(long nativeRef, int owner);
 
+    public static native long pilecv4j_ipc_shmQueue_unlink(long nativeRef);
+
     public static native long pilecv4j_ipc_shmQueue_buffer(long nativeRef, long offset, PointerByReference owner);
 
     public static native long pilecv4j_ipc_shmQueue_bufferSize(long nativeRef, LongByReference bufSizeOut);
