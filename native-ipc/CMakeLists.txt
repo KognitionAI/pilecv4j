@@ -105,7 +105,6 @@ set(SOURCE_FILES
 if(MSVC)
   set(SOURCE_FILES ${SOURCE_FILES}
      src/utils/platform/win/SharedMemoryTypes.h
-     src/utils/platform/win/SharedMemoryImpl.h
      src/utils/platform/win/SharedMemoryImpl.cpp
      src/utils/platform/win/errHandlingImpl.h
      src/utils/platform/win/errHandlingImpl.cpp
@@ -113,7 +112,6 @@ if(MSVC)
 else()
   set(SOURCE_FILES ${SOURCE_FILES}
      src/utils/platform/posix/SharedMemoryTypes.h
-     src/utils/platform/posix/SharedMemoryImpl.h
      src/utils/platform/posix/SharedMemoryImpl.cpp
      src/utils/platform/posix/errHandlingImpl.h
      src/utils/platform/posix/errHandlingImpl.cpp
