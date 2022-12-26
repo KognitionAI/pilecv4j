@@ -6,18 +6,8 @@
 
 #include <thread>
 
-#include <fcntl.h>
-
 #ifdef LOCKING
 #include <semaphore.h>
-#endif
-#ifndef _MSC_VER
-#include <sys/mman.h>
-#include <unistd.h>
-#else
-#include <windows.h>
-// The stupid ass windows #defined ERROR
-#undef ERROR
 #endif
 
 #include "utils/SharedMemory.h"
@@ -163,16 +153,6 @@ void SharedMemory::cleanup() {
     }
     addr = nullptr;
     totalSize = -1;
-#ifdef _MSC_VER
-#else
-    if (munmap(addr, totalSize) == -1) {
-      int err = errno;
-      char erroStr[256];
-      const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-      erroStr[sizeof(erroStr) - 1] = (char)0;
-      log(ERROR, COMPONENT, "Failed to un-mmap the shared memory segment. Error %d: %s", (int)err, msg);
-    }
-#endif
   }
   if (owner && fd >= 0) {
     unlink();
@@ -197,17 +177,6 @@ uint64_t SharedMemory::unlink() {
     log(ERROR, COMPONENT, "Failed to close the shared memory segment. Error %d: %s", err, errMsgStr.c_str());
     return fromErrno(err);
   }
-#ifdef _MSC_VER
-#else
-  if (shm_unlink(name.c_str())) {
-    int err = errno;
-    char erroStr[256];
-    const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-    erroStr[sizeof(erroStr) - 1] = (char)0;
-    log(ERROR, COMPONENT, "Failed to unlink the shared memory segment. Error %d: %s", err, msg);
-    return fromErrno(err);
-  }
-#endif
 
   fd = PCV4J_IPC_DEFAULT_DESCRIPTOR;
   isOpen = false;
@@ -231,42 +200,15 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)offsetToBuffer);
 
   if (!createSharedMemorySegment(&fd, name.c_str(), totalSize)) {
-      goto error;
-  }
-
-#ifndef _MSC_VER
-  fd = shm_open(name.c_str(), O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <---+
-  if (fd == -1){                                       //                 |
-    errMsg = "Failed to open shared memory segment";   //                 |
-    goto error;                                        //                 |
-  }                                                    //                 |
-  //       There is a race condition here which is "fixed" with a STUPID hack.
-  //       The other process can open the shm segment now and mmap it before
-  //       this process ftruncates it in which case access to the mapped memory
-  //       will cause a seg fault. Therefore there's a stupid SLEEP in there
-  //  +--- to minimize this gap.
-  //  |
-  //  v
-  if (ftruncate(fd, totalSize) == -1)
     goto error;
-#else
-#endif
+  }
 
   this->owner = powner;
 
   if (!mmapSharedMemorySegment(&addr, fd, totalSize)) {
-      errMsgPrefix = "Failed to map memory segment";
-      goto error;
-  }
-#ifndef _MSC_VER
-  // map shared memory to process address space
-  addr = mmap(NULL, totalSize, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-  if (addr == MAP_FAILED) {
     errMsgPrefix = "Failed to map memory segment";
     goto error;
   }
-#else
-#endif
 
   hptr = (Header*)addr;
 #ifdef LOCKING
@@ -286,7 +228,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
 
   data = ((uint8_t*)addr) + offsetToBuffer;
   if (isEnabled(DEBUG))
-    log(DEBUG, COMPONENT, "Allocated shared mem at 0x%P with offset to data of %d bytes putting the data at 0x%P", addr, (int)offsetToBuffer, data);
+    log(DEBUG, COMPONENT, "Allocated shared mem at 0x%p with offset to data of %d bytes putting the data at 0x%p", addr, (int)offsetToBuffer, data);
 
   // don't reorder any write operation below this with any read/write operations above this line
   std::atomic_thread_fence(std::memory_order_release);
@@ -297,17 +239,10 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
 
   error:
   {
-      ErrnoType err = getLastError();
-      std::string errMsgStr = getErrorMessage(err);
-      log(ERROR, COMPONENT, "%s Error %d: %s", errMsgPrefix.c_str(), err, errMsgStr.c_str());
-      return fromErrno(err);
-#ifdef _MSC_VER
-#else
-    int err = errno;
-    char erroStr[256];
-    const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-    erroStr[sizeof(erroStr) - 1] = (char)0;
-#endif
+    ErrnoType err = getLastError();
+    std::string errMsgStr = getErrorMessage(err);
+    log(ERROR, COMPONENT, "%s Error %d: %s", errMsgPrefix.c_str(), err, errMsgStr.c_str());
+    return fromErrno(err);
   }
   return false;
 }
@@ -317,45 +252,34 @@ uint64_t SharedMemory::open(bool powner) {
   Header* header;
   EndTime<> endTime;
   ErrnoType err;
+  void* tmpptr = nullptr;
+  const char* errMsgPrefix = "";
+  bool closeSm = false;
 
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "Attempting to open the shared memory segment.");
   if (!openSharedMemorySegment(&fd, name.c_str())) {
       err = getLastError();
       if (err == ENOENT) // no such file is a normal condition. Seems to be the same on windows and real OSes
           return fromErrno(EAGAIN);
+      errMsgPrefix = "Failed to open shared segment";
       goto error;
   }
-#ifdef _MSC_VER
-#else
-  fd = shm_open(name.c_str(), O_RDWR, S_IRUSR | S_IWUSR);
-  if (fd == -1) {
-      err = errno;
-      if (err == ENOENT) // no such file is a normal condition
-          return fromErrno(EAGAIN);
-      goto error;
-  }
-#endif
+  closeSm = true;
 
   // see the above described race condition. We need to allow the other process enough
   // time to get from shm_open to ftruncate. Other than tests, open is called infrequently
   // so this shouldn't be an overall performance hit.
   std::this_thread::sleep_for(200ms);
 
-  void* tmpptr;
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "Mapping the shared memory segment to read the header of %d bytes.", (int)sizeof(Header));
   if (!mmapSharedMemorySegment( &tmpptr, fd, sizeof(Header))) {
     err = getLastError();
-    log(INFO, COMPONENT, "MapViewOfFile returned %d", err);
+    errMsgPrefix = "Failed to memory map header";
     goto error;
   }
   header = (Header*)tmpptr;
-#ifdef _MSC_VER
-#else
-  // map just the header so we can see what the total size is.
-  header = (Header*)mmap(nullptr, sizeof(Header), PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-  if (header == MAP_FAILED) {
-    err = errno;
-    goto error;
-  }
-#endif
 
   this->owner = powner;
 
@@ -376,32 +300,22 @@ uint64_t SharedMemory::open(bool powner) {
   // okay, it's set up. re-map it to the correct size.
   lheader = *header; // copy the header
 
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "Unmapping the header to remap the segment for the total at %ld bytes", (long)lheader.totalSize);
+
   if (!unmmapSharedMemorySegment(header, sizeof(Header))) {
     err = getLastError();
+    errMsgPrefix = "Failed to unmap previously mapped header";
     goto error;
   }
-#ifdef _MSC_VER
-#else
-  if (munmap(header, sizeof(Header)) == -1) {
-    err = errno;
-    goto error;
-  }
-#endif
 
   // now remap.
-#ifdef _MSC_VER
-  this->addr = MapViewOfFile(fd, // handle to map object
-      FILE_MAP_ALL_ACCESS,       // read/write permission
-      0,
-      0,
-      lheader.totalSize);
-  if (!addr) {
-    err = GetLastError();
-#else
-  this->addr = mmap(NULL, lheader.totalSize, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
-  if (this->addr == MAP_FAILED) {
-    err = errno;
-#endif
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "Remapping the header to remap the segment for the total at %ld bytes", (long)lheader.totalSize);
+
+  if(!mmapSharedMemorySegment(&addr, fd, lheader.totalSize)) {
+    err = getLastError();
+    errMsgPrefix = "Failed to memory REmap total segment";
     goto error;
   }
   this->data = ((uint8_t*)this->addr) + lheader.offset;
@@ -413,14 +327,14 @@ uint64_t SharedMemory::open(bool powner) {
   {
     ErrnoType err = getLastError();
     std::string errMsgStr = getErrorMessage(err);
-    log(WARN, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, errMsgStr.c_str());
-#ifdef _MSC_VER
-#else
-    char erroStr[256];
-    const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
-    erroStr[sizeof(erroStr) - 1] = (char)0;
-    log(WARN, COMPONENT, "Failed to open shared memory segment. Error %d: %s", err, msg);
-#endif
+    log(WARN, COMPONENT, "%s Error %d: %s", errMsgPrefix, err, errMsgStr.c_str());
+    if (closeSm) {
+      if (!closeSharedMemorySegment(fd, name.c_str())) {
+        ErrnoType tmpErr = getLastError();
+        std::string tmpErrMsgStr = getErrorMessage(tmpErr);
+        log(WARN, COMPONENT, "Failed to reclose the shared memory segment. Error %d: %s", tmpErr, tmpErrMsgStr.c_str());
+      }
+    }
     return fromErrno(err);
   }
 }
@@ -440,7 +354,7 @@ uint64_t SharedMemory::getBuffer(std::size_t offset, void*& out) {
 
   out = ((uint8_t*)this->data + offset);
   if (isEnabled(TRACE))
-    log(TRACE, COMPONENT, "getBuffer is returning buffer at 0x%P", out);
+    log(TRACE, COMPONENT, "getBuffer is returning buffer at 0x%p", out);
   return OK_RET;
 }
 
@@ -541,7 +455,7 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_buffer(uint64_t nativeRef, uint64_t of
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
   if (isEnabled(TRACE))
-    log(TRACE, COMPONENT, "getting buffer and putting the results at 0x%P", ret);
+    log(TRACE, COMPONENT, "getting buffer and putting the results at 0x%p", ret);
   if (!ret)
     return fromErrno(EINVAL);
   return (uint64_t)((SharedMemory*)nativeRef)->getBuffer((std::size_t)offset, *ret);

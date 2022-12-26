@@ -1,12 +1,12 @@
-#include "utils/platform/win/SharedMemoryImpl.h"
+#include "utils/platform/SharedMemoryImpl.h"
 
 namespace pilecv4j {
 namespace ipc {
 
-bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, std::size_t totalSize) {
+bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, std::size_t size) {
     // I'm assuming the size of a DWORD is 32-bits ... but windows sucks so who knows ...
-    DWORD lowOrderTotalSize = (DWORD)((uint64_t)totalSize & (uint64_t)0xffffffff);
-    DWORD hiOrderTotalSize = (DWORD)(((uint64_t)totalSize >> 32) & (uint64_t)0xffffffff);
+    DWORD lowOrderTotalSize = (DWORD)((uint64_t)size & (uint64_t)0xffffffff);
+    DWORD hiOrderTotalSize = (DWORD)(((uint64_t)size >> 32) & (uint64_t)0xffffffff);
     // need to open the shm segment ... windows style.
     *fd = CreateFileMapping(
         INVALID_HANDLE_VALUE,    // use paging file

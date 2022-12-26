@@ -112,11 +112,11 @@ if(MSVC)
      )
 else()
   set(SOURCE_FILES ${SOURCE_FILES}
-     src/utils/platform/gcc/SharedMemoryTypes.h
-     src/utils/platform/gcc/SharedMemoryImpl.h
-     src/utils/platform/gcc/SharedMemoryImpl.cpp
-     src/utils/platform/gcc/errHandlingImpl.h
-     src/utils/platform/gcc/errHandlingImpl.cpp
+     src/utils/platform/posix/SharedMemoryTypes.h
+     src/utils/platform/posix/SharedMemoryImpl.h
+     src/utils/platform/posix/SharedMemoryImpl.cpp
+     src/utils/platform/posix/errHandlingImpl.h
+     src/utils/platform/posix/errHandlingImpl.cpp
      )
 endif()
 

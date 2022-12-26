@@ -1,6 +1,8 @@
 #pragma once
 
 #include <windows.h>
+// The stupid ass windows #defined ERROR
+#undef ERROR
 #include <string>
 
 namespace pilecv4j {
