@@ -27,9 +27,6 @@ static const char* errStrings[] = {
 };
 #define MAX_ERR_INDEX 3
 
-#ifdef _MSC_VER
-#endif
-
 const char* errString(uint64_t errorCode) {
   if (!errorCode) return ok;
   char* ret = new char[MAX_ERR_STRING_LEN];

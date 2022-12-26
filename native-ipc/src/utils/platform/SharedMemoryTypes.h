@@ -1,7 +1,9 @@
 #pragma once
 
-#ifdef _MSC_VER
-#include "utils/platform/win/SharedMemoryTypes.h"
-#else
+#if IPC_TYPE == IPC_TYPE_windows
+#include "windows/SharedMemoryTypes.h"
+#elif IPC_TYPE == IPC_TYPE_posix
 #include "posix/SharedMemoryTypes.h"
+#else
+#error "IPC_TYPE wasn't set."
 #endif
