@@ -50,12 +50,6 @@
     </dependency>
     
     <!-- Testing -->
-    <dependency> <!-- we need this built prior to running the tests since it uses the docker container -->
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>docker-nginx-rtmp</artifactId>
-      <type>pom</type>
-      <scope>test</scope>
-    </dependency>
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers</artifactId>
@@ -90,4 +84,50 @@
     </dependency>
   </dependencies>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/*Docker.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+  <profiles>
+    <profile>
+      <id>docker-dep</id>
+      <dependencies>
+        <dependency> <!-- we need this built prior to running the tests since it uses the docker container -->
+          <groupId>ai.kognition.pilecv4j</groupId>
+          <artifactId>docker-nginx-rtmp</artifactId>
+          <type>pom</type>
+          <scope>test</scope>
+        </dependency>
+      </dependencies>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <excludes />
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+      <activation>
+        <os>
+          <family>linux</family>
+          <arch>amd64</arch>
+        </os>
+        <property>
+          <name>!native-only</name>
+        </property>
+      </activation>
+    </profile>
+  </profiles>
 </project>

@@ -94,10 +94,11 @@ extern "C" {
     if (isEnabled(TRACE))
       log(TRACE, COMPONENT, "Making %d dimensional Mat of type %s", (int)ndims, type2str(type));
     void* data = (void*) dataLong;
-    int dims[ndims];
+    int* dims = new int[ndims];
     for (int i = 0; i < ndims; i++)
       dims[i] = (int)sizes[i];
     cv::Mat* newMat = new cv::Mat((int)ndims, dims, type, data);
+    delete[] dims;
     return (uint64_t) newMat;
   }
 

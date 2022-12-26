@@ -1,5 +1,8 @@
 #pragma once
 
+#include "utils/platform/SharedMemoryTypes.h"
+#include "utils/platform/errHandlingImpl.h"
+
 #include <stdint.h>
 
 namespace pilecv4j {
@@ -20,11 +23,10 @@ enum ErrorCode {
 };
 
 const char* errString(uint64_t errorCode);
-
 void freeErrString(const char* errStr);
 
 // DO NOT use the word `errno` as a variable
-inline uint64_t fromErrno(int en) {
+inline uint64_t fromErrno(ErrnoType en) {
   return (uint64_t)en;
 }
 

@@ -66,7 +66,6 @@ static void print_quartet(unsigned int i,FILE* ofd)
   putc(i%0x100,ofd);
 }
 
-
 static bool writeHeader(DWORD per_usec, long jpg_sz, DWORD frames,
                         DWORD width, DWORD height, DWORD riff_sz,
                         FILE* ofd)
@@ -191,8 +190,6 @@ static off_t file_sz(const char *fn)
   return s.st_size;
 }
 
-
-
 static FILE* ofd = NULL;
 static DWORD width = (DWORD)-1;
 static DWORD height = (DWORD)-1;
@@ -204,6 +201,16 @@ static DWORD prevoffset;
 static unsigned long tnbw = 0;
 static off64_t jpg_sz_64 = 0;
 
+// This is to get rid of some MSVC warnings about fopen being unsafe.
+static void open_file(FILE** file, const char* fname, const char* mode) {
+#if _MSC_VER
+    if (fopen_s(file, fname, mode) != 0)
+        *file = nullptr;
+#else
+    *file = fopen(fname, mode);
+#endif
+}
+
 extern "C" {
 KAI_EXPORT int32_t pilecv4j_image_mjpeg_initializeMJPEG(const char* filename)
 {
@@ -214,7 +221,7 @@ KAI_EXPORT int32_t pilecv4j_image_mjpeg_initializeMJPEG(const char* filename)
   DWORD riff_sz = 0;
   DWORD fps = 1;
 
-  ofd = fopen(filename,"wb");
+  open_file(&ofd, filename,"wb");
 
   if (ofd == NULL)
   {
@@ -282,8 +289,9 @@ KAI_EXPORT int32_t pilecv4j_image_mjpeg_doappendFile(const char* filename, int32
 
    offsets->push_back(curoffset);
 
-   FILE* fd; 
-   if((fd=fopen(filename,"rb")) == 0)
+   FILE* fd;
+   open_file(&fd, filename, "rb");
+   if(!fd)
    {
       fprintf(stderr,"couldn't open file!\n");
       return false;

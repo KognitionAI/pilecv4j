@@ -40,8 +40,8 @@ import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
-public class TestFfmpegStreaming extends BaseTest {
-    private static final Logger LOGGER = LoggerFactory.getLogger(TestFfmpegStreaming.class);
+public class TestFfmpegStreamingDocker extends BaseTest {
+    private static final Logger LOGGER = LoggerFactory.getLogger(TestFfmpegStreamingDocker.class);
     final int numFrames = SHOW ? 1000 : 10;
 
     @Rule public GenericContainer<?> docker = new GenericContainer<>(DockerImageName.parse("pilecv4j/nginx-rtmp:latest"))

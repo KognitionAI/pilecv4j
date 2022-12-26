@@ -19,7 +19,7 @@ import ai.kognition.pilecv4j.image.ImageFile;
 public class TestMatQueue2Procs {
 
     public static final String TEST_IMAGE = "resized.bmp";
-    public static final long NUM_MESSAGES = 500000;
+    public static final long NUM_MESSAGES = 50000;
 
     @Test
     public void testServer() throws Exception {
@@ -55,7 +55,7 @@ public class TestMatQueue2Procs {
                 }
                 if(count == 0)
                     startTime = System.currentTimeMillis();
-//                System.out.println(count);
+                // System.out.println(count);
                 count++;
             }
             final long endTime = System.currentTimeMillis();
@@ -83,7 +83,7 @@ public class TestMatQueue2Procs {
                 }
                 if(count == 0)
                     startTime = System.currentTimeMillis();
-//                System.out.println(count);
+                // System.out.println(count);
                 count++;
             }
             final long endTime = System.currentTimeMillis();

@@ -20,7 +20,6 @@ if (UNIX)
 endif()
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
-set(XTENSOR_USE_XSIMD, ON)
 
 # set where to find additional cmake modules if any
 # comment it out if not required
@@ -72,7 +71,6 @@ if (DEFINED ENV{OPENCV_INSTALL})
 endif()
 
 find_package(OpenCV CONFIG REQUIRED)
-find_package(xtensor REQUIRED)
 
 #############
 #get_cmake_property(_variableNames VARIABLES)
@@ -89,11 +87,38 @@ find_package(xtensor REQUIRED)
 add_definitions( -DLOGGING )
 add_definitions( -DTIMING )
 
+if(MSVC)
+  add_definitions( -D_CRT_SECURE_NO_WARNINGS )
+endif()
+
 set(SOURCE_FILES
+  src/utils/log.h
   src/utils/log.cpp
+  src/utils/errHandling.h
   src/utils/errHandling.cpp
+  src/utils/SharedMemory.h
   src/utils/SharedMemory.cpp
+  src/utils/platform/SharedMemoryTypes.h
+  src/utils/platform/errHandlingImpl.h
   )
+
+if(MSVC)
+  set(SOURCE_FILES ${SOURCE_FILES}
+     src/utils/platform/win/SharedMemoryTypes.h
+     src/utils/platform/win/SharedMemoryImpl.h
+     src/utils/platform/win/SharedMemoryImpl.cpp
+     src/utils/platform/win/errHandlingImpl.h
+     src/utils/platform/win/errHandlingImpl.cpp
+     )
+else()
+  set(SOURCE_FILES ${SOURCE_FILES}
+     src/utils/platform/gcc/SharedMemoryTypes.h
+     src/utils/platform/gcc/SharedMemoryImpl.h
+     src/utils/platform/gcc/SharedMemoryImpl.cpp
+     src/utils/platform/gcc/errHandlingImpl.h
+     src/utils/platform/gcc/errHandlingImpl.cpp
+     )
+endif()
 
 include_directories("src")
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -102,10 +127,17 @@ include_directories($ENV{COMMON_INCLUDE})
 add_library(ai.kognition.pilecv4j.ipc
   SHARED
   ${SOURCE_FILES})
-  
-target_link_options(ai.kognition.pilecv4j.ipc PUBLIC -pthread)
-target_link_libraries(ai.kognition.pilecv4j.ipc
+
+if(NOT MSVC)
+  target_link_options(ai.kognition.pilecv4j.ipc PUBLIC -pthread)
+  target_link_libraries(ai.kognition.pilecv4j.ipc
     ${OPENCV_STATIC_LIB}
     rt
     )
-    
+else()
+  target_link_libraries(ai.kognition.pilecv4j.ipc
+    ${OPENCV_STATIC_LIB}
+    )
+endif()
+
+  

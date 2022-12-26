@@ -40,7 +40,7 @@ void setLogLevel(LogLevel ll) {
 #define LOG_PREAMBLE \
     char hex_string[1024]; \
     size_t tid = std::hash<std::thread::id>{}(std::this_thread::get_id()); \
-    sprintf(hex_string, "%lx", (unsigned long)tid); \
+    sprintf(hex_string, "%llx", (unsigned long long)tid); \
     fputs(component, LOGGING_IOSTREAM); \
     fputs( ": [", LOGGING_IOSTREAM ); \
     fputs(hex_string, LOGGING_IOSTREAM); \
@@ -48,14 +48,6 @@ void setLogLevel(LogLevel ll) {
     fputs( logLevelNames[llevel], LOGGING_IOSTREAM ); \
     fputs( "] ", LOGGING_IOSTREAM)
 
-
-void log(LogLevel llevel, const char* component, const char* fmt, va_list args) {
-  if (logLevel <= llevel) {
-    LOG_PREAMBLE;
-    vfprintf( LOGGING_IOSTREAM, fmt, args );
-    fputs( "\n", LOGGING_IOSTREAM );
-  }
-}
 
 void log(LogLevel llevel, const char* component, const char *fmt, ...)
 {
