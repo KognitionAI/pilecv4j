@@ -1,7 +1,9 @@
 #pragma once
 
-#ifdef _MSC_VER
-#include "utils/platform/win/errHandlingImpl.h"
+#if ERR_HANDLING == ERR_HANDLING_windows
+#include "windows/errHandlingImpl.h"
+#elif ERR_HANDLING == ERR_HANDLING_errno
+#include "errno/errHandlingImpl.h"
 #else
-#include "posix/errHandlingImpl.h"
+#error "ERR_HANDLING wasn't set."
 #endif
