@@ -316,6 +316,8 @@ If you're going to use the SWT implementation you need to explicitly add the dep
 
 ```
 
+Newer versions of SWT need to be manually installed into your maven repository after being downloaded from https://download.eclipse.org/eclipse/downloads/
+
 *swtartifact* is platform specific. For 64-bit Linux it's `org.eclipse.swt.gtk.linux.x86_64`. For 64-bit Windows it's `org.eclipse.swt.win32.win32.x86_64`
 
 ## Other Image Processing and Image Handling

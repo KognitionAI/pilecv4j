@@ -1,9 +1,9 @@
 #pragma once
 
-#include <xtensor/xadapt.hpp>
-
 #include <sstream>
 #include <stdarg.h>
+
+#include <vector>
 
 // =====================================================
 // Utilities: logging
@@ -29,7 +29,6 @@ namespace ipc {
 #ifdef LOGGING
   bool isEnabled(LogLevel llevel);
   void log(LogLevel llevel, const char* component, const char *fmt, ...);
-  void log(LogLevel llevel, const char* component, const char* fmt, va_list args);
   void setLogLevel(LogLevel ll);
 
   template<typename TENSOR> std::string stringify(const TENSOR& tensor) {

@@ -1,8 +1,11 @@
 #pragma once
 
+#include "utils/errHandling.h"
+#include "utils/platform/SharedMemoryTypes.h"
+
 #include <string>
 
-#include "utils/log.h"
+#include <stdint.h>
 
 // forward declare mat
 namespace cv {
@@ -13,8 +16,9 @@ namespace pilecv4j {
 namespace ipc {
 
 class SharedMemory {
+protected:
   std::string name;
-  int fd = -1;
+  SharedMemoryDescriptor fd = PCV4J_IPC_DEFAULT_DESCRIPTOR;
   void* addr = nullptr;
   bool isOpen = false;
   bool owner = false;
@@ -22,13 +26,24 @@ class SharedMemory {
   // these are just helpers but could be recalculated from the header.
   std::size_t totalSize = -1;
   void* data = nullptr;
+
+  // meant to be called from child destructors to avoid the problem with
+  // calling [pure] virtual functions from a base class destructor.
+  void cleanup();
 public:
   inline SharedMemory(const char* pname) {
     if (pname)
       name = pname;
   }
 
-  virtual ~SharedMemory();
+  virtual ~SharedMemory() = default;
+
+  // These are platform specific
+  virtual bool createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, std::size_t size) = 0;
+  virtual bool openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name) = 0;
+  virtual bool closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name) = 0;
+  virtual bool mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size) = 0;
+  virtual bool unmmapSharedMemorySegment(void* addr, std::size_t size) = 0;
 
   inline bool isOwner() {
     return owner;
@@ -85,6 +100,10 @@ public:
    */
   uint64_t unlink();
 
+  /**
+  * This will be implemented in the SharedMemoryImpl platform specific cpp file
+  */
+  static SharedMemory* instantiate(const char* name);
 };
 
 template <typename T>

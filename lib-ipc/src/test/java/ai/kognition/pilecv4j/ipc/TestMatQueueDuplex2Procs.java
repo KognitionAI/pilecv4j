@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import java.net.URI;
 
+import org.junit.Ignore;
 import org.junit.Test;
 import org.opencv.core.CvType;
 
@@ -16,11 +17,11 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 
 // This needs to be run manually by starting the testClient and testServer tests in separate processes.
-//@Ignore
+@Ignore
 public class TestMatQueueDuplex2Procs {
 
     public static final String TEST_IMAGE = "resized.bmp";
-    public static final long NUM_MESSAGES = 500000;
+    public static final long NUM_MESSAGES = 50000;
 
     @Test
     public void testServer() throws Exception {
