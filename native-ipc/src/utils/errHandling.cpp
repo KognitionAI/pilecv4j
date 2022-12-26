@@ -1,7 +1,3 @@
-#ifdef _MSC_VER
-#include <windows.h>
-#include <string>
-#endif
 
 #include "errHandling.h"
 #include "common/kog_exports.h"
@@ -39,15 +35,8 @@ const char* errString(uint64_t errorCode) {
   char* ret = new char[MAX_ERR_STRING_LEN];
   if ((MSB_MASK & errorCode) == 0) {
     // we're just an errno (or windows error - like Bill Gates going to Epstein island).
-      std::string errMsgStr = getErrorMessage((ErrnoType)errorCode);
-      const char* msg = errMsgStr.c_str();
-#ifdef _MSC_VER
-#else
-    char erroStr[MAX_ERR_STRING_LEN];
-    const char* msg = strerror_r(errorCode, erroStr, sizeof(erroStr));
-    erroStr[MAX_ERR_STRING_LEN - 1] = (char)0; // belt and suspenders
-#endif
-    strncpy(ret, msg, MAX_ERR_STRING_LEN);
+    std::string errMsgStr = getErrorMessage((ErrnoType)errorCode);
+    strncpy(ret, errMsgStr.c_str(), MAX_ERR_STRING_LEN);
     return ret;
   } else {
     // extract the LSB

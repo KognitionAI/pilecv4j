@@ -31,14 +31,6 @@ namespace ipc {
   void log(LogLevel llevel, const char* component, const char *fmt, ...);
   void setLogLevel(LogLevel ll);
 
-  template<typename TENSOR> std::string stringify(const TENSOR& tensor) {
-    std::ostringstream os;
-    auto shape = xt::adapt(tensor.shape());
-    os << "[ at " << " shaped:[" << shape << "] ]"  << std::endl;
-    os << tensor << std::endl;
-    return std::move(os.str());
-  }
-
   template <typename S>
   std::ostream& operator<<(std::ostream& os,
                       const std::vector<S>& vector) {
