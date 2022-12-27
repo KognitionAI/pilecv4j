@@ -96,6 +96,8 @@ else()
   endif()
 endif()
 
+message(STATUS "ipc implementation is " ${IPC_TYPE})
+
 #############
 #get_cmake_property(_variableNames VARIABLES)
 #list (SORT _variableNames)
