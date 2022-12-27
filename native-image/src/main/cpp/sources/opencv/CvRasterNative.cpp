@@ -92,7 +92,7 @@ extern "C" {
 
   KAI_EXPORT uint64_t pilecv4j_image_CvRaster_makeMdMatFromRawDataReference(int32_t ndims, int32_t* sizes, uint32_t type, uint64_t dataLong) {
     if (isEnabled(TRACE))
-      log(TRACE, COMPONENT, "Making %d dimensional Mat of type %s", (int)ndims, type2str(type));
+      log(TRACE, COMPONENT, "Making %d dimensional Mat of type %s", (int)ndims, type2str(type).c_str());
     void* data = (void*) dataLong;
     int* dims = new int[ndims];
     for (int i = 0; i < ndims; i++)
