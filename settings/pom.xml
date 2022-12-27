@@ -112,7 +112,7 @@
       </dependency>
       <dependency>
         <groupId>${project.groupId}</groupId>
-        <artifactId>native-ipc-${platform}</artifactId>
+        <artifactId>native-ipc-${ipc-impl}-${platform}</artifactId>
         <classifier>bin</classifier>
         <version>${project.version}</version>
       </dependency>
@@ -293,6 +293,7 @@
         <!-- <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention> -->
         <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <platform.option></platform.option>
+        <ipc-impl>posix</ipc-impl>
       </properties>
     </profile>
     <profile>
@@ -309,6 +310,7 @@
         <platform.option>-Ax64</platform.option>
         <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
+        <ipc-impl>windows</ipc-impl>
       </properties>
       <!-- block Streaming tests on this platform -->
       <build>
@@ -342,6 +344,7 @@
         <generator>YOU MUST SPECIFY THE GENERATOR ON THE COMMAND LINE!!!! use: -Dgenerator="generator"</generator>
         <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <platform.option></platform.option>
+        <ipc-impl>windows</ipc-impl>
       </properties>
       <!-- block Streaming tests on this platform -->
       <build>

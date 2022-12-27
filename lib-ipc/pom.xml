@@ -15,7 +15,7 @@
     <!-- Third party deps -->
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-ipc-${platform}</artifactId>
+      <artifactId>native-ipc-${ipc-impl}-${platform}</artifactId>
       <classifier>bin</classifier>
       <optional>true</optional>
     </dependency>
