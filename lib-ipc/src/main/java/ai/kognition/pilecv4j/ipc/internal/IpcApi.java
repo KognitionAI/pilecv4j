@@ -38,6 +38,8 @@ public class IpcApi {
         Native.register(LIBNAME);
 
         pcv4j_ipc_logging_setLogLevel(kogLoglevel(LOGGER));
+
+        LOGGER.info("native-ipc implementation is " + pilecv4j_ipc_implementationName());
     }
 
     /**
@@ -70,16 +72,24 @@ public class IpcApi {
      */
     public static native void pcv4j_ipc_logging_setLogLevel(int logLevel);
 
+    public static native byte pilecv4j_ipc_locking_isLockingEnabled();
+
     /*
      * MatQueue
      */
-    public static native long pilecv4j_ipc_create_shmQueue(String name);
+    public static native long pilecv4j_ipc_create_shmQueue(String name, int nameRep);
 
     public static native void pilecv4j_ipc_destroy_shmQueue(long nativeRef);
+
+    public static native String pilecv4j_ipc_implementationName();
 
     public static native long pilecv4j_ipc_shmQueue_create(long nativeRef, long size, int owner, int numMailboxes);
 
     public static native long pilecv4j_ipc_shmQueue_open(long nativeRef, int owner);
+
+    public static native long pilecv4j_ipc_shmQueue_isOwner(long nativeRef, IntByReference ret);
+
+    public static native long pilecv4j_ipc_shmQueue_isOpen(long nativeRef, IntByReference ret);
 
     public static native long pilecv4j_ipc_shmQueue_unlink(long nativeRef);
 

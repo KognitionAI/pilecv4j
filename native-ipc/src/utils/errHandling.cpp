@@ -23,9 +23,11 @@ static const char* errStrings[] = {
     "Success",
     "Invalid State",
     "Null reference passed.",
-    "Queue is not opened. You need to create or open it first.",
+    "Shared memory is not opened. You need to create or open it first.",
+    "This implementation of shared memory requires the creator to be the owner",
+    "The shared memory is already open."
 };
-#define MAX_ERR_INDEX 3
+#define MAX_ERR_INDEX 5
 
 const char* errString(uint64_t errorCode) {
   if (!errorCode) return ok;

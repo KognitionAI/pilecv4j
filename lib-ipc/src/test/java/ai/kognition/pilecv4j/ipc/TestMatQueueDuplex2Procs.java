@@ -39,7 +39,7 @@ public class TestMatQueueDuplex2Procs {
             System.out.println("data size:" + size);
         }
 
-        try(final ShmQueue matqueue = new ShmQueue("TEST");) {
+        try(final ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");) {
             matqueue.create(size, true, 2);
             long startTime = 0;
             int count = 0;
@@ -76,7 +76,7 @@ public class TestMatQueueDuplex2Procs {
 
     @Test
     public void testClient() throws Exception {
-        try(final ShmQueue matqueue = new ShmQueue("TEST");
+        try(final ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 

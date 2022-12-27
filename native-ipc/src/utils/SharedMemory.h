@@ -7,6 +7,8 @@
 
 #include <stdint.h>
 
+#define PILECV4J_SHM_HEADER_MAGIC 0xBADFADE0CAFEF00D
+
 // forward declare mat
 namespace cv {
 class Mat;
@@ -18,9 +20,10 @@ namespace ipc {
 class SharedMemory {
 protected:
   std::string name;
+  int32_t nameRep;
   SharedMemoryDescriptor fd = PCV4J_IPC_DEFAULT_DESCRIPTOR;
   void* addr = nullptr;
-  bool isOpen = false;
+  bool m_isOpen = false;
   bool owner = false;
 
   // these are just helpers but could be recalculated from the header.
@@ -31,7 +34,7 @@ protected:
   // calling [pure] virtual functions from a base class destructor.
   void cleanup();
 public:
-  inline SharedMemory(const char* pname) {
+  inline SharedMemory(const char* pname, int32_t pnameRep) : nameRep(pnameRep) {
     if (pname)
       name = pname;
   }
@@ -39,14 +42,19 @@ public:
   virtual ~SharedMemory() = default;
 
   // These are platform specific
-  virtual bool createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, std::size_t size) = 0;
-  virtual bool openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name) = 0;
-  virtual bool closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name) = 0;
+  inline virtual bool implementationRequiresCreatorToBeOwner() { return false; }
+  virtual bool createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) = 0;
+  virtual bool openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep) = 0;
+  virtual bool closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) = 0;
   virtual bool mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size) = 0;
   virtual bool unmmapSharedMemorySegment(void* addr, std::size_t size) = 0;
 
   inline bool isOwner() {
     return owner;
+  }
+
+  inline bool isOpen() {
+    return m_isOpen;
   }
 
   uint64_t create(std::size_t numBytes, bool owner, std::size_t numMailboxes);
@@ -103,8 +111,32 @@ public:
   /**
   * This will be implemented in the SharedMemoryImpl platform specific cpp file
   */
-  static SharedMemory* instantiate(const char* name);
+  static SharedMemory* instantiate(const char* name, int32_t nameRep);
+
+  static const char* implementationName();
+
 };
+
+#ifdef _MSC_VER
+// Yes. I KNOW the zero length array wont participate in a copy or initialized by
+// a default constructor. Thanks Bill.
+#pragma warning( push )
+#pragma warning( disable : 4200 )
+#endif
+struct Header {
+  uint64_t magic = PILECV4J_SHM_HEADER_MAGIC;
+#ifdef LOCKING
+  sem_t sem;
+#endif
+  std::size_t totalSize = 0;
+  std::size_t numBytes = 0;
+  std::size_t offset = 0;
+  std::size_t numMailboxes = 0;
+  std::size_t messageAvailable[0];
+};
+#ifdef _MSC_VER
+#pragma warning( pop )
+#endif
 
 template <typename T>
 static inline T align64(T x) {

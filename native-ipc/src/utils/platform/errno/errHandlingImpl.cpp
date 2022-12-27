@@ -12,7 +12,7 @@ ErrnoType getLastError() {
 
 std::string getErrorMessage(ErrnoType errorMessageID)
 {
-  int err = errno;
+  int err = errorMessageID;
   char erroStr[256];
   const char* msg = strerror_r(err, erroStr, sizeof(erroStr));
   erroStr[sizeof(erroStr) - 1] = (char)0;
