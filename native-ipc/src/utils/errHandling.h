@@ -20,6 +20,8 @@ enum ErrorCode {
   INVALID_STATE = 1,
   NULL_REF = 2,
   NOT_OPEN = 3,
+  CREATOR_MUST_BE_OWNER = 4,
+  ALREADY_OPEN = 5
 };
 
 const char* errString(uint64_t errorCode);

@@ -3,7 +3,13 @@
 namespace pilecv4j {
 namespace ipc {
 
-bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, std::size_t size) {
+static const char* implName = "Windows";
+
+const char* SharedMemory::implementationName() {
+  return implName;
+}
+
+bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) {
     // I'm assuming the size of a DWORD is 32-bits ... but windows sucks so who knows ...
     DWORD lowOrderTotalSize = (DWORD)((uint64_t)size & (uint64_t)0xffffffff);
     DWORD hiOrderTotalSize = (DWORD)(((uint64_t)size >> 32) & (uint64_t)0xffffffff);
@@ -19,7 +25,7 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
     return *fd != NULL;
 }
 
-bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name) {
+bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep) {
     *fd = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, name);
     return *fd != NULL;
 }
@@ -37,12 +43,12 @@ bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
     return UnmapViewOfFile(addr) != 0;
 }
 
-bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name) {
+bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) {
     return CloseHandle(fd) != 0;
 }
 
-SharedMemory* SharedMemory::instantiate(const char* name) {
-    return new SharedMemoryImpl(name);
+SharedMemory* SharedMemory::instantiate(const char* name, int32_t nameRep) {
+    return new SharedMemoryImpl(name, nameRep);
 }
 
 }

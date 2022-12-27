@@ -7,7 +7,13 @@
 namespace pilecv4j {
 namespace ipc {
 
-bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, std::size_t size) {
+static const char* implName = "Posix";
+
+const char* SharedMemory::implementationName() {
+  return implName;
+}
+
+bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) {
   *fd = shm_open(name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <-----------+
   if (*fd == -1)                                       //                 |
     return false;                                      //                 |
@@ -23,7 +29,7 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
   return true;
 }
 
-bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name) {
+bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep) {
   *fd = shm_open(name, O_RDWR, S_IRUSR | S_IWUSR);
   return (*fd != -1);
 }
@@ -37,12 +43,12 @@ bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
   return munmap(addr, size) != -1;
 }
 
-bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name) {
+bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) {
   return !shm_unlink(name);
 }
 
-SharedMemory* SharedMemory::instantiate(const char* name) {
-  return new SharedMemoryImpl(name);
+SharedMemory* SharedMemory::instantiate(const char* name, int32_t nameRep) {
+  return new SharedMemoryImpl(name, nameRep);
 }
 
 }

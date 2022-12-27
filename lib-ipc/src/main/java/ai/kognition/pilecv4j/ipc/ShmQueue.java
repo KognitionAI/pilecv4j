@@ -2,8 +2,10 @@ package ai.kognition.pilecv4j.ipc;
 
 import static ai.kognition.pilecv4j.ipc.ErrorHandling.EAGAIN;
 import static ai.kognition.pilecv4j.ipc.ErrorHandling.throwIfNecessary;
+import static net.dempsy.util.Functional.uncheck;
 
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
 import java.util.function.Consumer;
 
 import com.sun.jna.Pointer;
@@ -34,6 +36,17 @@ import ai.kognition.pilecv4j.ipc.internal.IpcApi;
  * </p>
  *
  * <p>
+ * There are multiple underlying implementations. Some of these implementations
+ * identify a unique shared memory segment using a string (posix, windows), and some
+ * using an integer (system V). This is why the constructor takes both a {@code String},
+ * as well as an {@code int}. The underlying implementation may use one or the other
+ * but not typically both. Therefore, when using a ShmQueue, you should make sure
+ * that either both the {@code String} and the {@code int} uniquely identify the
+ * shared memory segment you want OR choose the native implementation that uses
+ * the one you care about.
+ * </p>
+ *
+ * <p>
  * <b>NOTE:</b> This functionality is built on POSIX shared memory so if
  * that's not available on your platform then it wont compile there.
  * </p>
@@ -56,7 +69,15 @@ public class ShmQueue implements QuietCloseable {
     public final long nativeRef;
     public final String name;
 
+    /**
+     * When passed as a timeout for acquiring a lock it means don't wait at all
+     * and return immediately if the lock can't be aquired.
+     */
     public static final long TRY_LOCK = 0;
+
+    /**
+     * When passed in as a timeout for acquiring a lock, it means wait forever.
+     */
     public static final long INFINITE = -1;
 
     private long size = -1; // until it's open this is unset
@@ -67,9 +88,32 @@ public class ShmQueue implements QuietCloseable {
     private final LongByReference longResult = new LongByReference();
     private final PointerByReference ptrResult = new PointerByReference();
 
-    public ShmQueue(final String name) {
+    /**
+     * <p>
+     * Construct a ShmQueue uniquely identified by BOTH the {@code name} AND the {@code key}.
+     * </p>
+     *
+     * <p>
+     * As described on the class, there are multiple underlying implementations. Some of these
+     * implementations identify a unique shared memory segment using a string (posix, windows),
+     * and some using an integer (system V). This is why the constructor takes both. The underlying
+     * implementation may use one or the other but not typically both. Therefore, when using a
+     * ShmQueue, you should make sure that either both the {@code String} and the {@code int}
+     * uniquely identify the shared memory segment you want OR choose the native implementation
+     * that uses the one you care about.
+     * </p>
+     *
+     */
+    public ShmQueue(final String name, final int key) {
         this.name = name;
-        nativeRef = IpcApi.pilecv4j_ipc_create_shmQueue(name);
+        nativeRef = IpcApi.pilecv4j_ipc_create_shmQueue(name, key);
+    }
+
+    public static ShmQueue createUsingMd5Hash(final String name) {
+        final MessageDigest md = uncheck(() -> MessageDigest.getInstance("MD5"));
+        md.update(name.getBytes());
+        final int key = ByteBuffer.wrap(md.digest()).getInt();
+        return new ShmQueue(name, key);
     }
 
     /**
@@ -125,8 +169,24 @@ public class ShmQueue implements QuietCloseable {
         if(result == EAGAIN)
             return false;
 
-        size = getBufferSize();
+        size = getSize();
         return true;
+    }
+
+    /**
+     * Is the shared memory segment currently opened by this {@link ShmQueue}
+     */
+    public boolean isOpen() {
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_isOpen(nativeRef, intResult), true);
+        return intResult.getValue() == 0 ? false : true;
+    }
+
+    /**
+     * Is the shared memory segment currently owned by this {@link ShmQueue}
+     */
+    public boolean isOwner() {
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_isOwner(nativeRef, intResult), true);
+        return intResult.getValue() == 0 ? false : true;
     }
 
     /**
@@ -324,17 +384,20 @@ public class ShmQueue implements QuietCloseable {
         return canWriteMessage(0);
     }
 
-    public ShmQueueCvMat accessAsMat(final long offset, final int rows, final int cols, final int type, final long millis) {
-        try(CvMat ret = getUnlockedBufferAsMat(offset, rows, cols, type);
-            ShmQueueCvMat aret = shallowCopy(ret);) {
-            aret.gotLock = lock(millis);
-            if(aret.gotLock)
-                return (ShmQueueCvMat)aret.returnMe();
-            else
-                return null;
-        }
-    }
-
+    /**
+     * Present the shared wrapped in a Mat. If locking is enabled then lock will be acquired
+     * if possible and held until the mat is closed. If the lock cannot be acquired in the
+     * time given then null will be returned.
+     *
+     * @param offset is the offset into the shared memory segment where the mat data begins
+     * @param sizes is the dimensions of the mat.
+     * @param type is the CvType of the data in the mat.
+     * @param millis is the milliseconds to wait to acquire the lock. This can be {@link #INFINITE}
+     *     to wait forever or {@link #TRY_LOCK} to make one attempt and return immediately.
+     * @return if the lock can be obtained, a Mat representing the shared memory segment or part
+     * thereof. When the Mat is closed the lock will be released. If the lock cannot be obtained,
+     * {@code null} will be returned.
+     */
     public ShmQueueCvMat accessAsMat(final long offset, final int[] sizes, final int type, final long millis) {
         try(CvMat ret = getUnlockedBufferAsMat(offset, sizes, type);
             ShmQueueCvMat aret = shallowCopy(ret);) {
@@ -346,52 +409,156 @@ public class ShmQueue implements QuietCloseable {
         }
     }
 
+    /**
+     * Convenience method for access as a 2D Mat. It's the same as calling
+     *
+     * <code>
+     * <pre>
+     * accessAsMat(offset, new int[] {rows,cols}, type, millis)
+     * </pre>
+     * </code>
+     *
+     * @see #accessAsMat(long, int[], int, long)
+     */
+    public ShmQueueCvMat accessAsMat(final long offset, final int rows, final int cols, final int type, final long millis) {
+        return accessAsMat(offset, new int[] {rows,cols}, type, millis);
+    }
+
+    /**
+     * Convenience method for access as a 2D Mat. It's the same as calling
+     *
+     * <code>
+     * <pre>
+     * accessAsMat(offset, new int[] {rows,cols}, type, INFINITE)
+     * </pre>
+     * </code>
+     *
+     * @see #accessAsMat(long, int[], int, long)
+     */
     public ShmQueueCvMat accessAsMat(final long offset, final int rows, final int cols, final int type) {
         return accessAsMat(offset, rows, cols, type, INFINITE);
     }
 
+    /**
+     * Convenience method. It's the same as calling
+     *
+     * <code>
+     * <pre>
+     * accessAsMat(offset, sizes, type, INFINITE)
+     * </pre>
+     * </code>
+     *
+     * @see #accessAsMat(long, int[], int, long)
+     */
     public ShmQueueCvMat accessAsMat(final long offset, final int[] sizes, final int type) {
         return accessAsMat(offset, sizes, type, INFINITE);
     }
 
+    /**
+     * Convenience method for access as a 2D Mat. It's the same as calling
+     *
+     * <code>
+     * <pre>
+     * accessAsMat(offset, new int[] {rows,cols}, type, TRY_LOCK)
+     * </pre>
+     * </code>
+     *
+     * @see #accessAsMat(long, int[], int, long)
+     */
     public ShmQueueCvMat tryAccessAsMat(final long offset, final int rows, final int cols, final int type) {
         return accessAsMat(offset, rows, cols, type, TRY_LOCK);
     }
 
+    /**
+     * Convenience method. It's the same as calling
+     *
+     * <code>
+     * <pre>
+     * accessAsMat(offset, sizes, type, TRY_LOCK)
+     * </pre>
+     * </code>
+     *
+     * @see #accessAsMat(long, int[], int, long)
+     */
     public ShmQueueCvMat tryAccessAsMat(final long offset, final int[] sizes, final int type) {
         return accessAsMat(offset, sizes, type, TRY_LOCK);
     }
 
+    /**
+     * Returns a pointer to the native location within the shared memory segment.
+     */
     public long getRawBuffer(final long offset) {
         throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, offset, ptrResult), true);
         return Pointer.nativeValue(ptrResult.getValue());
     }
 
+    /**
+     * Return a ByteBuffer mapping the portion of the shared memory segment requested.
+     *
+     * @param offset is the offset in bytes into the shared memory segment where the resulting
+     *     ByteBuffer should begin.
+     */
     public ByteBuffer getBuffer(final long offset) {
         throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, offset, ptrResult), true);
         final Pointer data = ptrResult.getValue();
         if(Pointer.nativeValue(data) == 0)
             throw new IpcException("Null data buffer");
-        return data.getByteBuffer(0, size);
+        return data.getByteBuffer(0, size - offset);
     }
 
+    /**
+     * Obtain the lock if possible. If the native code isn't compiled with locking enabled
+     * then this method will always return {@code true}.
+     *
+     * @param millis is the maximum amount of time to wait in milliseconds to obtain the lock.
+     * @return {@code true} of the lock was obtained. {@code false} otherwise.
+     */
     public boolean lock(final long millis) {
         return (throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_lock(nativeRef, millis, 0), false) == EAGAIN) ? false : true;
     }
 
+    /**
+     * <p>
+     * Obtain the lock waiting forever if necessary. If the native code isn't compiled with locking enabled
+     * then this method will always return {@code true}.
+     * </p>
+     *
+     * <p>
+     * This is a convenience method and is the same as calling {@code lock(INFINITE)}.
+     * </p>
+     */
     public boolean lock() {
         return lock(INFINITE);
     }
 
+    /**
+     * <p>
+     * Obtain the lock waiting forever if necessary. If the native code isn't compiled with locking enabled
+     * then this method will always return {@code true}.
+     * </p>
+     *
+     * <p>
+     * This is a convenience method and is the same as calling {@code lock(TRY_LOCK)}.
+     * </p>
+     */
     public boolean tryLock() {
         return lock(TRY_LOCK);
     }
 
+    /**
+     * If you're holding the lock, then release it. If the native code isn't compiled with locking enabled,
+     * this method will do nothing. If you're not holding the lock, this method will likely put the lock
+     * management in an unmanageable state.
+     */
     public void unlock() {
         throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_unlock(nativeRef), true);
     }
 
-    public long getBufferSize() {
+    /**
+     * This will return the size of the shared memory segment. The shared memory segment
+     * must be open already.
+     */
+    public long getSize() {
         throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_bufferSize(nativeRef, longResult), true);
         return longResult.getValue();
     }
@@ -401,16 +568,24 @@ public class ShmQueue implements QuietCloseable {
         return "ShmQueue [nativeRef=" + nativeRef + ", name=" + name + ", size=" + size + "]";
     }
 
-    private CvMat getUnlockedBufferAsMat(final long offset, final int rows, final int cols, final int type) {
-        final long nativeData = getRawBuffer(offset); // this will throw an exeception if it's not open so we wont
-        // need to worry about 'size' being set.
-        final long matSizeBytes = (long)CvType.ELEM_SIZE(type) * rows * cols;
-        if(matSizeBytes > size)
-            throw new IpcException("Can't allocate a mat with " + matSizeBytes + " bytes given a data buffer of " + size + " bytes");
-        try(CvMat ret = CvMat.create(rows, cols, type, nativeData);) {
-            return ret.returnMe();
-        }
+    /**
+     * This will return {@code true} if the native code has been compiled to enabled
+     * locking. Otherwise it will return {@code false}.
+     */
+    public static boolean isLockingEnabled() {
+        return IpcApi.pilecv4j_ipc_locking_isLockingEnabled() == 1 ? true : false;
     }
+
+//    private CvMat getUnlockedBufferAsMat(final long offset, final int rows, final int cols, final int type) {
+//        final long nativeData = getRawBuffer(offset); // this will throw an exeception if it's not open so we wont
+//        // need to worry about 'size' being set.
+//        final long matSizeBytes = (long)CvType.ELEM_SIZE(type) * rows * cols;
+//        if(matSizeBytes > size)
+//            throw new IpcException("Can't allocate a mat with " + matSizeBytes + " bytes given a data buffer of " + size + " bytes");
+//        try(CvMat ret = CvMat.create(rows, cols, type, nativeData);) {
+//            return ret.returnMe();
+//        }
+//    }
 
     private CvMat getUnlockedBufferAsMat(final long offset, final int[] sizes, final int type) {
         if(sizes == null || sizes.length == 0)
@@ -439,5 +614,4 @@ public class ShmQueue implements QuietCloseable {
         }
         return new ShmQueueCvMat(newNativeObj);
     }
-
 }

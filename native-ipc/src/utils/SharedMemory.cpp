@@ -29,7 +29,7 @@
   return fromErrno(EINVAL); \
 }
 
-#define OPEN_CHECK(x)   if (! isOpen) { \
+#define OPEN_CHECK(x)   if (! m_isOpen) { \
     log(ERROR, COMPONENT, "Cannot " x " until the shm segment is open"); \
     return fromErrorCode(NOT_OPEN); \
   }
@@ -50,29 +50,6 @@ namespace ipc {
 static const uint64_t OK_RET = fromErrorCode(OK);
 
 #define std_atomic_fence(x) std::atomic_thread_fence(x)
-
-#define SHM_HEADER_MAGIC 0xBADFADE0CAFEF00D
-
-#ifdef _MSC_VER
-// Yes. I KNOW the zero length array wont participate in a copy or initialized by
-// a default constructor. Thanks Bill.
-#pragma warning( push )
-#pragma warning( disable : 4200 )
-#endif
-struct Header {
-  uint64_t magic = SHM_HEADER_MAGIC;
-#ifdef LOCKING
-  sem_t sem;
-#endif
-  std::size_t totalSize = 0;
-  std::size_t numBytes = 0;
-  std::size_t offset = 0;
-  std::size_t numMailboxes = 0;
-  std::size_t messageAvailable[0];
-};
-#ifdef _MSC_VER
-#pragma warning( pop )
-#endif
 
 #ifdef LOCKING
 static uint64_t lockMe(sem_t* sem, int64_t millis, bool aggressive) {
@@ -146,6 +123,13 @@ static uint64_t unlockMe(sem_t* sem) {
 
 void SharedMemory::cleanup() {
   if (addr && totalSize >= 0) {
+    // if we're the owner, and we're going to unlink this, then before we
+    // unmap the shared memory, we want to set the magic number to a bogus
+    // value.
+    if (owner && fd > 0) { // the means we're going to unlink it below.
+      Header* header = (Header*)addr;
+      header->magic = 0x0;
+    }
     if (!unmmapSharedMemorySegment(addr, totalSize)) {
       ErrnoType err = getLastError();
       std::string errMsgStr = getErrorMessage(err);
@@ -163,7 +147,7 @@ uint64_t SharedMemory::unlink() {
   if (isEnabled(TRACE))
     log(TRACE,COMPONENT,"unlinking the shared memory segment %s.", name.c_str());
 
-  if (fd < 0 || !isOpen) {
+  if (fd < 0 || !m_isOpen) {
     log(ERROR, COMPONENT, "Attempt to unlink the shared memory segment \"%s\" but it's not currently open", name.c_str());
     return fromErrorCode(NOT_OPEN);
   }
@@ -171,7 +155,7 @@ uint64_t SharedMemory::unlink() {
   if (!owner)
     log(WARN, COMPONENT, "unlinking the shared memory segment \"%s\" though I'm not the owner.", name.c_str());
 
-  if (!closeSharedMemorySegment(fd, name.c_str())) {
+  if (!closeSharedMemorySegment(fd, name.c_str(), nameRep)) {
     ErrnoType err = getLastError();
     std::string errMsgStr = getErrorMessage(err);
     log(ERROR, COMPONENT, "Failed to close the shared memory segment. Error %d: %s", err, errMsgStr.c_str());
@@ -179,7 +163,7 @@ uint64_t SharedMemory::unlink() {
   }
 
   fd = PCV4J_IPC_DEFAULT_DESCRIPTOR;
-  isOpen = false;
+  m_isOpen = false;
 
   return OK_RET;
 }
@@ -187,6 +171,11 @@ uint64_t SharedMemory::unlink() {
 uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t numMailboxes) {
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "Creating shared mem queue for %ld bytes. Owner: %s", (long)numBytes, powner ? "true": "false" );
+
+  if (!powner && implementationRequiresCreatorToBeOwner()) {
+    log(ERROR, COMPONENT, "The implementation (%s) requires the creator to also be the owner.", implementationName());
+    return fromErrorCode(CREATOR_MUST_BE_OWNER);
+  }
 
   Header* hptr;
   std::string errMsgPrefix;
@@ -199,7 +188,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)offsetToBuffer);
 
-  if (!createSharedMemorySegment(&fd, name.c_str(), totalSize)) {
+  if (!createSharedMemorySegment(&fd, name.c_str(), nameRep, totalSize)) {
     goto error;
   }
 
@@ -233,8 +222,8 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   // don't reorder any write operation below this with any read/write operations above this line
   std::atomic_thread_fence(std::memory_order_release);
   // set the magic number
-  hptr->magic = SHM_HEADER_MAGIC;
-  this->isOpen = true;
+  hptr->magic = PILECV4J_SHM_HEADER_MAGIC;
+  this->m_isOpen = true;
   return OK_RET;
 
   error:
@@ -248,6 +237,13 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
 }
 
 uint64_t SharedMemory::open(bool powner) {
+
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "Attempting to open the shared memory segment.");
+
+  if (m_isOpen)
+    return fromErrorCode(ALREADY_OPEN);
+
   Header lheader;
   Header* header;
   EndTime<> endTime;
@@ -256,11 +252,11 @@ uint64_t SharedMemory::open(bool powner) {
   const char* errMsgPrefix = "";
   bool closeSm = false;
 
-  if (isEnabled(TRACE))
-    log(TRACE, COMPONENT, "Attempting to open the shared memory segment.");
-  if (!openSharedMemorySegment(&fd, name.c_str())) {
+  if (!openSharedMemorySegment(&fd, name.c_str(), nameRep)) {
       err = getLastError();
-      if (err == ENOENT) // no such file is a normal condition. Seems to be the same on windows and real OSes
+      // no such file is a normal condition. This error code is the same on windows
+      //    as it is on real OSes and is the same for posix and systemv
+      if (err == ENOENT)
           return fromErrno(EAGAIN);
       errMsgPrefix = "Failed to open shared segment";
       goto error;
@@ -285,12 +281,20 @@ uint64_t SharedMemory::open(bool powner) {
 
   // poll for the magic number to be set.
   endTime.set(50ms);
-  while(header->magic != SHM_HEADER_MAGIC && !endTime.isTimePast())
+  while(header->magic != PILECV4J_SHM_HEADER_MAGIC && !endTime.isTimePast())
     std::this_thread::yield();
 
-  if (header->magic != SHM_HEADER_MAGIC) {
+  if (header->magic != PILECV4J_SHM_HEADER_MAGIC) {
     if (isEnabled(DEBUG))
       log(DEBUG, COMPONENT, "Timed out waiting for the serving size to setup the semaphore");
+
+    // we want to close it since returning EAGAIN will likely cause the user
+    // to retry opening it and we want to do if from scratch.
+    if (!closeSharedMemorySegment(fd, name.c_str(), nameRep)) {
+      ErrnoType tmpErr = getLastError();
+      std::string tmpErrMsgStr = getErrorMessage(tmpErr);
+      log(WARN, COMPONENT, "Failed to reclose the shared memory segment. Error %d: %s", tmpErr, tmpErrMsgStr.c_str());
+    }
     return fromErrno(EAGAIN);
   }
 
@@ -320,7 +324,7 @@ uint64_t SharedMemory::open(bool powner) {
   }
   this->data = ((uint8_t*)this->addr) + lheader.offset;
   this->totalSize = lheader.totalSize;
-  this->isOpen = true;
+  this->m_isOpen = true;
 
   return OK_RET;
   error:
@@ -329,7 +333,7 @@ uint64_t SharedMemory::open(bool powner) {
     std::string errMsgStr = getErrorMessage(err);
     log(WARN, COMPONENT, "%s Error %d: %s", errMsgPrefix, err, errMsgStr.c_str());
     if (closeSm) {
-      if (!closeSharedMemorySegment(fd, name.c_str())) {
+      if (!closeSharedMemorySegment(fd, name.c_str(), nameRep)) {
         ErrnoType tmpErr = getLastError();
         std::string tmpErrMsgStr = getErrorMessage(tmpErr);
         log(WARN, COMPONENT, "Failed to reclose the shared memory segment. Error %d: %s", tmpErr, tmpErrMsgStr.c_str());
@@ -414,15 +418,20 @@ uint64_t SharedMemory::unlock() {
 
 extern "C" {
 
-KAI_EXPORT uint64_t pilecv4j_ipc_create_shmQueue(const char* name) {
+KAI_EXPORT uint64_t pilecv4j_ipc_create_shmQueue(const char* name, int32_t nameRep) {
   PCV4K_IPC_TRACE;
-  return (uint64_t)SharedMemory::instantiate(name);
+  log(INFO, COMPONENT, "Instantiating a %s SharedMemory segment using (%s, 0x%08x)", SharedMemory::implementationName(), name, (int)nameRep);
+  return (uint64_t)SharedMemory::instantiate(name, nameRep);
 }
 
 KAI_EXPORT void pilecv4j_ipc_destroy_shmQueue(uint64_t nativeRef) {
   PCV4K_IPC_TRACE;
   if (nativeRef)
     delete (SharedMemory*)nativeRef;
+}
+
+KAI_EXPORT const char* pilecv4j_ipc_implementationName() {
+  return SharedMemory::implementationName();
 }
 
 KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_create(uint64_t nativeRef, uint64_t size, int32_t owner, int32_t numMailboxes) {
@@ -435,6 +444,24 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_open(uint64_t nativeRef, int32_t owner
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
   return ((SharedMemory*)nativeRef)->open(owner == 0 ? false : true);
+}
+
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_isOpen(uint64_t nativeRef, int32_t* ret) {
+  PCV4K_IPC_TRACE;
+  NULL_CHECK(nativeRef);
+  if (!ret)
+    return fromErrno(EINVAL);
+  *ret = ((SharedMemory*)nativeRef)->isOpen() ? 1 : 0;
+  return OK_RET;
+}
+
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_isOwner(uint64_t nativeRef, int32_t* ret) {
+  PCV4K_IPC_TRACE;
+  NULL_CHECK(nativeRef);
+  if (!ret)
+    return fromErrno(EINVAL);
+  *ret = ((SharedMemory*)nativeRef)->isOwner() ? 1 : 0;
+  return OK_RET;
 }
 
 KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_unlink(uint64_t nativeRef) {
@@ -506,6 +533,14 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_unpostMessage(uint64_t nativeRef, int3
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
   return ((SharedMemory*)nativeRef)->unpostMessage((std::size_t)mailbox);
+}
+
+KAI_EXPORT uint8_t pilecv4j_ipc_locking_isLockingEnabled() {
+#ifdef LOCKING
+  return (uint8_t)1;
+#else
+  return (uint8_t)0;
+#endif
 }
 
 }

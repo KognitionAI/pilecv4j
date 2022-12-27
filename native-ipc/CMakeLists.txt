@@ -78,6 +78,10 @@ endif()
 find_package(OpenCV CONFIG REQUIRED)
 
 ## set IPC type variables
+if(DEFINED ENV{IPC_TYPE})
+  set(IPC_TYPE $ENV{IPC_TYPE})
+endif()
+
 if(MSVC)
   if(NOT IPC_TYPE)
     set(IPC_TYPE windows)

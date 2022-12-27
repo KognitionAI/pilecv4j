@@ -22,18 +22,30 @@ public class TestMatQueue {
 
     public static final String TEST_IMAGE = "resized.bmp";
 
+    // a bit of a hack just for the test but this will need to be kept in sync with
+    // the enum in errHandling.h
+    public static final long ALREADY_OPEN_ERROR_CODE = (0x100000000L | 0x05L);
+
     @Test
     public void testSimple() throws Exception {
-        try(ShmQueue matqueue = new ShmQueue("TEST");) {
+        try(ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");) {
             matqueue.create(100000, true);
-            matqueue.open(false);
-            assertEquals(100000L, matqueue.getBufferSize());
+            assertTrue(matqueue.isOpen());
+            assertTrue(matqueue.isOwner());
+            long errCode = -1;
+            try {
+                matqueue.open(false);
+            } catch(final IpcException ipce) {
+                errCode = ipce.nativeErrCode;
+            }
+            assertEquals(ALREADY_OPEN_ERROR_CODE, errCode);
+            assertEquals(100000L, matqueue.getSize());
         }
     }
 
     @Test
     public void testSimpleReadWrite() throws Exception {
-        try(final ShmQueue queue = new ShmQueue("TEST");) {
+        try(final ShmQueue queue = ShmQueue.createUsingMd5Hash("TEST");) {
             queue.create(Long.BYTES, true);
             assertTrue(queue.tryAccess(bb -> bb.putLong(0x0123456789L)));
             assertTrue(queue.tryAccess(bb -> {
@@ -45,7 +57,7 @@ public class TestMatQueue {
     @Ignore // there currently is no actual locking
     @Test
     public void testBlocking() {
-        try(final ShmQueue queue = new ShmQueue("TEST");) {
+        try(final ShmQueue queue = ShmQueue.createUsingMd5Hash("TEST");) {
             queue.create(Long.BYTES, true);
             assertTrue(queue.tryAccess(bb -> {
                 assertFalse(queue.tryLock());
@@ -57,7 +69,7 @@ public class TestMatQueue {
 
     @Test
     public void testPass() throws Exception {
-        try(ShmQueue matqueue = new ShmQueue("TEST");
+        try(ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
@@ -108,7 +120,7 @@ public class TestMatQueue {
         final AtomicBoolean serverException = new AtomicBoolean(false);
 
         final var server = new Thread(() -> {
-            try(final ShmQueue matqueue = new ShmQueue("TEST");) {
+            try(final ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");) {
                 matqueue.create(fsize, true, 2);
                 long startTime = 0;
                 int count = 0;
@@ -144,7 +156,7 @@ public class TestMatQueue {
         });
         server.start();
 
-        try(final ShmQueue matqueue = new ShmQueue("TEST");
+        try(final ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
@@ -203,7 +215,7 @@ public class TestMatQueue {
         final AtomicBoolean serverException = new AtomicBoolean(false);
 
         final var server = new Thread(() -> {
-            try(final ShmQueue matqueue = new ShmQueue("TEST");) {
+            try(final ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");) {
                 matqueue.create(fsize, true);
                 long startTime = 0;
                 int count = 0;
@@ -233,7 +245,7 @@ public class TestMatQueue {
         });
         server.start();
 
-        try(final ShmQueue matqueue = new ShmQueue("TEST");
+        try(final ShmQueue matqueue = ShmQueue.createUsingMd5Hash("TEST");
             final Vfs vfs = new Vfs();
             final CvMat mat = ImageFile.readMatFromFile(vfs.toFile(new URI("classpath:///test-images/" + TEST_IMAGE)).getAbsolutePath());) {
 
