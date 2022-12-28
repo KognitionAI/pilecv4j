@@ -56,24 +56,24 @@ else()
 endif()
 
 set(SOURCE_FILES
-  src/utils/log.h
-  src/utils/log.cpp
-  src/utils/errHandling.h
-  src/utils/errHandling.cpp
-  src/utils/SharedMemory.h
-  src/utils/SharedMemory.cpp
-  src/utils/platform/SharedMemoryTypes.h
-  src/utils/platform/errHandlingImpl.h
+  src/main/cpp/utils/log.h
+  src/main/cpp/utils/log.cpp
+  src/main/cpp/utils/errHandling.h
+  src/main/cpp/utils/errHandling.cpp
+  src/main/cpp/utils/SharedMemory.h
+  src/main/cpp/utils/SharedMemory.cpp
+  src/main/cpp/utils/platform/SharedMemoryTypes.h
+  src/main/cpp/utils/platform/errHandlingImpl.h
   )
 
 set(SOURCE_FILES ${SOURCE_FILES}
-   src/utils/platform/${IPC_TYPE_SUBDIR}/SharedMemoryTypes.h
-   src/utils/platform/${IPC_TYPE_SUBDIR}/SharedMemoryImpl.cpp
-   src/utils/platform/${ERR_HANDLING_SUBDIR}/errHandlingImpl.h
-   src/utils/platform/${ERR_HANDLING_SUBDIR}/errHandlingImpl.cpp
-   )
+  src/main/cpp/utils/platform/${IPC_TYPE_SUBDIR}/SharedMemoryTypes.h
+  src/main/cpp/utils/platform/${IPC_TYPE_SUBDIR}/SharedMemoryImpl.cpp
+  src/main/cpp/utils/platform/${ERR_HANDLING_SUBDIR}/errHandlingImpl.h
+  src/main/cpp/utils/platform/${ERR_HANDLING_SUBDIR}/errHandlingImpl.cpp
+  )
 
-include_directories("src")
+include_directories(src/main/cpp)
 
 add_library(ai.kognition.pilecv4j.ipc
   SHARED
