@@ -109,6 +109,9 @@ public class ShmQueue implements QuietCloseable {
         nativeRef = IpcApi.pilecv4j_ipc_create_shmQueue(name, key);
     }
 
+    /**
+     * Generate the {@code int} nameRep by using the MD5 hash of the name.
+     */
     public static ShmQueue createUsingMd5Hash(final String name) {
         final MessageDigest md = uncheck(() -> MessageDigest.getInstance("MD5"));
         md.update(name.getBytes());
@@ -533,7 +536,7 @@ public class ShmQueue implements QuietCloseable {
 
     /**
      * <p>
-     * Obtain the lock waiting forever if necessary. If the native code isn't compiled with locking enabled
+     * Obtain the lock if it's immediately available. If the native code isn't compiled with locking enabled
      * then this method will always return {@code true}.
      * </p>
      *
@@ -543,6 +546,22 @@ public class ShmQueue implements QuietCloseable {
      */
     public boolean tryLock() {
         return lock(TRY_LOCK);
+    }
+
+    /**
+     * Return a Resource that can be auto-closed. It will return null if the lock cannot be accessed
+     * so the return value will need to be checked.
+     */
+    public QuietCloseable lockAsResource(final long timeoutMillis) {
+        return lock(timeoutMillis) ? () -> unlock() : null;
+    }
+
+    public QuietCloseable tryLockAsResource() {
+        return lockAsResource(TRY_LOCK);
+    }
+
+    public QuietCloseable lockAsResource() {
+        return lockAsResource(INFINITE);
     }
 
     /**
@@ -587,7 +606,7 @@ public class ShmQueue implements QuietCloseable {
 //        }
 //    }
 
-    private CvMat getUnlockedBufferAsMat(final long offset, final int[] sizes, final int type) {
+    public CvMat getUnlockedBufferAsMat(final long offset, final int[] sizes, final int type) {
         if(sizes == null || sizes.length == 0)
             return new CvMat();
         final long nativeData = getRawBuffer(offset); // this will throw an exeception if it's not open so we wont
