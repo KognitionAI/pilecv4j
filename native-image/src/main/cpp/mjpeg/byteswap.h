@@ -3,6 +3,10 @@
 #ifndef _BYTESWAP_H_
 #define _BYTESWAP_H_
 
+// HAVE_ENDIAN_H is set in the CMake if it can be found
+#ifdef HAVE_ENDIAN_H
+#include <endian.h>
+#else
 #if (defined _BCC || defined MSVC)
 #define __LITTLE_ENDIAN 0
 #define __BIG_ENDIAN 1
@@ -11,9 +15,6 @@
 #define LITTLE_ENDIAN __LITTLE___ENDIAN
 #define BYTE_ORDER __BYTE_ORDER
 #define EMPTY_ARRAY 1
-#else
-#ifdef UNIX
-#include <endian.h>
 #else
 # if (defined _WINDOWS || defined __MINGW32__ || defined __MINGW64__)
    /* Pm windows we're going to assum little endian on

@@ -31,7 +31,7 @@
 
   <build>
     <directory>${basedir}/target/${platform}-${build.type}</directory>
-    <sourceDirectory>src/main/cpp</sourceDirectory>
+    <sourceDirectory>.</sourceDirectory>
     <plugins>
       <!-- Copies the dependencies so that javah can find them. -->
       <!--   see the CMakeLists.txt file -->
