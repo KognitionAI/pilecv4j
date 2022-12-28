@@ -81,6 +81,7 @@ public class ShmQueue implements QuietCloseable {
     public static final long INFINITE = -1;
 
     private long size = -1; // until it's open this is unset
+    private boolean isClosed = false;
 
     // Oddly, because we spin on these, many get instantiated stressing the memory/gc. So we're going to reuse the
     // same one over and over. This class is not thread safe.
@@ -125,7 +126,10 @@ public class ShmQueue implements QuietCloseable {
      */
     @Override
     public void close() {
+        if(isClosed)
+            throw new IllegalStateException("Double close on " + this);
         IpcApi.pilecv4j_ipc_destroy_shmQueue(nativeRef);
+        isClosed = true;
     }
 
     /**
@@ -556,10 +560,18 @@ public class ShmQueue implements QuietCloseable {
         return lock(timeoutMillis) ? () -> unlock() : null;
     }
 
+    /**
+     * Return a Resource that can be auto-closed. It will return null if the lock cannot be accessed
+     * so the return value will need to be checked. Convenience method for {@code lockAsResource(TRY_LOCK)}
+     */
     public QuietCloseable tryLockAsResource() {
         return lockAsResource(TRY_LOCK);
     }
 
+    /**
+     * Return a Resource that can be auto-closed. It will return null if the lock cannot be accessed
+     * so the return value will need to be checked. Convenience method for {@code lockAsResource(INFINITE)}
+     */
     public QuietCloseable lockAsResource() {
         return lockAsResource(INFINITE);
     }
