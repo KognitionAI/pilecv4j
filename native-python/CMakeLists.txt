@@ -6,6 +6,9 @@ project (pilecv4jpython)
 
 # set this before include CMakeHelpers.cmake
 set(REQUIRE_OPENCV_COMPILE ON)
+if(MSVC)
+  set(REQUIRE_OPENCV_LINK ON)
+endif()
 
 # make sure the commons dir is available
 if(NOT DEFINED COMMON_INCLUDE)
@@ -40,5 +43,8 @@ target_include_directories(pilecv4jpython PRIVATE src/main/cpp
 
 message(STATUS "Python 3 libraries: ${Python3_LIBRARIES}")
 
-target_link_libraries(pilecv4jpython ${Python3_LIBRARIES})
+target_link_libraries(pilecv4jpython
+   ${Python3_LIBRARIES}
+   ${OPENCV_STATIC_LIB}
+)
 
