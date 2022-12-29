@@ -6,6 +6,8 @@ def func(kogsys):
     imageSource = kogsys.getImageSource()
     km = imageSource.next()
     while (km is not None):
+        params = km.getParams()
+        print ("Params: ", params, flush=True)
         img = km.get()
         if (km.isRgb()):
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)

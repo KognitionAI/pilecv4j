@@ -46,6 +46,8 @@ import ai.kognition.pilecv4j.python.KogSys.KogMatResults;
 public class TestPython {
     public static final boolean SHOW;
 
+    private static final Map<String, Object> fakeParams = Map.of("int", 1, "float", 1.0, "string", "hello");
+
     static {
         final String sysOpSHOW = System.getProperty("pilecv4j.SHOW");
         final boolean sysOpSet = sysOpSHOW != null;
@@ -101,7 +103,7 @@ public class TestPython {
                     while(pt.imageSource.peek() != 0L) // waits until the current one is gone.
                         Thread.yield();
 
-                    final KogMatResults results = pt.sendMat(toSend, false);
+                    final KogMatResults results = pt.sendMat(toSend, false, null);
                     if(prev != null) {
                         final KogMatResults fprev = prev;
                         assertTrue(ConditionPoll.poll(o -> fprev.hasResult()));
@@ -166,12 +168,12 @@ public class TestPython {
             c
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
-                .openChain()
+                .openChain("default")
                 .createFirstVideoStreamSelector()
                 .createVideoFrameProcessor(f -> {
                     frameCount.getAndIncrement();
 
-                    try(final KogMatResults results = pt.sendMat(f, true);) {
+                    try(final KogMatResults results = pt.sendMat(f, true, fakeParams);) {
                         assertTrue(uncheck(() -> ConditionPoll.poll(o -> results.hasResult())));
 
                         try(CvMat result = results.getResultMat();) {

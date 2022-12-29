@@ -54,19 +54,41 @@ public class PythonAPI {
         public long image_source(long ptRef);
     }
 
+    // ===================================================
+    // Global python calls
+    // ===================================================
     public static native int pilecv4j_python_initPython();
 
     public static native void pilecv4j_python_addModulePath(String absDir);
 
     public static native int pilecv4j_python_runPythonFunction(String module, String function, long dictRef);
 
-    public static native long pilecv4j_python_imageSourceSend(long imageSourceRef, long matRef, int rgb);
+    // ===================================================
+    // KogSys lifecycle and methods
+    // ===================================================
+    public static native long pilecv4j_python_kogSys_create(get_image_source cb);
 
-    public static native long pilecv4j_python_imageSourcePeek(long imageSourceRef);
+    public static native int pilecv4j_python_kogSys_destroy(long kogSysRef);
 
-    public static native void pilecv4j_python_imageSourceClose(long imageSourceRef);
+    public static native int pilecv4j_python_kogSys_numModelLabels(long ptRef);
 
-    public static native void pilecv4j_python_kogMatResults_close(long nativeObj);
+    public static native Pointer pilecv4j_python_kogSys_modelLabel(final long ptRef, final int index);
+
+    // ==============================================================
+    // ImageSource lifecycle and methods
+    // ==============================================================
+    public static native long pilecv4j_python_imageSource_create(long ptRef);
+
+    public static native void pilecv4j_python_imageSource_destroy(long imageSourceRef);
+
+    public static native long pilecv4j_python_imageSource_send(long imageSourceRef, long paramsDict, long matRef, int rgb);
+
+    public static native long pilecv4j_python_imageSource_peek(long imageSourceRef);
+
+    // ==============================================================
+    // KogMatResults lifecycle and methods
+    // ==============================================================
+    public static native void pilecv4j_python_kogMatResults_destroy(long nativeObj);
 
     public static native long pilecv4j_python_kogMatResults_getResults(long nativeObj);
 
@@ -74,31 +96,32 @@ public class PythonAPI {
 
     public static native int pilecv4j_python_kogMatResults_isAbandoned(long nativeObj);
 
-    public static native Pointer pilecv4j_python_statusMessage(int status);
+    // ==============================================================
+    // Python Dict lifecycle and methods
+    // ==============================================================
+    public static native long pilecv4j_python_dict_create();
 
-    public static native void pilecv4j_python_freeStatusMessage(Pointer pointer);
+    public static native void pilecv4j_python_dict_destroy(long dictRef);
 
-    public static native long pilecv4j_python_newParamDict();
+    public static native int pilecv4j_python_dict_putString(long dictRef, String key, String valRaw);
 
-    public static native void pilecv4j_python_closeParamDict(long dictRef);
+    public static native int pilecv4j_python_dict_putInt(long dictRef, String key, long valRaw);
 
-    public static native int pilecv4j_python_putStringParamDict(long dictRef, String key, String valRaw);
+    public static native int pilecv4j_python_dict_putFloat(long dictRef, String key, double valRaw);
 
-    public static native int pilecv4j_python_putIntParamDict(long dictRef, String key, long valRaw);
+    public static native int pilecv4j_python_dict_putKogSys(long dictRef, String key, long nativeObj);
 
-    public static native int pilecv4j_python_putFloatParamDict(long dictRef, String key, double valRaw);
+    public static native int pilecv4j_python_dict_putBoolean(long dict, String key, int i);
 
-    public static native int pilecv4j_python_putPytorchParamDict(long dictRef, String key, long nativeObj);
+    // ===================================================
+    // Status/Error code access
+    // ===================================================
+    public static native Pointer pilecv4j_python_status_message(int status);
 
-    public static native int pilecv4j_python_putBooleanParamDict(long dict, String key, int i);
+    public static native void pilecv4j_python_status_freeMessage(Pointer pointer);
 
+    // ===================================================
+    // Logging
+    // ===================================================
     public static native int pilecv4j_python_setLogLevel(int logLevelSet);
-
-    public static native long pilecv4j_python_makeImageSource(long ptRef);
-
-    public static native long pilecv4j_python_initKogSys(get_image_source cb);
-
-    public static native int pilecv4j_python_kogSys_numModelLabels(long ptRef);
-
-    public static native Pointer pilecv4j_python_kogSys_modelLabel(final long ptRef, final int index);
 }

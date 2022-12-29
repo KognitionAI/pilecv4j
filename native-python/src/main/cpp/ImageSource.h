@@ -15,18 +15,20 @@ namespace python {
     bool rgb;
     bool resultsSet;
     bool abandoned;
+    PyObject* params;
 
     KogMatWithResults() = delete;
     KogMatWithResults(KogMatWithResults& other) = delete;
 
-    inline KogMatWithResults(cv::Mat* pmat, bool prgb, bool ownsmat) :
-      mat(ownsmat ? pmat : (pmat == nullptr ? nullptr : new cv::Mat(*pmat))),
-      results(nullptr),
-      rgb(prgb),
-      resultsSet(false),
-      abandoned(false),
-      refCnt(0) {
-      log(TRACE,"Constructing KMResult(%ld)", static_cast<long>((uint64_t)this));
+    inline KogMatWithResults(cv::Mat* pmat, bool prgb, bool ownsmat, PyObject* pparams) :
+
+          mat(ownsmat ? pmat : (pmat == nullptr ? nullptr : new cv::Mat(*pmat))),
+          results(nullptr), rgb(prgb), resultsSet(false), abandoned(false), params(nullptr), refCnt(0) {
+
+      log(TRACE, "Constructing KMResult(%p)", (void*)this);
+      if (pparams)
+        Py_INCREF(pparams);
+      params = pparams;
       increment();
     }
 
@@ -50,11 +52,13 @@ namespace python {
         results = nullptr;
       }
       resultsSet = false;
+      if (params)
+        Py_DECREF(params);
     }
 
   private:
     inline ~KogMatWithResults() {
-      log(TRACE,"Destructing KMResult(%ld)", static_cast<long>((uint64_t)this));
+      log(TRACE, "Destructing KMResult(%p)", (void*)this);
       free();
     }
 
@@ -65,7 +69,7 @@ namespace python {
     inline void decrement() {
       std::lock_guard<std::mutex> lck(mutex);
       int32_t val = (--refCnt);
-      log(TRACE,"Decrementing KMResult(%ld) to %d", static_cast<long>((uint64_t)this), (int)val);
+      log(TRACE,"Decrementing KMResult(%p) to %d", (void*)this, (int)val);
       if (val <= 0)
         delete this;
     }
@@ -73,12 +77,12 @@ namespace python {
     inline void increment() {
       std::lock_guard<std::mutex> lck(mutex);
       int32_t val = (++refCnt);
-      log(TRACE,"Incrementing KMResult(%ld) to %d", static_cast<long>((uint64_t)this), (int)val);
+      log(TRACE,"Incrementing KMResult(%p) to %d", (void*)this, (int)val);
     }
   };
 
   class ImageSource {
-    KogMatWithResults* ondeckx;
+    KogMatWithResults* ondeck;
     std::mutex ondeckMutex;
     bool eos;
   public:
@@ -89,8 +93,8 @@ namespace python {
       KogMatWithResults* toDelete;
       {
         std::lock_guard<std::mutex> lck(ondeckMutex);
-        toDelete = ondeckx;
-        ondeckx = nullptr;
+        toDelete = ondeck;
+        ondeck = nullptr;
       }
       if (toDelete)
         toDelete->decrement();
@@ -100,7 +104,7 @@ namespace python {
 
     inline KogMatWithResults* peek() {
       std::lock_guard<std::mutex> lck(ondeckMutex);
-      return ondeckx;
+      return ondeck;
     }
 
     static PyObject* convertMatToNumPyArray(cv::Mat* toConvert, bool ownsMatPassed, bool deepcopy, int* statusCode, bool fromPython);
