@@ -67,7 +67,7 @@ static const char* lookupCvTypeName(int cvType) {
 namespace pilecv4j {
 namespace python {
 
-  ImageSource::ImageSource() : ondeckx(nullptr), eos(false) {
+  ImageSource::ImageSource() : ondeck(nullptr), eos(false) {
     log(TRACE,"instantiating ImageSource %ld", (uint64_t)this );
   }
 
@@ -77,8 +77,8 @@ namespace python {
     for (int spinCount = 0; spinCount < SPINS; spinCount++) {
       {
         std::lock_guard<std::mutex> lck(ondeckMutex);
-        KogMatWithResults* ret = ondeckx;
-        ondeckx = nullptr;
+        KogMatWithResults* ret = ondeck;
+        ondeck = nullptr;
         if (ret) {
           log(TRACE,"retrieving KogMatWithResults %ld, count:0", static_cast<long>((uint64_t)ret) );
           return ret;
@@ -97,8 +97,8 @@ namespace python {
       std::this_thread::sleep_until(std::chrono::steady_clock::now() + 1us);
       {
         std::lock_guard<std::mutex> lck(ondeckMutex);
-        ret = ondeckx;
-        ondeckx = nullptr;
+        ret = ondeck;
+        ondeck = nullptr;
         if (!ret && eos) {
           log(TRACE,"EOS(2) on ImageSource detected %ld", (long)count);
           return nullptr;
@@ -115,13 +115,13 @@ namespace python {
     if (!mat) {
       // this is an EOS indicator
       eos = true;
-      prev = ondeckx;
-      ondeckx = nullptr;
+      prev = ondeck;
+      ondeck = nullptr;
     } else {
       log(TRACE,"sending KogMatWithResults %ld", (uint64_t)mat);
-      prev = ondeckx;
+      prev = ondeck;
       mat->increment();
-      ondeckx = mat;
+      ondeck = mat;
     }
     if (prev) {
       log(INFO,"decrementing KogMatWithResults %ld on abandoned result", (uint64_t)prev );

@@ -38,18 +38,9 @@ using namespace pilecv4j::python;
 extern PyObject* convert(KogSystem* pt);
 
 extern "C" {
-  KAI_EXPORT char* pilecv4j_python_statusMessage(uint32_t status) {
-    if (status == 0)
-      return nullptr;
-
-    return strdup(getStatusMessage(status));
-  }
-
-  KAI_EXPORT void pilecv4j_python_freeStatusMessage(char* messageRef) {
-    if (messageRef)
-      free((void*)messageRef);
-  }
-
+  // ==============================================================
+  // Global python management
+  // ==============================================================
   KAI_EXPORT int32_t pilecv4j_python_initPython() {
     static std::mutex initMutex;
 
@@ -72,7 +63,20 @@ extern "C" {
     return (int32_t)OK;
   }
 
-  KAI_EXPORT uint64_t pilecv4j_python_initKogSys(get_image_source cb) {
+  KAI_EXPORT int32_t pilecv4j_python_runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
+    PyObject* paramDict = (PyObject*)paramDictRef;
+    PythonEnvironment* p = PythonEnvironment::instance();
+    return p->runModel(moduleName, functionName, paramDict);
+  }
+
+  KAI_EXPORT void pilecv4j_python_addModulePath(const char* modPath) {
+    PythonEnvironment::instance()->addModulePath(modPath);
+  }
+
+  // ==============================================================
+  // KogSys lifecycle and methods
+  // ==============================================================
+  KAI_EXPORT uint64_t pilecv4j_python_kogSys_create(get_image_source cb) {
     return (uint64_t)new KogSystem(cb);
   }
 
@@ -86,51 +90,52 @@ extern "C" {
     return ths->getModelLabel(index);
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_closePyTorch(uint64_t ptRef) {
+  KAI_EXPORT int32_t pilecv4j_python_kogSys_destroy(uint64_t ptRef) {
     delete (KogSystem*)ptRef;
     return OK;
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
-    PyObject* paramDict = (PyObject*)paramDictRef;
-    PythonEnvironment* p = PythonEnvironment::instance();
-    return p->runModel(moduleName, functionName, paramDict);
+  // ==============================================================
+  // ImageSource lifecycle and methods
+  // ==============================================================
+  KAI_EXPORT uint64_t pilecv4j_python_imageSource_create(uint64_t pt) {
+    KogSystem* ptorch = (KogSystem*)pt;
+    return uint64_t(new ImageSource());
   }
 
-  KAI_EXPORT uint64_t pilecv4j_python_imageSourceSend(uint64_t imageSourceRef, uint64_t matRef, int32_t rgbi) {
+  KAI_EXPORT void pilecv4j_python_imageSource_destroy(uint64_t imageSourceRef) {
+    CallPythonGuard gg; // KogMatWithResults will be Py_DECREF params
+    ImageSource* is = ((ImageSource*)imageSourceRef);
+    delete is;
+  }
+
+  KAI_EXPORT uint64_t pilecv4j_python_imageSource_send(uint64_t imageSourceRef, uint64_t dictRef, uint64_t matRef, int32_t rgbi) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     if (matRef == 0L) {
       is->send(nullptr);
       return 0L;
     }
+    PyObject* params = (PyObject*)dictRef;
     cv::Mat* mat = (cv::Mat*)matRef;
-    KogMatWithResults* km = new KogMatWithResults(mat, rgbi ? true : false, false);
+    CallPythonGuard gg; // KogMatWithResults will be Py_INCREF/Py_DECREF params
+    KogMatWithResults* km = new KogMatWithResults(mat, rgbi ? true : false, false, params);
     is->send(km);
     return (uint64_t)km;
   }
 
-  KAI_EXPORT void pilecv4j_python_addModulePath(const char* modPath) {
-    PythonEnvironment::instance()->addModulePath(modPath);
-  }
-
-  KAI_EXPORT uint64_t pilecv4j_python_makeImageSource(uint64_t pt) {
-    KogSystem* ptorch = (KogSystem*)pt;
-    return uint64_t(new ImageSource());
-  }
-
-  KAI_EXPORT uint64_t pilecv4j_python_imageSourcePeek(uint64_t imageSourceRef) {
+  KAI_EXPORT uint64_t pilecv4j_python_imageSource_peek(uint64_t imageSourceRef) {
     ImageSource* is = ((ImageSource*)imageSourceRef);
     return (uint64_t)(is->peek());
   }
 
-  KAI_EXPORT void pilecv4j_python_imageSourceClose(uint64_t imageSourceRef) {
-    ImageSource* is = ((ImageSource*)imageSourceRef);
-    delete is;
-  }
+  // ==============================================================
+  // KogMatResults lifecycle and methods
+  // ==============================================================
 
-  KAI_EXPORT void pilecv4j_python_kogMatResults_close(uint64_t nativeObj) {
+  KAI_EXPORT void pilecv4j_python_kogMatResults_destroy(uint64_t nativeObj) {
     log(TRACE, "Closing KogMatWithResults at %ld", (long)nativeObj);
     if (nativeObj) {
+      CallPythonGuard gg; // KogMatWithResults may be Py_INCREF/Py_DECREF params
       ((KogMatWithResults*)nativeObj)->decrement();
     }
   }
@@ -162,17 +167,20 @@ extern "C" {
       return 0L;
   }
 
-  KAI_EXPORT uint64_t pilecv4j_python_newParamDict() {
+  // ==============================================================
+  // Python Dict lifecycle and methods
+  // ==============================================================
+  KAI_EXPORT uint64_t pilecv4j_python_dict_create() {
     CallPythonGuard gg;
     return (uint64_t)(PyObject*) PyDict_New();
   }
 
-  KAI_EXPORT void pilecv4j_python_closeParamDict(uint64_t dictRef) {
+  KAI_EXPORT void pilecv4j_python_dict_destroy(uint64_t dictRef) {
     CallPythonGuard gg;
     Py_DECREF((PyObject*)dictRef);
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_putBooleanParamDict(uint64_t dictRef, const char* key, int32_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_dict_putBoolean(uint64_t dictRef, const char* key, int32_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -186,7 +194,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_putIntParamDict(uint64_t dictRef, const char* key, int64_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_dict_putInt(uint64_t dictRef, const char* key, int64_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -199,7 +207,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_putFloatParamDict(uint64_t dictRef, const char* key, float64_t valRef) {
+  KAI_EXPORT int32_t pilecv4j_python_dict_putFloat(uint64_t dictRef, const char* key, float64_t valRef) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -213,7 +221,7 @@ extern "C" {
   }
 
 
-  KAI_EXPORT int32_t pilecv4j_python_putStringParamDict(uint64_t dictRef, const char* key, const char* valRaw) {
+  KAI_EXPORT int32_t pilecv4j_python_dict_putString(uint64_t dictRef, const char* key, const char* valRaw) {
     StatusCode result = OK;
     CallPythonGuard gg;
     PyObject* dict = (PyObject*)dictRef;
@@ -226,8 +234,7 @@ extern "C" {
     return (int32_t)result;
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_putPytorchParamDict(uint64_t dictRef, const char* key, uint64_t valRef) {
-
+  KAI_EXPORT int32_t pilecv4j_python_dict_putKogSys(uint64_t dictRef, const char* key, uint64_t valRef) {
     CallPythonGuard gg;
     PythonEnvironment::instance()->loadKognitionModule();
     PyObject* pytorch = convert((KogSystem*)valRef);
@@ -239,6 +246,7 @@ extern "C" {
       log (ERROR, "Failed to convert a PyTorch instance to a PyObject");
       return CANT_INSTANTIATE_PYTHON_OBJECT;
     }
+
     PyObject* dict = (PyObject*)dictRef;
     if (PyDict_SetItemString(dict, key, pytorch) != 0) {
       log(ERROR, "Failed to insert parameter (%s : %s) into dictionary", key, valRef);
@@ -248,6 +256,24 @@ extern "C" {
     return result;
   }
 
+  // ==============================================================
+  // Status/Error code access
+  // ==============================================================
+  KAI_EXPORT char* pilecv4j_python_status_message(uint32_t status) {
+    if (status == 0)
+      return nullptr;
+
+    return strdup(getStatusMessage(status));
+  }
+
+  KAI_EXPORT void pilecv4j_python_status_freeMessage(char* messageRef) {
+    if (messageRef)
+      free((void*)messageRef);
+  }
+
+  // ==============================================================
+  // Logging
+  // ==============================================================
   KAI_EXPORT int32_t pilecv4j_python_setLogLevel(int32_t plogLevel) {
     if (plogLevel <= MAX_LOG_LEVEL && plogLevel >= 0)
       setLogLevel(static_cast<LogLevel>(plogLevel));

@@ -12,7 +12,8 @@ namespace python {
   }
 
   KogSystem* convertPyTorch() {
-    log(TRACE, "converting PyTorch instance at %ld to python", static_cast<long>((uint64_t)instance));
+    if (isEnabled(TRACE))
+      log(TRACE, "converting PyTorch instance at %ld to python", static_cast<long>((uint64_t)instance));
     return instance;
   }
 }

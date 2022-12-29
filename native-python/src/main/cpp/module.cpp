@@ -7,6 +7,12 @@
 
 using namespace pilecv4j::python;
 
+#define RETURN_BORROWED_REF(x) \
+  { \
+    Py_INCREF(x); \
+    return x; \
+  }
+
 static void initializePyType(PyTypeObject* type_object)
 {
   static PyTypeObject py_type_object_header = { PyObject_HEAD_INIT(NULL) 0};
@@ -33,7 +39,14 @@ static PyTypeObject PKogMatWithResults_Type;
 
 static PyObject* KogMatWithResults_get(PKogMatWithResults* self, PyObject* args)
 {
-  return self->npArray;
+  RETURN_BORROWED_REF(self->npArray);
+}
+
+static PyObject* KogMatWithResults_getParams(PKogMatWithResults* self, PyObject* args)
+{
+  if (self->kmat->params)
+    RETURN_BORROWED_REF(self->kmat->params);
+  Py_RETURN_NONE;
 }
 
 static PyObject* KogMatWithResults_free(PKogMatWithResults* self, PyObject* args)
@@ -103,6 +116,7 @@ static PyMethodDef KogMatWithResults_methods[] = {
     {(char*)"isRgb", (PyCFunction)KogMatWithResults_isRgb, METH_VARARGS, NULL},
     {(char*)"free", (PyCFunction)KogMatWithResults_free, METH_VARARGS, NULL},
     {(char*)"setResult", (PyCFunction)KogMatWithResults_setResult, METH_VARARGS, NULL},
+    {(char*)"getParams", (PyCFunction)KogMatWithResults_getParams, METH_VARARGS, NULL},
     {NULL, NULL, 0, NULL}
 };
 
@@ -133,8 +147,8 @@ static PyObject* ImageSource_steal(PImageSource* imsrc, PyObject* args)
 {
   log(DEBUG, "Creating Stolen image");
   PKogMatWithResults* ret;
-
   KogMatWithResults* kmat;
+
   Py_BEGIN_ALLOW_THREADS
   kmat = imsrc->imageSource->next();
   Py_END_ALLOW_THREADS
@@ -346,7 +360,6 @@ static struct PyModuleDef createModule
 };
 
 PyMODINIT_FUNC PyInit_kognition() {
-
   log(INFO, "Initializing " KOGNITION_MODULE " module.");
   initKogMatWithResults_Type();
   initImageSource_Type();

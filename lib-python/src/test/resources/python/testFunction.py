@@ -5,6 +5,8 @@ def func(kogsys):
     km = imageSource.next()
     while (km is not None):
         img = km.get()
+        params = km.getParams()
+        print ("Params: ", params)
         km.setResult(img)
         km = imageSource.next()
 
