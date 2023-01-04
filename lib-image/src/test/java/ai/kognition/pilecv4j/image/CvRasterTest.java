@@ -21,6 +21,7 @@ import static org.junit.Assert.assertNotEquals;
 import static org.opencv.imgcodecs.Imgcodecs.IMREAD_UNCHANGED;
 
 import java.io.File;
+import java.nio.ByteBuffer;
 
 import org.junit.Rule;
 import org.junit.Test;
@@ -53,9 +54,13 @@ public class CvRasterTest {
         CvMat.initOpenCv();
     }
 
-    private static String testImagePath = new File(
-        CvRasterTest.class.getClassLoader().getResource("test-images/expected-8bit-grey.darkToLight.bmp").getFile())
-            .getAbsolutePath();
+    public static String classPathFile(final String str) {
+        return new File(
+            CvRasterTest.class.getClassLoader().getResource(str).getFile())
+                .getAbsolutePath();
+    }
+
+    private static String testImagePath = classPathFile("test-images/expected-8bit-grey.darkToLight.bmp");
 
     private static int IMAGE_WIDTH_HEIGHT = 256;
 
@@ -140,6 +145,127 @@ public class CvRasterTest {
                     raster.set(134, 144, new byte[] {(byte)(((134 + 144) >> 1) & 0xff)});
                     assertEquals(expected, raster);
                 }));
+            }
+        }
+    }
+
+    @Test
+    public void testInplaceReshape() throws Exception {
+        final String testImagePath = classPathFile("test-images/180x240_people.jpg");
+
+        try(final CvMat omat = ImageFile.readMatFromFile(testImagePath);) {
+
+            assertEquals(3, omat.channels());
+            System.out.println(omat);
+
+            try(final CvMat rmat = ImageFile.readMatFromFile(testImagePath);) {
+                final long originalDataLocation = rmat.rasterOp(r -> r.getNativeAddressOfData());
+                // let's make this a big ole flat matrix
+                rmat.inplaceReshape(1, new int[] {(int)(omat.total() * omat.channels())});
+
+                assertEquals(1, rmat.channels());
+                // System.out.println(rmat);
+                // oddly, you can't have a 1d mat
+                assertEquals(2, rmat.dims());
+                assertEquals(omat.total() * omat.elemSize(), rmat.rows());
+                // make sure it hasn't moved
+                assertEquals(originalDataLocation, rmat.rasterOp(r -> r.getNativeAddressOfData()).longValue());
+
+                // reshape it to rows,cols,chan
+                rmat.inplaceReshape(1, new int[] {omat.rows(),omat.cols(),3});
+                // make sure it hasn't moved
+                assertEquals(originalDataLocation, rmat.rasterOp(r -> r.getNativeAddressOfData()).longValue());
+                assertEquals(omat.total() * omat.elemSize(), rmat.total() * rmat.elemSize());
+                assertNotEquals(omat.total(), rmat.total());
+
+                final int rows = omat.rows();
+                final int cols = omat.cols();
+                rmat.rasterAp(r -> {
+                    final ByteBuffer bb = r.underlying();
+                    for(int i = 0; i < rows; i++) {
+                        for(int j = 0; j < cols; j++) {
+                            final double[] pix = omat.get(i, j);
+                            for(int c = 0; c < 3; c++) {
+                                assertEquals(pix[c], 0xff & bb.get((((i * cols) + j) * 3) + c), 0);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    }
+
+    @Test
+    public void testInplaceRemake() throws Exception {
+        try(final CvMat omat = ImageFile.readMatFromFile(classPathFile("test-images/180x240_people.jpg"));) {
+
+            assertEquals(3, omat.channels());
+            System.out.println(omat);
+
+            try(final CvMat rmat = CvMat.shallowCopy(omat);) {
+                final long originalDataLocation = omat.rasterOp(r -> r.getNativeAddressOfData());
+                // let's make this a big ole flat matrix
+                rmat.inplaceRemake(new int[] {(int)(omat.total() * omat.channels())}, CvType.CV_8UC1, rmat.total() * rmat.elemSize());
+
+                assertEquals(1, rmat.channels());
+                // System.out.println(rmat);
+                // oddly, you can't have a 1d mat
+                assertEquals(2, rmat.dims());
+                assertEquals(omat.total() * omat.elemSize(), rmat.rows());
+                // make sure it hasn't moved
+                assertEquals(originalDataLocation, rmat.rasterOp(r -> r.getNativeAddressOfData()).longValue());
+
+                // reshape it to rows,cols,chan
+                rmat.inplaceRemake(new int[] {omat.rows(),omat.cols(),3}, CvType.CV_8UC1, rmat.total() * rmat.elemSize());
+                // make sure it hasn't moved
+                assertEquals(originalDataLocation, rmat.rasterOp(r -> r.getNativeAddressOfData()).longValue());
+                assertEquals(omat.total() * omat.elemSize(), rmat.total() * rmat.elemSize());
+                assertNotEquals(omat.total(), rmat.total());
+
+                final int rows = omat.rows();
+                final int cols = omat.cols();
+                rmat.rasterAp(r -> {
+                    final ByteBuffer bb = r.underlying();
+                    for(int i = 0; i < rows; i++) {
+                        for(int j = 0; j < cols; j++) {
+                            final double[] pix = omat.get(i, j);
+                            for(int c = 0; c < 3; c++) {
+                                assertEquals(pix[c], 0xff & bb.get((((i * cols) + j) * 3) + c), 0);
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // 256x256 gray scale
+        try(final CvMat omat = ImageFile.readMatFromFile(testImagePath);) {
+            assertEquals(1, omat.channels());
+            System.out.println(omat);
+
+            try(final CvMat rmat = CvMat.shallowCopy(omat);) {
+
+                rmat.inplaceRemake(new int[] {omat.rows(),omat.cols() >> 2}, CvType.CV_32SC1, rmat.total() * rmat.elemSize());
+
+                final int rows = omat.rows();
+                final int cols = omat.cols();
+
+                rmat.rasterAp(r -> {
+                    for(int i = 0; i < rows; i++) {
+                        for(int j = 0; j < cols; j++) {
+                            final double[] pix = omat.get(i, j);
+                            final int val = (int)pix[0];
+                            // now extract the exact same value.
+                            final int rcols = j >>> 2;
+                            final int index = j & 3;
+                            final double[] rpixD = rmat.get(i, rcols);
+                            final int rpix = (int)rpixD[0];
+                            // endian-ness doesn't matter since I'm not interpreting the integer.
+                            final int rmatch = ((rpix) >>> (index * 8) & 0xff);
+                            assertEquals(val, rmatch);
+                        }
+                    }
+                });
             }
         }
     }

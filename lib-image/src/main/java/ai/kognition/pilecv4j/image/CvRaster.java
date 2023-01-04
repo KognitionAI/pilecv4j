@@ -220,7 +220,7 @@ public abstract class CvRaster implements AutoCloseable {
      */
     public long getNativeAddressOfData() {
         if(!mat.isContinuous())
-            throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
+            throw new IllegalArgumentException("Cannot retrieve the data reference of a Mat without a continuous buffer.");
         return Pointer.nativeValue(ImageAPI.pilecv4j_image_CvRaster_getData(mat.nativeObj));
     }
 

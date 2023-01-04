@@ -93,6 +93,10 @@ public class ImageAPI {
 
     public static native long pilecv4j_image_CvRaster_defaultMat();
 
+    public static native void pilecv4j_image_CvRaster_inplaceReshape(long nativeRef, int cn, int ndims, Pointer sizes);
+
+    public static native int pilecv4j_image_CvRaster_inplaceRemake(long nativeObj, int ndims, Pointer ptr, int type, long maxSize);
+
     // ==========================================================
     // Wrapped OpenCv HighGUI API.
     // ALL of these need to be called from a SINGLE common thread.

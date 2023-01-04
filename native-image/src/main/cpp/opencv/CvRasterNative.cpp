@@ -9,6 +9,7 @@
 #include "utils/log.h"
 
 #define COMPONENT "CVMT"
+#define MAX_MAT_DIMMS 30
 
 using namespace pilecv4j::image;
 
@@ -93,13 +94,65 @@ extern "C" {
   KAI_EXPORT uint64_t pilecv4j_image_CvRaster_makeMdMatFromRawDataReference(int32_t ndims, int32_t* sizes, uint32_t type, uint64_t dataLong) {
     if (isEnabled(TRACE))
       log(TRACE, COMPONENT, "Making %d dimensional Mat of type %s", (int)ndims, type2str(type).c_str());
+    if (ndims > MAX_MAT_DIMMS) {
+      log(ERROR, COMPONENT, "Cannot create a mat with more dimensions than %d. Requested %d", (int)MAX_MAT_DIMMS, (int)ndims);
+      return 0L;
+    }
     void* data = (void*) dataLong;
-    int* dims = new int[ndims];
+    int dims[MAX_MAT_DIMMS];
     for (int i = 0; i < ndims; i++)
       dims[i] = (int)sizes[i];
     cv::Mat* newMat = new cv::Mat((int)ndims, dims, type, data);
-    delete[] dims;
     return (uint64_t) newMat;
+  }
+
+  KAI_EXPORT void pilecv4j_image_CvRaster_inplaceReshape(uint64_t native, int32_t cn, int32_t ndims, int32_t* sizes) {
+    if (isEnabled(TRACE))
+      log(TRACE, COMPONENT, "Reshaping to a %d dimensional Mat with %d channels", (int)ndims, (int)cn);
+    if (!native) {
+      log(ERROR, COMPONENT, "NULL mat passed to inplaceReshape.");
+      return;
+    }
+    if (ndims > MAX_MAT_DIMMS) {
+      log(ERROR, COMPONENT, "Cannot reshape a mat with more dimensions than %d. Requested %d", (int)MAX_MAT_DIMMS, (int)ndims);
+      return;
+    }
+    cv::Mat* mat = (cv::Mat*)native;
+    int dims[MAX_MAT_DIMMS];
+    for (int i = 0; i < ndims; i++)
+      dims[i] = (int)sizes[i];
+    (*mat) = mat->reshape(cn, ndims, dims);
+  }
+
+  // This should only be called on a mat that has no control over its data and was itself constructed with a data
+  //   pointer, OR where another Mat is still controlling the data. The java side checks for this.
+  KAI_EXPORT int32_t pilecv4j_image_CvRaster_inplaceRemake(uint64_t native, int32_t ndims, int32_t* sizes, int32_t type, uint64_t maxSize) {
+    if (isEnabled(TRACE))
+      log(TRACE, COMPONENT, "Remaking to a %d dimensional Mat with type %s", (int)ndims, type2str(type).c_str());
+    if (!native) {
+      log(ERROR, COMPONENT, "NULL mat passed to inplaceRemake.");
+      return 0;
+    }
+    if (ndims > MAX_MAT_DIMMS) {
+      log(ERROR, COMPONENT, "Cannot remake a mat with more dimensions than %d. Requested %d", (int)MAX_MAT_DIMMS, (int)ndims);
+      return 0;
+    }
+    int dims[MAX_MAT_DIMMS];
+    std::size_t numBytes = CV_ELEM_SIZE(type);
+    for (int i = 0; i < ndims; i++) {
+      dims[i] = (int)sizes[i];
+      numBytes *= dims[i];
+    }
+    cv::Mat* mat = (cv::Mat*)native;
+    if (numBytes > maxSize) {
+      log(ERROR, COMPONENT, "Cannot remake a mat to a larger size than the original");
+      return 0;
+    }
+
+    uint8_t* data = (uint8_t*)mat->data;
+    cv::Mat remade(ndims, dims, type, data);
+    (*mat) = remade;
+    return 1;
   }
 
   KAI_EXPORT uint64_t pilecv4j_image_CvRaster_defaultMat() {
