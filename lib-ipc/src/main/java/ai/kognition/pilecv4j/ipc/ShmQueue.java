@@ -4,6 +4,7 @@ import static ai.kognition.pilecv4j.ipc.ErrorHandling.EAGAIN;
 import static ai.kognition.pilecv4j.ipc.ErrorHandling.throwIfNecessary;
 import static net.dempsy.util.Functional.uncheck;
 
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.util.function.Consumer;
@@ -88,6 +89,8 @@ public class ShmQueue implements QuietCloseable {
     private final IntByReference intResult = new IntByReference();
     private final LongByReference longResult = new LongByReference();
     private final PointerByReference ptrResult = new PointerByReference();
+    private ByteBuffer reusedBb;
+    private final int[] rowCol = new int[2];
 
     /**
      * <p>
@@ -146,6 +149,7 @@ public class ShmQueue implements QuietCloseable {
     public void create(final long size, final boolean owner, final int numMailboxes) {
         throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_create(nativeRef, size, owner ? 1 : 0, numMailboxes), true);
         this.size = size;
+        this.reusedBb = getBuffer(0);
     }
 
     /**
@@ -177,6 +181,7 @@ public class ShmQueue implements QuietCloseable {
             return false;
 
         size = getSize();
+        this.reusedBb = getBuffer(0);
         return true;
     }
 
@@ -225,7 +230,8 @@ public class ShmQueue implements QuietCloseable {
         final boolean gotLock = lock(timeoutMillis);
         if(gotLock) {
             try(QuietCloseable qc = () -> unlock();) {
-                bbconsumer.accept(getBuffer(0));
+                reusedBb.rewind();
+                bbconsumer.accept(reusedBb);
                 return true;
             }
         } else
@@ -314,16 +320,9 @@ public class ShmQueue implements QuietCloseable {
         }
 
         @Override
-        public void close() {
-            try {
-                if(!skipCloseOnceForReturn) {
-                    if(gotLock)
-                        unlock();
-                }
-            } finally {
-                // if skipCloseOnceForReturn is set, this will bookkeep it correctly.
-                super.close();
-            }
+        protected void doNativeDelete() {
+            if(gotLock)
+                unlock();
         }
 
         /**
@@ -428,7 +427,10 @@ public class ShmQueue implements QuietCloseable {
      * @see #accessAsMat(long, int[], int, long)
      */
     public ShmQueueCvMat accessAsMat(final long offset, final int rows, final int cols, final int type, final long millis) {
-        return accessAsMat(offset, new int[] {rows,cols}, type, millis);
+        rowCol[0] = rows;
+        rowCol[1] = cols;
+
+        return accessAsMat(offset, rowCol, type, millis);
     }
 
     /**
@@ -500,6 +502,15 @@ public class ShmQueue implements QuietCloseable {
     }
 
     /**
+     * This will return a ByteBuffer representing the entire shared memory segment. Each
+     * call will return the IDENTICAL byte buffer.
+     *
+     */
+    public ByteBuffer getReusedByteBuffer() {
+        return reusedBb;
+    }
+
+    /**
      * Return a ByteBuffer mapping the portion of the shared memory segment requested.
      *
      * @param offset is the offset in bytes into the shared memory segment where the resulting
@@ -511,6 +522,24 @@ public class ShmQueue implements QuietCloseable {
         if(Pointer.nativeValue(data) == 0)
             throw new IpcException("Null data buffer");
         return data.getByteBuffer(0, size - offset);
+    }
+
+    /**
+     * Return a ByteBuffer mapping the portion of the shared memory segment requested.
+     *
+     * @param offset is the offset in bytes into the shared memory segment where the resulting
+     *     ByteBuffer should begin.
+     */
+    public ByteBuffer getBuffer(final long offset, final long length) {
+        if(length + offset > size) {
+            LOGGER.error("Cannot allocate a bytebuffer of size {} with offset {} when the underlying data is only {} bytes long", length, offset, size);
+            throw new BufferOverflowException();
+        }
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_buffer(nativeRef, offset, ptrResult), true);
+        final Pointer data = ptrResult.getValue();
+        if(Pointer.nativeValue(data) == 0)
+            throw new IpcException("Null data buffer");
+        return data.getByteBuffer(0, length);
     }
 
     /**
@@ -606,17 +635,6 @@ public class ShmQueue implements QuietCloseable {
     public static boolean isLockingEnabled() {
         return IpcApi.pilecv4j_ipc_locking_isLockingEnabled() == 1 ? true : false;
     }
-
-//    private CvMat getUnlockedBufferAsMat(final long offset, final int rows, final int cols, final int type) {
-//        final long nativeData = getRawBuffer(offset); // this will throw an exeception if it's not open so we wont
-//        // need to worry about 'size' being set.
-//        final long matSizeBytes = (long)CvType.ELEM_SIZE(type) * rows * cols;
-//        if(matSizeBytes > size)
-//            throw new IpcException("Can't allocate a mat with " + matSizeBytes + " bytes given a data buffer of " + size + " bytes");
-//        try(CvMat ret = CvMat.create(rows, cols, type, nativeData);) {
-//            return ret.returnMe();
-//        }
-//    }
 
     public CvMat getUnlockedBufferAsMat(final long offset, final int[] sizes, final int type) {
         if(sizes == null || sizes.length == 0)

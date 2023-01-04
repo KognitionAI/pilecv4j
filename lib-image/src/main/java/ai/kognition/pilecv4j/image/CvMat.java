@@ -235,6 +235,45 @@ public class CvMat extends Mat implements QuietCloseable {
     }
 
     /**
+     * Reshape this Mat without constructing any intermediate and guaranteeing the result
+     * is using the same memory segment.
+     */
+    public void inplaceReshape(final int cn, final int[] sizes) {
+        final int ndims = sizes.length;
+        final long numBytes = ndims * Integer.BYTES;
+        final Pointer ptr = new Memory(numBytes);
+        final ByteBuffer bb = ptr.getByteBuffer(0, numBytes).order(ByteOrder.nativeOrder());
+        for(final int sz: sizes)
+            bb.putInt(sz);
+        ImageAPI.pilecv4j_image_CvRaster_inplaceReshape(nativeObj, cn, ndims, ptr);
+    }
+
+    /**
+     * <p>
+     * DO NOT USE THIS METHOD UNLESS YOU REALLY KNOW WHAT YOU'RE DOING!
+     * </p>
+     *
+     * <p>
+     * The memory representing this {@link CvMat} must be under the management of another mechanism.
+     * Therefore, either this must be a shallow copy of another Mat that outlives this Mat, OR
+     * the mat would have been constructed from a data buffer (that also must outlive this Mat).
+     * </p>
+     */
+//    public void inplaceRemake(final int[] sizes, final int type) {
+//        inplaceRemake(sizes, type, total() * elemSize());
+//    }
+
+    public boolean inplaceRemake(final int[] sizes, final int type, final long maxSize) {
+        final int ndims = sizes.length;
+        final long numBytes = ndims * Integer.BYTES;
+        final Pointer ptr = new Memory(numBytes);
+        final ByteBuffer bb = ptr.getByteBuffer(0, numBytes).order(ByteOrder.nativeOrder());
+        for(final int sz: sizes)
+            bb.putInt(sz);
+        return ImageAPI.pilecv4j_image_CvRaster_inplaceRemake(nativeObj, ndims, ptr, type, maxSize) == 0 ? false : true;
+    }
+
+    /**
      * This performs a proper matrix multiplication that returns {@code this * other}.
      *
      * @return a new {@link CvMat} resulting from the operation. <b>Note: The caller owns the CvMat returned</b>
@@ -305,6 +344,15 @@ public class CvMat extends Mat implements QuietCloseable {
      */
     public long numBytes() {
         return elemSize() * rows() * cols();
+    }
+
+    /**
+     * The underlying data buffer pointer as a long
+     */
+    public long getNativeAddressOfData() {
+        if(!isContinuous())
+            throw new IllegalArgumentException("Cannot retrieve the data reference of a Mat without a continuous buffer.");
+        return Pointer.nativeValue(ImageAPI.pilecv4j_image_CvRaster_getData(nativeObj));
     }
 
     // public GpuMat upload() {
@@ -564,6 +612,10 @@ public class CvMat extends Mat implements QuietCloseable {
      * data buffer outlives the {@link CvMat} or you're pretty much guaranteed a core dump.
      */
     public static CvMat create(final int[] sizes, final int type, final long pointer) {
+        return CvMat.wrapNative(createRaw(sizes, type, pointer));
+    }
+
+    protected static long createRaw(final int[] sizes, final int type, final long pointer) {
         final int ndims = sizes.length;
         final long numBytes = ndims * Integer.BYTES;
         final Pointer ptr = new Memory(numBytes);
@@ -573,7 +625,7 @@ public class CvMat extends Mat implements QuietCloseable {
         final long nativeObj = ImageAPI.pilecv4j_image_CvRaster_makeMdMatFromRawDataReference(ndims, ptr, type, pointer);
         if(nativeObj == 0)
             throw new NullPointerException("Cannot create a CvMat from a null pointer data buffer.");
-        return CvMat.wrapNative(nativeObj);
+        return nativeObj;
     }
 
     /**
