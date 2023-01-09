@@ -30,6 +30,8 @@ protected:
   std::size_t totalSize = -1;
   void* data = nullptr;
 
+  bool logOpen = true;
+
   // meant to be called from child destructors to avoid the problem with
   // calling [pure] virtual functions from a base class destructor.
   void cleanup();
