@@ -238,8 +238,9 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
 
 uint64_t SharedMemory::open(bool powner) {
 
-  if (isEnabled(TRACE))
-    log(TRACE, COMPONENT, "Attempting to open the shared memory segment.");
+  if (isEnabled(TRACE) && logOpen)
+    log(INFO, COMPONENT, "Attempting to open the shared memory segment: %s.", name.c_str());
+  logOpen = false;
 
   if (m_isOpen)
     return fromErrorCode(ALREADY_OPEN);
@@ -261,6 +262,7 @@ uint64_t SharedMemory::open(bool powner) {
       errMsgPrefix = "Failed to open shared segment";
       goto error;
   }
+  logOpen = true;
   closeSm = true;
 
   // see the above described race condition. We need to allow the other process enough
@@ -280,13 +282,13 @@ uint64_t SharedMemory::open(bool powner) {
   this->owner = powner;
 
   // poll for the magic number to be set.
-  endTime.set(50ms);
+  endTime.set(500ms);
   while(header->magic != PILECV4J_SHM_HEADER_MAGIC && !endTime.isTimePast())
     std::this_thread::yield();
 
   if (header->magic != PILECV4J_SHM_HEADER_MAGIC) {
     if (isEnabled(DEBUG))
-      log(DEBUG, COMPONENT, "Timed out waiting for the serving size to setup the semaphore");
+      log(DEBUG, COMPONENT, "Timed out waiting for the create side to setup the semaphore");
 
     // we want to close it since returning EAGAIN will likely cause the user
     // to retry opening it and we want to do if from scratch.
