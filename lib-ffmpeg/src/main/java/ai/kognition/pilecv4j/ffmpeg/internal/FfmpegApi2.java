@@ -214,9 +214,9 @@ public class FfmpegApi2 {
 
     public static native void pcv4j_ffmpeg2_mediaProcessor_destroy(final long vdsRef);
 
-    public static native long pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame_callback cb);
+    public static native long pcv4j_ffmpeg2_decodedFrameProcessor_create(final push_frame_callback cb, final String decoderName);
 
-    public static native void pcv4j_ffmpeg2_decodedFrameProcessor_replace(long nativeRef, push_frame_callback cb);
+    public static native void pcv4j_ffmpeg2_decodedFrameProcessor_replace(final long nativeRef, final push_frame_callback cb);
 
     public static native long pcv4j_ffmpeg2_remuxer_create(final int maxRemuxErrorCount);
 

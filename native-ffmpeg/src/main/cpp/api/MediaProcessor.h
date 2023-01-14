@@ -60,17 +60,21 @@ protected:
    * Open a codec and create a context for the given stream and return the status. *codecCtxPtr is
    * set to nullptr if an error is returned. Otherwise it should contain a valid AVCodecContext
    * for the given stream.
+   *
+   * You can pass a decoderName and it will use that decoder. Otherwise the decoder is inferred from the stream
    */
-  static uint64_t open_codec(AVStream* pStream, AVDictionary** options,  AVCodecContext** codecCtxPtr);
+  static uint64_t open_codec(AVStream* pStream, AVDictionary** options,  AVCodecContext** codecCtxPtr, const char* decoderName);
 
   /**
    * Open a codec and create a context for the given stream referenced in the AVFormatContext by the
    * given index, and return the status. *codecCtxPtr is set to nullptr if an error is returned.
    * Otherwise it should contain a valid AVCodecContext for the given stream.
+   *
+   * You can pass a decoderName and it will use that decoder. Otherwise the decoder is inferred from the stream
    */
-  static inline uint64_t open_codec(AVFormatContext* formatCtx, int streamIndex, AVDictionary** options, AVCodecContext** codecCtxPtr) {
+  static inline uint64_t open_codec(AVFormatContext* formatCtx, int streamIndex, AVDictionary** options, AVCodecContext** codecCtxPtr, const char* decoderName) {
     AVStream* pStream = formatCtx->streams[streamIndex];
-    return open_codec(pStream, options, codecCtxPtr);
+    return open_codec(pStream, options, codecCtxPtr, decoderName);
   }
 
 };

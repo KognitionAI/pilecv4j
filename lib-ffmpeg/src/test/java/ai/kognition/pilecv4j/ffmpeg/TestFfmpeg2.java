@@ -133,14 +133,19 @@ public class TestFfmpeg2 extends BaseTest {
                 })
                 .openChain("default")
                 .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
-                    frameCount.getAndIncrement();
-                    if(SHOW) {
-                        try(final CvMat rgb = f.bgr(false);) {
-                            id.update(rgb);
+                .createVideoFrameProcessor(
+
+                    // "hevc_cuvid",
+                    // "h264_cuvid",
+
+                    f -> {
+                        frameCount.getAndIncrement();
+                        if(SHOW) {
+                            try(final CvMat rgb = f.bgr(false);) {
+                                id.update(rgb);
+                            }
                         }
-                    }
-                })
+                    })
                 .streamContext()
                 .optionally(sync, s -> s.sync())
                 .play()

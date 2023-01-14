@@ -40,6 +40,7 @@ public class BaseTest {
     static {
         try(var vfs = new Vfs();) {
             STREAM_FILE = vfs.toFile(new URI("classpath:///test-videos/Libertas-70sec.mp4"));
+            // STREAM_FILE = vfs.toFile(new URI("file:///tmp/test-videos/Libertas-70sec.h265.mp4"));
             if(!STREAM_FILE.exists())
                 throw new RuntimeException();
         } catch(final Exception e) {
