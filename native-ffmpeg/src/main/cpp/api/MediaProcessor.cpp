@@ -27,15 +27,37 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 
 static const AVRational UNKNOWN_TIME_BASE{0, 1};
 
-uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCodecContext** codecCtxPtr) {
+uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCodecContext** codecCtxPtr, const char* decoderName) {
 
   *codecCtxPtr = nullptr;
 
   AVCodecParameters *pCodecParameters = pStream->codecpar;
-  AVCodec* pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
-  if (pCodec==NULL) {
-    llog(ERROR, "Unsupported codec, ID %d",(int)pCodecParameters->codec_id);
-    return MAKE_P_STAT(UNSUPPORTED_CODEC);
+  AVCodec* pCodec;
+  {
+    if (decoderName) {
+      pCodec = avcodec_find_decoder_by_name(decoderName);
+      const AVCodecDescriptor *desc;
+      if (!pCodec && (desc = avcodec_descriptor_get_by_name(decoderName))) {
+        pCodec = avcodec_find_decoder(desc->id);
+        if (isEnabled(INFO) && pCodec)
+          llog(INFO, "Matched decoder '%s' for codec '%s'.",
+              pCodec->name, desc->name);
+      }
+      if (!pCodec) {
+          llog(ERROR, "Unknown decoder '%s'\n", decoderName);
+          return MAKE_P_STAT(UNSUPPORTED_CODEC);
+      }
+      if (pCodec->type != AVMEDIA_TYPE_VIDEO) {
+          llog(ERROR, "Invalid decoder type '%s'\n", decoderName);
+          return MAKE_P_STAT(UNSUPPORTED_CODEC);
+      }
+    } else {
+      pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
+      if (pCodec==NULL) {
+        llog(ERROR, "Unsupported codec, ID %d",(int)pCodecParameters->codec_id);
+        return MAKE_P_STAT(UNSUPPORTED_CODEC);
+      }
+    }
   }
 
   // https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html

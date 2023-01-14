@@ -112,7 +112,7 @@ uint64_t DecodedFrameProcessor::setup(AVFormatContext* avformatCtx, const std::v
 
       AVDictionary* opts = nullptr;
       buildOptions(options, &opts);
-      uint64_t rc = MediaProcessor::open_codec(avformatCtx,i,&opts,&(codecs[i]->codecCtx));
+      uint64_t rc = MediaProcessor::open_codec(avformatCtx,i,&opts,&(codecs[i]->codecCtx), decoderNameSet ? decoderName.c_str() : nullptr);
       if (opts != nullptr)
         av_dict_free(&opts);
       if (isError(rc))
@@ -205,8 +205,8 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
 
 extern "C" {
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf) {
-  DecodedFrameProcessor* ret = new DecodedFrameProcessor(pf);
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf, const char* decoderName) {
+  DecodedFrameProcessor* ret = new DecodedFrameProcessor(pf, decoderName);
 
   return (uint64_t)((MediaProcessor*)ret);
 }

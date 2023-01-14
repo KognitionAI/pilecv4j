@@ -254,7 +254,6 @@ public class Ffmpeg2 {
                 super(nativeRef);
                 ssc = selector;
             }
-
         }
 
         /**
@@ -336,13 +335,35 @@ public class Ffmpeg2 {
          * Create a video processor that takes the first decodable video stream.
          */
         public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer consumer) {
+            return createVideoFrameProcessor((String)null, consumer);
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream and applies the initializer on the
+         * first frame and the handler on all of the other frames.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
+            return createVideoFrameProcessor(null, initializer, handler);
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream. If decoderName is not null then the decoder
+         * will be used to decode the frames.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer consumer) {
             final var pfc = wrap(consumer);
 
-            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(pfc);
+            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(pfc, decoderName);
             return manage(new FrameVideoProcessor(nativeRef, pfc));
         }
 
-        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
+        /**
+         * Create a video processor that takes the first decodable video stream and applies the initializer on the
+         * first frame and the handler on all of the other frames. If decoderName is not null then the decoder
+         * will be used to decode the frames.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer initializer,
+            final VideoFrameConsumer handler) {
             final var pfc = wrap(handler);
 
             final MutableRef<FrameVideoProcessor> proc = new MutableRef<>();
@@ -352,7 +373,7 @@ public class Ffmpeg2 {
                 handler.handle(vf);
             });
 
-            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(init);
+            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(init, decoderName);
             final var fm = new FrameVideoProcessor(nativeRef, init);
             proc.ref = fm;
             return manage(fm);
@@ -443,7 +464,6 @@ public class Ffmpeg2 {
 
         private MediaProcessingChain createStreamSelector(final RawStreamSelectorCallback callback) {
             final var ssc = new select_streams_callback() {
-
                 @Override
                 public int select_streams(final int numStreams, final Pointer selected) {
                     final IntBuffer buf = selected.getByteBuffer(0, Integer.BYTES * numStreams).asIntBuffer();
@@ -460,7 +480,6 @@ public class Ffmpeg2 {
 
                     return 1;
                 }
-
             };
 
             return manage(new CallbackStreamSelector(FfmpegApi2.pcv4j_ffmpeg2_javaStreamSelector_create(ssc), ssc));
