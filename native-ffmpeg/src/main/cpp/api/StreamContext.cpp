@@ -9,6 +9,8 @@
 #include "api/StreamDetails.h"
 
 #include "common/kog_exports.h"
+#include "utils/timing.h"
+
 #ifdef PILECV4J_FFMPEG_DEVICE_SUPPORT
 extern "C" {
 #include "libavdevice/avdevice.h"
@@ -21,6 +23,11 @@ namespace ffmpeg
 {
 
 #define COMPONENT "STRC"
+
+TIME_DECL(read_frame);
+TIME_DECL(hande_packet);
+TIME_DECL(read_and_process_frame);
+TIME_DECL(throttle);
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_list args;
@@ -253,7 +260,25 @@ uint64_t StreamContext::stop() {
   return 0;
 }
 
+extern void displayDecodeTiming();
+#ifdef TIMING
+static void displayDecoderTimings() {
+  TIME_DISPLAY("Overall reading and processing frame packets", read_and_process_frame);
+  TIME_DISPLAY("reading frame/packet", read_frame);
+  TIME_DISPLAY("handling/decoding/remuxing", hande_packet);
+  displayDecodeTiming();
+  TIME_DISPLAY("waiting due to synchronization", throttle);
+}
+#endif
+
 extern "C" {
+
+KAI_EXPORT void pcv4j_ffmpeg2_timings() {
+#ifdef TIMING
+  displayDecoderTimings();
+#endif
+}
+
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_create() {
   uint64_t ret = (uint64_t) new StreamContext();
@@ -345,6 +370,22 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_load(uint64_t ctx) {
 
 }
 
+#ifdef TIMING
+static inline int read_frame(AVFormatContext* pFormatContext, AVPacket * pPacket) {
+  TIME_GUARD(read_frame);
+  return av_read_frame(pFormatContext, pPacket);
+}
+
+static inline bool dontSkipPacket(Synchronizer* throttle, const AVFormatContext* pFormatContext, const AVPacket * pPacket) {
+  TIME_GUARD(throttle);
+  return !throttle || !throttle->throttle(pFormatContext, pPacket);
+}
+#else
+#define read_frame av_read_frame
+#define dontSkipPacket(t,f,p) !t || !t->throttle(f, p)
+#endif
+
+
 static uint64_t process_packets(StreamContext* c) {
   int remuxErrorCount = 0; // if this count goes above MAX_REMUX_ERRORS then process_frames will fail.
 
@@ -382,26 +423,37 @@ static uint64_t process_packets(StreamContext* c) {
 
   // fill the Packet with data from the Stream
   // https://ffmpeg.org/doxygen/trunk/group__lavf__decoding.html#ga4fdb3084415a82e3810de6ee60e46a61
-  while ((av_rc = av_read_frame(pFormatContext, pPacket)) >= 0 && !c->stopMe)
+  while (!c->stopMe)
   {
-    logPacket(TRACE, COMPONENT, "Packet", pPacket, pFormatContext);
+    // time full read packet processing loop
+    {
+      TIME_GUARD(read_and_process_frame);
 
-    const int streamIndex = (int)pPacket->stream_index;
-    const AVMediaType mediaType = c->streamTypes[streamIndex];
-    if (!throttle || !throttle->throttle(pFormatContext, pPacket)) {
-      for (auto o : c->mediaProcessors) {
-        rc = o->handlePacket(pFormatContext, pPacket, mediaType);
+      if ((av_rc = read_frame(pFormatContext, pPacket)) < 0)
+        break;
 
-        if (isError(rc))
-          break;
+      logPacket(TRACE, COMPONENT, "Packet", pPacket, pFormatContext);
+
+      const int streamIndex = (int)pPacket->stream_index;
+      const AVMediaType mediaType = c->streamTypes[streamIndex];
+      if (dontSkipPacket(throttle, pFormatContext, pPacket)) {
+        for (auto o : c->mediaProcessors) {
+          {
+            TIME_GUARD(hande_packet);
+            rc = o->handlePacket(pFormatContext, pPacket, mediaType);
+          }
+
+          if (isError(rc))
+            break;
+        }
       }
+
+      // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
+      av_packet_unref(pPacket);
+
+      if (isError(rc))
+        break;
     }
-
-    // https://ffmpeg.org/doxygen/trunk/group__lavc__packet.html#ga63d5a489b419bd5d45cfd09091cbcbc2
-    av_packet_unref(pPacket);
-
-    if (av_rc < 0 || isError(rc))
-      break;
   }
 
   if (av_rc < 0)

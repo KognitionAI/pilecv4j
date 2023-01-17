@@ -52,7 +52,7 @@ bool Synchronizer::throttle(int64_t pts, AVRational& time_base) {
   return decide(timeToDiplayFrame, maxDelayMillisBeforeDroppingFrame);
 }
 
-bool Synchronizer::throttle(AVFormatContext* fmt, AVPacket* pPacket) {
+bool Synchronizer::throttle(const AVFormatContext* fmt, const AVPacket* pPacket) {
   AVRational time_base = fmt->streams[pPacket->stream_index]->time_base;
 
   int64_t pts;

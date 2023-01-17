@@ -40,6 +40,7 @@ endif()
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
 #add_definitions( -DLOGGING -DPILECV4J_ENABLE_TRACE_API )
 add_definitions( -DLOGGING )
+add_definitions( -DTIMING )
 
 if(MSVC)
   add_definitions( -D_CRT_SECURE_NO_WARNINGS -D_CRT_NO_VA_START_VALIDATION )

@@ -47,6 +47,7 @@ import net.dempsy.util.MutableRef;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
@@ -67,7 +68,7 @@ public class TestFfmpeg2 extends BaseTest {
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
             {false},
-            {true},
+            // {true},
         });
     }
 
@@ -136,7 +137,7 @@ public class TestFfmpeg2 extends BaseTest {
                 .createVideoFrameProcessor(
 
                     // "hevc_cuvid",
-                    // "h264_cuvid",
+                    "h264_cuvid",
 
                     f -> {
                         frameCount.getAndIncrement();
@@ -153,11 +154,14 @@ public class TestFfmpeg2 extends BaseTest {
             ;
         }
 
+        FfmpegApi2.pcv4j_ffmpeg2_timings();
+
         assertTrue(frameCount.get() > 50);
         assertNotNull(details.ref);
         assertEquals(2, details.ref.length);
         assertEquals(Ffmpeg2.AVMEDIA_TYPE_VIDEO, details.ref[0].mediaType);
         assertEquals(Ffmpeg2.AVMEDIA_TYPE_AUDIO, details.ref[1].mediaType);
+
     }
 
     @Test

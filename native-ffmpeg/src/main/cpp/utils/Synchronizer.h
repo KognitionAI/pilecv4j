@@ -60,7 +60,7 @@ public:
    */
   bool throttle(AVRational& streamTimeBase, AVFrame *pFrame);
 
-  bool throttle(AVFormatContext* fmt, AVPacket* pPacket);
+  bool throttle(const AVFormatContext* fmt, const AVPacket* pPacket);
 
   bool throttle(int64_t pts, AVRational& time_base);
 

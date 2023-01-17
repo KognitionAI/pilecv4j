@@ -11,6 +11,7 @@
 #include "utils/log.h"
 
 #include "common/kog_exports.h"
+#include "utils/timing.h"
 
 extern "C" {
 #include <libavutil/opt.h>
@@ -24,7 +25,13 @@ namespace pilecv4j
 namespace ffmpeg
 {
 
+TIME_DECL(decode);
+TIME_DECL(decode_and_handle);
+TIME_DECL(create_mat);
+TIME_DECL(handle);
+
 #define COMPONENT "DEFP"
+#define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_list args;
@@ -57,6 +64,15 @@ struct CodecDetails {
 
   inline ~CodecDetails() = default;
 };
+
+DecodedFrameProcessor::~DecodedFrameProcessor() {
+  if (frameData) {
+    free(frameData);
+
+    if (frameMat)
+      IMakerManager::freeImage(frameMat);
+  }
+}
 
 uint64_t DecodedFrameProcessor::close() {
   if (codecs) {
@@ -136,6 +152,9 @@ uint64_t DecodedFrameProcessor::preFirstFrame(AVFormatContext* avformatCtx) {
 }
 
 uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPacket *pPacket) {
+  PILECV4J_TRACE;
+  TIME_GUARD(decode_and_handle);
+
   if (codecDetails == nullptr) {
     llog(WARN,"A null codecDetails was passed to decode_packet. Skipping.");
     return 0;
@@ -146,9 +165,11 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
   }
   // Supply raw packet data as input to a decoder
   // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga58bc4bf1e0ac59e27362597e467efff3
+  TIME_OPEN(decode);
   int response = avcodec_send_packet(codecDetails->codecCtx, pPacket);
 
   if (response < 0 && response != AVERROR_INVALIDDATA) {
+    TIME_CAP(decode);
     llog(ERROR, "Error while sending a packet to the decoder: %s", av_err2str(response));
     return MAKE_AV_STAT(response);
   }
@@ -157,6 +178,7 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
   AVFrame *pFrame = av_frame_alloc();
   if (!pFrame)
   {
+    TIME_CAP(decode);
     llog(ERROR, "failed to allocated memory for AVFrame");
     return MAKE_P_STAT(FAILED_CREATE_FRAME);
   }
@@ -167,6 +189,7 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
     // Return decoded output data (into a frame) from a decoder
     // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga11e6542c4e66d3028668788a1a74217c
     response = avcodec_receive_frame(codecDetails->codecCtx, pFrame);
+    TIME_CAP(decode);
     if (response == AVERROR(EAGAIN) || response == AVERROR_EOF) {
       break;
     } else if (response < 0) {
@@ -190,17 +213,42 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
       }
 
       int32_t isRgb;
-      uint64_t mat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed);
+      TIME_OPEN(create_mat);
+      uint64_t mat = frameMat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed, frameMat, &frameData);
+      TIME_CAP(create_mat);
 
+      TIME_OPEN(handle);
       returnCode = (*callback)(mat, isRgb, pPacket->stream_index);
+      TIME_CAP(handle);
 
-      IMakerManager::freeImage(mat);
+      // this is a hack and needs to be fixed but if frameData is null then
+      // the mat is a temporary wrap of the raw original frame data and needs
+      // to be freed. Otherwise it will be freed in either the destructor
+      // (which is the most likely) or, if the image parameters change, it
+      // will be freed and recreated inside of a call to createMatFromFrame
+      // and a new one will be returned.
+      //
+      // WHY did I do this? ... code evolution. TODO: refactor to make this
+      // make more sense.
+      if (!frameData) {
+        IMakerManager::freeImage(mat);
+      }
     }
   }
 
   // cleanup and return.
   av_frame_free(&pFrame);
   return returnCode;
+}
+
+extern void displayImageMakerTimings();
+
+void displayDecodeTiming() {
+  TIME_DISPLAY("decoding and handing", decode_and_handle);
+  TIME_DISPLAY("decoding", decode);
+  TIME_DISPLAY("creating cv::Mat", create_mat);
+  displayImageMakerTimings();
+  TIME_DISPLAY("handling in java", handle);
 }
 
 extern "C" {
