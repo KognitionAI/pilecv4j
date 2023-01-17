@@ -65,14 +65,14 @@ struct CodecDetails {
   inline ~CodecDetails() = default;
 };
 
-DecodedFrameProcessor::~DecodedFrameProcessor() {
-  if (frameData) {
-    free(frameData);
-
-    if (frameMat)
-      IMakerManager::freeImage(frameMat);
-  }
-}
+//DecodedFrameProcessor::~DecodedFrameProcessor() {
+//  if (frameData) {
+//    free(frameData);
+//
+//    if (frameMat)
+//      IMakerManager::freeImage(frameMat);
+//  }
+//}
 
 uint64_t DecodedFrameProcessor::close() {
   if (codecs) {
@@ -214,7 +214,7 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
 
       int32_t isRgb;
       TIME_OPEN(create_mat);
-      uint64_t mat = frameMat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed, frameMat, &frameData);
+      uint64_t mat = /*frameMat = */ IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed /*, frameMat, &frameData */);
       TIME_CAP(create_mat);
 
       TIME_OPEN(handle);
@@ -230,9 +230,9 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
       //
       // WHY did I do this? ... code evolution. TODO: refactor to make this
       // make more sense.
-      if (!frameData) {
+      //if (!frameData) {
         IMakerManager::freeImage(mat);
-      }
+      //}
     }
   }
 

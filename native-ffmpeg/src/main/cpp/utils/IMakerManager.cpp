@@ -94,7 +94,7 @@ static inline T align128(T x) {
  * to eventually free it with sws_freeContext. If it's not null but the format changed
  * then the method will free the existing one before creating the new one.
  */
-uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb, AVPixelFormat& lastFormatUsed, uint64_t existingMat, uint8_t** existingBuffer) {
+uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb, AVPixelFormat& lastFormatUsed) {
   PILECV4J_TRACE;
   if (imaker == nullptr)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
@@ -110,17 +110,6 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCv
     // use the existing setup if it's there already.
     SwsContext* swCtx = *colorCvrt;
     if (swCtx == nullptr || lastFormatUsed != curFormat) {
-      // we need to reset the mat also.
-      // existingBuffer also acts as a flag as to whether or not we created the mat or just wrapped the frame data.
-      if (*(existingBuffer)) {
-        free(*existingBuffer);
-        *existingBuffer = nullptr;
-
-        if (existingMat) {
-          imaker->freeImage(existingMat);
-        }
-      }
-
       lastFormatUsed = curFormat;
       if (swCtx)
         sws_freeContext(swCtx);
@@ -138,23 +127,10 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCv
       TIME_CAP(create_color_cvt);
     }
 
-    int stride;
-    if (!(*existingBuffer)) {
-      TIME_OPEN(alloc_mat);
-      // stride will be (w * 3) aligned to 16 bytes
-      uint64_t lstride = w * 3;
-      lstride = align128(lstride);
-      (*existingBuffer) = (uint8_t*)aligned_alloc(16, h * lstride);
-      stride = (int)lstride;
-      if (isEnabled(TRACE))
-        llog(TRACE, "stride is %d", stride);
-      existingMat = imaker->allocateImageWithData(h,w,stride,(*existingBuffer));
-      TIME_CAP(alloc_mat);
-    } else
-      stride = 3 * (int)w;
-
-    mat = existingMat;
-    uint8_t* matData = *existingBuffer;
+    int32_t stride = 3 * w;
+    ai::kognition::pilecv4j::MatAndData matPlus = imaker->allocateImage(h,w);
+    mat = matPlus.mat;
+    uint8_t* matData = (uint8_t*)matPlus.data;
     uint8_t *rgb24[1] = { matData };
     int rgb24_stride[1] = { stride };
     TIME_OPEN(cvt_color);
