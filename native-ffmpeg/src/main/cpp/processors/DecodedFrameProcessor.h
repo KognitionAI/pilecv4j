@@ -42,19 +42,19 @@ class DecodedFrameProcessor: public MediaProcessor
   std::string decoderName;
   bool decoderNameSet;
 
-  uint8_t* frameData;
-  uint64_t frameMat;
+//  uint8_t* frameData;
+//  uint64_t frameMat;
 
   uint64_t decode_packet(CodecDetails* pCodecContext, AVPacket *pPacket);
   uint64_t createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb);
 
 public:
   inline DecodedFrameProcessor(push_frame pcallback, const char* pdecoderName) : callback(pcallback),
-       decoderNameSet(pdecoderName ? true : false), frameData(nullptr), frameMat(0L) {
+       decoderNameSet(pdecoderName ? true : false) /*, frameData(nullptr), frameMat(0L) */ {
     if (pdecoderName)
       decoderName = pdecoderName;
   }
-  virtual ~DecodedFrameProcessor();
+  virtual ~DecodedFrameProcessor() = default;
 
   virtual uint64_t setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams);
   virtual uint64_t preFirstFrame(AVFormatContext* avformatCtx);
