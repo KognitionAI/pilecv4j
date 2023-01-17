@@ -35,6 +35,11 @@ public:
     return (uint64_t)cvmat;
   }
 
+  virtual uint64_t allocateImageWithData(int height, int width, int stride, void* data) {
+    cv::Mat* cvmat = new cv::Mat(height, width, CV_8UC3, data, stride);
+    return (uint64_t)cvmat;
+  }
+
   virtual void freeImage(uint64_t mat) {
     delete ((cv::Mat*)mat);
   }

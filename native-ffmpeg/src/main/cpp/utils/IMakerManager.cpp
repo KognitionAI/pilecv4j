@@ -11,6 +11,8 @@
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/IMakerManager.h"
 
+#include "utils/timing.h"
+
 extern "C" {
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
@@ -29,6 +31,11 @@ namespace ffmpeg
 {
 
 #define COMPONENT "IMMA"
+#define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
+
+TIME_DECL(alloc_mat);
+TIME_DECL(cvt_color);
+TIME_DECL(create_color_cvt);
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_list args;
@@ -71,6 +78,10 @@ static AVPixelFormat upgradePixFormatIfNecessary(AVPixelFormat cur) {
   return pixFormat;
 }
 
+template <typename T>
+static inline T align128(T x) {
+  return (x & (T)127) ? (((x >> 7) + 1) << 7) : x;
+}
 
 /**
  * This will take the current frame and create an opencv Mat. It will set isRgb based
@@ -78,12 +89,13 @@ static AVPixelFormat upgradePixFormatIfNecessary(AVPixelFormat cur) {
  * of conversion possible but it prefers rgb. This means it will only return a bgr mat
  * if the source frame is already in bgr.
  *
- * The SwsContext** passed with be used if the format hasn't changed and it's not null.
+ * The SwsContext** passed will be used if the format hasn't changed and it's not null.
  * Otherwise it will be created and returned through the parameter requiring the caller
  * to eventually free it with sws_freeContext. If it's not null but the format changed
  * then the method will free the existing one before creating the new one.
  */
-uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb, AVPixelFormat& lastFormatUsed) {
+uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb, AVPixelFormat& lastFormatUsed, uint64_t existingMat, uint8_t** existingBuffer) {
+  PILECV4J_TRACE;
   if (imaker == nullptr)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
 
@@ -94,9 +106,21 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCv
   AVPixelFormat curFormat = (AVPixelFormat)pFrame->format;
   curFormat = upgradePixFormatIfNecessary(curFormat);
   if (curFormat != AV_PIX_FMT_RGB24 && curFormat != AV_PIX_FMT_BGR24) {
+    TIME_OPEN(create_color_cvt);
     // use the existing setup if it's there already.
     SwsContext* swCtx = *colorCvrt;
     if (swCtx == nullptr || lastFormatUsed != curFormat) {
+      // we need to reset the mat also.
+      // existingBuffer also acts as a flag as to whether or not we created the mat or just wrapped the frame data.
+      if (*(existingBuffer)) {
+        free(*existingBuffer);
+        *existingBuffer = nullptr;
+
+        if (existingMat) {
+          imaker->freeImage(existingMat);
+        }
+      }
+
       lastFormatUsed = curFormat;
       if (swCtx)
         sws_freeContext(swCtx);
@@ -109,20 +133,38 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCv
               w,
               h,
               AV_PIX_FMT_RGB24,
-              SWS_BILINEAR,NULL,NULL,NULL
+              SWS_POINT,NULL,NULL,NULL
           );
+      TIME_CAP(create_color_cvt);
     }
 
-    int32_t stride = 3 * w;
-    ai::kognition::pilecv4j::MatAndData matPlus = imaker->allocateImage(h,w);
-    mat = matPlus.mat;
-    uint8_t* matData = (uint8_t*)matPlus.data;
+    int stride;
+    if (!(*existingBuffer)) {
+      TIME_OPEN(alloc_mat);
+      // stride will be (w * 3) aligned to 16 bytes
+      uint64_t lstride = w * 3;
+      lstride = align128(lstride);
+      (*existingBuffer) = (uint8_t*)aligned_alloc(16, h * lstride);
+      stride = (int)lstride;
+      if (isEnabled(TRACE))
+        llog(TRACE, "stride is %d", stride);
+      existingMat = imaker->allocateImageWithData(h,w,stride,(*existingBuffer));
+      TIME_CAP(alloc_mat);
+    } else
+      stride = 3 * (int)w;
+
+    mat = existingMat;
+    uint8_t* matData = *existingBuffer;
     uint8_t *rgb24[1] = { matData };
     int rgb24_stride[1] = { stride };
+    TIME_OPEN(cvt_color);
     sws_scale(swCtx,pFrame->data, pFrame->linesize, 0, h, rgb24, rgb24_stride);
+    TIME_CAP(cvt_color);
     isRgb = 1;
   } else {
+    TIME_OPEN(alloc_mat);
     mat = imaker->allocateImageWithCopyOfData(h,w,w * 3,pFrame->data[0]);
+    TIME_CAP(alloc_mat);
     isRgb = (curFormat == AV_PIX_FMT_RGB24) ? 1 : 0;
   }
 
@@ -234,6 +276,12 @@ void IMakerManager::freeFrame(AVFrame** ppframe) {
     av_frame_free(ppframe);
     *ppframe= nullptr;
   }
+}
+
+void displayImageMakerTimings() {
+  TIME_DISPLAY("create color conversion", create_color_cvt);
+  TIME_DISPLAY("allocate mat for image", alloc_mat);
+  TIME_DISPLAY("conver to RGB", cvt_color);
 }
 
 extern "C" {

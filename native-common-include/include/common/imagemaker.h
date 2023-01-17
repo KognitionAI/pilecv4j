@@ -41,6 +41,8 @@ namespace ai {
 
         virtual uint64_t allocateImageWithCopyOfData(int height, int width, int stride, void* data) = 0;
 
+        virtual uint64_t allocateImageWithData(int height, int width, int stride, void* data) = 0;
+
         virtual void freeImage(uint64_t mat) = 0;
 
         virtual uint64_t copy(uint64_t mat) = 0;

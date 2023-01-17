@@ -398,6 +398,8 @@ public class FfmpegApi2 {
 
     public static native int pcv4j_ffmpeg2_mediaType_NB();
 
+    public static native void pcv4j_ffmpeg2_timings();
+
     private static List<String> gfo(final Class<?> clazz, final String... fieldNames) {
         try {
             final ArrayList<String> ret = new ArrayList<>(fieldNames.length);
