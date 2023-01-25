@@ -186,6 +186,14 @@ public class ShmQueue implements QuietCloseable {
     }
 
     /**
+     * This will reset and clear the underlying shared memory segment and set all mailboxes
+     * to empty.
+     */
+    public void reset() {
+        throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_reset(nativeRef), true);
+    }
+
+    /**
      * Is the shared memory segment currently opened by this {@link ShmQueue}
      */
     public boolean isOpen() {

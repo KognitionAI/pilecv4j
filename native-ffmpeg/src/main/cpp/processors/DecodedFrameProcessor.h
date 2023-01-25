@@ -42,9 +42,6 @@ class DecodedFrameProcessor: public MediaProcessor
   std::string decoderName;
   bool decoderNameSet;
 
-//  uint8_t* frameData;
-//  uint64_t frameMat;
-
   uint64_t decode_packet(CodecDetails* pCodecContext, AVPacket *pPacket);
   uint64_t createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb);
 

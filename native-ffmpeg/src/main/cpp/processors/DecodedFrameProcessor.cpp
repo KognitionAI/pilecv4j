@@ -65,15 +65,6 @@ struct CodecDetails {
   inline ~CodecDetails() = default;
 };
 
-//DecodedFrameProcessor::~DecodedFrameProcessor() {
-//  if (frameData) {
-//    free(frameData);
-//
-//    if (frameMat)
-//      IMakerManager::freeImage(frameMat);
-//  }
-//}
-
 uint64_t DecodedFrameProcessor::close() {
   if (codecs) {
     for (int i = 0; i < numStreams; i++) {
@@ -214,25 +205,15 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
 
       int32_t isRgb;
       TIME_OPEN(create_mat);
-      uint64_t mat = /*frameMat = */ IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed /*, frameMat, &frameData */);
+      uint64_t mat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed /*, frameMat, &frameData */);
       TIME_CAP(create_mat);
 
       TIME_OPEN(handle);
+      // management of the mat is passed to the
       returnCode = (*callback)(mat, isRgb, pPacket->stream_index);
       TIME_CAP(handle);
 
-      // this is a hack and needs to be fixed but if frameData is null then
-      // the mat is a temporary wrap of the raw original frame data and needs
-      // to be freed. Otherwise it will be freed in either the destructor
-      // (which is the most likely) or, if the image parameters change, it
-      // will be freed and recreated inside of a call to createMatFromFrame
-      // and a new one will be returned.
-      //
-      // WHY did I do this? ... code evolution. TODO: refactor to make this
-      // make more sense.
-      //if (!frameData) {
-        IMakerManager::freeImage(mat);
-      //}
+      IMakerManager::freeImage(mat);
     }
   }
 
