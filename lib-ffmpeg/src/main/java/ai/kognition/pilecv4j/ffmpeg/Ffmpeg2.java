@@ -306,7 +306,6 @@ public class Ffmpeg2 {
                 public long push_frame(final long frame, final int isRbg, final int streamIndex) {
                     try(final VideoFrame mat = new VideoFrame(
                         frame, System.currentTimeMillis(), frameNumber.getAndIncrement(), isRbg == 0 ? false : true) {
-
                         // mats are closed automatically in the native code
                         // once the push_frame returns.
                         @Override

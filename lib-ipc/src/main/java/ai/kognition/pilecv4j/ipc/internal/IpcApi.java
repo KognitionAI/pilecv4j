@@ -87,6 +87,8 @@ public class IpcApi {
 
     public static native long pilecv4j_ipc_shmQueue_open(long nativeRef, int owner);
 
+    public static native long pilecv4j_ipc_shmQueue_reset(long nativeRef);
+
     public static native long pilecv4j_ipc_shmQueue_isOwner(long nativeRef, IntByReference ret);
 
     public static native long pilecv4j_ipc_shmQueue_isOpen(long nativeRef, IntByReference ret);

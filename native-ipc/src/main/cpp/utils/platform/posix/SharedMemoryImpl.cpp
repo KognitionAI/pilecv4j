@@ -14,7 +14,7 @@ const char* SharedMemory::implementationName() {
 }
 
 bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) {
-  *fd = shm_open(name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <-----------+
+  *fd = shm_open(name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <----------+
   if (*fd == -1)                                       //                 |
     return false;                                      //                 |
   //       There is a race condition here which is "fixed" with a STUPID hack.

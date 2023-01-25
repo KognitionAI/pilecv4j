@@ -71,6 +71,8 @@ public:
   // mark message as having been read. Lock should already be held.
   uint64_t unpostMessage(std::size_t mailbox);
 
+  uint64_t reset();
+
   /**
    * Checks if a message is available to be read.
    */

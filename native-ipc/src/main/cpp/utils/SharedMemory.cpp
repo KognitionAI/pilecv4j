@@ -189,6 +189,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)offsetToBuffer);
 
   if (!createSharedMemorySegment(&fd, name.c_str(), nameRep, totalSize)) {
+    errMsgPrefix = "Failed to create shared memory segment";
     goto error;
   }
 
@@ -206,6 +207,8 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     goto error;
   }
 #endif
+  memset(addr,0,totalSize);
+  hptr->magic = 0L; // in case this is being reopened
 
   // set the sizes
   hptr->totalSize = totalSize;
@@ -373,6 +376,44 @@ uint64_t SharedMemory::postMessage(std::size_t mailbox) {
   // don't reorder any write operation below this with any read/write operations above this line
   std_atomic_fence(std::memory_order_release);
   header->messageAvailable[mailbox] = 1;
+  //log(INFO, COMPONENT, "post: Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
+  return OK_RET;
+}
+
+uint64_t SharedMemory::reset() {
+  PCV4K_IPC_TRACE;
+  OPEN_CHECK("reset shm segment");
+
+  Header* hptr = (Header*)addr;
+  std::size_t totalSize = hptr->totalSize;
+  std::size_t numBytes = hptr->numBytes;
+  std::size_t offsetToBuffer = hptr->offset;
+  std::size_t numMailboxes = hptr->numMailboxes;
+
+  // don't reorder any write operation below this with any read/write operations above this line
+  std_atomic_fence(std::memory_order_release);
+
+  memset(addr,0,totalSize);
+
+  hptr->magic = 0L; // in case this is being reopened
+
+  // set the sizes
+  hptr->totalSize = totalSize;
+  hptr->numBytes = numBytes;
+  hptr->offset = offsetToBuffer;
+  hptr->numMailboxes = numMailboxes;
+  for (std::size_t i = 0; i < numMailboxes; i++)
+    hptr->messageAvailable[i] = 0;
+
+  data = ((uint8_t*)addr) + offsetToBuffer;
+  if (isEnabled(DEBUG))
+    log(DEBUG, COMPONENT, "Allocated shared mem at 0x%p with offset to data of %d bytes putting the data at 0x%p", addr, (int)offsetToBuffer, data);
+
+  // don't reorder any write operation below this with any read/write operations above this line
+  std::atomic_thread_fence(std::memory_order_release);
+  // set the magic number
+  hptr->magic = PILECV4J_SHM_HEADER_MAGIC;
+
   return OK_RET;
 }
 
@@ -385,6 +426,8 @@ uint64_t SharedMemory::unpostMessage(std::size_t mailbox) {
   // don't reorder any write operation below this with any read/write operations above this line
   std_atomic_fence(std::memory_order_release);
   header->messageAvailable[mailbox] = 0;
+  //log(INFO, COMPONENT, "unpost: Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
+
   return OK_RET;
 }
 
@@ -395,7 +438,7 @@ uint64_t SharedMemory::isMessageAvailable(bool& out, std::size_t mailbox) {
   Header* header = (Header*)addr;
   MAILBOX_CHECK(header, mailbox);
 
-  //log(INFO, COMPONENT, "Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
+  //log(INFO, COMPONENT, "isMessageAvailable: Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
   out = header->messageAvailable[mailbox] ? true : false;
   // don't reorder the read above this with any read/write below this
   std_atomic_fence(std::memory_order_acquire);
@@ -528,6 +571,13 @@ KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_postMessage(uint64_t nativeRef, int32_
   PCV4K_IPC_TRACE;
   NULL_CHECK(nativeRef);
   uint64_t ret = ((SharedMemory*)nativeRef)->postMessage((std::size_t)mailbox);
+  return ret;
+}
+
+KAI_EXPORT uint64_t pilecv4j_ipc_shmQueue_reset(uint64_t nativeRef) {
+  PCV4K_IPC_TRACE;
+  NULL_CHECK(nativeRef);
+  uint64_t ret = ((SharedMemory*)nativeRef)->reset();
   return ret;
 }
 
