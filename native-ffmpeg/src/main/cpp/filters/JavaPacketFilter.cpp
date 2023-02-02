@@ -28,14 +28,13 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 
 static AVRational nullRat{ -1, -1 };
 
-bool JavaPacketFilter::filter(AVFormatContext* ctx, AVPacket* packet, AVMediaType streamMediaType) {
+bool JavaPacketFilter::filter(AVPacket* packet, AVMediaType streamMediaType) {
 
   const int stream_index = packet->stream_index;
-  const AVStream* stream = (stream_index >= 0 && stream_index < ctx->nb_streams) ? ctx->streams[stream_index] : nullptr;
-  const AVRational* tb = stream ? &(stream->time_base) : &nullRat;
+  AVRational& tb = streamTimeBases[stream_index];
 
   return (*callback)(streamMediaType, stream_index, packet->size, (packet->flags & AV_PKT_FLAG_KEY) ? 1 : 0,
-      packet->pts, packet->dts, tb->num, tb->den) ? true : false;
+      packet->pts, packet->dts, tb.num, tb.den) ? true : false;
 }
 
 extern "C" {

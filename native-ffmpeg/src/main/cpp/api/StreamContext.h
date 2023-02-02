@@ -13,6 +13,7 @@
 
 #include "api/MediaDataSource.h"
 #include "api/MediaProcessor.h"
+#include "api/PacketSourceInfo.h"
 
 #include <atomic>
 
@@ -46,7 +47,17 @@ enum StreamContextState {
 
 struct StreamDetails;
 
-struct StreamContext {
+#ifdef _INSIDE_PILECV4J_FFMPEG_STREAMCONTEXT_CPP
+extern "C" {
+  uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx);
+  uint32_t pcv4j_ffmpeg2_streamContext_state(uint64_t ctx);
+}
+
+class StreamContext;
+static uint64_t process_packets(StreamContext* ctx);
+#endif
+
+class StreamContext : public PacketSourceInfo {
   /**
    * Current state.
    *
@@ -81,12 +92,19 @@ struct StreamContext {
 
   AVMediaType* streamTypes = nullptr;
 
+#ifdef _INSIDE_PILECV4J_FFMPEG_STREAMCONTEXT_CPP
+  friend uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx);
+  friend uint32_t pcv4j_ffmpeg2_streamContext_state(uint64_t ctx);
+  friend uint64_t process_packets(StreamContext* c);
+#endif
+
+public:
   inline StreamContext() : state(FRESH), stopMe(false) {
     if (isEnabled(TRACE))
       log(TRACE, "STRC", "In StreamContext() for %" PRId64, (uint64_t)this);
   }
 
-  inline ~StreamContext() {
+  virtual inline ~StreamContext() {
     if (isEnabled(TRACE))
       log(TRACE, "STRC", "In ~StreamContext() for %" PRId64, (uint64_t)this);
     if (formatCtx != nullptr)
@@ -94,6 +112,19 @@ struct StreamContext {
     if (streamTypes != nullptr)
       delete [] streamTypes;
   }
+
+  // =====================================================
+  // PacketSourceInfo implementation. Since a StreamContext
+  // is basically a wrapper/manager for the input AVFormatContext,
+  // this is where all of the PacketSourceInfo comes from
+  // =====================================================
+  virtual uint64_t getStream(int streamIndex, AVStream** streamOut);
+
+  virtual uint64_t numStreams(int* numStreamsOut);
+
+  virtual uint64_t getCodecTag(AVCodecID codecId, unsigned int* tagOut);
+  // =====================================================
+
 
   inline void sync() {
     throttle = new Synchronizer();

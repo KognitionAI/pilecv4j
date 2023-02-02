@@ -26,58 +26,43 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 }
 
 MediaProcessorChain::~MediaProcessorChain() {
-  if (selectedStreams)
-    delete[] selectedStreams;
 }
 
-uint64_t MediaProcessorChain::setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* defaultSelectedStreams) {
-  if (avformatCtx->streams == nullptr || avformatCtx->nb_streams <= 0)
-    return MAKE_P_STAT(NO_STREAM);
+uint64_t MediaProcessorChain::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options) {
+  if (!psi)
+    return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
 
-  if (defaultSelectedStreams && selector)
-    llog(WARN, "MediaProcessorChain was passed a non-null set of streams. They will be ignored and stream selection will be deferred to the given selector");
-
-  streamCount = avformatCtx->nb_streams;
-  selectedStreams = new bool[streamCount];
-
-  for (int i = 0; i < streamCount; i++)
-    selectedStreams[i] = true;
-
-  if (selector)
-    selector->selectStreams(avformatCtx, selectedStreams, streamCount);
-  else if (defaultSelectedStreams) {
-    for (int i = 0; i < streamCount; i++)
-      selectedStreams[i] = defaultSelectedStreams[i];
+  for (auto o : packetFilters) {
+    uint64_t rc = o->setup(psi, options);
+    if (isError(rc))
+      return rc;
   }
 
   for (auto o : mediaProcessors) {
-    uint64_t rc = o->setup(avformatCtx, options, selectedStreams);
+    uint64_t rc = o->setup(psi, options);
     if (isError(rc))
       return rc;
   }
   return 0;
 }
 
-uint64_t MediaProcessorChain::preFirstFrame(AVFormatContext* avformatCtx) {
+uint64_t MediaProcessorChain::preFirstFrame() {
   for (auto o : mediaProcessors) {
-    uint64_t rc = o->preFirstFrame(avformatCtx);
+    uint64_t rc = o->preFirstFrame();
     if (isError(rc))
       return rc;
   }
   return 0;
 }
 
-uint64_t MediaProcessorChain::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType) {
-  if (!streamSelected(selectedStreams, pPacket->stream_index))
-    return 0L;
-
+uint64_t MediaProcessorChain::handlePacket(AVPacket* pPacket, AVMediaType streamMediaType) {
   for (auto f : packetFilters) {
-    if (!f->filter(avformatCtx, pPacket, streamMediaType))
+    if (!f->filter(pPacket, streamMediaType))
       return 0L;
   }
 
   for (auto o : mediaProcessors) {
-    uint64_t rc = o->handlePacket(avformatCtx, pPacket, streamMediaType);
+    uint64_t rc = o->handlePacket(pPacket, streamMediaType);
     if (isError(rc))
       return rc;
   }
@@ -106,13 +91,6 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(uint64_t m
   PacketFilter* vds = (PacketFilter*)packetFilter;
   llog(DEBUG, "Adding packet filter at %" PRId64 " to media processor chain at %" PRId64, packetFilter, mpc);
   return c->addPacketFilter((PacketFilter*)vds);
-}
-
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(uint64_t mpc, uint64_t selector) {
-  MediaProcessorChain* c = (MediaProcessorChain*)mpc;
-  StreamSelector* vds = (StreamSelector*)selector;
-  llog(DEBUG, "Adding stream selector at %" PRId64 " to media processor chain at %" PRId64, selector, mpc);
-  return c->setStreamSelector((StreamSelector*)vds);
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_mediaProcessorChain_destroy(uint64_t mpcRef) {

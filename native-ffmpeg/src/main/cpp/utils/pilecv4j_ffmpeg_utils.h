@@ -58,9 +58,11 @@ enum Pcv4jStat {
   STREAM_CHANGED = 16,
   STREAM_SELECT_FAILED = 17,
   NO_FORMAT = 18,
-  NO_OUTPUT = 19
+  NO_OUTPUT = 19,
+  NO_PACKET_SOURCE_INFO = 20,
+  NULL_PARAMETER = 21
 };
-#define MAX_PCV4J_CODE 19
+#define MAX_PCV4J_CODE 21
 
 // Make a full kognition return status from an libav status.
 #define MAKE_AV_STAT(x) ((uint64_t)((int32_t)x) & 0xffffffff)

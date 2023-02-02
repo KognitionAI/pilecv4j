@@ -5,7 +5,6 @@
  *      Author: jim
  */
 
-#include "api/StreamContext.h"
 #include "api/StreamDetails.h"
 
 #include "common/kog_exports.h"
@@ -16,6 +15,9 @@ extern "C" {
 #include "libavdevice/avdevice.h"
 }
 #endif
+
+#define _INSIDE_PILECV4J_FFMPEG_STREAMCONTEXT_CPP
+#include "api/StreamContext.h"
 
 namespace pilecv4j
 {
@@ -148,12 +150,67 @@ uint64_t StreamContext::setupProcessors() {
 
   uint64_t rc = 0;
   for (auto o : mediaProcessors) {
-    rc = o->setup(formatCtx, options, nullptr);
+    rc = o->setup(this, options);
     if (isError(rc))
       return rc;
   }
 
   state = PROCESSORS_SETUP;
+  return 0;
+}
+
+uint64_t StreamContext::getStream(int streamIndex, AVStream** streamOut) {
+  if (!streamOut) {
+    llog(ERROR, "NULL parameter 'streamOut'");
+    return MAKE_P_STAT(NULL_PARAMETER);
+  }
+
+  uint64_t ret = 0;
+  if (state < OPEN) {
+    if (isError(ret = advanceStateTo(OPEN)))
+        return ret;
+  }
+
+  // formatCtx MUST be set or the advanceStateTo(OPEN) would have failed.
+
+  if (streamIndex >= formatCtx->nb_streams) {
+    llog(ERROR, "There is not stream at index %d. The total number of streams is %d", (int)streamIndex, (int)formatCtx->nb_streams);
+    return MAKE_P_STAT(NO_STREAM);
+  }
+
+  *streamOut = formatCtx->streams[streamIndex];
+  return 0;
+}
+
+uint64_t StreamContext::numStreams(int* numStreamsOut) {
+  if (!numStreamsOut) {
+    llog(ERROR, "NULL parameter 'numStreamsOut'");
+    return MAKE_P_STAT(NULL_PARAMETER);
+  }
+
+  uint64_t ret = 0;
+  if (state < OPEN) {
+    if (isError(ret = advanceStateTo(OPEN)))
+        return ret;
+  }
+
+  *numStreamsOut = formatCtx->nb_streams;
+  return 0;
+}
+
+uint64_t StreamContext::getCodecTag(AVCodecID codecId, unsigned int* tagOut) {
+  if (!tagOut) {
+    llog(ERROR, "NULL parameter 'tagOut'");
+    return MAKE_P_STAT(NULL_PARAMETER);
+  }
+
+  uint64_t ret = 0;
+  if (state < OPEN) {
+    if (isError(ret = advanceStateTo(OPEN)))
+        return ret;
+  }
+
+  av_codec_get_tag2(formatCtx->iformat->codec_tag, codecId, tagOut);
   return 0;
 }
 
@@ -385,7 +442,6 @@ static inline bool dontSkipPacket(Synchronizer* throttle, const AVFormatContext*
 #define dontSkipPacket(t,f,p) !t || !t->throttle(f, p)
 #endif
 
-
 static uint64_t process_packets(StreamContext* c) {
   int remuxErrorCount = 0; // if this count goes above MAX_REMUX_ERRORS then process_frames will fail.
 
@@ -413,7 +469,7 @@ static uint64_t process_packets(StreamContext* c) {
 
   for (auto o : c->mediaProcessors) {
     uint64_t frc = 0;
-    frc = o->preFirstFrame(pFormatContext);
+    frc = o->preFirstFrame();
     if (isError(frc))
       goto end;
   }
@@ -440,7 +496,8 @@ static uint64_t process_packets(StreamContext* c) {
         for (auto o : c->mediaProcessors) {
           {
             TIME_GUARD(hande_packet);
-            rc = o->handlePacket(pFormatContext, pPacket, mediaType);
+            const AVStream* stream = pFormatContext->streams[streamIndex];
+            rc = o->handlePacket(pPacket, mediaType);
           }
 
           if (isError(rc))

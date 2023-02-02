@@ -196,7 +196,6 @@ public class Ffmpeg2 {
      */
     public static class MediaProcessingChain extends MediaProcessor {
 
-        private StreamSelector selector = null;
         private final StreamContext ctx;
         private final List<MediaProcessor> processors = new ArrayList<>();
         private final List<PacketFilter> packetFilters = new ArrayList<>();
@@ -222,10 +221,6 @@ public class Ffmpeg2 {
             Functional.reverseRange(0, packetFilters.size())
                 .mapToObj(i -> packetFilters.get(i))
                 .forEach(p -> p.close());
-
-            if(selector != null)
-                selector.close();
-
         }
 
         // ======================================================================
@@ -233,14 +228,14 @@ public class Ffmpeg2 {
         // ======================================================================
 
         public MediaProcessingChain createFirstVideoStreamSelector() {
-            return manage(new StreamSelector(FfmpegApi2.pcv4j_ffmpeg2_firstVideoStreamSelector_create()));
+            return manage(new PacketFilter(FfmpegApi2.pcv4j_ffmpeg2_firstVideoStreamSelector_create()));
         }
 
         /**
          * This is package protected to eliminate any optimization of the strong references
          * required to keep the JNA callbacks from being GCed
          */
-        static class CallbackStreamSelector extends StreamSelector {
+        static class CallbackStreamSelector extends PacketFilter {
             // ======================================================================
             // JNA will only hold a weak reference to the callbacks passed in
             // so if we dynamically allocate them then they will be garbage collected.
@@ -495,15 +490,6 @@ public class Ffmpeg2 {
             packetFilters.add(newProc);
             return this;
         }
-
-        private MediaProcessingChain manage(final StreamSelector selector) {
-            if(this.selector != null)
-                throw new FfmpegException("Selector for this processing chain is already set.");
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(this.nativeRef, selector.nativeRef));
-            this.selector = selector;
-            return this;
-        }
-
     }
 
     /**
@@ -560,20 +546,6 @@ public class Ffmpeg2 {
         }
     }
 
-    private static class StreamSelector implements QuietCloseable {
-        final long nativeRef;
-
-        private StreamSelector(final long nativeRef) {
-            this.nativeRef = nativeRef;
-        }
-
-        @Override
-        public void close() {
-            if(nativeRef != 0)
-                FfmpegApi2.pcv4j_ffmpeg2_streamSelector_destroy(nativeRef);
-        }
-    }
-
     private static class PacketFilter implements QuietCloseable {
         final long nativeRef;
 
@@ -584,7 +556,7 @@ public class Ffmpeg2 {
         @Override
         public void close() {
             if(nativeRef != 0)
-                FfmpegApi2.pcv4j_ffmpeg2_streamSelector_destroy(nativeRef);
+                FfmpegApi2.pcv4j_ffmpeg2_packetFilter_destroy(nativeRef);
         }
     }
 

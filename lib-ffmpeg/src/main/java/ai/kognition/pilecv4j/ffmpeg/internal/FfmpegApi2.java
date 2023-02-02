@@ -250,19 +250,21 @@ public class FfmpegApi2 {
 
     public static native long pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(long mpc, long pf);
 
-    public static native long pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(long mpc, long ss);
+//    public static native long pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(long mpc, long ss);
 
     // ==========================================================
-    // Stream selector
+    // Filters and Stream selectors
     // ==========================================================
 
-    public static native void pcv4j_ffmpeg2_streamSelector_destroy(final long ssRef);
+//    public static native void pcv4j_ffmpeg2_streamSelector_destroy(final long ssRef);
 
     public static native long pcv4j_ffmpeg2_firstVideoStreamSelector_create();
 
     public static native long pcv4j_ffmpeg2_javaStreamSelector_create(select_streams_callback callback);
 
     public static native long pcv4j_ffmpeg2_javaPacketFilter_create(packet_filter_callback callback);
+
+    public static native void pcv4j_ffmpeg2_packetFilter_destroy(long nativeRef);
 
     // ==========================================================
     // Stream Context setup methods

@@ -1,10 +1,3 @@
-/*
- * UriRemuxer.cpp
- *
- *  Created on: Jul 7, 2022
- *      Author: jim
- */
-
 #include "output/UriOutput.h"
 
 #include "utils/pilecv4j_ffmpeg_utils.h"
