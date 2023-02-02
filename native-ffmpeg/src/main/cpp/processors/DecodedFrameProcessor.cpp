@@ -5,6 +5,7 @@
  *      Author: jim
  */
 
+#include "api/PacketSourceInfo.h"
 #include "processors/DecodedFrameProcessor.h"
 
 #include "utils/IMakerManager.h"
@@ -66,6 +67,7 @@ struct CodecDetails {
 };
 
 uint64_t DecodedFrameProcessor::close() {
+  PILECV4J_TRACE;
   if (codecs) {
     for (int i = 0; i < numStreams; i++) {
       CodecDetails* cd = codecs[i];
@@ -81,8 +83,15 @@ uint64_t DecodedFrameProcessor::close() {
   return 0;
 }
 
-uint64_t DecodedFrameProcessor::setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams) {
-  int numStreams = avformatCtx->nb_streams;
+uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options) {
+  PILECV4J_TRACE;
+  if (!psi)
+    return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
+
+  uint64_t ret = 0;
+  int numStreams;
+  if (isError(ret = psi->numStreams(&numStreams)))
+    return ret;
 
   if (numStreams <= 0)
     return MAKE_P_STAT(NO_STREAM);
@@ -91,55 +100,65 @@ uint64_t DecodedFrameProcessor::setup(AVFormatContext* avformatCtx, const std::v
   for (int i = 0; i < numStreams; i++) {
     codecs[i] = nullptr;
 
-    if (streamSelected(selectedStreams, i)) {
-      AVStream* lStream = avformatCtx->streams[i];
+    AVStream* lStream;
+    if (isError(ret = psi->getStream(i, &lStream)))
+      return ret;
 
-      if (!lStream) {
-        llog(WARN, "The %d stream in the context is selected but doesn't appear to exist. It will be skipped.", i);
+    if (!lStream) {
+      llog(WARN, "The %d stream in the context is selected but doesn't appear to exist. It will be skipped.", i);
+      continue;
+    }
+
+    AVCodecParameters *pLocalCodecParameters = lStream->codecpar;
+
+    // check if the decoder exists
+    {
+      AVCodec *pLocalCodec = NULL;
+
+      // finds the registered decoder for a codec ID
+      // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
+      pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+      if (pLocalCodec==NULL) {
+        llog(WARN, "ERROR unsupported codec at %d!", i);
         continue;
       }
-
-      AVCodecParameters *pLocalCodecParameters = lStream->codecpar;
-
-      // check if the decoder exists
-      {
-        AVCodec *pLocalCodec = NULL;
-
-        // finds the registered decoder for a codec ID
-        // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-        pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
-        if (pLocalCodec==NULL) {
-          llog(WARN, "ERROR unsupported codec at %d!", i);
-          continue;
-        }
-      }
-
-      codecs[i] = new CodecDetails();
-      codecs[i]->mediaType = pLocalCodecParameters->codec_type;
-
-      AVDictionary* opts = nullptr;
-      buildOptions(options, &opts);
-      uint64_t rc = MediaProcessor::open_codec(avformatCtx,i,&opts,&(codecs[i]->codecCtx), decoderNameSet ? decoderName.c_str() : nullptr);
-      if (opts != nullptr)
-        av_dict_free(&opts);
-      if (isError(rc))
-        return rc;
     }
+
+//    // this only cares about video so we're going to skip anything else.
+//    if (pLocalCodecParameters->codec_type != AVMEDIA_TYPE_VIDEO) {
+//      codecs[i] = nullptr;
+//      continue;
+//    }
+
+    codecs[i] = new CodecDetails();
+    codecs[i]->mediaType = pLocalCodecParameters->codec_type;
+
+    AVDictionary* opts = nullptr;
+    buildOptions(options, &opts);
+    uint64_t rc = MediaProcessor::open_codec(lStream,&opts,&(codecs[i]->codecCtx), decoderNameSet ? decoderName.c_str() : nullptr);
+    if (opts != nullptr)
+      av_dict_free(&opts);
+    if (isError(rc))
+      return rc;
   }
 
   return 0;
 }
 
-uint64_t DecodedFrameProcessor::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType mediaType) {
+uint64_t DecodedFrameProcessor::handlePacket(AVPacket* pPacket, AVMediaType mediaType) {
+  PILECV4J_TRACE;
   if (codecs == nullptr) {
     llog(ERROR, "handle packet called on uninitialized DecodedFrameProcessor");
     return MAKE_P_STAT(NO_SUPPORTED_CODEC);
   }
-  return decode_packet(codecs[pPacket->stream_index], pPacket);
-}
-
-uint64_t DecodedFrameProcessor::preFirstFrame(AVFormatContext* avformatCtx) {
-  return 0;
+  const int stream_index = pPacket->stream_index;
+  if (codecs[stream_index])
+    return decode_packet(codecs[pPacket->stream_index], pPacket);
+  else {
+    if (isEnabled(TRACE))
+      llog(TRACE, "packet passed with no corresponding codec.");
+    return 0;
+  }
 }
 
 uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPacket *pPacket) {

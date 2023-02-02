@@ -47,7 +47,6 @@ import net.dempsy.util.MutableRef;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
-import ai.kognition.pilecv4j.ffmpeg.Throttle.TimingType;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
@@ -123,7 +122,7 @@ public class TestFfmpeg2 extends BaseTest {
         LOGGER.info("Running test: {}.testConsumeFrames(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
         final MutableRef<Ffmpeg2.StreamContext.StreamDetails[]> details = new MutableRef<>(null);
-        final Throttle throttle = new Throttle(10, TimingType.FPS, LOGGER);
+//        final Throttle throttle = new Throttle(10, TimingType.FPS, LOGGER);
         try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
             final StreamContext ctx = Ffmpeg2.createStreamContext();) {
             ctx

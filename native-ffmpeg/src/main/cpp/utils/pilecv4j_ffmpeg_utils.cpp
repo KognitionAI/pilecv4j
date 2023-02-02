@@ -25,7 +25,9 @@ static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "The underlying stream seems to have changed in some important dimension.",
     "The stream selection failed.",
     "No format context",
-    "There's no output set"
+    "There's no output set",
+    "No packet source info",
+    "Required parameter missing"
 };
 
 /**

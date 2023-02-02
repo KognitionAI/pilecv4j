@@ -21,16 +21,18 @@ typedef int32_t (*packet_filter)(int32_t mediaType, int32_t stream_index, int32_
 class JavaPacketFilter: public PacketFilter
 {
   packet_filter callback;
+  AVRational* streamTimeBases = nullptr;
+  int numStreams = 0;
 
 public:
   inline JavaPacketFilter(packet_filter cb) : callback(cb) {}
   virtual ~JavaPacketFilter() = default;
 
-  virtual bool filter(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType);
-
-  virtual inline uint64_t setup(AVFormatContext* formatCtx) {
-    return 0L;
+  inline virtual uint64_t setup(PacketSourceInfo* mediaSource, const std::vector<std::tuple<std::string,std::string> >& options) {
+    return PacketFilter::calculateTimeBaseReference(mediaSource, &streamTimeBases, &numStreams);
   }
+
+  virtual bool filter(AVPacket* pPacket, AVMediaType streamMediaType);
 };
 
 }

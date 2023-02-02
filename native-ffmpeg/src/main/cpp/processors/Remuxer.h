@@ -32,7 +32,7 @@ class Remuxer: public MediaProcessor
   uint32_t remuxErrorCount = 0;
 
   // sets output_format_context, cleanupIoContext, and streams_list
-  uint64_t remuxPacket(AVFormatContext* formatCtx,  const AVPacket * inPacket);
+  uint64_t remuxPacket(const AVPacket * inPacket);
 
   MediaOutput* output = nullptr;
   AVCodecParameters** in_codecparpp = nullptr;
@@ -42,6 +42,7 @@ class Remuxer: public MediaProcessor
   bool alreadySetup = false;
 
   uint64_t setupStreams();
+  AVRational* streamTimeBases = nullptr;
 
 protected:
 
@@ -55,11 +56,11 @@ public:
 
   virtual uint64_t close();
 
-  virtual uint64_t setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams);
+  virtual uint64_t setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options);
 
-  virtual uint64_t preFirstFrame(AVFormatContext* input_format_context);
+  virtual uint64_t preFirstFrame();
 
-  virtual uint64_t handlePacket(AVFormatContext* input_format_context, AVPacket* pPacket, AVMediaType streamMediaType);
+  virtual uint64_t handlePacket(AVPacket* pPacket, AVMediaType streamMediaType);
 
 };
 

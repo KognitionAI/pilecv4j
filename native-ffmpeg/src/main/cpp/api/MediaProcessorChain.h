@@ -11,31 +11,28 @@
 #include <vector>
 
 #include "api/MediaProcessor.h"
-#include "api/StreamSelector.h"
+#include "api/PacketFilter.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 
 namespace pilecv4j
 {
 namespace ffmpeg
 {
-class PacketFilter;
 
 class MediaProcessorChain : public MediaProcessor
 {
-  StreamSelector* selector = nullptr;
   std::vector<PacketFilter*> packetFilters;
   std::vector<MediaProcessor*> mediaProcessors;
 
-  bool* selectedStreams = nullptr;
-  int streamCount = 0;
-
+  PacketSourceInfo* packetSource = nullptr;
+  std::vector<std::tuple<std::string,std::string> > options;
 public:
   MediaProcessorChain() = default;
   virtual ~MediaProcessorChain();
 
-  virtual uint64_t setup(AVFormatContext* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options, bool* selectedStreams);
-  virtual uint64_t preFirstFrame(AVFormatContext* avformatCtx);
-  virtual uint64_t handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType);
+  virtual uint64_t setup(PacketSourceInfo* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options);
+  virtual uint64_t preFirstFrame();
+  virtual uint64_t handlePacket(AVPacket* pPacket, AVMediaType streamMediaType);
 
   virtual inline uint64_t close() {
     return 0;
@@ -44,6 +41,8 @@ public:
   inline uint64_t addProcessor(MediaProcessor* vds) {
     if (vds == nullptr)
       return MAKE_P_STAT(NO_PROCESSOR_SET);
+    if (packetSource)
+      vds->setup(packetSource, options);
     mediaProcessors.push_back(vds);
     return 0;
   }
@@ -51,12 +50,9 @@ public:
   inline uint64_t addPacketFilter(PacketFilter* vds) {
     if (vds == nullptr)
       return MAKE_P_STAT(NO_PROCESSOR_SET);
+    if (packetSource)
+      vds->setup(packetSource, options);
     packetFilters.push_back(vds);
-    return 0;
-  }
-
-  inline uint64_t setStreamSelector(StreamSelector* pselector) {
-    selector = pselector;
     return 0;
   }
 

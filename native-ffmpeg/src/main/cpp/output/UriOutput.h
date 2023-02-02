@@ -1,10 +1,3 @@
-/*
- * UriRemuxer.h
- *
- *  Created on: Jul 7, 2022
- *      Author: jim
- */
-
 #ifndef _pilecv4j_ffmpeg_URIREMUXER_H_
 #define _pilecv4j_ffmpeg_URIREMUXER_H_
 

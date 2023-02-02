@@ -38,7 +38,7 @@ if (AVDEVICE_LIBRARY)
 endif()
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-#add_definitions( -DLOGGING -DPILECV4J_ENABLE_TRACE_API )
+add_definitions( -DPILECV4J_ENABLE_TRACE_API )
 add_definitions( -DLOGGING )
 add_definitions( -DTIMING )
 
@@ -59,20 +59,21 @@ add_library(${PROJECT_NAME} SHARED
   src/main/cpp/api/MediaDataSource.cpp
   src/main/cpp/api/MediaProcessor.cpp
   src/main/cpp/api/MediaProcessorChain.cpp
-  src/main/cpp/api/StreamSelector.cpp
   src/main/cpp/api/PacketFilter.cpp
   src/main/cpp/api/StreamDetails.cpp
   src/main/cpp/api/EncodingContext.cpp
   src/main/cpp/api/MediaOutput.cpp
+  src/main/cpp/api/Muxer.cpp
   src/main/cpp/sources/UriMediaDataSource.cpp
   src/main/cpp/sources/CustomMediaDataSource.cpp
   src/main/cpp/processors/DecodedFrameProcessor.cpp
   src/main/cpp/processors/Remuxer.cpp
-  src/main/cpp/selectors/FirstVideoStreamSelector.cpp
-  src/main/cpp/selectors/JavaStreamSelector.cpp
+  src/main/cpp/filters/FirstVideoStreamSelector.cpp
+  src/main/cpp/filters/JavaStreamSelector.cpp
   src/main/cpp/filters/JavaPacketFilter.cpp
   src/main/cpp/output/CustomOutput.cpp
   src/main/cpp/output/UriOutput.cpp
+  src/main/cpp/muxers/UriMuxer.cpp
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE . PUBLIC ${AVCODEC_INCLUDE_DIR})

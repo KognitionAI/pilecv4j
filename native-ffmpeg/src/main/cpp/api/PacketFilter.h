@@ -12,10 +12,15 @@ extern "C" {
 #include <libavformat/avformat.h>
 }
 
+#include <vector>
+#include <string>
+
 namespace pilecv4j
 {
 namespace ffmpeg
 {
+
+class PacketSourceInfo;
 
 class PacketFilter
 {
@@ -23,10 +28,12 @@ public:
   PacketFilter() = default;
   virtual ~PacketFilter() = default;
 
-  virtual uint64_t setup(AVFormatContext* formatCtx) = 0;
+  virtual uint64_t setup(PacketSourceInfo* mediaSource, const std::vector<std::tuple<std::string,std::string> >& options) = 0;
 
-  virtual bool filter(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType) = 0;
+  virtual bool filter(AVPacket* pPacket, AVMediaType streamMediaType) = 0;
 
+protected:
+  static uint64_t calculateTimeBaseReference(PacketSourceInfo* psi, AVRational** time_bases, int* numStreams);
 };
 
 }

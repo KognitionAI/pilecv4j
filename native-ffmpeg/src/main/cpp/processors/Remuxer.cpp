@@ -7,6 +7,7 @@
 
 #include "processors/Remuxer.h"
 #include "api/MediaOutput.h"
+#include "api/PacketSourceInfo.h"
 
 #include "utils/log.h"
 
@@ -127,24 +128,32 @@ uint64_t Remuxer::setupStreams() {
     output->fail();
 
   return iret;
-
 }
 
-uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector<std::tuple<std::string,std::string> >& poptions, bool* selectedStreams) {
+uint64_t Remuxer::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& poptions) {
   PILECV4J_TRACE;
+  if (!psi)
+    return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
+
   uint64_t iret = 0;
 
   // save off the options
   options = poptions;
 
   // set up the output streams
-  number_of_streams = input_format_context->nb_streams;
+  if (isError(iret = psi->numStreams(&number_of_streams)))
+    return iret;
   in_codecparpp = new AVCodecParameters*[number_of_streams];
+  streamTimeBases = new AVRational[number_of_streams];
 
-  for (unsigned int i = 0; i < input_format_context->nb_streams; i++) {
+  for (unsigned int i = 0; i < number_of_streams; i++) {
     in_codecparpp[i] = nullptr;
 
-    AVStream* in_stream = input_format_context->streams[i];
+    AVStream* in_stream;
+    if (isError(iret = psi->getStream(i, &in_stream)))
+      return iret;
+
+    streamTimeBases[i] = in_stream->time_base;
     AVCodecParameters *in_codecpar = in_stream->codecpar;
 
     // only video, audio, and subtitles will be remuxed.
@@ -166,14 +175,15 @@ uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector
     }
 
     {
-      // set the tag ....
-      bool setTag = true;
+      // see: https://stackoverflow.com/questions/33981707/ffmpeg-copy-streams-without-transcode
+      // I don't fully understand this but if I can access the information then I'll try.
       unsigned int tag = 0;
-      if (av_codec_get_tag2(input_format_context->iformat->codec_tag, in_codecpar->codec_id, &tag) < 0) {
+      bool gotInputTag = true;
+      if (isError(psi->getCodecTag(in_codecpar->codec_id, &tag))) {
         llog(DEBUG, "Failed to get tag");
-        setTag = false;
+        gotInputTag = false;
       }
-      if (setTag)
+      if (gotInputTag)
         in_codecparpp[i]->codec_tag = tag;
     }
   }
@@ -195,16 +205,21 @@ uint64_t Remuxer::setup(AVFormatContext* input_format_context, const std::vector
     in_codecparpp = nullptr;
   }
 
+  if (streamTimeBases) {
+    delete [] streamTimeBases;
+    streamTimeBases = nullptr;
+  }
+
   return iret;
 }
 
-uint64_t Remuxer::preFirstFrame(AVFormatContext* avformatCtx) {
+uint64_t Remuxer::preFirstFrame() {
   PILECV4J_TRACE;
   startTime = now();
   return 0;
 }
 
-uint64_t Remuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * inPacket) {
+uint64_t Remuxer::remuxPacket(const AVPacket * inPacket) {
   PILECV4J_TRACE;
 
   if (!output) {
@@ -222,8 +237,10 @@ uint64_t Remuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * inPac
   if (streams_list[input_stream_index] < 0)
     return 0;
 
-  AVStream * in_stream = formatCtx->streams[input_stream_index];
-  AVRational& time_base = in_stream->time_base;
+  AVRational& time_base = streamTimeBases[input_stream_index];
+
+  //AVStream * in_stream = formatCtx->streams[input_stream_index];
+  //AVRational& time_base = in_stream->time_base;
 
   AVPacket* pPacket = av_packet_clone(inPacket);
   if (!pPacket) {
@@ -254,9 +271,9 @@ uint64_t Remuxer::remuxPacket(AVFormatContext* formatCtx, const AVPacket * inPac
   return MAKE_AV_STAT(ret);
 }
 
-uint64_t Remuxer::handlePacket(AVFormatContext* avformatCtx, AVPacket* pPacket, AVMediaType streamMediaType) {
+uint64_t Remuxer::handlePacket(AVPacket* pPacket, AVMediaType streamMediaType) {
   PILECV4J_TRACE;
-  uint64_t ret = remuxPacket(avformatCtx,pPacket);
+  uint64_t ret = remuxPacket(pPacket);
   if (ret != 0) {
     remuxErrorCount++;
     if (remuxErrorCount > maxRemuxErrorCount) {
