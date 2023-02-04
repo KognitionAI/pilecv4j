@@ -374,8 +374,8 @@ public class Ffmpeg2 {
         }
 
         public MediaProcessingChain createRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
-            final MediaOutput output = new MediaOutput(FfmpegApi2.pcv4j_ffmpeg2_uriOutput_create(fmt, outputUri));
-            return manage(new MediaProcessorWithCustomOutput(FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(maxRemuxErrorCount), output));
+            final MediaOutput output = new MediaOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(fmt, outputUri, null));
+            return manage(new MediaProcessorWithCustomOutput(FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, maxRemuxErrorCount), output));
         }
 
         public MediaProcessingChain createRemuxer(final String outputUri, final int maxRemuxErrorCount) {
@@ -400,33 +400,44 @@ public class Ffmpeg2 {
             @SuppressWarnings("unused") public write_buffer_callback strongRefW = null;
             // ======================================================================
 
-            private CustomOutput(final long nativeRef) {
+            private CustomOutput(final long nativeRef, final write_buffer_callback write) {
                 super(nativeRef);
+                strongRefW = write;
             }
 
             private ByteBuffer customBuffer() {
-                final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_customOutput_buffer(nativeRef);
-                final int bufSize = FfmpegApi2.pcv4j_ffmpeg2_customOutput_bufferSize(nativeRef);
+                final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_buffer(nativeRef);
+                final int bufSize = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_bufferSize(nativeRef);
                 return value.getByteBuffer(0, bufSize);
             }
+        }
 
-            private void set(final write_buffer_callback write) {
-                strongRefW = write;
-                FfmpegApi2.pcv4j_ffmpeg2_customOutput_set(nativeRef, write);
+        private static class Wbc implements write_buffer_callback {
+            ByteBuffer bb;
+            final WritePacket writer;
+
+            private Wbc(final WritePacket writer) {
+                this.writer = writer;
+            }
+
+            @Override
+            public long write_buffer(final int numBytesToWrite) {
+                writer.handle(bb, numBytesToWrite);
+                return 0L;
             }
         }
 
         public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer) {
+            final Wbc wbc = new Wbc(writer);
 
-            final var remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(DEFAULT_MAX_REMUX_ERRORS);
-            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_customOutput_create(outputFormat, null));
+            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(outputFormat, null, wbc), wbc);
 
-            final ByteBuffer bb = output.customBuffer();
+            final var remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, DEFAULT_MAX_REMUX_ERRORS);
 
-            output.set(numBytes -> {
-                writer.handle(bb, numBytes);
-                return 0L;
-            });
+            // violation of the rule that objects should be usable once the constructor returns ... oh well,
+            // at least it's private. The fix for this would be to have the Wbc hold the CustomOutput rather than
+            // the other way around but ... not right now.
+            wbc.bb = output.customBuffer();
 
             return manage(new MediaProcessorWithCustomOutput(remuxerRef, output));
         }
@@ -520,7 +531,6 @@ public class Ffmpeg2 {
         private MediaProcessorWithCustomOutput(final long nativeRef, final MediaOutput output) {
             super(nativeRef);
             this.output = output;
-            FfmpegApi2.pcv4j_ffmpeg2_remuxer_setOutput(nativeRef, output.nativeRef);
         }
 
         @Override
@@ -542,7 +552,7 @@ public class Ffmpeg2 {
         @Override
         public void close() {
             if(nativeRef != 0L)
-                FfmpegApi2.pcv4j_ffmpeg2_mediaOutput_delete(nativeRef);
+                FfmpegApi2.pcv4j_ffmpeg2_muxer_delete(nativeRef);
         }
     }
 
