@@ -218,25 +218,19 @@ public class FfmpegApi2 {
 
     public static native void pcv4j_ffmpeg2_decodedFrameProcessor_replace(final long nativeRef, final push_frame_callback cb);
 
-    public static native long pcv4j_ffmpeg2_remuxer_create(final int maxRemuxErrorCount);
-
-    public static native void pcv4j_ffmpeg2_remuxer_setOutput(final long remuxRef, final long outputRef);
+    public static native long pcv4j_ffmpeg2_remuxer_create(long outputRef, final int maxRemuxErrorCount);
 
     // ==========================================================
-    // MediaOutput methods
+    // Muxers methods
     // ==========================================================
 
-    public static native long pcv4j_ffmpeg2_uriOutput_create(final String pfmt, final String poutputUri);
+    public static native void pcv4j_ffmpeg2_muxer_delete(final long outputRef);
 
-    public static native void pcv4j_ffmpeg2_mediaOutput_delete(final long outputRef);
+    public static native long pcv4j_ffmpeg2_defaultMuxer_create(final String pfmt, final String poutputUri, final write_buffer_callback callback);
 
-    public static native long pcv4j_ffmpeg2_customOutput_create(final String pfmt, final String poutputUri);
+    public static native Pointer pcv4j_ffmpeg2_defaultMuxer_buffer(final long ctx);
 
-    public static native long pcv4j_ffmpeg2_customOutput_set(final long ctx, final write_buffer_callback callback);
-
-    public static native Pointer pcv4j_ffmpeg2_customOutput_buffer(final long ctx);
-
-    public static native int pcv4j_ffmpeg2_customOutput_bufferSize(final long ctx);
+    public static native int pcv4j_ffmpeg2_defaultMuxer_bufferSize(final long ctx);
 
     // ==========================================================
     // MediaProcessorChain methods
@@ -250,13 +244,9 @@ public class FfmpegApi2 {
 
     public static native long pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(long mpc, long pf);
 
-//    public static native long pcv4j_ffmpeg2_mediaProcessorChain_setStreamSelector(long mpc, long ss);
-
     // ==========================================================
     // Filters and Stream selectors
     // ==========================================================
-
-//    public static native void pcv4j_ffmpeg2_streamSelector_destroy(final long ssRef);
 
     public static native long pcv4j_ffmpeg2_firstVideoStreamSelector_create();
 

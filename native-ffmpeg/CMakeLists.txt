@@ -62,7 +62,7 @@ add_library(${PROJECT_NAME} SHARED
   src/main/cpp/api/PacketFilter.cpp
   src/main/cpp/api/StreamDetails.cpp
   src/main/cpp/api/EncodingContext.cpp
-  src/main/cpp/api/MediaOutput.cpp
+  src/main/cpp/api/Muxer.cpp
   src/main/cpp/sources/UriMediaDataSource.cpp
   src/main/cpp/sources/CustomMediaDataSource.cpp
   src/main/cpp/processors/DecodedFrameProcessor.cpp
@@ -70,8 +70,7 @@ add_library(${PROJECT_NAME} SHARED
   src/main/cpp/filters/FirstVideoStreamSelector.cpp
   src/main/cpp/filters/JavaStreamSelector.cpp
   src/main/cpp/filters/JavaPacketFilter.cpp
-  src/main/cpp/output/CustomOutput.cpp
-  src/main/cpp/output/UriOutput.cpp
+  src/main/cpp/muxers/DefaultMuxer.cpp
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE . PUBLIC ${AVCODEC_INCLUDE_DIR})

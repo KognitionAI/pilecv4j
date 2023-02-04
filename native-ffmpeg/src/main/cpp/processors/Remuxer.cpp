@@ -5,8 +5,8 @@
  *      Author: jim
  */
 
+#include <api/Muxer.h>
 #include "processors/Remuxer.h"
-#include "api/MediaOutput.h"
 #include "api/PacketSourceInfo.h"
 
 #include "utils/log.h"
@@ -34,42 +34,30 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 
 Remuxer::~Remuxer() {}
 
-void Remuxer::setMediaOutput(MediaOutput* poutput) {
-  PILECV4J_TRACE;
-  output = poutput;
-  if (alreadySetup)
-    setupStreams();
-}
-
 uint64_t Remuxer::close() {
   PILECV4J_TRACE;
-  // we're NOT going to close the output since the responsibility for that will be left up to java
-  if (in_codecparpp) {
-    for (int i = 0; i < number_of_streams; i++) {
-      if (in_codecparpp[i])
-        avcodec_parameters_free(&(in_codecparpp[i]));
-    }
-    delete [] in_codecparpp;
-    in_codecparpp = nullptr;
-  }
   return 0;
 }
 
-uint64_t Remuxer::setupStreams() {
+uint64_t Remuxer::setupStreams(AVCodecParameters** in_codecparpp) {
   PILECV4J_TRACE;
   int stream_index = 0;
   uint64_t iret = 0;
-  bool skipOutput = false;
 
   if (!output)
     return MAKE_P_STAT(NO_OUTPUT);
 
-  AVFormatContext* output_format_context = nullptr;
-  iret = output->allocateOutputContext(&output_format_context);
-  if (!output_format_context || isError(iret)) {
-    llog(ERROR, "Failed to allocateOutputContext: %ld", (long)iret);
-    skipOutput = true;
-    goto fail;
+  // open the muxer
+  {
+    AVDictionary* opts = nullptr;
+    buildOptions(options, &opts);
+    iret = output->open(&opts);
+    if (opts != nullptr)
+      av_dict_free(&opts);
+    if (isError(iret)) {
+      llog(ERROR, "Failed to openOutput: %ld", (long)iret);
+      return iret;
+    }
   }
 
   streams_list = new int[number_of_streams];
@@ -88,32 +76,17 @@ uint64_t Remuxer::setupStreams() {
       continue;
 
     streams_list[i] = stream_index++;
-    AVStream* out_stream = avformat_new_stream(output_format_context, nullptr);
-    if (!out_stream) {
+    if (isError(iret = output->createNextStream(in_codecpar, nullptr))) {
       llog(ERROR, "Failed allocating output stream");
-      iret = MAKE_AV_STAT(AVERROR_UNKNOWN);
-      goto fail;
-    }
-    iret = MAKE_AV_STAT(avcodec_parameters_copy(out_stream->codecpar, in_codecpar));
-    if (isError(iret)) {
-      llog(ERROR, "Failed to copy codec parameters");
       goto fail;
     }
   }
 
   llog(TRACE, "Number of streams: %d", stream_index);
 
-  {
-    AVDictionary* opts = nullptr;
-    buildOptions(options, &opts);
-    iret = output->openOutput(&opts);
-    if (opts != nullptr)
-      av_dict_free(&opts);
-    if (isError(iret)) {
-      skipOutput = true;
-      llog(ERROR, "Failed to openOutput: %ld", (long)iret);
-      return iret;
-    }
+  if (isError(iret = output->ready())) {
+    llog(ERROR, "Failed readying output");
+    goto fail;
   }
 
   return 0;
@@ -124,8 +97,7 @@ uint64_t Remuxer::setupStreams() {
     streams_list = nullptr;
   }
 
-  if (!skipOutput)
-    output->fail();
+  output->fail();
 
   return iret;
 }
@@ -143,7 +115,7 @@ uint64_t Remuxer::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std:
   // set up the output streams
   if (isError(iret = psi->numStreams(&number_of_streams)))
     return iret;
-  in_codecparpp = new AVCodecParameters*[number_of_streams];
+  AVCodecParameters** in_codecparpp = new AVCodecParameters*[number_of_streams];
   streamTimeBases = new AVRational[number_of_streams];
 
   for (unsigned int i = 0; i < number_of_streams; i++) {
@@ -188,7 +160,7 @@ uint64_t Remuxer::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std:
     }
   }
 
-  iret = setupStreams();
+  iret = setupStreams(in_codecparpp);
   if (isError(iret))
     goto fail;
 
@@ -292,17 +264,15 @@ uint64_t Remuxer::handlePacket(AVPacket* pPacket, AVMediaType streamMediaType) {
 //========================================================================
 extern "C" {
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_remuxer_create(int32_t maxRemuxErrorCount) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_remuxer_create(uint64_t outputRef, int32_t maxRemuxErrorCount) {
   PILECV4J_TRACE;
-  MediaProcessor* ret = new Remuxer(maxRemuxErrorCount);
+  Muxer* output = (Muxer*)outputRef;
+  if (!output) {
+    llog(ERROR, "No output specified for remuxer");
+    return MAKE_P_STAT(NO_OUTPUT);
+  }
+  MediaProcessor* ret = new Remuxer(output, maxRemuxErrorCount);
   return (uint64_t)ret;
-}
-
-KAI_EXPORT void pcv4j_ffmpeg2_remuxer_setOutput(uint64_t remuxRef, uint64_t outputRef) {
-  PILECV4J_TRACE;
-  Remuxer* ths = (Remuxer*)remuxRef;
-  MediaOutput* output = (MediaOutput*)outputRef;
-  ths->setMediaOutput(output);
 }
 
 }
