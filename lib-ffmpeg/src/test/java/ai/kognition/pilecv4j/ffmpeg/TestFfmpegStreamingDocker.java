@@ -102,7 +102,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
             final Thread checker = startChecker(id, rtmpPort, numFrames, checkerLatch, () -> triggerWhenDone.set(true), finishedSuccessfully, checkerFailed);
 
             encoder
-                .outputStream("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
+                .muxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
                 .openVideoEncoder("libx264", "default")
                 .addCodecOptions("profile", "baseline")
                 .addCodecOptions("preset", "ultrafast")

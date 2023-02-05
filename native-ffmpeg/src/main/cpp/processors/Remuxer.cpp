@@ -49,11 +49,11 @@ uint64_t Remuxer::setupStreams(AVCodecParameters** in_codecparpp) {
 
   // open the muxer
   {
-    AVDictionary* opts = nullptr;
-    buildOptions(options, &opts);
-    iret = output->open(&opts);
-    if (opts != nullptr)
-      av_dict_free(&opts);
+//    AVDictionary* opts = nullptr;
+//    buildOptions(options, &opts);
+    iret = output->open();
+//    if (opts != nullptr)
+//      av_dict_free(&opts);
     if (isError(iret)) {
       llog(ERROR, "Failed to openOutput: %ld", (long)iret);
       return iret;
