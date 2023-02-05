@@ -70,7 +70,7 @@ public class TestSplitIntoFiles extends BaseTest {
         try(final CvMat firstFrame = ImageFile.readMatFromFile(new File(imageDir, "image-0.jpg").getAbsolutePath());
 
             final EncodingContext ectx = Ffmpeg2.createEncoder()
-                .outputStream(outputVideo.getAbsolutePath())
+                .muxer(outputVideo.getAbsolutePath())
                 .openVideoEncoder("libx264", "vidEncoder")
                 .addCodecOptions("preset", "slow")
                 .addCodecOptions("crf", "40")

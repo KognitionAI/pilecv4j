@@ -60,9 +60,9 @@ public:
 
   /**
    * Implementers need to open the output here including creating the output context
-   * and calling setFormatContext if they're not overloading getFormatContext
+   * and calling setFormatContext if they're not overloading getFormatContext.
    */
-  virtual uint64_t open(AVDictionary** opts) = 0;
+  virtual uint64_t open() = 0;
 
   /**
    * The current output format context should be returned here.

@@ -38,6 +38,7 @@ enum VideoEncoderState {
 
 class EncodingContext;
 class Synchronizer;
+class Muxer;
 
 /**
  * This class is NOT thread safe. ALL calls to the VideoEncoder and the EncodingContext
@@ -129,15 +130,16 @@ public:
  */
 class EncodingContext
 {
-  std::string fmt;
-  bool fmtNull = false;
-  std::string outputUri;
+//  std::string fmt;
+//  bool fmtNull = false;
+//  std::string outputUri;
 
-  AVFormatContext *output_format_context = nullptr;
-  bool cleanupIoContext = false;
+  //AVFormatContext *output_format_context = nullptr;
+  //bool cleanupIoContext = false;
+  Muxer* muxer = nullptr;
   EncoderState state = ENC_FRESH;
 
-  bool wroteHeader = false;
+//  bool wroteHeader = false;
 
   friend class VideoEncoder;
 
@@ -149,7 +151,7 @@ public:
   }
   ~EncodingContext();
 
-  uint64_t setupOutputContext(const char* lfmt, const char* loutputUri);
+  uint64_t setMuxer(Muxer* pmuxer);
 
   inline VideoEncoder* openVideoEncoder(const char* video_codec) {
     return new VideoEncoder(this, video_codec);

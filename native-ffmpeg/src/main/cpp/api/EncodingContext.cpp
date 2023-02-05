@@ -5,8 +5,9 @@
  *      Author: jim
  */
 
-#include <api/EncodingContext.h>
-#include <utils/Synchronizer.h>
+#include "api/EncodingContext.h"
+#include "api/Muxer.h"
+#include "utils/Synchronizer.h"
 #include "common/FakeMutexGuard.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
@@ -26,6 +27,7 @@ namespace ffmpeg
 {
 
 #define COMPONENT "ENCC"
+#define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_list args;
@@ -36,87 +38,50 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 
 EncodingContext::~EncodingContext()
 {
+  PILECV4J_TRACE;
   stop(); // stop if not already stopped
-
-  // non-recursive so can't cover stop()
-  FakeMutextGuard g(fake_mutex);
-
-  if (output_format_context) {
-    if (cleanupIoContext) {
-      llog(TRACE, "closing io");
-      avio_closep(&output_format_context->pb);
-      llog(TRACE, "closed io");
-      output_format_context->pb = nullptr;
-    }
-    llog(TRACE, "freeing context");
-    avformat_free_context(output_format_context);
-    llog(TRACE, "freed context");
-  }
 }
 
 uint64_t EncodingContext::stop() {
+  PILECV4J_TRACE;
   FakeMutextGuard g(fake_mutex);
 
   if (state == ENC_STOPPED)
     return 0;
 
   state = ENC_STOPPED;
-  if (output_format_context && wroteHeader) {
-    //llog(TRACE, "STEP 11 av_write_trailer");
-    int rc = av_write_trailer(output_format_context);
-    if (rc < 0)
-      llog(ERROR, "Failed to write the trailer: %d, %s", (int)rc, av_err2str(rc));
-    return MAKE_AV_STAT(rc);
+  if (muxer) {
+    uint64_t iret;
+    if (isError(iret = muxer->close()))
+      return iret;
   }
   return 0;
 }
 
-uint64_t EncodingContext::setupOutputContext(const char* pfmt, const char* poutputUri) {
-  FakeMutextGuard g(fake_mutex);
-
-  fmt = pfmt == nullptr ? "" : pfmt;
-  fmtNull = pfmt == nullptr;
-  outputUri = poutputUri;
-
+uint64_t EncodingContext::setMuxer(Muxer* pmuxer) {
+  PILECV4J_TRACE;
   if (state != ENC_FRESH) {
-    llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_FRESH, (int)state);
+    llog(ERROR, "EncodingContext is in the wrong state to set the Muxer. It should have been FRESH but it's in %d.", (int)state);
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
-  llog(DEBUG, "prepare_video_encoder: [%s, %s]", PO(pfmt), PO(poutputUri));
-
-  if (output_format_context) {
-    llog(ERROR, "The encoder has already had its input set.");
+  if (muxer) {
+    llog(ERROR, "Muxer is already set.");
     return MAKE_P_STAT(ALREADY_SET);
   }
-
-  //llog(TRACE, "STEP 1: avformat_alloc_output_context2( ctx, null, %s, %s )", PO(pfmt), PO(poutputUri));
-  int ret = avformat_alloc_output_context2(&output_format_context, nullptr, pfmt, poutputUri);
-  if (!output_format_context) {
-    llog(ERROR, "Failed to allocate output format context using a format of \"%s\" and an output file of \"%s\"",
-        pfmt == nullptr ? "[NULL]" : pfmt, poutputUri);
-    return ret < 0 ? MAKE_AV_STAT(ret) : MAKE_AV_STAT(AVERROR_UNKNOWN);
+  if (!pmuxer) {
+    llog(ERROR, "Cannot set muxer on encoder to NULL");
+    return MAKE_P_STAT(NO_OUTPUT);
   }
-
-  if (!(output_format_context->oformat->flags & AVFMT_NOFILE)) {
-    llog(TRACE, "Opening AVIOContext for %s", outputUri.c_str());
-    //llog(TRACE, "STEP 2: avio_open2( ctx->pb, %s, AVIO_FLAG_WRITE, null, null )", PO(outputUri.c_str()));
-    ret = avio_open2(&output_format_context->pb, outputUri.c_str(), AVIO_FLAG_WRITE, nullptr, nullptr);
-    if (ret < 0) {
-      llog(ERROR, "Could not open output file '%s'", outputUri.c_str());
-      return MAKE_AV_STAT(ret);
-    }
-    cleanupIoContext = true; // we need to close what we opened.
-  } else
-    llog(TRACE, "NOT Opening AVIOContext for %s", outputUri.c_str());
-
-  if (ret >= 0)
+  muxer = pmuxer;
+  uint64_t ret = muxer->open();
+  if (!isError(ret))
     state = ENC_OPEN_CONTEXT;
-
-  return MAKE_P_STAT(ret);
+  return ret;
 }
 
 uint64_t EncodingContext::ready() {
+  PILECV4J_TRACE;
   FakeMutextGuard g(fake_mutex);
 
   if (state != ENC_OPEN_STREAMS) {
@@ -124,30 +89,23 @@ uint64_t EncodingContext::ready() {
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
-  // https://ffmpeg.org/doxygen/trunk/group__lavf__misc.html#gae2645941f2dc779c307eb6314fd39f10
-  av_dump_format(output_format_context, 0, outputUri.c_str(), 1);
-
-  int ret = 0;
-
-  // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
-  //llog(TRACE, "STEP 10: avformat_write_header", PO(outputUri.c_str()));
-  ret = avformat_write_header(output_format_context, nullptr);
-  if (ret < 0) {
-    llog(ERROR, "Error occurred when writing the header");
-    return MAKE_AV_STAT(ret);
+  if (!muxer) {
+    llog(ERROR, "Cannot ready the encoder without setting a muxer");
+    return MAKE_P_STAT(NO_OUTPUT);
   }
-  wroteHeader = true;
-  //llog(TRACE, "STEP 10 - Returned");
 
-  if (ret >= 0)
-    state = ENC_READY;
+  uint64_t iret = 0;
+  if (isError(iret = muxer->ready())) {
+    llog(ERROR, "Failed to ready the muxer");
+    return iret;
+  }
 
-  av_dump_format(output_format_context, 0, outputUri.c_str(), 1);
-
-  return MAKE_AV_STAT(ret);
+  state = ENC_READY;
+  return 0;
 }
 
 uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
+  PILECV4J_TRACE;
   auto imaker = IMakerManager::getIMaker();
   if (!imaker)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
@@ -160,6 +118,7 @@ uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
 }
 
 uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, int dstW, int dstH) {
+  PILECV4J_TRACE;
   FakeMutextGuard g(enc->fake_mutex);
 
   AVRational framerate = { fps, 1 };
@@ -181,8 +140,24 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
+  if (!enc->muxer) {
+    llog(ERROR, "Cannot enable the encoder without setting a muxer");
+    return MAKE_P_STAT(NO_OUTPUT);
+  }
+
   uint64_t result = 0;
   AVDictionary* opts = nullptr;
+
+  // llog(TRACE, "STEP 6: set_codec_params");
+
+  // set the options
+  result = buildOptions(options, &opts);
+  if (isError(result)) {
+    if (opts != nullptr)
+      av_dict_free(&opts);
+    return result;
+  }
+
   int avres = 0;
 
   //llog(TRACE, "STEP 3: find codec");
@@ -195,7 +170,13 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   llog(TRACE, "video codec id %d: %s", (int)video_avc->id, PO(video_avc->name));
 
   //llog(TRACE, "STEP 4: avformat_new_stream ( ctx, codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
-  video_avs = avformat_new_stream(enc->output_format_context, video_avc);
+  //  avformat_new_stream(enc->output_format_context, video_avc);
+  video_avs = nullptr;
+  result = enc->muxer->createNextStream(video_avc, &video_avs);
+  if (isError(result)) {
+    llog(ERROR, "Failed to create stream in muxer");
+    goto fail;
+  }
   llog(TRACE, "video stream index %d", (int)video_avs->index);
 
   //llog(TRACE, "STEP 5: avcodec_alloc_context3 ( codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
@@ -238,7 +219,7 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   else
     video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
 
-  if (enc->output_format_context->oformat->flags & AVFMT_GLOBALHEADER)
+  if (enc->muxer->getFormatContext()->oformat->flags & AVFMT_GLOBALHEADER)
     video_avcc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   enc->state = ENC_OPEN_STREAMS;
@@ -248,16 +229,6 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   result = MAKE_AV_STAT(avcodec_parameters_from_context(video_avs->codecpar, video_avcc));
   if (isError(result)) {
     llog(ERROR, "could not fill codec parameters");
-    goto fail;
-  }
-
-  //llog(TRACE, "STEP 6: set_codec_params");
-
-  // set the options
-  result = buildOptions(options, &opts);
-  if (isError(result)) {
-    if (opts != nullptr)
-      av_dict_free(&opts);
     goto fail;
   }
 
@@ -301,10 +272,12 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
     avcodec_free_context(&video_avcc);
     video_avcc = nullptr;
   }
+  enc->muxer->fail();
   return result;
 }
 
 uint64_t VideoEncoder::streaming() {
+  PILECV4J_TRACE;
   FakeMutextGuard g(enc->fake_mutex);
 
   // this should NOT already be encoding.
@@ -318,6 +291,7 @@ uint64_t VideoEncoder::streaming() {
 }
 
 uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
+  PILECV4J_TRACE;
   FakeMutextGuard g(enc->fake_mutex);
 
   if (!matRef) {
@@ -326,7 +300,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   }
 
   if (enc->state != ENC_READY) {
-    llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_READY, (int)enc->state);
+    llog(ERROR, "EncodingContext is in the wrong state. It should have been in ENC_READY(%d) but it's in %d.", (int)ENC_READY, (int)enc->state);
     return MAKE_P_STAT(STREAM_BAD_STATE);
   }
 
@@ -417,7 +391,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
             (int)video_avs->time_base.num, (int)video_avs->time_base.den);
       }
 
-      rc = av_interleaved_write_frame(enc->output_format_context, &output_packet);
+      rc = av_interleaved_write_frame(enc->muxer->getFormatContext(), &output_packet);
       if (rc != 0) {
         llog(ERROR,"Error %d while writing packet to output: %s", rc, av_err2str(rc));
         result = MAKE_AV_STAT(rc);
@@ -433,6 +407,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 }
 
 uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
+  PILECV4J_TRACE;
   FakeMutextGuard g(enc->fake_mutex);
 
   if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
@@ -453,13 +428,27 @@ uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
 }
 
 uint64_t VideoEncoder::stop() {
+  PILECV4J_TRACE;
   FakeMutextGuard g(enc->fake_mutex);
+
+  // need to put it back or we get a double free when closing the overall context
+  if (streams_original_set && video_avs) {
+    if (isEnabled(TRACE))
+      llog(TRACE, "Resetting video_avs(%" PRId64 ")->codecpar(%" PRId64 ")->extradata(%" PRId64 ") to %" PRId64,
+          (uint64_t)video_avs, (uint64_t)(video_avs ? video_avs->codecpar : 0L),
+          (uint64_t)((video_avs && video_avs->codecpar) ? video_avs->codecpar->extradata : 0L),
+          (uint64_t)streams_original_set);
+    video_avs->codecpar->extradata = streams_original_extradata;
+    video_avs->codecpar->extradata_size = streams_original_extradata_size;
+    streams_original_set = false;
+  }
 
   state = VE_STOPPED;
   return 0;
 }
 
 VideoEncoder::~VideoEncoder() {
+  PILECV4J_TRACE;
   stop(); // stop if not already stopped
 
   // non-recursive so can't cover stop()
@@ -470,20 +459,17 @@ VideoEncoder::~VideoEncoder() {
     IMakerManager::freeFrame(&frame);
   }
 
-  // need to put it back or we get a double free when closing the overall context
-  if (streams_original_set) {
-    video_avs->codecpar->extradata = streams_original_extradata;
-    video_avs->codecpar->extradata_size = streams_original_extradata_size;
-    streams_original_set = false;
-  }
-
-  if (video_avcc)
+  if (video_avcc) {
+    if (isEnabled(TRACE))
+      llog(TRACE, "freeing video_avcc at %" PRId64, (uint64_t)video_avcc);
     avcodec_free_context(&video_avcc);
+  }
 }
 
 extern "C" {
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_create() {
+  PILECV4J_TRACE;
   uint64_t ret = (uint64_t)new EncodingContext();
   if (isEnabled(TRACE))
     llog(TRACE, "Creating new EncodingContext: %" PRId64, ret);
@@ -491,20 +477,24 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_create() {
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_encodingContext_delete(uint64_t nativeDef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Deleting EncodingContext: %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
   delete enc;
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_setOutput(uint64_t nativeDef, const char* fmt, const char* uri) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_setMuxer(uint64_t nativeDef, uint64_t muxerRef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
-    llog(TRACE, "Setting up output for EncodingContext: %" PRId64, nativeDef);
+    llog(TRACE, "Setting up muxer for EncodingContext: %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
-  return enc->setupOutputContext(fmt, uri);
+  Muxer* muxer = (Muxer*)muxerRef;
+  return enc->setMuxer(muxer);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_openVideoEncoder(uint64_t nativeDef, const char* video_codec) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "opening Video Encoder:on EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
@@ -515,6 +505,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_openVideoEncoder(uint64_t nati
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_ready(uint64_t nativeDef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Readying EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
@@ -523,6 +514,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_ready(uint64_t nativeDef) {
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_stop(uint64_t nativeDef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
@@ -531,6 +523,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_stop(uint64_t nativeDef) {
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_encode(uint64_t nativeDef, uint64_t matRef, int32_t isRgb) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Encoding mat at: %" PRId64 " as frame using video encoder at %" PRId64, matRef, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -538,6 +531,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_encode(uint64_t nativeDef, uint64
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_addCodecOption(uint64_t nativeDef, const char* key, const char* val) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "adding option for video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -545,6 +539,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_addCodecOption(uint64_t nativeDef
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setEncodingParameters(uint64_t nativeDef, int32_t pfps, int32_t pbufferSize, int64_t pminBitrate, int64_t pmaxBitrate) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "setting encoding parameters for video encoder at: %" PRId64 ": fps: %d, bufferSize: %d, min bitrate: %ld, max bitrate: %ld",
         nativeDef, (int)pfps, (int)pbufferSize, (long)pminBitrate, (long)pmaxBitrate);
@@ -560,6 +555,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setFps(uint64_t nativeDef, int32_
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBufferSize(uint64_t nativeDef, int32_t pbufferSize) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "setting buffer size for video encoder at: %" PRId64 ": bufferSize: %d",  nativeDef, (int)pbufferSize);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -567,6 +563,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBufferSize(uint64_t nativeDef,
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBitrate(uint64_t nativeDef, int64_t pminBitrate, int64_t pmaxBitrate) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "setting bitrate for video encoder at: %" PRId64 ": min bitrate: %ld, max bitrate: %ld",
         nativeDef, (long)pminBitrate, (long)pmaxBitrate);
@@ -575,6 +572,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBitrate(uint64_t nativeDef, in
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBitrate2(uint64_t nativeDef, int64_t pminBitrate) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "setting bitrate for video encoder at: %" PRId64 ": bitrate: %ld", nativeDef, (long)pminBitrate);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -582,6 +580,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBitrate2(uint64_t nativeDef, i
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable(uint64_t nativeDef, uint64_t matRef, int32_t isRgb) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -589,6 +588,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable(uint64_t nativeDef, uint64
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable2(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -596,6 +596,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable2(uint64_t nativeDef, int32
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable3(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -603,6 +604,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable3(uint64_t nativeDef, int32
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable4(uint64_t nativeDef, uint64_t matRef, int32_t isRgb, int32_t dstW, int32_t dstH) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -610,6 +612,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable4(uint64_t nativeDef, uint6
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable5(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride, int32_t dstW, int32_t dstH) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -617,6 +620,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable5(uint64_t nativeDef, int32
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable6(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t dstW, int32_t dstH) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -624,6 +628,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable6(uint64_t nativeDef, int32
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_videoEncoder_delete(uint64_t nativeDef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "deleting video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -631,6 +636,7 @@ KAI_EXPORT void pcv4j_ffmpeg2_videoEncoder_delete(uint64_t nativeDef) {
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_stop(uint64_t nativeDef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping video encoder at %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
@@ -638,6 +644,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_stop(uint64_t nativeDef) {
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_streaming(uint64_t nativeDef) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping video encoder at %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;

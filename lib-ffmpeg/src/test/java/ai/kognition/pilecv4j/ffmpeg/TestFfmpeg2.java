@@ -25,6 +25,9 @@ import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -46,6 +49,7 @@ import net.dempsy.util.MutableRef;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.MediaDataSeek;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
 import ai.kognition.pilecv4j.image.CvMat;
@@ -262,23 +266,7 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(destination.isFile());
         assertTrue(destination.length() > 0);
 
-        if(SHOW) {
-            try(final ImageDisplay id = new ImageDisplay.Builder().build();
-                final StreamContext c = Ffmpeg2.createStreamContext();) {
-                c
-                    .createMediaDataSource(destination.toURI())
-                    .openChain("default")
-                    .createFirstVideoStreamSelector()
-                    .createVideoFrameProcessor(f -> {
-                        try(final CvMat rgb = f.bgr(false);) {
-                            id.update(rgb);
-                        }
-                    })
-                    .streamContext()
-                    // .optionally(sync, s -> s.sync())
-                    .play();
-            }
-        }
+        assertTrue(frameCount(destination.toURI()) > 1000);
     }
 
     @Test
@@ -290,7 +278,7 @@ public class TestFfmpeg2 extends BaseTest {
         try(
 
             final StreamContext c = Ffmpeg2.createStreamContext();
-            OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
+            final OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
 
         ) {
             c
@@ -312,23 +300,67 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(destination.isFile());
         assertTrue(destination.length() > 0);
 
-        if(SHOW) {
-            try(final ImageDisplay id = new ImageDisplay.Builder().build();
-                final StreamContext c = Ffmpeg2.createStreamContext();) {
-                c
-                    .createMediaDataSource(destination.toURI())
-                    .openChain("default")
-                    .createFirstVideoStreamSelector()
-                    .createVideoFrameProcessor(f -> {
-                        try(final CvMat rgb = f.bgr(false);) {
-                            id.update(rgb);
-                        }
+        assertTrue(frameCount(destination.toURI()) > 1000);
+    }
+
+    @Test
+    public void testCustomRemuxWithSeek() throws Exception {
+        LOGGER.info("Running test: {}.testCustomRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        final File destination = tempDir.newFile("out.mp4");
+        if(destination.exists())
+            destination.delete();
+
+        final var bb = ByteBuffer.allocate(20 * 1024 * 1024);
+        final AtomicBoolean calledSeek = new AtomicBoolean(false);
+
+        try(
+
+            final StreamContext c = Ffmpeg2.createStreamContext();
+
+        ) {
+
+            c
+                .addOption("rtsp_flags", "prefer_tcp")
+                .createMediaDataSource(STREAM)
+                .openChain("default")
+                .createRemuxer("mp4", (packet, numBytes) -> {
+                    packet.rewind();
+                    final byte[] pkt = new byte[numBytes];
+                    packet.get(pkt);
+                    bb.put(pkt);
+                },
+                    (MediaDataSeek)(final long offset, final int whence) -> {
+                        calledSeek.set(true);
+                        if(whence == Ffmpeg2.SEEK_SET)
+                            bb.position((int)offset);
+                        else if(whence == Ffmpeg2.SEEK_CUR)
+                            bb.position(bb.position() + (int)offset);
+                        else if(whence == Ffmpeg2.SEEK_END)
+                            bb.position(bb.limit() - (int)offset);
+                        else if(whence == Ffmpeg2.AVSEEK_SIZE)
+                            return bb.limit();
+                        else
+                            return -1;
+                        return bb.position();
                     })
-                    .streamContext()
-                    // .optionally(sync, s -> s.sync())
-                    .play();
-            }
+                .streamContext()
+                .optionally(sync, s -> s.sync())
+                .play();
+
         }
+
+        bb.flip();
+        try(final var fos = new FileOutputStream(destination);
+            final FileChannel fc = fos.getChannel();) {
+            fc.write(bb);
+        }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        assertTrue(frameCount(destination.toURI()) > 1000);
+        assertTrue(calledSeek.get());
     }
 
     @Test
@@ -346,7 +378,7 @@ public class TestFfmpeg2 extends BaseTest {
         ) {
 
             encoder
-                .outputStream(destination.getAbsolutePath())
+                .muxer(destination.getAbsolutePath())
                 .openVideoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
@@ -412,24 +444,210 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(destination.isFile());
         assertTrue(destination.length() > 0);
 
-        if(SHOW) {
-            try(final ImageDisplay id = new ImageDisplay.Builder().build();
-                final StreamContext c = Ffmpeg2.createStreamContext();) {
-                c
-                    .createMediaDataSource(destination.toURI())
-                    .openChain("default")
-                    // with the following commented out, all streams will be selected.
-                    // .createFirstVideoStreamSelector()
-                    .createVideoFrameProcessor(f -> {
-                        try(final CvMat rgb = f.bgr(false);) {
-                            id.update(rgb);
+        assertTrue(frameCount(destination.toURI()) > 1000);
+    }
+
+    @Test
+    public void testEncodingCustomOutput() throws Exception {
+        LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        final File destination = tempDir.newFile("out.ts");
+        if(destination.exists())
+            destination.delete();
+
+        try(
+            final EncodingContext encoder = Ffmpeg2.createEncoder();
+            final StreamContext ctx = Ffmpeg2.createStreamContext();
+            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
+            OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
+
+        ) {
+
+            encoder
+                .muxer("mpegts", (packet, numBytes) -> {
+                    packet.rewind();
+                    final byte[] pkt = new byte[numBytes];
+                    packet.get(pkt);
+                    uncheck(() -> os.write(pkt));
+                })
+                .openVideoEncoder("libx265", "first")
+                .addCodecOptions("preset", "ultrafast")
+                .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
+                .addCodecOptions("flags", "low_delay")
+                .setBufferSize(4 * 16 * MEG)
+                .setBitrate(2 * MEG)
+                .encodingContext()
+                .openVideoEncoder("libx265", "second")
+                .addCodecOptions("preset", "ultrafast")
+                .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
+                .addCodecOptions("flags", "low_delay")
+                .setBufferSize(4 * 16 * MEG)
+                .setBitrate(2 * MEG)
+                .encodingContext()
+
+            ;
+
+            final VideoEncoder ve1 = encoder.getVideoEncoder("first");
+            final VideoEncoder ve2 = encoder.getVideoEncoder("second");
+            final AtomicBoolean firstFrame = new AtomicBoolean(true);
+
+            ctx
+                .addOption("rtsp_flags", "prefer_tcp")
+                .createMediaDataSource(STREAM)
+                .load()
+                .peek(s -> {
+                    final var details = s.getStreamDetails();
+                    ve1.setFps(details[0].fps_num / details[0].fps_den);
+                    ve2.setFps(details[0].fps_num / details[0].fps_den);
+
+                })
+                .openChain("default")
+                .createFirstVideoStreamSelector()
+                .createVideoFrameProcessor(f -> {
+                    if(firstFrame.get()) {
+                        firstFrame.set(false);
+                        ve1.enable(f, f.isRgb);
+                        try(CvMat flipped = new CvMat();) {
+                            Core.flip(f, flipped, 1);
+                            ve2.enable(flipped, f.isRgb);
                         }
-                    })
-                    .streamContext()
-                    // .optionally(sync, s -> s.sync())
-                    .play();
-            }
+                        encoder.ready();
+                    }
+                    ve1.encode(f, f.isRgb);
+                    try(CvMat flipped = new CvMat();) {
+                        Core.flip(f, flipped, 1);
+                        ve2.encode(flipped, f.isRgb);
+                    }
+                    if(id != null) {
+                        try(var bgr = f.bgr(false);) {
+                            id.update(bgr);
+                        }
+                    }
+                })
+                .streamContext()
+                .optionally(sync, s -> s.sync())
+                .play()
+
+            ;
         }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        assertTrue(frameCount(destination.toURI()) > 1000);
+    }
+
+    @Test
+    public void testEncodingCustomOutputWithSeek() throws Exception {
+        LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        final File destination = tempDir.newFile("out.mp4");
+        if(destination.exists())
+            destination.delete();
+
+        final var bb = ByteBuffer.allocate(100 * 1024 * 1024);
+        final AtomicBoolean calledSeek = new AtomicBoolean(false);
+
+        try(
+            final EncodingContext encoder = Ffmpeg2.createEncoder();
+            final StreamContext ctx = Ffmpeg2.createStreamContext();
+            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
+
+        ) {
+
+            encoder
+                .muxer("mp4", (packet, numBytes) -> {
+                    packet.rewind();
+                    final byte[] pkt = new byte[numBytes];
+                    packet.get(pkt);
+                    bb.put(pkt);
+                },
+                    (MediaDataSeek)(final long offset, final int whence) -> {
+                        calledSeek.set(true);
+                        if(whence == Ffmpeg2.SEEK_SET)
+                            bb.position((int)offset);
+                        else if(whence == Ffmpeg2.SEEK_CUR)
+                            bb.position(bb.position() + (int)offset);
+                        else if(whence == Ffmpeg2.SEEK_END)
+                            bb.position(bb.limit() - (int)offset);
+                        else if(whence == Ffmpeg2.AVSEEK_SIZE)
+                            return bb.limit();
+                        else
+                            return -1;
+                        return bb.position();
+                    })
+                .openVideoEncoder("libx265", "first")
+                .addCodecOptions("preset", "ultrafast")
+                .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
+                .addCodecOptions("flags", "low_delay")
+                .setBufferSize(4 * 16 * MEG)
+                .setBitrate(2 * MEG)
+                .encodingContext()
+                .openVideoEncoder("libx265", "second")
+                .addCodecOptions("preset", "ultrafast")
+                .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
+                .addCodecOptions("flags", "low_delay")
+                .setBufferSize(4 * 16 * MEG)
+                .setBitrate(2 * MEG)
+                .encodingContext()
+
+            ;
+
+            final VideoEncoder ve1 = encoder.getVideoEncoder("first");
+            final VideoEncoder ve2 = encoder.getVideoEncoder("second");
+            final AtomicBoolean firstFrame = new AtomicBoolean(true);
+
+            ctx
+                .addOption("rtsp_flags", "prefer_tcp")
+                .createMediaDataSource(STREAM)
+                .load()
+                .peek(s -> {
+                    final var details = s.getStreamDetails();
+                    ve1.setFps(details[0].fps_num / details[0].fps_den);
+                    ve2.setFps(details[0].fps_num / details[0].fps_den);
+
+                })
+                .openChain("default")
+                .createFirstVideoStreamSelector()
+                .createVideoFrameProcessor(f -> {
+                    if(firstFrame.get()) {
+                        firstFrame.set(false);
+                        ve1.enable(f, f.isRgb);
+                        try(CvMat flipped = new CvMat();) {
+                            Core.flip(f, flipped, 1);
+                            ve2.enable(flipped, f.isRgb);
+                        }
+                        encoder.ready();
+                    }
+                    ve1.encode(f, f.isRgb);
+                    try(CvMat flipped = new CvMat();) {
+                        Core.flip(f, flipped, 1);
+                        ve2.encode(flipped, f.isRgb);
+                    }
+                    if(id != null) {
+                        try(var bgr = f.bgr(false);) {
+                            id.update(bgr);
+                        }
+                    }
+                })
+                .streamContext()
+                .optionally(sync, s -> s.sync())
+                .play()
+
+            ;
+        }
+
+        bb.flip();
+        try(final var fos = new FileOutputStream(destination);
+            final FileChannel fc = fos.getChannel();) {
+            fc.write(bb);
+        }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        assertTrue(frameCount(destination.toURI()) > 1000);
+        assertTrue(calledSeek.get());
     }
 
     @Test
@@ -448,7 +666,7 @@ public class TestFfmpeg2 extends BaseTest {
         ) {
 
             encoder
-                .outputStream(destination.getAbsolutePath())
+                .muxer(destination.getAbsolutePath())
                 .openVideoEncoder("mjpeg", "first")
                 .encodingContext()
 
@@ -505,23 +723,29 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(destination.isFile());
         assertTrue(destination.length() > 0);
 
-        if(SHOW) {
-            try(final ImageDisplay id = new ImageDisplay.Builder().build();
-                final StreamContext c = Ffmpeg2.createStreamContext();) {
-                c
-                    .createMediaDataSource(destination.toURI())
-                    .openChain("default")
-                    .createFirstVideoStreamSelector()
-                    .createVideoFrameProcessor(f -> {
+        assertTrue(frameCount(destination.toURI()) > 250);
+    }
+
+    private static long frameCount(final URI uri) {
+        final MutableInt ret = new MutableInt(0);
+        try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
+            final StreamContext c = Ffmpeg2.createStreamContext();) {
+            c
+                .createMediaDataSource(uri)
+                .openChain("default")
+                .createFirstVideoStreamSelector()
+                .createVideoFrameProcessor(f -> {
+                    if(id != null) {
                         try(final CvMat rgb = f.bgr(false);) {
                             id.update(rgb);
                         }
-                    })
-                    .streamContext()
-                    // .optionally(sync, s -> s.sync())
-                    .play();
-            }
+                    }
+                    ret.val++;
+                })
+                .streamContext()
+                // .optionally(sync, s -> s.sync())
+                .play();
         }
-
+        return ret.val;
     }
 }

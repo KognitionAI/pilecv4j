@@ -22,10 +22,12 @@ namespace ffmpeg
  * For custom IO, this will be responsible for reading bytes from the stream
  */
 typedef uint64_t (*write_buffer)(int32_t numBytes);
+typedef int64_t (*seek_buffer_out)(int64_t offset, int whence);
 
 #ifdef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
 class DefaultMuxer;
-static int write_packet_to_custom_source(void *opaque, uint8_t *buf, int buf_size);
+static int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size);
+static int64_t seek_in_custom_output(void *opaque, int64_t offset, int whence);
 static inline void* fetchBuffer(DefaultMuxer*);
 #endif
 
@@ -48,29 +50,37 @@ class DefaultMuxer: public Muxer
   uint8_t* ioBuffer = nullptr;
   uint8_t* ioBufferToWriteToJava;
   write_buffer dataSupplyCallback = nullptr;
+  seek_buffer_out seekCallback = nullptr;
 
   bool closed = false;
   AVFormatContext* output_format_context = nullptr;
+  bool createdStreams = false;
+  bool readyCalled = false;
 
 #ifdef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
-  friend int write_packet_to_custom_source(void *opaque, uint8_t *buf, int buf_size);
+  friend int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size);
+  friend int64_t seek_in_custom_output(void *opaque, int64_t offset, int whence);
   friend void* fetchBuffer(DefaultMuxer*);
 #endif
 
   void cleanup(bool writeTrailer);
   uint64_t allocateOutputContext(AVFormatContext **);
 
+  inline bool seekable() {
+    return seekCallback != nullptr;
+  }
+
 public:
-  inline DefaultMuxer(const char* pfmt, const char* poutputUri, write_buffer callback) :
+  inline DefaultMuxer(const char* pfmt, const char* poutputUri, write_buffer callback, seek_buffer_out seek) :
      fmt(pfmt == nullptr ? "" : pfmt), fmtNull(pfmt == nullptr),
      outputUri(poutputUri == nullptr ? "" : poutputUri), outputUriNull(poutputUri == nullptr),
-     dataSupplyCallback(callback) {
+     dataSupplyCallback(callback), seekCallback(seek) {
     ioBufferToWriteToJava = callback ? (uint8_t*)malloc(PCV4J_CUSTOMIO_OUTPUT_BUFSIZE * sizeof(uint8_t)) : nullptr;
   }
 
   virtual ~DefaultMuxer();
 
-  virtual uint64_t open(AVDictionary** opts);
+  virtual uint64_t open();
 
   inline virtual AVFormatContext* getFormatContext() {
     return output_format_context;

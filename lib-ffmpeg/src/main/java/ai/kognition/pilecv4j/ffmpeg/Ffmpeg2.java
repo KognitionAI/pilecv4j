@@ -374,7 +374,7 @@ public class Ffmpeg2 {
         }
 
         public MediaProcessingChain createRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
-            final MediaOutput output = new MediaOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(fmt, outputUri, null));
+            final Muxer output = new Muxer(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(fmt, outputUri, null, null));
             return manage(new MediaProcessorWithCustomOutput(FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, maxRemuxErrorCount), output));
         }
 
@@ -390,47 +390,20 @@ public class Ffmpeg2 {
             return createRemuxer(null, outputUri, DEFAULT_MAX_REMUX_ERRORS);
         }
 
-        private static class CustomOutput extends MediaOutput {
-            // ======================================================================
-            // JNA will only hold a weak reference to the callbacks passed in
-            // so if we dynamically allocate them then they will be garbage collected.
-            // In order to prevent that, we're keeping strong references to them.
-            // These are not private in order to avoid any possibility that the
-            // JVM optimized them out since they aren't read anywhere in this code.
-            @SuppressWarnings("unused") public write_buffer_callback strongRefW = null;
-            // ======================================================================
-
-            private CustomOutput(final long nativeRef, final write_buffer_callback write) {
-                super(nativeRef);
-                strongRefW = write;
-            }
-
-            private ByteBuffer customBuffer() {
-                final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_buffer(nativeRef);
-                final int bufSize = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_bufferSize(nativeRef);
-                return value.getByteBuffer(0, bufSize);
-            }
-        }
-
-        private static class Wbc implements write_buffer_callback {
-            ByteBuffer bb;
-            final WritePacket writer;
-
-            private Wbc(final WritePacket writer) {
-                this.writer = writer;
-            }
-
-            @Override
-            public long write_buffer(final int numBytesToWrite) {
-                writer.handle(bb, numBytesToWrite);
-                return 0L;
-            }
-        }
-
         public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer) {
-            final Wbc wbc = new Wbc(writer);
+            return createRemuxer(outputFormat, writer, null);
+        }
 
-            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(outputFormat, null, wbc), wbc);
+        public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer, final MediaDataSeek seek) {
+            final Wbc wbc = new Wbc(writer);
+            final seek_buffer_callback sbcb = seek != null ? new seek_buffer_callback() {
+                @Override
+                public long seek_buffer(final long offset, final int whence) {
+                    return seek.seekBuffer(offset, whence);
+                }
+            } : null;
+
+            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(outputFormat, null, wbc, sbcb), wbc, sbcb);
 
             final var remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, DEFAULT_MAX_REMUX_ERRORS);
 
@@ -522,13 +495,13 @@ public class Ffmpeg2 {
     }
 
     private static class MediaProcessorWithCustomOutput extends MediaProcessor {
-        private final MediaOutput output;
+        private final Muxer output;
 
         private MediaProcessorWithCustomOutput(final long nativeRef) {
             this(nativeRef, null);
         }
 
-        private MediaProcessorWithCustomOutput(final long nativeRef, final MediaOutput output) {
+        private MediaProcessorWithCustomOutput(final long nativeRef, final Muxer output) {
             super(nativeRef);
             this.output = output;
         }
@@ -542,10 +515,10 @@ public class Ffmpeg2 {
         }
     }
 
-    private static class MediaOutput implements QuietCloseable {
+    private static class Muxer implements QuietCloseable {
         final long nativeRef;
 
-        private MediaOutput(final long nativeRef) {
+        private Muxer(final long nativeRef) {
             this.nativeRef = nativeRef;
         }
 
@@ -1213,18 +1186,48 @@ public class Ffmpeg2 {
         private final long nativeRef;
         private final LinkedList<QuietCloseable> toClose = new LinkedList<>();
         private final Map<String, VideoEncoder> encoders = new HashMap<>();
+        private Muxer output = null;
 
         private EncodingContext(final long nativeRef) {
             this.nativeRef = nativeRef;
         }
 
-        public EncodingContext outputStream(final String fmt, final String outputUri) {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_setOutput(nativeRef, fmt, outputUri));
+        public EncodingContext muxer(final String fmt, final String outputUri) {
+            if(output != null)
+                throw new IllegalStateException("Muxer already set");
+            output = new Muxer(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(fmt, outputUri, null, null));
+            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_setMuxer(nativeRef, output.nativeRef));
             return this;
         }
 
-        public EncodingContext outputStream(final String outputUri) {
-            return outputStream(null, outputUri);
+        public EncodingContext muxer(final String outputUri) {
+            return muxer(null, outputUri);
+        }
+
+        public EncodingContext muxer(final String outputFormat, final WritePacket writer) {
+            return muxer(outputFormat, writer, null);
+        }
+
+        public EncodingContext muxer(final String outputFormat, final WritePacket writer, final MediaDataSeek seek) {
+            final Wbc wbc = new Wbc(writer);
+            final seek_buffer_callback sbcb = seek != null ? new seek_buffer_callback() {
+                @Override
+                public long seek_buffer(final long offset, final int whence) {
+                    return seek.seekBuffer(offset, whence);
+                }
+            } : null;
+
+            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(outputFormat, null, wbc, sbcb), wbc, sbcb);
+
+            // violation of the rule that objects should be usable once the constructor returns ... oh well,
+            // at least it's private. The fix for this would be to have the Wbc hold the CustomOutput rather than
+            // the other way around but ... not right now.
+            wbc.bb = output.customBuffer();
+
+            this.output = output;
+            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_setMuxer(nativeRef, this.output.nativeRef));
+
+            return this;
         }
 
         public VideoEncoder openVideoEncoder(final String codec, final String name) {
@@ -1260,6 +1263,10 @@ public class Ffmpeg2 {
             ignore(() -> stop(), re -> LOGGER.error("Failed on stopping the EncodingContext", re));
 
             toClose.forEach(q -> q.close());
+
+            // output should be closed ONLY after the video encoders
+            if(output != null)
+                output.close();
 
             if(nativeRef != 0)
                 FfmpegApi2.pcv4j_ffmpeg2_encodingContext_delete(nativeRef);
@@ -1329,4 +1336,44 @@ public class Ffmpeg2 {
                 .getString(0);
         }
     }
+
+    private static class CustomOutput extends Muxer {
+        // ======================================================================
+        // JNA will only hold a weak reference to the callbacks passed in
+        // so if we dynamically allocate them then they will be garbage collected.
+        // In order to prevent that, we're keeping strong references to them.
+        // These are not private in order to avoid any possibility that the
+        // JVM optimized them out since they aren't read anywhere in this code.
+        @SuppressWarnings("unused") public write_buffer_callback strongRefW = null;
+        @SuppressWarnings("unused") public seek_buffer_callback strongRefS = null;
+        // ======================================================================
+
+        private CustomOutput(final long nativeRef, final write_buffer_callback write, final seek_buffer_callback sbcb) {
+            super(nativeRef);
+            strongRefW = write;
+            strongRefS = sbcb;
+        }
+
+        private ByteBuffer customBuffer() {
+            final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_buffer(nativeRef);
+            final int bufSize = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_bufferSize(nativeRef);
+            return value.getByteBuffer(0, bufSize);
+        }
+    }
+
+    private static class Wbc implements write_buffer_callback {
+        ByteBuffer bb;
+        final WritePacket writer;
+
+        private Wbc(final WritePacket writer) {
+            this.writer = writer;
+        }
+
+        @Override
+        public long write_buffer(final int numBytesToWrite) {
+            writer.handle(bb, numBytesToWrite);
+            return 0L;
+        }
+    }
+
 }

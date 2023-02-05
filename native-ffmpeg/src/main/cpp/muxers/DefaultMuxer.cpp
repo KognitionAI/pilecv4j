@@ -36,7 +36,7 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 /**
  * AV compliant callback for custom IO.
  */
-static int write_packet_to_custom_source(void *opaque, uint8_t *buf, int buf_size) {
+static int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size) {
   PILECV4J_TRACE;
   DefaultMuxer const* c = (DefaultMuxer*)opaque;
   void* bufForCallback = c->ioBufferToWriteToJava;
@@ -45,6 +45,16 @@ static int write_packet_to_custom_source(void *opaque, uint8_t *buf, int buf_siz
   uint64_t ret = static_cast<int32_t>((*callback)(buf_size));
   llog(TRACE, "Result of writing %d bytes to Java: %ld", buf_size, (long)ret);
   return buf_size;
+}
+
+static int64_t seek_in_custom_output(void *opaque, int64_t offset, int whence) {
+  PILECV4J_TRACE;
+  DefaultMuxer const* c = (DefaultMuxer*)opaque;
+  const seek_buffer_out seek = c->seekCallback;
+
+  int64_t ret = (*seek)(offset, whence);
+  llog(DEBUG, "seeking to %ld from 0x%x, results: %ld", (long)offset, (int)whence, (long)ret);
+  return ret;
 }
 
 DefaultMuxer::~DefaultMuxer() {
@@ -69,16 +79,18 @@ uint64_t DefaultMuxer::close() {
 }
 
 void DefaultMuxer::cleanup(bool writeTrailer) {
+  PILECV4J_TRACE;
 
   // This will free the output_format_context
   if (output_format_context) {
-    if (writeTrailer) {
+    if (writeTrailer && readyCalled) {
       llog(TRACE, "Writing trailer");
       //https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga7f14007e7dc8f481f054b21614dfec13
       av_write_trailer(output_format_context);
     }
 
     if (cleanupIoContext) {
+      llog(TRACE, "Closing custom avio");
       cleanupIoContext = false;
       avio_closep(&output_format_context->pb);
       output_format_context->pb = nullptr;
@@ -134,14 +146,9 @@ uint64_t DefaultMuxer::allocateOutputContext(AVFormatContext** ofcpp) {
   return 0;
 }
 
-uint64_t DefaultMuxer::open(AVDictionary** opts) {
+uint64_t DefaultMuxer::open() {
   PILECV4J_TRACE;
   uint64_t iret = 0;
-
-  if (isError(iret = allocateOutputContext(&output_format_context))) {
-    llog(ERROR, "Failed to allocate the output context for muxing");
-    return iret;
-  }
 
   // either the dataSupplyCallback is null and the outputUri is set, or
   // the dataSupplyCallback is not null and the outputUri may or may not be set.
@@ -153,6 +160,12 @@ uint64_t DefaultMuxer::open(AVDictionary** opts) {
     llog(ERROR, "Cannot open an output without setting either the write callback or the output uri or both");
     return MAKE_P_STAT(NO_OUTPUT);
   }
+
+  if (isError(iret = allocateOutputContext(&output_format_context))) {
+    llog(ERROR, "Failed to allocate the output context for muxing");
+    return iret;
+  }
+
   return 0;
 }
 
@@ -168,6 +181,11 @@ uint64_t DefaultMuxer::ready() {
 
   // if we're doing custom output ...
   if (dataSupplyCallback) {
+    if (isEnabled(TRACE)) {
+      llog(TRACE, "Custom output using the callback at %" PRId64, (uint64_t)dataSupplyCallback);
+      if (seekable())
+        llog(TRACE, "  ... and a seek callback at %" PRId64, (uint64_t)seekCallback);
+    }
     // check if open was called already
     if (ioBuffer != nullptr) {
       llog(ERROR, "It appears the open has been called twice on the CustomOutputRemuxer");
@@ -182,8 +200,8 @@ uint64_t DefaultMuxer::ready() {
     // So we're assuming that if the formatCtx->pb is set then the url can be null
     ioContext = avio_alloc_context(ioBuffer,PCV4J_CUSTOMIO_OUTPUT_BUFSIZE,AVIO_FLAG_WRITE,this,
         nullptr,
-        write_packet_to_custom_source,
-        nullptr);
+        write_packet_to_custom_output,
+        seekable() ? seek_in_custom_output : nullptr);
 
     // setup the AVFormatContext for the custom io. See above note.
     llog(TRACE, "AVFMT_NOFILE set: %s", (output_format_context->flags & AVFMT_NOFILE) ? "true" : "false");
@@ -208,11 +226,12 @@ uint64_t DefaultMuxer::ready() {
   // https://ffmpeg.org/doxygen/trunk/group__lavf__encoding.html#ga18b7b10bb5b94c4842de18166bc677cb
   ret = avformat_write_header(output_format_context, nullptr);
   if (ret < 0) {
-    llog(ERROR, "Error occurred when opening output file\n");
+    llog(ERROR, "Error occurred when writing the header to the output");
     fail();
     return MAKE_AV_STAT(ret);
   }
 
+  readyCalled = true;
   return 0;
 }
 
@@ -222,7 +241,10 @@ uint64_t DefaultMuxer::createNextStream(AVCodecParameters* codecPars, AVStream**
     return MAKE_P_STAT(NO_OUTPUT);
   }
 
-  return createStreamFromCodecParams(output_format_context, codecPars, out);
+  uint64_t ret = createStreamFromCodecParams(output_format_context, codecPars, out);
+  if (!isError(ret))
+    createdStreams = true;
+  return ret;
 }
 
 uint64_t DefaultMuxer::createNextStream(AVCodec* codec, AVStream** out) {
@@ -231,7 +253,10 @@ uint64_t DefaultMuxer::createNextStream(AVCodec* codec, AVStream** out) {
     return MAKE_P_STAT(NO_OUTPUT);
   }
 
-  return createStreamFromCodec(output_format_context, codec, out);
+  uint64_t ret = createStreamFromCodec(output_format_context, codec, out);
+  if (!isError(ret))
+    createdStreams = true;
+  return ret;
 }
 
 
@@ -239,9 +264,9 @@ uint64_t DefaultMuxer::createNextStream(AVCodec* codec, AVStream** out) {
 // Everything here in this extern "C" section is callable from Java
 //========================================================================
 extern "C" {
-  KAI_EXPORT uint64_t pcv4j_ffmpeg2_defaultMuxer_create(const char* pfmt, const char* poutputUri, write_buffer callback) {
+  KAI_EXPORT uint64_t pcv4j_ffmpeg2_defaultMuxer_create(const char* pfmt, const char* poutputUri, write_buffer callback, seek_buffer_out seek) {
     PILECV4J_TRACE;
-    Muxer* ret = new DefaultMuxer(pfmt, poutputUri, callback);
+    Muxer* ret = new DefaultMuxer(pfmt, poutputUri, callback, seek);
     return (uint64_t)ret;
   }
 

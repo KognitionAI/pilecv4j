@@ -226,7 +226,8 @@ public class FfmpegApi2 {
 
     public static native void pcv4j_ffmpeg2_muxer_delete(final long outputRef);
 
-    public static native long pcv4j_ffmpeg2_defaultMuxer_create(final String pfmt, final String poutputUri, final write_buffer_callback callback);
+    public static native long pcv4j_ffmpeg2_defaultMuxer_create(final String pfmt, final String poutputUri, final write_buffer_callback callback,
+        seek_buffer_callback seek);
 
     public static native Pointer pcv4j_ffmpeg2_defaultMuxer_buffer(final long ctx);
 
@@ -295,7 +296,7 @@ public class FfmpegApi2 {
 
     public native static void pcv4j_ffmpeg2_encodingContext_delete(final long nativeDef);
 
-    public native static long pcv4j_ffmpeg2_encodingContext_setOutput(final long nativeDef, final String fmt, final String uri);
+    public native static long pcv4j_ffmpeg2_encodingContext_setMuxer(final long nativeDef, long muxerRef);
 
     public native static long pcv4j_ffmpeg2_encodingContext_openVideoEncoder(final long encCtxRef, final String video_codec);
 
@@ -409,7 +410,4 @@ public class FfmpegApi2 {
     public static interface get_frame_callback extends Callback {
         public long get_frame();
     }
-
-    // public static native void startme(long matRef, int isRgb, get_frame_callback cb);
-
 }
