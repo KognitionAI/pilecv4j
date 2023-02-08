@@ -69,7 +69,7 @@ public:
     seekCallback = pseekCallback;
   }
 
-  virtual uint64_t open(AVFormatContext* preallocatedAvFormatCtx, AVDictionary** options);
+  virtual uint64_t open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** options);
 
   virtual inline std::string toString() {
     return StringFormat("CustomFormat(%" PRId64 ", %" PRId64 ")", (uint64_t)dataSupplyCallback, (uint64_t)seekCallback);

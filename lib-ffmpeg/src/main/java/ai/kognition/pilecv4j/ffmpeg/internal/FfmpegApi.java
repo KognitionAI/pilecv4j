@@ -36,8 +36,8 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageAPI;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
 
-public class FfmpegApi2 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FfmpegApi2.class);
+public class FfmpegApi {
+    private static final Logger LOGGER = LoggerFactory.getLogger(FfmpegApi.class);
 
     public static final AtomicBoolean inited = new AtomicBoolean(false);
     public static final String LIBNAME = "ai.kognition.pilecv4j.ffmpeg";
@@ -116,6 +116,18 @@ public class FfmpegApi2 {
     public static interface packet_filter_callback extends Callback {
         public int packet_filter(final int mediaType, final int stream_index, final int packetNumBytes, final int isKeyFrame, final long pts, final long dts,
             final int tbNum, final int tbDen);
+    }
+
+    // ==========================================================
+    // Segmented Muxer callback declarations
+    // ==========================================================
+    public static interface create_muxer_from_java_callback extends Callback {
+        public long next_muxer(final long muxerNumber, LongByReference muxerOut);
+    }
+
+    public static interface should_close_segment_callback extends Callback {
+        public int should_close_segment(int mediaType, int stream_index, int packetNumBytes,
+            int isKeyFrame, long pts, long dts, int tbNum, int tbDen);
     }
 
     // ==========================================================
@@ -232,6 +244,9 @@ public class FfmpegApi2 {
     public static native Pointer pcv4j_ffmpeg2_defaultMuxer_buffer(final long ctx);
 
     public static native int pcv4j_ffmpeg2_defaultMuxer_bufferSize(final long ctx);
+
+    public static native long pcv4j_ffmpeg2_segmentedMuxer_create(final create_muxer_from_java_callback create_muxer_callback,
+        final should_close_segment_callback ssc_callback);
 
     // ==========================================================
     // MediaProcessorChain methods

@@ -5,9 +5,9 @@
  *      Author: jim
  */
 
-#define __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
+#define __INSIDE_DEFAULT_MUXER_SOURCE_CPP
 #include <muxers/DefaultMuxer.h>
-#undef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
+#undef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
 
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
@@ -186,9 +186,9 @@ uint64_t DefaultMuxer::ready() {
       if (seekable())
         llog(TRACE, "  ... and a seek callback at %" PRId64, (uint64_t)seekCallback);
     }
-    // check if open was called already
+    // check if ready was called already
     if (ioBuffer != nullptr) {
-      llog(ERROR, "It appears the open has been called twice on the CustomOutputRemuxer");
+      llog(ERROR, "It appears the ready has been called twice on the DefaultMuxer");
       fail();
       return MAKE_P_STAT(ALREADY_SET);
     }
@@ -235,30 +235,46 @@ uint64_t DefaultMuxer::ready() {
   return 0;
 }
 
-uint64_t DefaultMuxer::createNextStream(AVCodecParameters* codecPars, AVStream** out) {
+uint64_t DefaultMuxer::createNextStream(AVCodecParameters* codecPars, int* stream_index_out) {
   if (!output_format_context) {
     llog(ERROR, "Cannot create a stream without a valid output_format_context already having been created. Did 'open' succeed?");
     return MAKE_P_STAT(NO_OUTPUT);
   }
 
-  uint64_t ret = createStreamFromCodecParams(output_format_context, codecPars, out);
-  if (!isError(ret))
+  AVStream* stream = nullptr;
+  uint64_t ret = createStreamFromCodecParams(output_format_context, codecPars, &stream);
+  if (!isError(ret)){
     createdStreams = true;
+    if (stream_index_out)
+      *stream_index_out = stream->index;
+  }
   return ret;
 }
 
-uint64_t DefaultMuxer::createNextStream(AVCodec* codec, AVStream** out) {
+uint64_t DefaultMuxer::createNextStream(AVCodecContext* codecc, int* stream_index_out) {
   if (!output_format_context) {
     llog(ERROR, "Cannot create a stream without a valid output_format_context already having been created. Did 'open' succeed?");
     return MAKE_P_STAT(NO_OUTPUT);
   }
 
-  uint64_t ret = createStreamFromCodec(output_format_context, codec, out);
-  if (!isError(ret))
+  AVStream* stream = nullptr;
+  uint64_t ret = createStreamFromCodec(output_format_context, codecc, &stream);
+  if (!isError(ret)) {
     createdStreams = true;
+    if (stream_index_out)
+      *stream_index_out = stream->index;
+
+    // copy the timebase from the codec context as a suggestion to the muxer when ready/avformat_write_header
+    // which may very well modify it
+    stream->time_base = codecc->time_base;
+
+    // set the codecpar on the stream from the codec context
+    ret = MAKE_AV_STAT(avcodec_parameters_from_context(stream->codecpar, codecc));
+    if (isError(ret))
+      llog(ERROR, "could not fill codec parameters");
+  }
   return ret;
 }
-
 
 //========================================================================
 // Everything here in this extern "C" section is callable from Java

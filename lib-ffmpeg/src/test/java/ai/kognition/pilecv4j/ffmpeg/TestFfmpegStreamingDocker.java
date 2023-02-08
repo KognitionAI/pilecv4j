@@ -34,9 +34,9 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
@@ -55,7 +55,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
         Thread.sleep(100);
 
-        try(final StreamContext c = Ffmpeg2.createStreamContext();
+        try(final StreamContext c = Ffmpeg.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
 
             final AtomicBoolean checkerFailed = new AtomicBoolean(false);
@@ -70,7 +70,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
                 .peek(sc -> sc.load())
                 .peek(sc -> checkerLatch.countDown())
                 .openChain("default")
-                .createRemuxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
+                .createRemuxer(Muxer.create("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id"))
                 .streamContext()
                 .sync()
                 .play();
@@ -88,8 +88,8 @@ public class TestFfmpegStreamingDocker extends BaseTest {
         Thread.sleep(100);
 
         try(
-            final EncodingContext encoder = Ffmpeg2.createEncoder();
-            final StreamContext ctx = Ffmpeg2.createStreamContext();
+            final EncodingContext encoder = Ffmpeg.createEncoder();
+            final StreamContext ctx = Ffmpeg.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
@@ -102,7 +102,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
             final Thread checker = startChecker(id, rtmpPort, numFrames, checkerLatch, () -> triggerWhenDone.set(true), finishedSuccessfully, checkerFailed);
 
             encoder
-                .muxer("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id")
+                .muxer(Muxer.create("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id"))
                 .openVideoEncoder("libx264", "default")
                 .addCodecOptions("profile", "baseline")
                 .addCodecOptions("preset", "ultrafast")
@@ -164,7 +164,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
                 ignore(() -> Thread.sleep(1000));
 
-                try(final StreamContext sc = Ffmpeg2.createStreamContext();) {
+                try(final StreamContext sc = Ffmpeg.createStreamContext();) {
 
                     sc
                         .addOption("flags", "low_delay")

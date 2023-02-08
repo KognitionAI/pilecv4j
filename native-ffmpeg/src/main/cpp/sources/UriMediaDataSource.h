@@ -30,7 +30,7 @@ public:
 
   virtual ~UriMediaDataSource() = default;
 
-  virtual uint64_t open(AVFormatContext* preallocatedAvFormatCtx, AVDictionary** options);
+  virtual uint64_t open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** options);
 
   inline std::string toString() {
     return uriNull ? "null" : uri;

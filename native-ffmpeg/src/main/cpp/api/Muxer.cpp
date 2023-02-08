@@ -39,7 +39,13 @@ uint64_t Muxer::createStreamFromCodecParams(AVFormatContext* output_format_conte
   return 0;
 }
 
-uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, AVCodec* codec, AVStream** out) {
+uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, AVCodecContext* codecc, AVStream** out) {
+  const AVCodec* codec = codecc->codec;
+  if (!codec) {
+    log(ERROR, COMPONENT, "The AVCodecContext at %" PRId64 " doesn't have the codec set.", (uint64_t)codecc);
+    return MAKE_P_STAT(NO_SUPPORTED_CODEC);
+  }
+
   AVStream* out_stream = avformat_new_stream(output_format_context, codec);
   if (!out_stream) {
     log(ERROR, COMPONENT, "Failed allocating output stream");
@@ -50,6 +56,45 @@ uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, AV
   if (out)
     *out = out_stream;
   return 0;
+}
+
+uint64_t Muxer::writePacket(const AVPacket* inPacket, const AVRational& time_base, int output_stream_index) {
+  AVFormatContext* output_format_context = getFormatContext();
+  AVStream* out_stream = output_format_context->streams[output_stream_index];
+  AVPacket* pPacket = av_packet_clone(inPacket);
+  if (!pPacket) {
+    log(ERROR, COMPONENT, "Failed to clone a packet");
+    return MAKE_AV_STAT(AVERROR_UNKNOWN);
+  }
+
+  pPacket->stream_index = output_stream_index;
+  // https://ffmpeg.org/doxygen/trunk/structAVPacket.html#ab5793d8195cf4789dfb3913b7a693903
+  pPacket->pos = -1;
+
+  // ======================================================================================
+  // adjust the packet timing
+  if (pPacket->pts == AV_NOPTS_VALUE) {
+    if (!loggedPacketPtsDtsMissingAlready) {
+      log(WARN, COMPONENT, "Packet has no pts/dts set. It will be sent as is to the output");
+      loggedPacketPtsDtsMissingAlready = true;
+    }
+  } else {
+//    if (isEnabled(TRACE))
+//      log(TRACE, COMPONENT, "in tb = %d/%d, out = %d/%d", time_base.num, time_base.den, out_stream->time_base.num, out_stream->time_base.den);
+    pPacket->pts = av_rescale_q_rnd(pPacket->pts, time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+    pPacket->dts = av_rescale_q_rnd(pPacket->dts, time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+    pPacket->duration = av_rescale_q(pPacket->duration, time_base, out_stream->time_base);
+  }
+  // ======================================================================================
+
+  if (isEnabled(TRACE))
+    logPacket(TRACE, COMPONENT, "Rescaled Packet", pPacket, output_format_context);
+
+  int ret = writePacket(pPacket);
+  av_packet_free(&pPacket);
+  if (ret < 0)
+    log(ERROR, COMPONENT, "Error muxing packet \"%s\"", av_err2str(ret));
+  return MAKE_AV_STAT(ret);
 }
 
 //========================================================================

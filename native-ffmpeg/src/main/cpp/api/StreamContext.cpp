@@ -24,7 +24,8 @@ namespace pilecv4j
 namespace ffmpeg
 {
 
-#define COMPONENT "STRC"
+#define COMPONENT "SCTX"
+#define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
 TIME_DECL(read_frame);
 TIME_DECL(hande_packet);
@@ -49,6 +50,7 @@ static uint64_t process_packets(StreamContext* ctx);
 // ===========================================================
 
 uint64_t StreamContext::open() {
+  PILECV4J_TRACE;
 #ifdef PILECV4J_FFMPEG_DEVICE_SUPPORT
   avdevice_register_all();
 #endif
@@ -57,7 +59,7 @@ uint64_t StreamContext::open() {
 
   if (state != FRESH) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)FRESH, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (!isSourceSet())
@@ -69,33 +71,42 @@ uint64_t StreamContext::open() {
   // This should be impossible given the state management but if something odd happens
   // and the header has already been loaded then we can't open another (or the same) stream
   if (formatCtx) // if the formatCtx isn't null then this can't be in the FRESH state ... but belt-n-suspenders and all
-    return MAKE_P_STAT(STREAM_IN_USE);
+    return MAKE_P_STAT(IN_USE);
 
   formatCtx = avformat_alloc_context();
 
   {
     AVDictionary* opts = nullptr;
-    buildOptions(options, &opts);
-    rc = mediaDataSource->open(formatCtx, &opts);
+    llog(TRACE, "number of options set in StreamContext::open: %d", (int)options.size());
+    uint64_t iret = 0;
+    if (isError(iret = buildOptions(options, &opts))) {
+      llog(ERROR, "Failed setting build options: %" PRId64 ", %s", iret, errMessage(iret));
+      return iret;
+    }
+    rc = mediaDataSource->open(&formatCtx, &opts);
     if (opts != nullptr)
       av_dict_free(&opts);
   }
 
   if (!isError(rc))
     state = OPEN;
-  else // if open returned an error then it's required to free the AVFormatContext
+  else { // if open returned an error then it's required to free the AVFormatContext
+    if (formatCtx)
+      avformat_free_context(formatCtx);
     formatCtx = nullptr;
+  }
   // =====================================================
 
   return rc;
 }
 
 uint64_t StreamContext::load() {
+  PILECV4J_TRACE;
   advanceStateTo(OPEN);
 
   if (state != OPEN) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)OPEN, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   // read's the stream data into the format
@@ -122,27 +133,28 @@ uint64_t StreamContext::load() {
   return 0;
 }
 
-
 uint64_t StreamContext::getStreamDetails(StreamDetails** ppdetails, int* nb) {
+  PILECV4J_TRACE;
   if (state < LOADED) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been AT LEAST %d but it's in %d.", (int)LOADED, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (state > PLAYING) {
     llog(ERROR, "StreamContext is in the wrong state. It can't be higher than %d but it's in %d.", (int)PLAYING, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   return StreamDetails::fillStreamDetails(formatCtx, ppdetails, nb);
 }
 
 uint64_t StreamContext::setupProcessors() {
+  PILECV4J_TRACE;
   advanceStateTo(LOADED);
 
   if (state != LOADED) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)LOADED, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (mediaProcessors.size() == 0)
@@ -160,6 +172,7 @@ uint64_t StreamContext::setupProcessors() {
 }
 
 uint64_t StreamContext::getStream(int streamIndex, AVStream** streamOut) {
+  PILECV4J_TRACE;
   if (!streamOut) {
     llog(ERROR, "NULL parameter 'streamOut'");
     return MAKE_P_STAT(NULL_PARAMETER);
@@ -183,6 +196,7 @@ uint64_t StreamContext::getStream(int streamIndex, AVStream** streamOut) {
 }
 
 uint64_t StreamContext::numStreams(int* numStreamsOut) {
+  PILECV4J_TRACE;
   if (!numStreamsOut) {
     llog(ERROR, "NULL parameter 'numStreamsOut'");
     return MAKE_P_STAT(NULL_PARAMETER);
@@ -199,6 +213,7 @@ uint64_t StreamContext::numStreams(int* numStreamsOut) {
 }
 
 uint64_t StreamContext::getCodecTag(AVCodecID codecId, unsigned int* tagOut) {
+  PILECV4J_TRACE;
   if (!tagOut) {
     llog(ERROR, "NULL parameter 'tagOut'");
     return MAKE_P_STAT(NULL_PARAMETER);
@@ -215,9 +230,10 @@ uint64_t StreamContext::getCodecTag(AVCodecID codecId, unsigned int* tagOut) {
 }
 
 uint64_t StreamContext::advanceStateTo(StreamContextState toAdvanceTo) {
+  PILECV4J_TRACE;
   if (toAdvanceTo < state) {
     llog(ERROR, "StreamContext is in the wrong state. Cannot advance to %d when it's already in %d.", (int)toAdvanceTo, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (toAdvanceTo == state)
@@ -236,7 +252,7 @@ uint64_t StreamContext::advanceStateTo(StreamContextState toAdvanceTo) {
 
     if (state != OPEN) {
       llog(ERROR, "Open did not result in an OPEN state.");
-      return MAKE_P_STAT(STREAM_BAD_STATE);
+      return MAKE_P_STAT(BAD_STATE);
     }
 
     if (toAdvanceTo == state)
@@ -255,7 +271,7 @@ uint64_t StreamContext::advanceStateTo(StreamContextState toAdvanceTo) {
 
     if (state != LOADED) {
       llog(ERROR, "Load did not result in a LOADED state.");
-      return MAKE_P_STAT(STREAM_BAD_STATE);
+      return MAKE_P_STAT(BAD_STATE);
     }
 
     if (toAdvanceTo == state)
@@ -274,7 +290,7 @@ uint64_t StreamContext::advanceStateTo(StreamContextState toAdvanceTo) {
 
     if (state != PROCESSORS_SETUP) {
       llog(ERROR, "setupProcessors did not result in a PROCESSORS_SETUP state.");
-      return MAKE_P_STAT(STREAM_BAD_STATE);
+      return MAKE_P_STAT(BAD_STATE);
     }
 
     if (toAdvanceTo == state)
@@ -283,10 +299,11 @@ uint64_t StreamContext::advanceStateTo(StreamContextState toAdvanceTo) {
   // =====================================================
 
   llog(ERROR, "Cannot use advanceState to advance beyond PROCESSORS_SETUP (%d)", (int)PROCESSORS_SETUP);
-  return MAKE_P_STAT(STREAM_BAD_STATE);
+  return MAKE_P_STAT(BAD_STATE);
 }
 
 uint64_t StreamContext::play() {
+  PILECV4J_TRACE;
 
   uint64_t rc = 0;
 
@@ -304,13 +321,15 @@ uint64_t StreamContext::play() {
 }
 
 uint64_t StreamContext::stop() {
+  PILECV4J_TRACE;
+
   if (isEnabled(TRACE))
     llog(TRACE,"Stopping with a current state of %d", (int) state);
   if (state >= STOPPING)
     return 0;
   if (state != PLAYING) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)PLAYING, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
   state = STOPPING;
   stopMe = true;
@@ -338,6 +357,7 @@ KAI_EXPORT void pcv4j_ffmpeg2_timings() {
 
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_create() {
+  PILECV4J_TRACE;
   uint64_t ret = (uint64_t) new StreamContext();
   if (isEnabled(TRACE))
     llog(TRACE, "Creating new StreamContext: %" PRId64, ret);
@@ -345,6 +365,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_create() {
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_streamContext_delete(uint64_t ctx) {
+  PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "Deleting StreamContext: %" PRId64, ctx);
   StreamContext* c = (StreamContext*)ctx;
@@ -352,6 +373,7 @@ KAI_EXPORT void pcv4j_ffmpeg2_streamContext_delete(uint64_t ctx) {
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_setSource(uint64_t ctx, uint64_t mediaDataSource) {
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   MediaDataSource* vds = (MediaDataSource*)mediaDataSource;
   llog(DEBUG, "Setting source to %s", vds == nullptr ? "null" : PO(vds->toString().c_str()) );
@@ -359,6 +381,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_setSource(uint64_t ctx, uint64_t
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_addProcessor(uint64_t ctx, uint64_t mediaProcessor) {
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   MediaProcessor* vds = (MediaProcessor*)mediaProcessor;
   llog(DEBUG, "Adding processor at %" PRId64 " to StreamContext at %" PRId64, mediaProcessor, ctx);
@@ -366,12 +389,14 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_addProcessor(uint64_t ctx, uint6
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_addOption(uint64_t ctx, const char* key, const char* value) {
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   llog(INFO, "Setting option \"%s\" = \"%s\"",key,value);
   return c->addOption(key, value);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx){
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   if (isEnabled(TRACE))
     llog(TRACE,"Stopping with a current state of %d", (int) c->state);
@@ -379,7 +404,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx){
     return 0;
   if (c->state != PLAYING) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)PLAYING, (int)c->state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
   c->state = STOPPING;
   c->stopMe = true;
@@ -387,6 +412,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx){
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_streamContext_sync(uint64_t ctx){
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   if (isEnabled(DEBUG))
     llog(DEBUG,"Setting stream %" PRId64 " to synchronous.", ctx);
@@ -395,11 +421,13 @@ KAI_EXPORT void pcv4j_ffmpeg2_streamContext_sync(uint64_t ctx){
 }
 
 KAI_EXPORT uint32_t pcv4j_ffmpeg2_streamContext_state(uint64_t ctx) {
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   return (int32_t) c->state;
 }
 
 KAI_EXPORT StreamDetails* pcv4j_ffmpeg2_streamContext_getStreamDetails(uint64_t ctx, int32_t* numResults, uint64_t* rc) {
+  PILECV4J_TRACE;
   StreamDetails* ret = nullptr;
   StreamContext* c = (StreamContext*)ctx;
   *rc = c->getStreamDetails(&ret, numResults);
@@ -407,6 +435,7 @@ KAI_EXPORT StreamDetails* pcv4j_ffmpeg2_streamContext_getStreamDetails(uint64_t 
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_streamDetails_deleteArray(void* sdRef) {
+  PILECV4J_TRACE;
   StreamDetails* c = (StreamDetails*)sdRef;
   delete [] c;
 }
@@ -416,11 +445,13 @@ KAI_EXPORT void pcv4j_ffmpeg2_streamDetails_deleteArray(void* sdRef) {
 // ===========================================================
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_play(uint64_t ctx) {
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   return c->play();
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_streamContext_load(uint64_t ctx) {
+  PILECV4J_TRACE;
   StreamContext* c = (StreamContext*)ctx;
   return c->load();
 }
@@ -443,11 +474,12 @@ static inline bool dontSkipPacket(Synchronizer* throttle, const AVFormatContext*
 #endif
 
 static uint64_t process_packets(StreamContext* c) {
+  PILECV4J_TRACE;
   int remuxErrorCount = 0; // if this count goes above MAX_REMUX_ERRORS then process_frames will fail.
 
   if (c->state != PROCESSORS_SETUP) {
     llog(ERROR, "StreamContext is in the wrong state. It should have been in %d but it's in %d.", (int)PROCESSORS_SETUP, (int)c->state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   Synchronizer* throttle = c->throttle;
@@ -456,8 +488,7 @@ static uint64_t process_packets(StreamContext* c) {
 
   // https://ffmpeg.org/doxygen/trunk/structAVPacket.html
   AVPacket *pPacket = av_packet_alloc();
-  if (!pPacket)
-  {
+  if (!pPacket) {
     llog(ERROR, "failed to allocate memory for AVPacket");
     return MAKE_P_STAT(FAILED_CREATE_PACKET);
   }

@@ -27,7 +27,8 @@ static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
     "No format context",
     "There's no output set",
     "No packet source info",
-    "Required parameter missing"
+    "Required parameter missing",
+    "Failed to create a muxer",
 };
 
 /**
@@ -37,7 +38,26 @@ static const char* totallyUnknownError = "UNKNOWN ERROR";
 
 // =====================================================
 
-using namespace pilecv4j::ffmpeg;
+namespace pilecv4j
+{
+namespace ffmpeg
+{
+
+const char* errMessage(uint64_t status) {
+  // if the MSBs have a value, then that's what we're going with.
+  {
+    uint32_t pcv4jCode = (status >> 32) & 0xffffffff;
+    if (pcv4jCode != 0) {
+      if (pcv4jCode < 0 || pcv4jCode > MAX_PCV4J_CODE)
+        return strdup(totallyUnknownError);
+      else
+        return strdup(pcv4jStatMessages[pcv4jCode]);
+    }
+  }
+  char* ret = new char[AV_ERROR_MAX_STRING_SIZE + 1]{0};
+  av_strerror((int)status, ret, AV_ERROR_MAX_STRING_SIZE);
+  return ret;
+}
 
 extern "C" {
 
@@ -46,20 +66,8 @@ extern "C" {
   // ===========================================================
 
   // use pcv4j_ffmpeg_freeString to free the string that's returned
-  KAI_EXPORT char* pcv4j_ffmpeg2_utils_statusMessage(uint64_t status) {
-    // if the MSBs have a value, then that's what we're going with.
-    {
-      uint32_t pcv4jCode = (status >> 32) & 0xffffffff;
-      if (pcv4jCode != 0) {
-        if (pcv4jCode < 0 || pcv4jCode > MAX_PCV4J_CODE)
-          return strdup(totallyUnknownError);
-        else
-          return strdup(pcv4jStatMessages[pcv4jCode]);
-      }
-    }
-    char* ret = new char[AV_ERROR_MAX_STRING_SIZE + 1]{0};
-    av_strerror((int)status, ret, AV_ERROR_MAX_STRING_SIZE);
-    return ret;
+  KAI_EXPORT const char* pcv4j_ffmpeg2_utils_statusMessage(uint64_t status) {
+    return errMessage(status);
   }
 
   // free the string returned from pcv4j_ffmpeg_statusMessage
@@ -68,4 +76,8 @@ extern "C" {
       delete[] str;
   }
 }
+
+}
+}
+
 

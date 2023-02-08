@@ -37,7 +37,7 @@ public:
    * going to return an error. This is because most open calls will inevitably call avformat_open_input
    * which STUPIDLY, according to the documentation, frees a user supplied AVFormatContext.
    */
-  virtual uint64_t open(AVFormatContext* preallocatedAvFormatCtx, AVDictionary** options) = 0;
+  virtual uint64_t open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** options) = 0;
 
   virtual std::string toString() = 0;
 };

@@ -61,11 +61,12 @@ static int64_t seek_in_custom_source(void *opaque, int64_t offset, int whence) {
 }
 //========================================================================
 
-uint64_t CustomMediaDataSource::open(AVFormatContext* preallocatedAvFormatCtx, AVDictionary** opts)
+uint64_t CustomMediaDataSource::open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** opts)
 {
   // check if open was called already
   if (ioBuffer != nullptr) {
-    avformat_free_context(preallocatedAvFormatCtx);
+    avformat_free_context(*preallocatedAvFormatCtx);
+    *preallocatedAvFormatCtx = nullptr;
     return MAKE_P_STAT(ALREADY_SET);
   }
 
@@ -80,10 +81,10 @@ uint64_t CustomMediaDataSource::open(AVFormatContext* preallocatedAvFormatCtx, A
           seekable() ? seek_in_custom_source : nullptr);
 
   // setup the AVFormatContext for the custom io. See above note.
-  preallocatedAvFormatCtx->pb = ioContext;
+  (*preallocatedAvFormatCtx)->pb = ioContext;
 
   // according to the docs for avformat_open_input, "a user-supplied AVFormatContext will be freed on failure."
-  return MAKE_AV_STAT(avformat_open_input(&preallocatedAvFormatCtx, nullptr, nullptr, opts));
+  return MAKE_AV_STAT(avformat_open_input(preallocatedAvFormatCtx, nullptr, nullptr, opts));
 }
 
 CustomMediaDataSource::~CustomMediaDataSource()

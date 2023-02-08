@@ -30,9 +30,9 @@ import org.junit.rules.TemporaryFolder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
@@ -45,7 +45,7 @@ public class TestSplitIntoFiles extends BaseTest {
     private static long spitVideoIntoFiles(final File inputFile, final File destDir) {
         final AtomicLong frameNum = new AtomicLong(0);
 
-        try(final StreamContext sctx = Ffmpeg2.createStreamContext()
+        try(final StreamContext sctx = Ffmpeg.createStreamContext()
             .createMediaDataSource(inputFile.getAbsolutePath())
             .openChain("default")
 
@@ -69,8 +69,8 @@ public class TestSplitIntoFiles extends BaseTest {
     private static void encodeFiles(final File imageDir, final long numFrames, final File outputVideo) throws IOException {
         try(final CvMat firstFrame = ImageFile.readMatFromFile(new File(imageDir, "image-0.jpg").getAbsolutePath());
 
-            final EncodingContext ectx = Ffmpeg2.createEncoder()
-                .muxer(outputVideo.getAbsolutePath())
+            final EncodingContext ectx = Ffmpeg.createEncoder()
+                .muxer(Muxer.create(outputVideo.getAbsolutePath()))
                 .openVideoEncoder("libx264", "vidEncoder")
                 .addCodecOptions("preset", "slow")
                 .addCodecOptions("crf", "40")
@@ -111,7 +111,7 @@ public class TestSplitIntoFiles extends BaseTest {
 
         if(SHOW) {
             try(ImageDisplay id = new ImageDisplay.Builder().build();
-                StreamContext sc = Ffmpeg2.createStreamContext()
+                StreamContext sc = Ffmpeg.createStreamContext()
                     .createMediaDataSource(destination.getAbsolutePath())
                     .sync()
                     .openChain("default")

@@ -47,11 +47,10 @@ import org.slf4j.LoggerFactory;
 import net.dempsy.util.MutableInt;
 import net.dempsy.util.MutableRef;
 
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.MediaDataSeek;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
@@ -79,13 +78,13 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testCreateContext() {
         LOGGER.info("Running test: {}.testCreateContext(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        try(StreamContext c = Ffmpeg2.createStreamContext();) {}
+        try(StreamContext c = Ffmpeg.createStreamContext();) {}
     }
 
     @Test(expected = FfmpegException.class)
     public void testPlayNoSource() {
         LOGGER.info("Running test: {}.testPlayNoSource(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        try(StreamContext c = Ffmpeg2.createStreamContext();) {
+        try(StreamContext c = Ffmpeg.createStreamContext();) {
             c
                 .optionally(sync, s -> s.sync())
                 .play();
@@ -97,7 +96,7 @@ public class TestFfmpeg2 extends BaseTest {
         LOGGER.info("Running test: {}.testPlayWithStop(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
         final AtomicBoolean stopped = new AtomicBoolean(false);
-        try(final StreamContext c = Ffmpeg2.createStreamContext();) {
+        try(final StreamContext c = Ffmpeg.createStreamContext();) {
             c
                 .createMediaDataSource(STREAM)
                 .openChain("default")
@@ -125,10 +124,10 @@ public class TestFfmpeg2 extends BaseTest {
     public void testConsumeFrames() {
         LOGGER.info("Running test: {}.testConsumeFrames(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
-        final MutableRef<Ffmpeg2.StreamContext.StreamDetails[]> details = new MutableRef<>(null);
+        final MutableRef<Ffmpeg.StreamContext.StreamDetails[]> details = new MutableRef<>(null);
 //        final Throttle throttle = new Throttle(10, TimingType.FPS, LOGGER);
         try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-            final StreamContext ctx = Ffmpeg2.createStreamContext();) {
+            final StreamContext ctx = Ffmpeg.createStreamContext();) {
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
@@ -142,7 +141,7 @@ public class TestFfmpeg2 extends BaseTest {
                 .createVideoFrameProcessor(
 
                     // "hevc_cuvid",
-                    "h264_cuvid",
+                    // "h264_cuvid",
 
                     f -> {
                         frameCount.getAndIncrement();
@@ -161,14 +160,13 @@ public class TestFfmpeg2 extends BaseTest {
             ;
         }
 
-        FfmpegApi2.pcv4j_ffmpeg2_timings();
+        FfmpegApi.pcv4j_ffmpeg2_timings();
 
         assertTrue(frameCount.get() > 50);
         assertNotNull(details.ref);
         assertEquals(2, details.ref.length);
-        assertEquals(Ffmpeg2.AVMEDIA_TYPE_VIDEO, details.ref[0].mediaType);
-        assertEquals(Ffmpeg2.AVMEDIA_TYPE_AUDIO, details.ref[1].mediaType);
-
+        assertEquals(Ffmpeg.AVMEDIA_TYPE_VIDEO, details.ref[0].mediaType);
+        assertEquals(Ffmpeg.AVMEDIA_TYPE_AUDIO, details.ref[1].mediaType);
     }
 
     @Test
@@ -182,7 +180,7 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
 
-            final StreamContext c = Ffmpeg2.createStreamContext();
+            final StreamContext c = Ffmpeg.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
             c
                 .createMediaDataSource(
@@ -190,7 +188,7 @@ public class TestFfmpeg2 extends BaseTest {
                     // read bytes from buffer
                     (bb, numBytes) -> {
                         if(pos.val >= contents.length)
-                            return Ffmpeg2.AVERROR_EOF_AVSTAT;
+                            return Ffmpeg.AVERROR_EOF_AVSTAT;
                         final int size = bb.capacity();
                         LOGGER.trace("buf size: {}, to write: {}, from pos: {}", size, numBytes, pos.val);
                         final int numToSend = (numBytes + (int)pos.val > contents.length) ? (contents.length - (int)pos.val) : numBytes;
@@ -204,13 +202,13 @@ public class TestFfmpeg2 extends BaseTest {
 
                     // need to support seek to read some mp4 files
                     (final long offset, final int whence) -> {
-                        if(whence == Ffmpeg2.SEEK_SET)
+                        if(whence == Ffmpeg.SEEK_SET)
                             pos.val = offset;
-                        else if(whence == Ffmpeg2.SEEK_CUR)
+                        else if(whence == Ffmpeg.SEEK_CUR)
                             pos.val += offset;
-                        else if(whence == Ffmpeg2.SEEK_END)
+                        else if(whence == Ffmpeg.SEEK_END)
                             pos.val = contents.length - offset;
-                        else if(whence == Ffmpeg2.AVSEEK_SIZE)
+                        else if(whence == Ffmpeg.AVSEEK_SIZE)
                             return contents.length;
                         else
                             return -1;
@@ -242,21 +240,64 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testRemux() throws Exception {
         LOGGER.info("Running test: {}.testRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        final File destination = tempDir.newFile("out.flv");
+        final File destination = new File("/tmp/out.flv");// tempDir.newFile("out.flv");
         if(destination.exists())
             destination.delete();
         try(
 
-            final StreamContext c = Ffmpeg2.createStreamContext();) {
+            final StreamContext c = Ffmpeg.createStreamContext();) {
             c
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
                 .openChain("default")
                 .createPacketFilter((mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen) -> {
-                    System.out.println(isKeyFrame ? "keyframe" : "not keyframe");
+                    // System.out.println(isKeyFrame ? "keyframe" : "not keyframe");
                     return true;
                 })
-                .createRemuxer(destination.getAbsolutePath())
+                .createRemuxer(Muxer.create(destination.getAbsolutePath()))
+                .streamContext()
+                .optionally(sync, s -> s.sync())
+                .play();
+        }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        assertTrue(frameCount(destination.toURI()) > 1000);
+    }
+
+    @Test
+    public void testSegmentedRemux() throws Exception {
+        LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        final File destination = new File("/tmp/out"); // tempDir.newFile("out.flv");
+        if(destination.exists())
+            destination.delete();
+        try(final StreamContext c = Ffmpeg.createStreamContext();) {
+
+            c
+                .createMediaDataSource(STREAM)
+                // .createMediaDataSource("rtsp://admin:gregormendel1@172.16.2.11:554/")
+                .addOption("flags", "+cgop")
+                .openChain("default")
+                .createRemuxer(Muxer.create(index -> {
+                    System.out.println("Muxer #" + index);
+                    return Muxer.create("mpegts", String.format("%s_%02d.%s", destination.getAbsolutePath(), index, "ts"));
+                }, new PacketFilter() {
+
+                    private long startTime = -1;
+
+                    @Override
+                    public boolean test(final int mediaType, final int stream_index, final int packetNumBytes, final boolean isKeyFrame, final long pts,
+                        final long dts, final int tbNum, final int tbDen) {
+                        if(startTime < 0)
+                            startTime = System.currentTimeMillis();
+                        final boolean ret = ((startTime + 2000) < System.currentTimeMillis());
+                        if(ret)
+                            startTime = System.currentTimeMillis();
+                        return ret;
+                    }
+                }))
                 .streamContext()
                 .optionally(sync, s -> s.sync())
                 .play();
@@ -277,7 +318,7 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
         try(
 
-            final StreamContext c = Ffmpeg2.createStreamContext();
+            final StreamContext c = Ffmpeg.createStreamContext();
             final OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
 
         ) {
@@ -285,12 +326,12 @@ public class TestFfmpeg2 extends BaseTest {
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
                 .openChain("default")
-                .createRemuxer("mpegts", (packet, numBytes) -> {
+                .createRemuxer(Muxer.create("mpegts", (packet, numBytes) -> {
                     packet.rewind();
                     final byte[] pkt = new byte[numBytes];
                     packet.get(pkt);
                     uncheck(() -> os.write(pkt));
-                })
+                }))
                 .streamContext()
                 .optionally(sync, s -> s.sync())
                 .play();
@@ -315,7 +356,7 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
 
-            final StreamContext c = Ffmpeg2.createStreamContext();
+            final StreamContext c = Ffmpeg.createStreamContext();
 
         ) {
 
@@ -323,7 +364,7 @@ public class TestFfmpeg2 extends BaseTest {
                 .addOption("rtsp_flags", "prefer_tcp")
                 .createMediaDataSource(STREAM)
                 .openChain("default")
-                .createRemuxer("mp4", (packet, numBytes) -> {
+                .createRemuxer(Muxer.create("mp4", (packet, numBytes) -> {
                     packet.rewind();
                     final byte[] pkt = new byte[numBytes];
                     packet.get(pkt);
@@ -331,18 +372,18 @@ public class TestFfmpeg2 extends BaseTest {
                 },
                     (MediaDataSeek)(final long offset, final int whence) -> {
                         calledSeek.set(true);
-                        if(whence == Ffmpeg2.SEEK_SET)
+                        if(whence == Ffmpeg.SEEK_SET)
                             bb.position((int)offset);
-                        else if(whence == Ffmpeg2.SEEK_CUR)
+                        else if(whence == Ffmpeg.SEEK_CUR)
                             bb.position(bb.position() + (int)offset);
-                        else if(whence == Ffmpeg2.SEEK_END)
+                        else if(whence == Ffmpeg.SEEK_END)
                             bb.position(bb.limit() - (int)offset);
-                        else if(whence == Ffmpeg2.AVSEEK_SIZE)
+                        else if(whence == Ffmpeg.AVSEEK_SIZE)
                             return bb.limit();
                         else
                             return -1;
                         return bb.position();
-                    })
+                    }))
                 .streamContext()
                 .optionally(sync, s -> s.sync())
                 .play();
@@ -371,14 +412,14 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
 
         try(
-            final EncodingContext encoder = Ffmpeg2.createEncoder();
-            final StreamContext ctx = Ffmpeg2.createStreamContext();
+            final EncodingContext encoder = Ffmpeg.createEncoder();
+            final StreamContext ctx = Ffmpeg.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
 
             encoder
-                .muxer(destination.getAbsolutePath())
+                .muxer(Muxer.create(destination.getAbsolutePath()))
                 .openVideoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
@@ -455,20 +496,20 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
 
         try(
-            final EncodingContext encoder = Ffmpeg2.createEncoder();
-            final StreamContext ctx = Ffmpeg2.createStreamContext();
-            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
             OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
+            final EncodingContext encoder = Ffmpeg.createEncoder();
+            final StreamContext ctx = Ffmpeg.createStreamContext();
+            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
 
             encoder
-                .muxer("mpegts", (packet, numBytes) -> {
+                .muxer(Muxer.create("mpegts", (packet, numBytes) -> {
                     packet.rewind();
                     final byte[] pkt = new byte[numBytes];
                     packet.get(pkt);
                     uncheck(() -> os.write(pkt));
-                })
+                }))
                 .openVideoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
@@ -548,14 +589,14 @@ public class TestFfmpeg2 extends BaseTest {
         final AtomicBoolean calledSeek = new AtomicBoolean(false);
 
         try(
-            final EncodingContext encoder = Ffmpeg2.createEncoder();
-            final StreamContext ctx = Ffmpeg2.createStreamContext();
+            final EncodingContext encoder = Ffmpeg.createEncoder();
+            final StreamContext ctx = Ffmpeg.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
 
             encoder
-                .muxer("mp4", (packet, numBytes) -> {
+                .muxer(Muxer.create("mp4", (packet, numBytes) -> {
                     packet.rewind();
                     final byte[] pkt = new byte[numBytes];
                     packet.get(pkt);
@@ -563,18 +604,18 @@ public class TestFfmpeg2 extends BaseTest {
                 },
                     (MediaDataSeek)(final long offset, final int whence) -> {
                         calledSeek.set(true);
-                        if(whence == Ffmpeg2.SEEK_SET)
+                        if(whence == Ffmpeg.SEEK_SET)
                             bb.position((int)offset);
-                        else if(whence == Ffmpeg2.SEEK_CUR)
+                        else if(whence == Ffmpeg.SEEK_CUR)
                             bb.position(bb.position() + (int)offset);
-                        else if(whence == Ffmpeg2.SEEK_END)
+                        else if(whence == Ffmpeg.SEEK_END)
                             bb.position(bb.limit() - (int)offset);
-                        else if(whence == Ffmpeg2.AVSEEK_SIZE)
+                        else if(whence == Ffmpeg.AVSEEK_SIZE)
                             return bb.limit();
                         else
                             return -1;
                         return bb.position();
-                    })
+                    }))
                 .openVideoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
@@ -659,14 +700,14 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
 
         try(
-            final EncodingContext encoder = Ffmpeg2.createEncoder();
-            final StreamContext ctx = Ffmpeg2.createStreamContext();
+            final EncodingContext encoder = Ffmpeg.createEncoder();
+            final StreamContext ctx = Ffmpeg.createStreamContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
 
             encoder
-                .muxer(destination.getAbsolutePath())
+                .muxer(Muxer.create(destination.getAbsolutePath()))
                 .openVideoEncoder("mjpeg", "first")
                 .encodingContext()
 
@@ -688,7 +729,7 @@ public class TestFfmpeg2 extends BaseTest {
                     boolean found = false;
                     for(int i = 0; i < sd.length; i++) {
                         res[i] = false;
-                        if(!found && sd[i].mediaType == Ffmpeg2.AVMEDIA_TYPE_VIDEO) {
+                        if(!found && sd[i].mediaType == Ffmpeg.AVMEDIA_TYPE_VIDEO) {
                             found = true;
                             res[i] = true;
                         }
@@ -729,7 +770,7 @@ public class TestFfmpeg2 extends BaseTest {
     private static long frameCount(final URI uri) {
         final MutableInt ret = new MutableInt(0);
         try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-            final StreamContext c = Ffmpeg2.createStreamContext();) {
+            final StreamContext c = Ffmpeg.createStreamContext();) {
             c
                 .createMediaDataSource(uri)
                 .openChain("default")
