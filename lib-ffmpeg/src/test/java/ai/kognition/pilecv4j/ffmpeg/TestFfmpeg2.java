@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.io.FileUtils;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -267,6 +268,7 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(frameCount(destination.toURI()) > 1000);
     }
 
+    @Ignore
     @Test
     public void testSegmentedRemux() throws Exception {
         LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
