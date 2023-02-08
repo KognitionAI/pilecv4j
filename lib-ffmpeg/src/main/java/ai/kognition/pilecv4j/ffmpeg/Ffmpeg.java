@@ -16,12 +16,12 @@
 
 package ai.kognition.pilecv4j.ffmpeg;
 
-import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_DEBUG;
-import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_ERROR;
-import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_FATAL;
-import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_INFO;
-import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_TRACE;
-import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.LOG_LEVEL_WARN;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_DEBUG;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_ERROR;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_FATAL;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_INFO;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_TRACE;
+import static ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.LOG_LEVEL_WARN;
 import static net.dempsy.util.Functional.chain;
 import static net.dempsy.util.Functional.ignore;
 
@@ -55,43 +55,42 @@ import net.dempsy.util.Functional;
 import net.dempsy.util.MutableRef;
 import net.dempsy.util.QuietCloseable;
 
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext.StreamDetails;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.fill_buffer_callback;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.packet_filter_callback;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.push_frame_callback;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.seek_buffer_callback;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.select_streams_callback;
-import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi2.write_buffer_callback;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext.StreamDetails;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.fill_buffer_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.packet_filter_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.push_frame_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.seek_buffer_callback;
+import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.select_streams_callback;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.VideoFrame;
 
-public class Ffmpeg2 {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Ffmpeg2.class);
+public class Ffmpeg {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Ffmpeg.class);
 
     static {
-        FfmpegApi2._init();
+        FfmpegApi._init();
     }
 
-    public static final long AVERROR_EOF_KOGSTAT = FfmpegApi2.pcv4j_ffmpeg_code_averror_eof_as_kognition_stat();
-    public static final long AVERROR_UNKNOWN = FfmpegApi2.pcv4j_ffmpeg_code_averror_unknown_as_kognition_stat();
-    public static final int AVERROR_EOF_AVSTAT = FfmpegApi2.pcv4j_ffmpeg_code_averror_eof();
+    public static final long AVERROR_EOF_KOGSTAT = FfmpegApi.pcv4j_ffmpeg_code_averror_eof_as_kognition_stat();
+    public static final long AVERROR_UNKNOWN = FfmpegApi.pcv4j_ffmpeg_code_averror_unknown_as_kognition_stat();
+    public static final int AVERROR_EOF_AVSTAT = FfmpegApi.pcv4j_ffmpeg_code_averror_eof();
 
     // values of 'whence' passed to seek_buffer_callback
-    public static final int SEEK_SET = FfmpegApi2.pcv4j_ffmpeg_code_seek_set();
-    public static final int SEEK_CUR = FfmpegApi2.pcv4j_ffmpeg_code_seek_cur();
-    public static final int SEEK_END = FfmpegApi2.pcv4j_ffmpeg_code_seek_end();
-    public static final int AVSEEK_SIZE = FfmpegApi2.pcv4j_ffmpeg_code_seek_size();
-    public static final int AVEAGAIN = FfmpegApi2.pcv4j_ffmpeg_code_eagain();
+    public static final int SEEK_SET = FfmpegApi.pcv4j_ffmpeg_code_seek_set();
+    public static final int SEEK_CUR = FfmpegApi.pcv4j_ffmpeg_code_seek_cur();
+    public static final int SEEK_END = FfmpegApi.pcv4j_ffmpeg_code_seek_end();
+    public static final int AVSEEK_SIZE = FfmpegApi.pcv4j_ffmpeg_code_seek_size();
+    public static final int AVEAGAIN = FfmpegApi.pcv4j_ffmpeg_code_eagain();
 
-    public static final int AVMEDIA_TYPE_UNKNOWN = FfmpegApi2.pcv4j_ffmpeg2_mediaType_UNKNOWN();
-    public static final int AVMEDIA_TYPE_VIDEO = FfmpegApi2.pcv4j_ffmpeg2_mediaType_VIDEO();
-    public static final int AVMEDIA_TYPE_AUDIO = FfmpegApi2.pcv4j_ffmpeg2_mediaType_AUDIO();
-    public static final int AVMEDIA_TYPE_DATA = FfmpegApi2.pcv4j_ffmpeg2_mediaType_DATA();
-    public static final int AVMEDIA_TYPE_SUBTITLE = FfmpegApi2.pcv4j_ffmpeg2_mediaType_SUBTITLE();
-    public static final int AVMEDIA_TYPE_ATTACHMENT = FfmpegApi2.pcv4j_ffmpeg2_mediaType_ATTACHMENT();
-    public static final int AVMEDIA_TYPE_NB = FfmpegApi2.pcv4j_ffmpeg2_mediaType_NB();
+    public static final int AVMEDIA_TYPE_UNKNOWN = FfmpegApi.pcv4j_ffmpeg2_mediaType_UNKNOWN();
+    public static final int AVMEDIA_TYPE_VIDEO = FfmpegApi.pcv4j_ffmpeg2_mediaType_VIDEO();
+    public static final int AVMEDIA_TYPE_AUDIO = FfmpegApi.pcv4j_ffmpeg2_mediaType_AUDIO();
+    public static final int AVMEDIA_TYPE_DATA = FfmpegApi.pcv4j_ffmpeg2_mediaType_DATA();
+    public static final int AVMEDIA_TYPE_SUBTITLE = FfmpegApi.pcv4j_ffmpeg2_mediaType_SUBTITLE();
+    public static final int AVMEDIA_TYPE_ATTACHMENT = FfmpegApi.pcv4j_ffmpeg2_mediaType_ATTACHMENT();
+    public static final int AVMEDIA_TYPE_NB = FfmpegApi.pcv4j_ffmpeg2_mediaType_NB();
 
     // This needs to be kept in sync with the value in EncodingContext.h
     public static final int DEFAULT_FPS = 30;
@@ -99,7 +98,7 @@ public class Ffmpeg2 {
     public static final long DEFAULT_MAX_LATENCY_MILLIS = 500;
 
     static {
-        final Logger nativeLogger = LoggerFactory.getLogger(Ffmpeg2.class.getPackageName() + ".native");
+        final Logger nativeLogger = LoggerFactory.getLogger(Ffmpeg.class.getPackageName() + ".native");
 
         // find the level
         final int logLevelSet;
@@ -116,7 +115,7 @@ public class Ffmpeg2 {
         else
             logLevelSet = LOG_LEVEL_FATAL;
 
-        FfmpegApi2.pcv4j_ffmpeg2_logging_setLogLevel(logLevelSet);
+        FfmpegApi.pcv4j_ffmpeg2_logging_setLogLevel(logLevelSet);
     }
 
     /**
@@ -138,11 +137,6 @@ public class Ffmpeg2 {
         public int fillBuffer(ByteBuffer buf, int numBytes);
     }
 
-    @FunctionalInterface
-    public static interface MediaDataSeek {
-        public long seekBuffer(long offset, int whence);
-    }
-
     // ======================================================================
 
     // ======================================================================
@@ -153,16 +147,11 @@ public class Ffmpeg2 {
      * This interface is used for processors that handle decoded video frames.
      */
     @FunctionalInterface
-    public static interface VideoFrameConsumer {
+    public static interface VideoFrameConsumer extends QuietCloseable {
         public void handle(VideoFrame frame);
-    }
 
-    /**
-     * This interface is used for remuxing (TODO: or encoding) to java memory
-     */
-    @FunctionalInterface
-    public static interface WritePacket {
-        public void handle(ByteBuffer packet, int len);
+        @Override
+        default public void close() {}
     }
 
     /**
@@ -181,16 +170,8 @@ public class Ffmpeg2 {
         public boolean select(StreamDetails[] details, boolean[] selection);
     }
 
-    public static interface PacketFilterCallback {
-        /**
-         * @return given the details, should this packet be let through
-         */
-        public boolean filter(final int mediaType, final int stream_index, final int packetNumBytes, final boolean isKeyFrame, final long pts, final long dts,
-            final int tbNum, final int tbDen);
-    }
-
     /**
-     * Calling {@link Ffmpeg2.StreamContext#openChain(String)} returns a {@link Ffmpeg2.MediaProcessingChain}
+     * Calling {@link Ffmpeg.StreamContext#openChain(String)} returns a {@link Ffmpeg.MediaProcessingChain}
      * which represents a selection of streams and a number of processes that operate on those
      * streams.
      */
@@ -198,7 +179,7 @@ public class Ffmpeg2 {
 
         private final StreamContext ctx;
         private final List<MediaProcessor> processors = new ArrayList<>();
-        private final List<PacketFilter> packetFilters = new ArrayList<>();
+        private final List<PacketFilterWrap> packetFilters = new ArrayList<>();
         private final String name;
 
         private MediaProcessingChain(final String name, final long nativeRef, final StreamContext ctx) {
@@ -209,6 +190,10 @@ public class Ffmpeg2 {
 
         public StreamContext streamContext() {
             return ctx;
+        }
+
+        public String getName() {
+            return name;
         }
 
         @Override
@@ -228,48 +213,7 @@ public class Ffmpeg2 {
         // ======================================================================
 
         public MediaProcessingChain createFirstVideoStreamSelector() {
-            return manage(new PacketFilter(FfmpegApi2.pcv4j_ffmpeg2_firstVideoStreamSelector_create()));
-        }
-
-        /**
-         * This is package protected to eliminate any optimization of the strong references
-         * required to keep the JNA callbacks from being GCed
-         */
-        static class CallbackStreamSelector extends PacketFilter {
-            // ======================================================================
-            // JNA will only hold a weak reference to the callbacks passed in
-            // so if we dynamically allocate them then they will be garbage collected.
-            // In order to prevent that we're keeping strong references to them.
-            // These are not private in order to avoid any possibility that the
-            // JVM optimized them out since they aren't read anywhere in this code.
-            public select_streams_callback ssc;
-            // ======================================================================
-
-            private CallbackStreamSelector(final long nativeRef, final select_streams_callback selector) {
-                super(nativeRef);
-                ssc = selector;
-            }
-        }
-
-        /**
-         * This is package protected to eliminate any optimization of the strong references
-         * required to keep the JNA callbacks from being GCed
-         */
-        static class CallbackPacketFilter extends PacketFilter {
-            // ======================================================================
-            // JNA will only hold a weak reference to the callbacks passed in
-            // so if we dynamically allocate them then they will be garbage collected.
-            // In order to prevent that we're keeping strong references to them.
-            // These are not private in order to avoid any possibility that the
-            // JVM optimized them out since they aren't read anywhere in this code.
-            public packet_filter_callback pfcb;
-            // ======================================================================
-
-            private CallbackPacketFilter(final long nativeRef, final packet_filter_callback selector) {
-                super(nativeRef);
-                pfcb = selector;
-            }
-
+            return manage(new PacketFilterWrap(FfmpegApi.pcv4j_ffmpeg2_firstVideoStreamSelector_create()));
         }
 
         public MediaProcessingChain createStreamSelector(final StreamSelectorCallback callback) {
@@ -290,6 +234,121 @@ public class Ffmpeg2 {
 
                 return callback.select(sd, res);
             });
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer consumer) {
+            return createVideoFrameProcessor((String)null, consumer);
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream and applies the initializer on the
+         * first frame and the handler on all of the other frames.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
+            return createVideoFrameProcessor(null, initializer, handler);
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream. If decoderName is not null then the decoder
+         * will be used to decode the frames.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer consumer) {
+            final var pfc = wrap(consumer);
+
+            final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_decodedFrameProcessor_create(pfc, decoderName);
+            return manage(new FrameVideoProcessor(nativeRef, pfc, consumer));
+        }
+
+        /**
+         * Create a video processor that takes the first decodable video stream and applies the initializer on the
+         * first frame and the handler on all of the other frames. If decoderName is not null then the decoder
+         * will be used to decode the frames.
+         */
+        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer initializer,
+            final VideoFrameConsumer handler) {
+            final var pfc = wrap(handler);
+
+            final MutableRef<FrameVideoProcessor> proc = new MutableRef<>();
+            final var init = wrap(vf -> {
+                initializer.handle(vf);
+                proc.ref.replace(pfc);
+                initializer.close();
+                handler.handle(vf);
+            });
+
+            final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_decodedFrameProcessor_create(init, decoderName);
+            final var fm = new FrameVideoProcessor(nativeRef, init, handler);
+            proc.ref = fm;
+            return manage(fm);
+        }
+
+        public MediaProcessingChain createRemuxer(final Muxer output, final int maxRemuxErrorCount) {
+            return manage(new MediaProcessorWithMuxer(FfmpegApi.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, maxRemuxErrorCount), output));
+        }
+
+        public MediaProcessingChain createRemuxer(final Muxer output) {
+            return createRemuxer(output, DEFAULT_MAX_REMUX_ERRORS);
+        }
+
+        public MediaProcessingChain optionally(final boolean doIt, final Consumer<MediaProcessingChain> ctxWork) {
+            if(doIt)
+                ctxWork.accept(this);
+            return this;
+        }
+
+        public MediaProcessingChain createPacketFilter(final PacketFilter cb) {
+            final packet_filter_callback rcb = new packet_filter_callback() {
+                @Override
+                public int packet_filter(final int mediaType, final int stream_index, final int packetNumBytes, final int isKeyFrame, final long pts,
+                    final long dts, final int tbNum, final int tbDen) {
+                    return cb.test(mediaType, stream_index, packetNumBytes, isKeyFrame == 0 ? false : true, pts, dts, tbNum, tbDen) ? 1 : 0;
+                }
+            };
+
+            return manage(new CallbackPacketFilter(FfmpegApi.pcv4j_ffmpeg2_javaPacketFilter_create(rcb), rcb));
+        }
+
+        /**
+         * This is package protected to eliminate any optimization of the strong references
+         * required to keep the JNA callbacks from being GCed
+         */
+        static class CallbackStreamSelector extends PacketFilterWrap {
+            // ======================================================================
+            // JNA will only hold a weak reference to the callbacks passed in
+            // so if we dynamically allocate them then they will be garbage collected.
+            // In order to prevent that we're keeping strong references to them.
+            // These are not private in order to avoid any possibility that the
+            // JVM optimized them out since they aren't read anywhere in this code.
+            public select_streams_callback ssc;
+            // ======================================================================
+
+            private CallbackStreamSelector(final long nativeRef, final select_streams_callback selector) {
+                super(nativeRef);
+                ssc = selector;
+            }
+        }
+
+        /**
+         * This is package protected to eliminate any optimization of the strong references
+         * required to keep the JNA callbacks from being GCed
+         */
+        static class CallbackPacketFilter extends PacketFilterWrap {
+            // ======================================================================
+            // JNA will only hold a weak reference to the callbacks passed in
+            // so if we dynamically allocate them then they will be garbage collected.
+            // In order to prevent that we're keeping strong references to them.
+            // These are not private in order to avoid any possibility that the
+            // JVM optimized them out since they aren't read anywhere in this code.
+            public packet_filter_callback pfcb;
+            // ======================================================================
+
+            private CallbackPacketFilter(final long nativeRef, final packet_filter_callback selector) {
+                super(nativeRef);
+                pfcb = selector;
+            }
         }
 
         private push_frame_callback wrap(final VideoFrameConsumer consumer) {
@@ -325,116 +384,6 @@ public class Ffmpeg2 {
             };
         }
 
-        /**
-         * Create a video processor that takes the first decodable video stream.
-         */
-        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer consumer) {
-            return createVideoFrameProcessor((String)null, consumer);
-        }
-
-        /**
-         * Create a video processor that takes the first decodable video stream and applies the initializer on the
-         * first frame and the handler on all of the other frames.
-         */
-        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
-            return createVideoFrameProcessor(null, initializer, handler);
-        }
-
-        /**
-         * Create a video processor that takes the first decodable video stream. If decoderName is not null then the decoder
-         * will be used to decode the frames.
-         */
-        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer consumer) {
-            final var pfc = wrap(consumer);
-
-            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(pfc, decoderName);
-            return manage(new FrameVideoProcessor(nativeRef, pfc));
-        }
-
-        /**
-         * Create a video processor that takes the first decodable video stream and applies the initializer on the
-         * first frame and the handler on all of the other frames. If decoderName is not null then the decoder
-         * will be used to decode the frames.
-         */
-        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer initializer,
-            final VideoFrameConsumer handler) {
-            final var pfc = wrap(handler);
-
-            final MutableRef<FrameVideoProcessor> proc = new MutableRef<>();
-            final var init = wrap(vf -> {
-                initializer.handle(vf);
-                proc.ref.replace(pfc);
-                handler.handle(vf);
-            });
-
-            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_create(init, decoderName);
-            final var fm = new FrameVideoProcessor(nativeRef, init);
-            proc.ref = fm;
-            return manage(fm);
-        }
-
-        public MediaProcessingChain createRemuxer(final String fmt, final String outputUri, final int maxRemuxErrorCount) {
-            final Muxer output = new Muxer(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(fmt, outputUri, null, null));
-            return manage(new MediaProcessorWithCustomOutput(FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, maxRemuxErrorCount), output));
-        }
-
-        public MediaProcessingChain createRemuxer(final String outputUri, final int maxRemuxErrorCount) {
-            return createRemuxer(null, outputUri, maxRemuxErrorCount);
-        }
-
-        public MediaProcessingChain createRemuxer(final String fmt, final String outputUri) {
-            return createRemuxer(fmt, outputUri, DEFAULT_MAX_REMUX_ERRORS);
-        }
-
-        public MediaProcessingChain createRemuxer(final String outputUri) {
-            return createRemuxer(null, outputUri, DEFAULT_MAX_REMUX_ERRORS);
-        }
-
-        public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer) {
-            return createRemuxer(outputFormat, writer, null);
-        }
-
-        public MediaProcessingChain createRemuxer(final String outputFormat, final WritePacket writer, final MediaDataSeek seek) {
-            final Wbc wbc = new Wbc(writer);
-            final seek_buffer_callback sbcb = seek != null ? new seek_buffer_callback() {
-                @Override
-                public long seek_buffer(final long offset, final int whence) {
-                    return seek.seekBuffer(offset, whence);
-                }
-            } : null;
-
-            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(outputFormat, null, wbc, sbcb), wbc, sbcb);
-
-            final var remuxerRef = FfmpegApi2.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, DEFAULT_MAX_REMUX_ERRORS);
-
-            // violation of the rule that objects should be usable once the constructor returns ... oh well,
-            // at least it's private. The fix for this would be to have the Wbc hold the CustomOutput rather than
-            // the other way around but ... not right now.
-            wbc.bb = output.customBuffer();
-
-            return manage(new MediaProcessorWithCustomOutput(remuxerRef, output));
-        }
-
-        public MediaProcessingChain optionally(final boolean doIt, final Consumer<MediaProcessingChain> ctxWork) {
-            if(doIt)
-                ctxWork.accept(this);
-            return this;
-        }
-
-        public MediaProcessingChain createPacketFilter(final PacketFilterCallback cb) {
-            final packet_filter_callback rcb = new packet_filter_callback() {
-
-                @Override
-                public int packet_filter(final int mediaType, final int stream_index, final int packetNumBytes, final int isKeyFrame, final long pts,
-                    final long dts, final int tbNum, final int tbDen) {
-                    return cb.filter(mediaType, stream_index, packetNumBytes, isKeyFrame == 0 ? false : true, pts, dts, tbNum, tbDen) ? 1 : 0;
-                }
-
-            };
-
-            return manage(new CallbackPacketFilter(FfmpegApi2.pcv4j_ffmpeg2_javaPacketFilter_create(rcb), rcb));
-        }
-
         @FunctionalInterface
         private static interface RawStreamSelectorCallback {
             public boolean select(boolean[] selection);
@@ -460,17 +409,17 @@ public class Ffmpeg2 {
                 }
             };
 
-            return manage(new CallbackStreamSelector(FfmpegApi2.pcv4j_ffmpeg2_javaStreamSelector_create(ssc), ssc));
+            return manage(new CallbackStreamSelector(FfmpegApi.pcv4j_ffmpeg2_javaStreamSelector_create(ssc), ssc));
         }
 
         private MediaProcessingChain manage(final MediaProcessor newProc) {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_mediaProcessorChain_addProcessor(this.nativeRef, newProc.nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaProcessorChain_addProcessor(this.nativeRef, newProc.nativeRef));
             processors.add(newProc);
             return this;
         }
 
-        private MediaProcessingChain manage(final PacketFilter newProc) {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(this.nativeRef, newProc.nativeRef));
+        private MediaProcessingChain manage(final PacketFilterWrap newProc) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaProcessorChain_addPacketFilter(this.nativeRef, newProc.nativeRef));
             packetFilters.add(newProc);
             return this;
         }
@@ -490,18 +439,18 @@ public class Ffmpeg2 {
         @Override
         public void close() {
             if(nativeRef != 0L)
-                FfmpegApi2.pcv4j_ffmpeg2_mediaProcessor_destroy(nativeRef);
+                FfmpegApi.pcv4j_ffmpeg2_mediaProcessor_destroy(nativeRef);
         }
     }
 
-    private static class MediaProcessorWithCustomOutput extends MediaProcessor {
+    private static class MediaProcessorWithMuxer extends MediaProcessor {
         private final Muxer output;
 
-        private MediaProcessorWithCustomOutput(final long nativeRef) {
+        private MediaProcessorWithMuxer(final long nativeRef) {
             this(nativeRef, null);
         }
 
-        private MediaProcessorWithCustomOutput(final long nativeRef, final Muxer output) {
+        private MediaProcessorWithMuxer(final long nativeRef, final Muxer output) {
             super(nativeRef);
             this.output = output;
         }
@@ -515,31 +464,17 @@ public class Ffmpeg2 {
         }
     }
 
-    private static class Muxer implements QuietCloseable {
+    private static class PacketFilterWrap implements QuietCloseable {
         final long nativeRef;
 
-        private Muxer(final long nativeRef) {
-            this.nativeRef = nativeRef;
-        }
-
-        @Override
-        public void close() {
-            if(nativeRef != 0L)
-                FfmpegApi2.pcv4j_ffmpeg2_muxer_delete(nativeRef);
-        }
-    }
-
-    private static class PacketFilter implements QuietCloseable {
-        final long nativeRef;
-
-        private PacketFilter(final long nativeRef) {
+        private PacketFilterWrap(final long nativeRef) {
             this.nativeRef = nativeRef;
         }
 
         @Override
         public void close() {
             if(nativeRef != 0)
-                FfmpegApi2.pcv4j_ffmpeg2_packetFilter_destroy(nativeRef);
+                FfmpegApi.pcv4j_ffmpeg2_packetFilter_destroy(nativeRef);
         }
     }
 
@@ -558,20 +493,29 @@ public class Ffmpeg2 {
         // JVM optimized them out since they aren't read anywhere in this code.
         public push_frame_callback pfc;
         // ======================================================================
+        public final QuietCloseable toClose;
 
-        private FrameVideoProcessor(final long nativeRef, final push_frame_callback consumer) {
+        private FrameVideoProcessor(final long nativeRef, final push_frame_callback consumer, final QuietCloseable toClose) {
             super(nativeRef);
             pfc = consumer;
+            this.toClose = toClose;
         }
 
         public void replace(final push_frame_callback consumer) {
             pfc = consumer;
-            FfmpegApi2.pcv4j_ffmpeg2_decodedFrameProcessor_replace(super.nativeRef, consumer);
+            FfmpegApi.pcv4j_ffmpeg2_decodedFrameProcessor_replace(super.nativeRef, consumer);
+        }
+
+        @Override
+        public void close() {
+            if(toClose != null)
+                toClose.close();
+            super.close();
         }
     }
 
     public static StreamContext createStreamContext() {
-        final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_streamContext_create();
+        final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_streamContext_create();
         return new StreamContext(nativeRef);
     }
 
@@ -669,7 +613,7 @@ public class Ffmpeg2 {
             public final int codecId;
             public final String codecName;
 
-            private StreamDetails(final FfmpegApi2.internal_StreamDetails sd) {
+            private StreamDetails(final FfmpegApi.internal_StreamDetails sd) {
                 streamIndex = sd.stream_index;
                 mediaType = sd.mediaType;
                 fps_num = sd.fps_num;
@@ -682,7 +626,8 @@ public class Ffmpeg2 {
 
             @Override
             public String toString() {
-                return "StreamDetails [streamIndex=" + streamIndex + ", mediaType=" + mediaType + ", fps_num=" + fps_num + ", fps_den=" + fps_den + ", tb_num="
+                return "StreamDetails [streamIndex=" + streamIndex + ", mediaType=" + mediaType + ", fps_num=" + fps_num + ", fps_den=" + fps_den
+                    + ", tb_num="
                     + tb_num + ", tb_den=" + tb_den + ", codecId=" + codecId + ", codecName=" + codecName + "]";
             }
         }
@@ -690,35 +635,36 @@ public class Ffmpeg2 {
         public StreamDetails[] getStreamDetails() {
             final IntByReference numStreamsRef = new IntByReference();
             final LongByReference rc = new LongByReference();
-            final FfmpegApi2.internal_StreamDetails.ByReference detailsRef = FfmpegApi2.pcv4j_ffmpeg2_streamContext_getStreamDetails(nativeRef, numStreamsRef,
+            final FfmpegApi.internal_StreamDetails.ByReference detailsRef = FfmpegApi.pcv4j_ffmpeg2_streamContext_getStreamDetails(nativeRef,
+                numStreamsRef,
                 rc);
             try {
                 throwIfNecessary(rc.getValue());
 
                 final int numStreams = numStreamsRef.getValue();
-                final FfmpegApi2.internal_StreamDetails[] details = numStreams == 0 ? new FfmpegApi2.internal_StreamDetails[0]
-                    : (FfmpegApi2.internal_StreamDetails[])detailsRef.toArray(numStreams);
+                final FfmpegApi.internal_StreamDetails[] details = numStreams == 0 ? new FfmpegApi.internal_StreamDetails[0]
+                    : (FfmpegApi.internal_StreamDetails[])detailsRef.toArray(numStreams);
 
                 return Arrays.stream(details)
                     .map(sd -> new StreamDetails(sd))
                     .toArray(StreamDetails[]::new);
             } finally {
-                FfmpegApi2.pcv4j_ffmpeg2_streamDetails_deleteArray(detailsRef.getPointer());
+                FfmpegApi.pcv4j_ffmpeg2_streamDetails_deleteArray(detailsRef.getPointer());
             }
         }
 
         public StreamContext load() {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_streamContext_load(nativeRef), Ffmpeg2.AVERROR_EOF_KOGSTAT);
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_load(nativeRef), Ffmpeg.AVERROR_EOF_KOGSTAT);
             return this;
         }
 
         public StreamContext play() {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_streamContext_play(nativeRef), Ffmpeg2.AVERROR_EOF_KOGSTAT);
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_play(nativeRef), Ffmpeg.AVERROR_EOF_KOGSTAT);
             return this;
         }
 
         public StreamContext addOption(final String key, final String value) {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_streamContext_addOption(nativeRef, key, value));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_addOption(nativeRef, key, value));
             return this;
         }
 
@@ -728,12 +674,12 @@ public class Ffmpeg2 {
         }
 
         public synchronized StreamContext stop() {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_streamContext_stop(nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_stop(nativeRef));
             return this;
         }
 
         public synchronized StreamContext sync() {
-            FfmpegApi2.pcv4j_ffmpeg2_streamContext_sync(nativeRef);
+            FfmpegApi.pcv4j_ffmpeg2_streamContext_sync(nativeRef);
             return this;
         }
 
@@ -749,23 +695,23 @@ public class Ffmpeg2 {
         }
 
         public synchronized int currentState() {
-            return FfmpegApi2.pcv4j_ffmpeg2_streamContext_state(nativeRef);
+            return FfmpegApi.pcv4j_ffmpeg2_streamContext_state(nativeRef);
         }
 
         @Override
         public void close() {
             if(nativeRef != 0) {
-                if(currentState() == FfmpegApi2.STREAM_CONTEXT_STATE_PLAYING) {
+                if(currentState() == FfmpegApi.STREAM_CONTEXT_STATE_PLAYING) {
                     stop();
 
                     final long endTime = System.currentTimeMillis() + 10000; // give it 10 seconds to stop
-                    while(currentState() != FfmpegApi2.STREAM_CONTEXT_STATE_ENDED && (System.currentTimeMillis() < endTime))
+                    while(currentState() != FfmpegApi.STREAM_CONTEXT_STATE_ENDED && (System.currentTimeMillis() < endTime))
                         Thread.yield();
 
-                    if(currentState() != FfmpegApi2.STREAM_CONTEXT_STATE_ENDED)
+                    if(currentState() != FfmpegApi.STREAM_CONTEXT_STATE_ENDED)
                         LOGGER.warn("Couldn't stop the playing stream.");
                 }
-                FfmpegApi2.pcv4j_ffmpeg2_streamContext_delete(nativeRef);
+                FfmpegApi.pcv4j_ffmpeg2_streamContext_delete(nativeRef);
             }
 
             if(dataSource != null)
@@ -787,7 +733,7 @@ public class Ffmpeg2 {
          * URI is pointing to given it's supported by ffmpeg.
          */
         public StreamContext createMediaDataSource(final String source) {
-            final long nativeVds = FfmpegApi2.pcv4j_ffmpeg2_uriMediaDataSource_create(source);
+            final long nativeVds = FfmpegApi.pcv4j_ffmpeg2_uriMediaDataSource_create(source);
             if(nativeVds == 0)
                 throw new FfmpegException("Failed to create a uri based native MediaDataSource");
 
@@ -816,7 +762,7 @@ public class Ffmpeg2 {
             } else
                 uriStr = url.toString();
 
-            final long nativeVds = FfmpegApi2.pcv4j_ffmpeg2_uriMediaDataSource_create(uriStr);
+            final long nativeVds = FfmpegApi.pcv4j_ffmpeg2_uriMediaDataSource_create(uriStr);
             if(nativeVds == 0)
                 throw new FfmpegException("Failed to create a uri based native MediaDataSource");
 
@@ -839,7 +785,7 @@ public class Ffmpeg2 {
          * @see https://trac.ffmpeg.org/wiki/Capture/Webcam
          */
         public StreamContext createMediaDataSource(final String fmt, final String rawFile) {
-            final long nativeVds = FfmpegApi2.pcv4j_ffmpeg2_uriMediaDataSource_create2(fmt, rawFile);
+            final long nativeVds = FfmpegApi.pcv4j_ffmpeg2_uriMediaDataSource_create2(fmt, rawFile);
             if(nativeVds == 0)
                 throw new FfmpegException("Failed to create a uri based native MediaDataSource");
 
@@ -862,7 +808,7 @@ public class Ffmpeg2 {
          */
         public StreamContext createMediaDataSource(final MediaDataSupplier dataSupplier, final MediaDataSeek seek) {
 
-            final var ret = new CustomMediaDataSource(FfmpegApi2.pcv4j_ffmpeg2_customMediaDataSource_create());
+            final var ret = new CustomMediaDataSource(FfmpegApi.pcv4j_ffmpeg2_customMediaDataSource_create());
 
             final ByteBuffer buffer = ret.customStreamBuffer();
             final int bufSize = ret.bufSize; // set after customStreamBuffer is called.
@@ -897,7 +843,7 @@ public class Ffmpeg2 {
             final MediaProcessingChain cur = mediaProcesingChainsMap.get(chainName);
             if(cur != null)
                 return cur;
-            final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_mediaProcessorChain_create();
+            final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_mediaProcessorChain_create();
             if(nativeRef == 0)
                 throw new FfmpegException("Failed to create a media processing chain");
 
@@ -910,7 +856,7 @@ public class Ffmpeg2 {
          *
          * @deprecated use {@link #openChain(String)}
          * @return if it doesn't already exist, a newly created {@link MediaProcessingChain}
-         * with the name {@link Ffmpeg2#DEFAULT_CHAIN_NAME}. If it does exist it will
+         * with the name {@link Ffmpeg#DEFAULT_CHAIN_NAME}. If it does exist it will
          * return that already created {@link MediaProcessingChain}
          */
         @Deprecated
@@ -919,15 +865,15 @@ public class Ffmpeg2 {
         }
 
         private StreamContext manage(final MediaDataSource vds) {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_streamContext_setSource(nativeRef, vds.nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_setSource(nativeRef, vds.nativeRef));
             dataSource = vds;
             return this;
         }
 
         private MediaProcessingChain manage(final MediaProcessingChain vds) {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_streamContext_addProcessor(nativeRef, vds.nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_addProcessor(nativeRef, vds.nativeRef));
             mediaProcesingChains.add(vds);
-            mediaProcesingChainsMap.put(vds.name, vds);
+            mediaProcesingChainsMap.put(vds.getName(), vds);
             return vds;
         }
     }
@@ -937,7 +883,7 @@ public class Ffmpeg2 {
     // ======================================================================
 
     public static EncodingContext createEncoder() {
-        final long nativeRef = FfmpegApi2.pcv4j_ffmpeg2_encodingContext_create();
+        final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_encodingContext_create();
         return new EncodingContext(nativeRef);
     }
 
@@ -1063,37 +1009,37 @@ public class Ffmpeg2 {
             }
 
             public VideoEncoder addCodecOptions(final String key, final String values) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_addCodecOption(nativeRef, key, values));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_addCodecOption(nativeRef, key, values));
                 return this;
             }
 
             public VideoEncoder setEncodingParameters(final int pfps, final int pbufferSize, final long pminBitrate, final long pmaxBitrate) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_setEncodingParameters(nativeRef, pfps, pbufferSize, pminBitrate, pmaxBitrate));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setEncodingParameters(nativeRef, pfps, pbufferSize, pminBitrate, pmaxBitrate));
                 return this;
             }
 
             public VideoEncoder setFps(final int pfps) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_setFps(nativeRef, pfps));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setFps(nativeRef, pfps));
                 return this;
             }
 
             public VideoEncoder setBufferSize(final int pbufferSize) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_setBufferSize(nativeRef, pbufferSize));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setBufferSize(nativeRef, pbufferSize));
                 return this;
             }
 
             public VideoEncoder setBitrate(final long pminBitrate, final long pmaxBitrate) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_setBitrate(nativeRef, pminBitrate, pmaxBitrate));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setBitrate(nativeRef, pminBitrate, pmaxBitrate));
                 return this;
             }
 
             public VideoEncoder setBitrate(final long pminBitrate) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_setBitrate2(nativeRef, pminBitrate));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setBitrate2(nativeRef, pminBitrate));
                 return this;
             }
 
             public EncodingContext enable(final Mat frame, final boolean isRgb) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
                 inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
@@ -1103,7 +1049,7 @@ public class Ffmpeg2 {
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride) {
                 inputIsRgb = isRgb;
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable2(nativeRef, isRgb ? 1 : 0, width, height, stride));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable2(nativeRef, isRgb ? 1 : 0, width, height, stride));
                 inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
@@ -1112,7 +1058,7 @@ public class Ffmpeg2 {
             }
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable3(nativeRef, isRgb ? 1 : 0, width, height));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable3(nativeRef, isRgb ? 1 : 0, width, height));
                 inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
@@ -1121,7 +1067,7 @@ public class Ffmpeg2 {
             }
 
             public EncodingContext enable(final Mat frame, final boolean isRgb, final int destWidth, final int destHeight) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable4(nativeRef, frame.nativeObj, isRgb ? 1 : 0, destWidth, destHeight));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable4(nativeRef, frame.nativeObj, isRgb ? 1 : 0, destWidth, destHeight));
                 inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
@@ -1129,8 +1075,9 @@ public class Ffmpeg2 {
                 return EncodingContext.this;
             }
 
-            public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride, final int destWidth, final int destHeight) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable5(nativeRef, isRgb ? 1 : 0, width, height, stride, destWidth, destHeight));
+            public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride, final int destWidth,
+                final int destHeight) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable5(nativeRef, isRgb ? 1 : 0, width, height, stride, destWidth, destHeight));
                 inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
@@ -1139,7 +1086,7 @@ public class Ffmpeg2 {
             }
 
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int destWidth, final int destHeight) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_enable6(nativeRef, isRgb ? 1 : 0, width, height, destWidth, destHeight));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable6(nativeRef, isRgb ? 1 : 0, width, height, destWidth, destHeight));
                 inputIsRgb = isRgb;
                 enabled = true;
                 if(se != null)
@@ -1148,19 +1095,19 @@ public class Ffmpeg2 {
             }
 
             public void encode(final Mat frame, final boolean isRgb) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
             }
 
             public void encode(final Mat frame) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, inputIsRgb ? 1 : 0));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, inputIsRgb ? 1 : 0));
             }
 
             public void stop() {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_stop(nativeRef));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_stop(nativeRef));
             }
 
             public StreamingEncoder streamingEncoder(final long maxLatencyMillis) {
-                throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_streaming(nativeRef));
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_streaming(nativeRef));
                 final var r = new StreamingEncoder(this);
                 if(enabled)
                     r.start();
@@ -1178,7 +1125,7 @@ public class Ffmpeg2 {
             @Override
             public void close() {
                 if(!closed && nativeRef != 0)
-                    FfmpegApi2.pcv4j_ffmpeg2_videoEncoder_delete(nativeRef);
+                    FfmpegApi.pcv4j_ffmpeg2_videoEncoder_delete(nativeRef);
                 closed = true;
             }
         }
@@ -1192,48 +1139,16 @@ public class Ffmpeg2 {
             this.nativeRef = nativeRef;
         }
 
-        public EncodingContext muxer(final String fmt, final String outputUri) {
-            if(output != null)
-                throw new IllegalStateException("Muxer already set");
-            output = new Muxer(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(fmt, outputUri, null, null));
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_setMuxer(nativeRef, output.nativeRef));
-            return this;
-        }
-
-        public EncodingContext muxer(final String outputUri) {
-            return muxer(null, outputUri);
-        }
-
-        public EncodingContext muxer(final String outputFormat, final WritePacket writer) {
-            return muxer(outputFormat, writer, null);
-        }
-
-        public EncodingContext muxer(final String outputFormat, final WritePacket writer, final MediaDataSeek seek) {
-            final Wbc wbc = new Wbc(writer);
-            final seek_buffer_callback sbcb = seek != null ? new seek_buffer_callback() {
-                @Override
-                public long seek_buffer(final long offset, final int whence) {
-                    return seek.seekBuffer(offset, whence);
-                }
-            } : null;
-
-            final var output = new CustomOutput(FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_create(outputFormat, null, wbc, sbcb), wbc, sbcb);
-
-            // violation of the rule that objects should be usable once the constructor returns ... oh well,
-            // at least it's private. The fix for this would be to have the Wbc hold the CustomOutput rather than
-            // the other way around but ... not right now.
-            wbc.bb = output.customBuffer();
-
-            this.output = output;
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_setMuxer(nativeRef, this.output.nativeRef));
-
+        public EncodingContext muxer(final Muxer muxer) {
+            this.output = muxer;
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_setMuxer(nativeRef, muxer.nativeRef));
             return this;
         }
 
         public VideoEncoder openVideoEncoder(final String codec, final String name) {
             if(encoders.containsKey(name))
                 throw new FfmpegException("Cannot add a second encoder with the name \"" + name + "\"");
-            final var ret = new VideoEncoder(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_openVideoEncoder(nativeRef, codec));
+            final var ret = new VideoEncoder(FfmpegApi.pcv4j_ffmpeg2_encodingContext_openVideoEncoder(nativeRef, codec));
             toClose.addFirst(ret);
             encoders.put(name, ret);
             return ret;
@@ -1248,13 +1163,13 @@ public class Ffmpeg2 {
         }
 
         public EncodingContext ready() {
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_ready(nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_ready(nativeRef));
             return this;
         }
 
         public EncodingContext stop() {
             encoders.values().forEach(v -> v.stop());
-            throwIfNecessary(FfmpegApi2.pcv4j_ffmpeg2_encodingContext_stop(nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_stop(nativeRef));
             return this;
         }
 
@@ -1269,7 +1184,7 @@ public class Ffmpeg2 {
                 output.close();
 
             if(nativeRef != 0)
-                FfmpegApi2.pcv4j_ffmpeg2_encodingContext_delete(nativeRef);
+                FfmpegApi.pcv4j_ffmpeg2_encodingContext_delete(nativeRef);
         }
     }
 
@@ -1283,7 +1198,7 @@ public class Ffmpeg2 {
         @Override
         public void close() {
             if(nativeRef != 0L)
-                FfmpegApi2.pcv4j_ffmpeg2_mediaDataSource_destroy(nativeRef);
+                FfmpegApi.pcv4j_ffmpeg2_mediaDataSource_destroy(nativeRef);
         }
     }
 
@@ -1311,12 +1226,12 @@ public class Ffmpeg2 {
         private void set(final fill_buffer_callback fill, final seek_buffer_callback seek) {
             strongRefDs = fill;
             strongRefS = seek;
-            FfmpegApi2.pcv4j_ffmpeg2_customMediaDataSource_set(nativeRef, fill, seek);
+            FfmpegApi.pcv4j_ffmpeg2_customMediaDataSource_set(nativeRef, fill, seek);
         }
 
         private ByteBuffer customStreamBuffer() {
-            final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_customMediaDataSource_buffer(nativeRef);
-            bufSize = FfmpegApi2.pcv4j_ffmpeg2_customMediaDataSource_bufferSize(nativeRef);
+            final Pointer value = FfmpegApi.pcv4j_ffmpeg2_customMediaDataSource_buffer(nativeRef);
+            bufSize = FfmpegApi.pcv4j_ffmpeg2_customMediaDataSource_bufferSize(nativeRef);
             return value.getByteBuffer(0, bufSize);
         }
     }
@@ -1330,49 +1245,10 @@ public class Ffmpeg2 {
 
     private static String errorMessage(final long errorCode) {
         final MutableObject<Pointer> nmes = new MutableObject<>(null);
-        try(final QuietCloseable qc = () -> FfmpegApi2.pcv4j_ffmpeg2_utils_freeString(nmes.getValue());) {
-            nmes.setValue(FfmpegApi2.pcv4j_ffmpeg2_utils_statusMessage(errorCode));
+        try(final QuietCloseable qc = () -> FfmpegApi.pcv4j_ffmpeg2_utils_freeString(nmes.getValue());) {
+            nmes.setValue(FfmpegApi.pcv4j_ffmpeg2_utils_statusMessage(errorCode));
             return Optional.ofNullable(nmes.getValue()).orElseThrow(() -> new FfmpegException("Failed to retrieve status message for code: " + errorCode))
                 .getString(0);
-        }
-    }
-
-    private static class CustomOutput extends Muxer {
-        // ======================================================================
-        // JNA will only hold a weak reference to the callbacks passed in
-        // so if we dynamically allocate them then they will be garbage collected.
-        // In order to prevent that, we're keeping strong references to them.
-        // These are not private in order to avoid any possibility that the
-        // JVM optimized them out since they aren't read anywhere in this code.
-        @SuppressWarnings("unused") public write_buffer_callback strongRefW = null;
-        @SuppressWarnings("unused") public seek_buffer_callback strongRefS = null;
-        // ======================================================================
-
-        private CustomOutput(final long nativeRef, final write_buffer_callback write, final seek_buffer_callback sbcb) {
-            super(nativeRef);
-            strongRefW = write;
-            strongRefS = sbcb;
-        }
-
-        private ByteBuffer customBuffer() {
-            final Pointer value = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_buffer(nativeRef);
-            final int bufSize = FfmpegApi2.pcv4j_ffmpeg2_defaultMuxer_bufferSize(nativeRef);
-            return value.getByteBuffer(0, bufSize);
-        }
-    }
-
-    private static class Wbc implements write_buffer_callback {
-        ByteBuffer bb;
-        final WritePacket writer;
-
-        private Wbc(final WritePacket writer) {
-            this.writer = writer;
-        }
-
-        @Override
-        public long write_buffer(final int numBytesToWrite) {
-            writer.handle(bb, numBytesToWrite);
-            return 0L;
         }
     }
 

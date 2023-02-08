@@ -26,7 +26,7 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_end( args );
 }
 
-uint64_t UriMediaDataSource::open(AVFormatContext* preallocatedAvFormatCtx, AVDictionary** opts) {
+uint64_t UriMediaDataSource::open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** opts) {
   if (isEnabled(TRACE)) {
     llog(TRACE, "Opening stream for UriMediaDataSource %" PRId64 " with AVFormatContext %" PRId64 " and opts %" PRId64, (uint64_t)this, (uint64_t)preallocatedAvFormatCtx, (uint64_t)opts);
     llog(TRACE, "     fmt: %s", fmtNull ? "null" : fmt.c_str());
@@ -42,7 +42,7 @@ uint64_t UriMediaDataSource::open(AVFormatContext* preallocatedAvFormatCtx, AVDi
   }
 
   // according to the docs for avformat_open_input, "a user-supplied AVFormatContext will be freed on failure."
-  return MAKE_AV_STAT(avformat_open_input(&preallocatedAvFormatCtx, uriNull ? nullptr : uri.c_str(), ifmt, opts));
+  return MAKE_AV_STAT(avformat_open_input(preallocatedAvFormatCtx, uriNull ? nullptr : uri.c_str(), ifmt, opts));
 }
 
 //========================================================================

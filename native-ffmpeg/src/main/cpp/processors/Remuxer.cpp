@@ -195,7 +195,7 @@ uint64_t Remuxer::remuxPacket(const AVPacket * inPacket) {
   PILECV4J_TRACE;
 
   if (!output) {
-    llog(ERROR, "Can't remux packet without a destination (output) set");
+    llog(ERROR, "Can't remux packet without a muxer set");
     return MAKE_P_STAT(NO_OUTPUT);
   }
 
@@ -206,41 +206,27 @@ uint64_t Remuxer::remuxPacket(const AVPacket * inPacket) {
   }
 
   int input_stream_index = inPacket->stream_index;
-  if (streams_list[input_stream_index] < 0)
+  int output_stream_index = streams_list[input_stream_index];
+  if (output_stream_index < 0)
     return 0;
 
   AVRational& time_base = streamTimeBases[input_stream_index];
 
-  //AVStream * in_stream = formatCtx->streams[input_stream_index];
-  //AVRational& time_base = in_stream->time_base;
+  AVPacket* toUse = (AVPacket*)inPacket;
 
-  AVPacket* pPacket = av_packet_clone(inPacket);
-  if (!pPacket) {
-    llog(ERROR, "Failed to clone a packet");
-    return MAKE_AV_STAT(AVERROR_UNKNOWN);
-  }
   // if the input stream has no valid pts (like when reading the live feed from milestone)
   // then we're going to calculate it.
-  if (pPacket->pts == AV_NOPTS_VALUE) {
-    pPacket->pts = av_rescale_q((int64_t)(now() - startTime), millisecondTimeBase, time_base);
-    pPacket->dts = pPacket->pts;
+  if (toUse->pts == AV_NOPTS_VALUE) {
+    toUse = av_packet_clone(inPacket);
+    toUse->pts = av_rescale_q((int64_t)(now() - startTime), millisecondTimeBase, time_base);
+    toUse->dts = inPacket->pts;
   }
 
-  AVStream* out_stream = output_format_context->streams[0];
-  pPacket->stream_index = streams_list[input_stream_index];
-  pPacket->pts = av_rescale_q_rnd(pPacket->pts, time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
-  pPacket->dts = av_rescale_q_rnd(pPacket->dts, time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
-  pPacket->duration = av_rescale_q(pPacket->duration, time_base, out_stream->time_base);
-  // https://ffmpeg.org/doxygen/trunk/structAVPacket.html#ab5793d8195cf4789dfb3913b7a693903
-  pPacket->pos = -1;
-  if (isEnabled(TRACE))
-    logPacket(TRACE, COMPONENT, "Rescaled Packet", pPacket, output_format_context);
+  auto ret = output->writePacket(inPacket, time_base, output_stream_index);
+  if (toUse != inPacket)
+    av_packet_free(&toUse);
 
-  int ret = av_interleaved_write_frame(output_format_context, pPacket);
-  av_packet_free(&pPacket);
-  if (ret < 0)
-    llog(ERROR, "Error muxing packet \"%s\"", av_err2str(ret));
-  return MAKE_AV_STAT(ret);
+  return ret;
 }
 
 uint64_t Remuxer::handlePacket(AVPacket* pPacket, AVMediaType streamMediaType) {

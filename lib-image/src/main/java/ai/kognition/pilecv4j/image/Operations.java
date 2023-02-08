@@ -30,8 +30,6 @@ import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.QuietCloseable;
 
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
-
 public class Operations {
     private static Logger LOGGER = LoggerFactory.getLogger(Operations.class);
 
@@ -84,14 +82,14 @@ public class Operations {
      *
      * @return A CvMat with the edge detection results. The caller owns the CvMat.
      */
-    public static CvMat canny(final GradientImages gis, final double tlow, final double thigh, final Closer closer) {
+    public static CvMat canny(final GradientImages gis, final double tlow, final double thigh) {
         try(final CvMat edgeImage = new CvMat();) {
             Imgproc.Canny(gis.dx, gis.dy, edgeImage, tlow, thigh, true);
             return edgeImage.returnMe();
         }
     }
 
-    public static GradientImages gradient(final CvMat grayImage, final int kernelSize, final Closer closerp) {
+    public static GradientImages gradient(final CvMat grayImage, final int kernelSize) {
 
         // find gradient image
         try(final CvMat dx = new CvMat();
@@ -119,7 +117,7 @@ public class Operations {
             try(final CvMat gradientDirImage = new CvMat(dx.rows(), dx.cols(), CvType.CV_8UC1);) {
                 gradientDirImage.put(0, 0, dirsa);
                 final GradientImages ret = new GradientImages(gradientDirImage.returnMe(), dx.returnMe(), dy.returnMe());
-                return closerp == null ? ret : closerp.add(ret);
+                return ret;
             }
         }
     }

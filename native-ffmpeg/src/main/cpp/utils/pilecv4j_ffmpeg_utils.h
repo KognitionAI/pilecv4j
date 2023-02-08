@@ -40,8 +40,8 @@ namespace ffmpeg
  */
 enum Pcv4jStat {
   OK = 0,
-  STREAM_IN_USE = 1,
-  STREAM_BAD_STATE = 2,
+  IN_USE = 1,
+  BAD_STATE = 2,
   NO_STREAM = 3,
   NO_SUPPORTED_CODEC = 4,
   FAILED_CREATE_CODEC_CONTEXT = 5,
@@ -60,14 +60,17 @@ enum Pcv4jStat {
   NO_FORMAT = 18,
   NO_OUTPUT = 19,
   NO_PACKET_SOURCE_INFO = 20,
-  NULL_PARAMETER = 21
+  NULL_PARAMETER = 21,
+  FAILED_CREATE_MUXER = 22
 };
-#define MAX_PCV4J_CODE 21
+#define MAX_PCV4J_CODE 22
 
 // Make a full kognition return status from an libav status.
 #define MAKE_AV_STAT(x) ((uint64_t)((int32_t)x) & 0xffffffff)
 // Make a full kognition return status from an native-ffmpeg kognition status.
 #define MAKE_P_STAT(x) ((((uint64_t)((int32_t)x) & 0xffffffff)) << 32);
+
+const char* errMessage(uint64_t status);
 
 static inline bool isError(uint64_t stat) {
   // 0 is good and we expect this most of the time so check it first.
@@ -103,15 +106,20 @@ static inline int64_t now() {
   ).count());
 }
 
-static inline void buildOptions(const std::vector<std::tuple<std::string,std::string> >& options, AVDictionary** opts) {
+static inline uint64_t buildOptions(const std::vector<std::tuple<std::string,std::string> >& options, AVDictionary** opts) {
   if (options.size() == 0) {
+    if (isEnabled(TRACE))
+      log(TRACE,"UTIL","No options set. Setting opts to nullptr");
     *opts = nullptr;
-    return;
+    return 0;
   }
 
   for (auto o : options) {
-    av_dict_set(opts, std::get<0>(o).c_str(), std::get<1>(o).c_str(), 0 );
+    uint64_t result = MAKE_AV_STAT(av_dict_set(opts, std::get<0>(o).c_str(), std::get<1>(o).c_str(), 0 ));
+    if (isError(result))
+      return result;
   }
+  return 0;
 }
 
 static inline uint64_t buildOptions(const std::map<std::string,std::string>& options, AVDictionary** opts) {
@@ -130,10 +138,6 @@ static inline uint64_t buildOptions(const std::map<std::string,std::string>& opt
   }
 
   return 0;
-}
-
-static inline bool streamSelected(bool* selectedStreams, int streamIndex) {
-  return streamIndex < 0 ? false : (selectedStreams ? selectedStreams[streamIndex] : true);
 }
 
 static inline bool decoderExists(AVCodecID id) {

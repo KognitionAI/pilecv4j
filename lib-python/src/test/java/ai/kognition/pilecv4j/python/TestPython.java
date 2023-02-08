@@ -35,8 +35,8 @@ import org.junit.Test;
 
 import net.dempsy.utils.test.ConditionPoll;
 
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg2.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.ImageFile;
@@ -142,7 +142,7 @@ public class TestPython {
         final AtomicLong frameCount = new AtomicLong(0);
         try(final KogSys pt = new KogSys();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-            final StreamContext c = Ffmpeg2.createStreamContext();) {
+            final StreamContext c = Ffmpeg.createStreamContext();) {
 
             pt.addModulePath("./src/test/resources/python");
 

@@ -533,11 +533,11 @@ You can also you the library to encode videos and video streams. The first thing
     ...
 ```
 
-First you need to define where the media data is going. You do this using the `outputStream` method.
+First you need to define where the media data is going. You do this using the `muxer` method.
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .outputStream(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(OUTPUT_FILE_OR_STREAM_URI)
         ...
 ```
 
@@ -545,7 +545,7 @@ You can also explicitly define the format. This is often necessary for streaming
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .outputStream("flv", "rtmp://myhost:1935/live...")
+        .muxer("flv", "rtmp://myhost:1935/live...")
         ...
 ```
 
@@ -555,7 +555,7 @@ You need to select at least one encoder to add to the context. You can do that w
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .outputStream(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(OUTPUT_FILE_OR_STREAM_URI)
         .openVideoEncoder("libx264", "my encoder")
         ...
 ```
@@ -572,7 +572,7 @@ You can fine tune the parameters for the codec using `addCodecOption`. You can a
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .outputStream(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(OUTPUT_FILE_OR_STREAM_URI)
         .openVideoEncoder("libx264")
         .addCodecOptions("preset","slow")
         .addCodecOptions("crf", "40")
@@ -583,7 +583,7 @@ You should set the encoder's frame rate explicitly using `setFps`. If you don't 
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .outputStream(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(OUTPUT_FILE_OR_STREAM_URI)
         .openVideoEncoder("libx264")
         .setFps(10)
         ...
@@ -621,7 +621,7 @@ After that you can start sending frames to the encoder using the `encode()` meth
 ``` java
     Mat firstFrame = ...;
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .outputStream(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(OUTPUT_FILE_OR_STREAM_URI)
         .openVideoEncoder("libx264", "my encoder")
         .addCodecOptions("preset","slow")
         .addCodecOptions("crf", "40")

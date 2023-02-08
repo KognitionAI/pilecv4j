@@ -71,6 +71,7 @@ add_library(${PROJECT_NAME} SHARED
   src/main/cpp/filters/JavaStreamSelector.cpp
   src/main/cpp/filters/JavaPacketFilter.cpp
   src/main/cpp/muxers/DefaultMuxer.cpp
+  src/main/cpp/muxers/SegmentedMuxer.cpp
   )
 
 target_include_directories(${PROJECT_NAME} PRIVATE . PUBLIC ${AVCODEC_INCLUDE_DIR})

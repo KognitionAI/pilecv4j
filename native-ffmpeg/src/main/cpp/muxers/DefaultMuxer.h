@@ -24,7 +24,7 @@ namespace ffmpeg
 typedef uint64_t (*write_buffer)(int32_t numBytes);
 typedef int64_t (*seek_buffer_out)(int64_t offset, int whence);
 
-#ifdef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
+#ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
 class DefaultMuxer;
 static int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size);
 static int64_t seek_in_custom_output(void *opaque, int64_t offset, int whence);
@@ -57,7 +57,7 @@ class DefaultMuxer: public Muxer
   bool createdStreams = false;
   bool readyCalled = false;
 
-#ifdef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
+#ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
   friend int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size);
   friend int64_t seek_in_custom_output(void *opaque, int64_t offset, int whence);
   friend void* fetchBuffer(DefaultMuxer*);
@@ -90,25 +90,33 @@ public:
    * This will be called if we have the AVCodecParameters. If we have the actual AVCodec
    * then createNextStream(AVCodec*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodecParameters* codecPars, AVStream** out);
+  virtual uint64_t createNextStream(AVCodecParameters* codecPars, int* stream_index_out);
 
   /**
    * This will be called if we have the AVCodec. If we only have the AVCodecParameters
    * then createNextStream(AVCodecParameters*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodec* codec, AVStream** out);
+  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out);
 
-  uint64_t ready();
+  /**
+   * This is essentially where the avformat_write_header should be called on the output
+   */
+  virtual uint64_t ready();
+
   /**
    * By default, if the output_format_context is not null, this will write the trailer
    * using <em>av_write_trailer</em>
    */
   virtual uint64_t close();
 
+  /**
+   * This will be called if a failure occurs in a class using the muxer as a notification to
+   * the muxer to clean up resources because of a failure.
+   */
   virtual void fail();
 };
 
-#ifdef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP
+#ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
 static inline void* fetchBuffer(DefaultMuxer* c) {
   return c->ioBufferToWriteToJava;
 }

@@ -102,7 +102,7 @@ public class TestHoughTransform {
             ImageFile.writeImageFile(grayImage, new File(rootDir, "tmpgray.bmp").getAbsolutePath());
 
             // find gradient image
-            final GradientImages gis = Operations.gradient(grayImage, kernelSize, closer);
+            final GradientImages gis = closer.add(Operations.gradient(grayImage, kernelSize));
             final CvMat gradientDirRaster = gis.gradientDir;
             ImageFile.writeImageFile(gis.gradientDir, new File(rootDir, "tmpgradDir.bmp").getAbsolutePath());
             ImageFile.writeImageFile(gis.dx, new File(rootDir, "tmpdx.bmp").getAbsolutePath());
@@ -110,7 +110,7 @@ public class TestHoughTransform {
 
             // edge detection
             final double tlow = (tlowpct / 100.0) * thigh;
-            final CvMat edgeRaster = closer.add(Operations.canny(gis, tlow, thigh, closer));
+            final CvMat edgeRaster = closer.add(Operations.canny(gis, tlow, thigh));
             ImageFile.writeImageFile(edgeRaster, new File(rootDir, "tmpedge.bmp").getAbsolutePath());
 
             final Transform transform = new Transform(sm, quantFactor, 1.0, 10.0);

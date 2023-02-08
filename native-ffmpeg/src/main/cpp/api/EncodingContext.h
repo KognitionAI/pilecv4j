@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <string>
+#include <vector>
 #include <map>
 
 extern "C" {
@@ -55,7 +56,8 @@ class VideoEncoder {
   // ==================================
   // valid once state becomes VE_ENABLED
   AVCodec* video_avc = nullptr;
-  AVStream* video_avs = nullptr;
+  int video_sindex = -1;
+  AVRational video_stime_base;
   AVCodecContext* video_avcc = nullptr;
   // ==================================
 
@@ -80,6 +82,7 @@ class VideoEncoder {
   uint8_t* streams_original_extradata = nullptr;
   int streams_original_extradata_size = 0;
   bool streams_original_set = false;
+  // ==================================
 
   Synchronizer* sync = nullptr;
 public:
@@ -119,6 +122,13 @@ public:
 
   uint64_t streaming();
 
+  /**
+   * Called from the EncodingContext after everything else in EncodingContext::ready() is done
+   * as a notification. It will take the opportunity to set the time_base from the stream post
+   * avformat_write_header.
+   */
+  uint64_t ready();
+
   uint64_t stop();
 };
 
@@ -130,21 +140,13 @@ public:
  */
 class EncodingContext
 {
-//  std::string fmt;
-//  bool fmtNull = false;
-//  std::string outputUri;
-
-  //AVFormatContext *output_format_context = nullptr;
-  //bool cleanupIoContext = false;
   Muxer* muxer = nullptr;
   EncoderState state = ENC_FRESH;
-
-//  bool wroteHeader = false;
 
   friend class VideoEncoder;
 
   std::atomic<bool> fake_mutex;
-
+  std::vector<VideoEncoder*> encoders;
 public:
   inline EncodingContext() {
     fake_mutex = false;
@@ -154,7 +156,9 @@ public:
   uint64_t setMuxer(Muxer* pmuxer);
 
   inline VideoEncoder* openVideoEncoder(const char* video_codec) {
-    return new VideoEncoder(this, video_codec);
+    auto ret = new VideoEncoder(this, video_codec);
+    encoders.push_back(ret);
+    return ret;
   }
 
   /**

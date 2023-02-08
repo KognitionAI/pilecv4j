@@ -26,7 +26,7 @@ namespace pilecv4j
 namespace ffmpeg
 {
 
-#define COMPONENT "ENCC"
+#define COMPONENT "ECTX"
 #define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
@@ -62,7 +62,7 @@ uint64_t EncodingContext::setMuxer(Muxer* pmuxer) {
   PILECV4J_TRACE;
   if (state != ENC_FRESH) {
     llog(ERROR, "EncodingContext is in the wrong state to set the Muxer. It should have been FRESH but it's in %d.", (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (muxer) {
@@ -86,7 +86,7 @@ uint64_t EncodingContext::ready() {
 
   if (state != ENC_OPEN_STREAMS) {
     llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_OPEN_STREAMS, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (!muxer) {
@@ -98,6 +98,11 @@ uint64_t EncodingContext::ready() {
   if (isError(iret = muxer->ready())) {
     llog(ERROR, "Failed to ready the muxer");
     return iret;
+  }
+
+  for (auto ve : encoders) {
+    if (isError(iret = ve->ready()))
+      return iret;
   }
 
   state = ENC_READY;
@@ -132,12 +137,12 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   // the encoding context state needs to be open
   if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
     llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_OPEN_CONTEXT, (int)enc->state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (state != VE_FRESH) {
     llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d but it's in %d.", (int)VE_FRESH, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (!enc->muxer) {
@@ -169,16 +174,6 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   }
   llog(TRACE, "video codec id %d: %s", (int)video_avc->id, PO(video_avc->name));
 
-  //llog(TRACE, "STEP 4: avformat_new_stream ( ctx, codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
-  //  avformat_new_stream(enc->output_format_context, video_avc);
-  video_avs = nullptr;
-  result = enc->muxer->createNextStream(video_avc, &video_avs);
-  if (isError(result)) {
-    llog(ERROR, "Failed to create stream in muxer");
-    goto fail;
-  }
-  llog(TRACE, "video stream index %d", (int)video_avs->index);
-
   //llog(TRACE, "STEP 5: avcodec_alloc_context3 ( codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
   video_avcc = avcodec_alloc_context3(video_avc);
   if (!video_avcc) {
@@ -207,11 +202,9 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   video_avcc->codec_type = AVMEDIA_TYPE_VIDEO;
   video_avcc->width = dstW;
   video_avcc->height = dstH;
-  // set with addCodecOption("g","12")
-//  video_avcc->gop_size = 12;
+
   video_avcc->time_base = av_inv_q(framerate);
   video_avcc->framerate = framerate;
-  video_avs->time_base = video_avcc->time_base;
 
   // video_avcc->sample_aspect_ratio = 0; // TODO: carry this over from the input: decoder_ctx->sample_aspect_ratio;
   if (video_avc->pix_fmts)
@@ -219,18 +212,21 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   else
     video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
 
+  //llog(TRACE, "STEP 4: avformat_new_stream ( ctx, codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
+  //  avformat_new_stream(enc->output_format_context, video_avc);
+  //llog(TRACE, "STEP 7: avcodec_parameters_from_context");
+  result = enc->muxer->createNextStream(video_avcc, &video_sindex);
+  if (isError(result)) {
+    llog(ERROR, "Failed to create stream in muxer");
+    goto fail;
+  }
+  llog(TRACE, "video stream index %d", (int)video_sindex);
+
+
   if (enc->muxer->getFormatContext()->oformat->flags & AVFMT_GLOBALHEADER)
     video_avcc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   enc->state = ENC_OPEN_STREAMS;
-
-  //llog(TRACE, "STEP 7: avcodec_parameters_from_context");
-
-  result = MAKE_AV_STAT(avcodec_parameters_from_context(video_avs->codecpar, video_avcc));
-  if (isError(result)) {
-    llog(ERROR, "could not fill codec parameters");
-    goto fail;
-  }
 
   //llog(TRACE, "STEP 8: avcodec_open2");
 
@@ -251,11 +247,19 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   // We're going to store off the original setting so we can put it back correctly.
   // If we don't do this then we get a double free if we close both the AVCodecContext
   // and the overall AVFormatContext
-  streams_original_extradata = video_avs->codecpar->extradata;
-  streams_original_extradata_size = video_avs->codecpar->extradata_size;
-  video_avs->codecpar->extradata = video_avcc->extradata;
-  video_avs->codecpar->extradata_size = video_avcc->extradata_size;
-  streams_original_set = true;
+  {
+    AVStream* video_avs = enc->muxer->getStream(video_sindex);
+    if (!video_avs) {
+      result = MAKE_P_STAT(NO_STREAM);
+      goto fail;
+    }
+
+    streams_original_extradata = video_avs->codecpar->extradata;
+    streams_original_extradata_size = video_avs->codecpar->extradata_size;
+    video_avs->codecpar->extradata = video_avcc->extradata;
+    video_avs->codecpar->extradata_size = video_avcc->extradata_size;
+    streams_original_set = true;
+  }
   // ======================================
 
   result = IMakerManager::setupTransform(width, height, stride, isRgb ? ai::kognition::pilecv4j::RGB24 : ai::kognition::pilecv4j::BGR24, video_avcc, dstW, dstH, &xform);
@@ -283,10 +287,21 @@ uint64_t VideoEncoder::streaming() {
   // this should NOT already be encoding.
   if (state >= VE_ENCODING) {
     llog(ERROR, "VideoEncoder is in the wrong state. streaming() must be called before encoding. The current state is %d.", (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   sync = new Synchronizer();
+  return 0;
+}
+
+uint64_t VideoEncoder::ready() {
+  AVStream* stream = enc->muxer->getStream(video_sindex);
+  if (!stream) {
+    llog(ERROR, "No stream set ");
+    return MAKE_P_STAT(NO_STREAM);
+  }
+
+  video_stime_base = stream->time_base;
   return 0;
 }
 
@@ -301,7 +316,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 
   if (enc->state != ENC_READY) {
     llog(ERROR, "EncodingContext is in the wrong state. It should have been in ENC_READY(%d) but it's in %d.", (int)ENC_READY, (int)enc->state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   uint64_t result = 0;
@@ -315,7 +330,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
         sync->start();
     } else {
       llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d or %d but it's in %d.", (int)VE_SET_UP, (int)VE_ENCODING, (int)state);
-      return MAKE_P_STAT(STREAM_BAD_STATE);
+      return MAKE_P_STAT(BAD_STATE);
     }
   }
 
@@ -331,15 +346,15 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
   // encode the frame
   if (sync) {
     int64_t pts;
-    int64_t oneInterval = av_rescale_q(1, video_avcc->time_base, video_avs->time_base);
+    int64_t oneInterval = av_rescale_q(1, video_avcc->time_base, video_stime_base);
     do {
       pts = framecount * oneInterval;
       framecount++;
-    } while(sync->throttle(pts, video_avs->time_base));
+    } while(sync->throttle(pts, video_stime_base));
     frame->pts = pts - oneInterval;
   } else {
     llog(TRACE, "rescaling pts for frame at %" PRId64, (uint64_t)frame);
-    frame->pts = framecount * av_rescale_q(1, video_avcc->time_base, video_avs->time_base);
+    frame->pts = framecount * av_rescale_q(1, video_avcc->time_base, video_stime_base);
     framecount++;
   }
 
@@ -381,21 +396,18 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 
       packetReceived = true;
 
-      output_packet.stream_index = video_avs->index;
+      output_packet.stream_index = video_sindex;
 
       if (isEnabled(TRACE)) {
         llog(TRACE, "Output Packet Timing[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64 " timebase: [ %d / %d ]",
             (int) output_packet.stream_index,
             (int64_t)output_packet.pts, (int64_t)output_packet.dts,
             (int64_t)output_packet.duration,
-            (int)video_avs->time_base.num, (int)video_avs->time_base.den);
+            (int)video_stime_base.num, (int)video_stime_base.den);
       }
 
-      rc = av_interleaved_write_frame(enc->muxer->getFormatContext(), &output_packet);
-      if (rc != 0) {
-        llog(ERROR,"Error %d while writing packet to output: %s", rc, av_err2str(rc));
-        result = MAKE_AV_STAT(rc);
-      }
+      enc->muxer->writePacket(&output_packet);
+
     }
 
     if (packetReceived)
@@ -412,12 +424,12 @@ uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
 
   if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
     llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d or %d but it's in %d.", (int)ENC_OPEN_CONTEXT, (int)ENC_OPEN_STREAMS, (int)enc->state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (state != VE_FRESH) {
     llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d but it's in %d.", (int)VE_FRESH, (int)state);
-    return MAKE_P_STAT(STREAM_BAD_STATE);
+    return MAKE_P_STAT(BAD_STATE);
   }
 
   if (options.find(key) != options.end())
@@ -432,6 +444,7 @@ uint64_t VideoEncoder::stop() {
   FakeMutextGuard g(enc->fake_mutex);
 
   // need to put it back or we get a double free when closing the overall context
+  AVStream* video_avs = enc->muxer->getStream(0);
   if (streams_original_set && video_avs) {
     if (isEnabled(TRACE))
       llog(TRACE, "Resetting video_avs(%" PRId64 ")->codecpar(%" PRId64 ")->extradata(%" PRId64 ") to %" PRId64,
