@@ -44,11 +44,18 @@ import java.awt.image.DataBufferShort;
 import java.awt.image.DataBufferUShort;
 import java.awt.image.DirectColorModel;
 import java.awt.image.IndexColorModel;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.PrintStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.DoubleBuffer;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -56,6 +63,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import org.apache.commons.io.IOUtils;
 import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -315,8 +323,8 @@ public class Utils {
      * This is a convenience method for {@link Utils#dump(Mat, PrintStream)} that
      * uses {@link System#out} as the {@link PrintStream}
      */
-    public static void dump(final Mat mat, final int numRows, final int numCols) {
-        dump(mat, System.out, numRows, numCols);
+    public static void dump(final Mat mat, final int startRow, final int numRows, final int startCol, final int numCols) {
+        dump(mat, System.out, startRow, numRows, startCol, numCols);
     }
 
     /**
@@ -326,7 +334,7 @@ public class Utils {
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
      */
     public static void dump(final Mat mat) {
-        dump(mat, System.out, -1, -1);
+        dump(mat, System.out, 0, -1, 0, -1);
     }
 
     /**
@@ -335,7 +343,7 @@ public class Utils {
      * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
      */
     public static void dump(final Mat mat, final PrintStream out) {
-        dump(mat, out, -1, -1);
+        dump(mat, out, 0, -1, 0, -1);
     }
 
     /**
@@ -357,8 +365,12 @@ public class Utils {
      * @param numCols limit the number of columns to the given number. Supply -1 for
      *     the all columns.
      */
-    public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
-        CvMat.rasterAp(mat, raster -> dump(raster, out, numRows, numCols));
+//    public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
+//        CvMat.rasterAp(mat, raster -> dump(raster, out, 0, numRows, 0, numCols));
+//    }
+//
+    public static void dump(final Mat mat, final PrintStream out, final int startRow, final int numRows, final int startCol, final int numCols) {
+        CvMat.rasterAp(mat, raster -> dump(raster, out, startRow, numRows, startCol, numCols));
     }
 
     /**
@@ -389,6 +401,78 @@ public class Utils {
      */
     public static CvMat letterbox(final Mat mat, final int dim, final Scalar padding) {
         return letterbox(mat, new Size(dim, dim), padding);
+    }
+
+    public static double averageError(Mat mat, float[] expected) {
+        System.out.println(mat);
+        int numTotalElements = (int)(mat.total() * mat.channels());
+        if (expected.length != numTotalElements)
+            throw new IllegalArgumentException("Mat size doesn't match expected size. Mat size is " + 
+               numTotalElements + " while the number of expected elements is " + expected.length);
+        
+        try (var flat = CvMat.move(mat.reshape(1, new int[] { 1, numTotalElements }));) {
+            double err = 0;
+            for (int i =0; i < numTotalElements; i++) {
+                err += Math.abs((double)expected[i] - flat.get(0, i)[0]);
+            }
+            return err / (double)numTotalElements;
+        }
+    }
+    
+    public static double averageError(Mat mat, double[] expected) {
+        System.out.println(mat);
+        int numTotalElements = (int)(mat.total() * mat.channels());
+        if (expected.length != numTotalElements)
+            throw new IllegalArgumentException("Mat size doesn't match expected size. Mat size is " + 
+               numTotalElements + " while the number of expected elements is " + expected.length);
+        
+        try (var flat = CvMat.move(mat.reshape(1, new int[] { 1, numTotalElements }));) {
+            double err = 0;
+            for (int i =0; i < numTotalElements; i++) {
+                err += Math.abs((double)expected[i] - flat.get(0, i)[0]);
+            }
+            return err / (double)numTotalElements;
+        }
+    }
+    
+    public static double averageErrorFloat(Mat mat, File rawDataFile) throws IOException {
+        final float[] expected;
+        try (var in = new FileInputStream(rawDataFile);) {
+            final ByteBuffer expectedBb = ByteBuffer.wrap(IOUtils.toByteArray(in));
+            expectedBb.order(ByteOrder.LITTLE_ENDIAN);
+            final FloatBuffer expectedFb = expectedBb.asFloatBuffer();
+
+            expected = new float[expectedFb.capacity()];
+            expectedFb.get(expected);
+        }
+        return averageError(mat, expected);
+    }
+
+    public static double averageErrorDouble(Mat mat, File rawDataFile) throws IOException {
+        final double[] expected;
+        try (var in = new FileInputStream(rawDataFile);) {
+            final ByteBuffer expectedBb = ByteBuffer.wrap(IOUtils.toByteArray(in));
+            expectedBb.order(ByteOrder.LITTLE_ENDIAN);
+            final DoubleBuffer expectedFb = expectedBb.asDoubleBuffer();
+
+            expected = new double[expectedFb.capacity()];
+            expectedFb.get(expected);
+        }
+        return averageError(mat, expected);
+    }
+
+    public static double averageErrorUint8(Mat mat, File rawDataFile) throws IOException {
+        final float[] expected;
+        try (var in = new FileInputStream(rawDataFile);) {
+            final ByteBuffer expectedBb = ByteBuffer.wrap(IOUtils.toByteArray(in));
+            expectedBb.order(ByteOrder.LITTLE_ENDIAN);
+
+            expected = new float[expectedBb.capacity()];
+            for (int i = 0; i < expected.length; i++) {
+                expected[i] = (float)(expectedBb.get() & 0xff);
+            }
+        }
+        return averageError(mat, expected);
     }
 
     /**
@@ -433,12 +517,14 @@ public class Utils {
         final StringBuilder sb = new StringBuilder("[");
         IntStream.range(0, length - 1)
             .forEach(i -> {
-                sb.append(Long.toHexString(valueGetter.apply(i) & mask));
+                //sb.append(Long.toHexString(valueGetter.apply(i) & mask));
+                sb.append(valueGetter.apply(i) & mask);
                 sb.append(", ");
             });
 
         if(length > 0)
-            sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
+            //sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
+            sb.append(valueGetter.apply(length - 1) & mask);
         sb.append("]");
         return sb.toString();
     }
@@ -485,27 +571,22 @@ public class Utils {
      *     the all columns.
      */
     @SuppressWarnings("unchecked")
-    private static void dump(final CvRaster raster, final PrintStream out, int numRows, int numCols) {
-        if(numRows < 0) numRows = raster.rows();
-        if(numCols < 0) numCols = raster.cols();
-
-        if(raster.rows() < numRows)
-            numRows = raster.rows();
-        if(raster.cols() < numCols)
-            numCols = raster.cols();
+    private static void dump(final CvRaster raster, final PrintStream out, int startRow, int numRows, int startCol, int numCols) {
+        int endRow = (numRows < 0) ? (raster.rows() - 1 - startRow) : Math.min((startRow + numRows - 1), raster.rows() - 1);
+        int endCol = (numCols < 0) ? (raster.cols() - 1 - startCol) : Math.min((startCol + numCols - 1), raster.cols() - 1);
 
         out.println(raster.mat);
         @SuppressWarnings("rawtypes")
         final PixelConsumer pp = makePixelPrinter(out, raster.type());
-        for(int r = 0; r < numRows; r++) {
+        for(int r = startRow; r <= endRow; r++) {
             out.print("[");
-            for(int c = 0; c < numCols - 1; c++) {
+            for(int c = startCol; c < endCol; c++) {
                 out.print(" ");
                 pp.accept(r, c, raster.get(r, c));
                 out.print(",");
             }
             out.print(" ");
-            pp.accept(r, numCols - 1, raster.get(r, numCols - 1));
+            pp.accept(r, endCol, raster.get(r, endCol));
             out.println("]");
         }
     }
@@ -1389,7 +1470,11 @@ public class Utils {
     }
 
     public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
-        return scaleWhilePreservingAspectRatio(mat.size(), maxSize);
+        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, true);
+    }
+
+    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize, boolean round) {
+        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, round);
     }
 
     public static double scaleFactorWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
@@ -1405,8 +1490,15 @@ public class Utils {
      */
     public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {
         // calculate the appropriate resize
+        return scaleWhilePreservingAspectRatio(originalMatSize, maxSize, true);
+    }
+
+    public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize, boolean round) {
+        // calculate the appropriate resize
         final double scale = scaleFactorWhilePreservingAspectRatio(originalMatSize, maxSize);
-        return new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
+        return round ?
+                new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale)) :
+                    new Size((long)(originalMatSize.width * scale), (long)(originalMatSize.height * scale));
     }
 
     public static double scaleFactorWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {

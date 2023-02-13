@@ -250,7 +250,25 @@ public class CvMat extends Mat implements QuietCloseable {
 
     /**
      * <p>
+     * This method is similar to reshape except it also allows the changing of the type
+     * without doing a conversion. That is it simply reinterprets the raw binary buffer
+     * as being a different type.
+     * </p>
+     * 
+     * <p>
+     * @param maxSize is the total number of bytes that should not be exceeded. It
+     * should be the number of bytes that the mat's backing buffer contains and is
+     * used as a safety check (as in C/C++'s {@code strncpy} for example). This
+     * number can be greater than the number of bytes required by {@code sizes} and 
+     * {@code type} but it cannot be less. 
+     * </p>
+     * 
+     * <p>
      * DO NOT USE THIS METHOD UNLESS YOU REALLY KNOW WHAT YOU'RE DOING!
+     * </p>
+     * 
+     * <p>
+     * This method has the unfortunate side effect of unreferencing the underlying data.
      * </p>
      *
      * <p>
@@ -259,10 +277,6 @@ public class CvMat extends Mat implements QuietCloseable {
      * the mat would have been constructed from a data buffer (that also must outlive this Mat).
      * </p>
      */
-//    public void inplaceRemake(final int[] sizes, final int type) {
-//        inplaceRemake(sizes, type, total() * elemSize());
-//    }
-
     public boolean inplaceRemake(final int[] sizes, final int type, final long maxSize) {
         final int ndims = sizes.length;
         final long numBytes = ndims * Integer.BYTES;
