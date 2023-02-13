@@ -144,9 +144,9 @@ public class FfmpegApi {
     // ==========================================================
     // Stream Context construction/destruction
     // ==========================================================
-    public static native long pcv4j_ffmpeg2_streamContext_create();
+    public static native long pcv4j_ffmpeg2_mediaContext_create();
 
-    public static native void pcv4j_ffmpeg2_streamContext_delete(final long nativeRef);
+    public static native void pcv4j_ffmpeg2_mediaContext_delete(final long nativeRef);
 
     public static class internal_StreamDetails extends Structure {
         public int stream_index;
@@ -184,7 +184,7 @@ public class FfmpegApi {
         }
     }
 
-    public static native internal_StreamDetails.ByReference pcv4j_ffmpeg2_streamContext_getStreamDetails(final long ctx, final IntByReference numResults,
+    public static native internal_StreamDetails.ByReference pcv4j_ffmpeg2_mediaContext_getStreamDetails(final long ctx, final IntByReference numResults,
         LongByReference rc);
 
     public static native void pcv4j_ffmpeg2_streamDetails_deleteArray(Pointer p);
@@ -276,32 +276,30 @@ public class FfmpegApi {
     // Stream Context setup methods
     // ==========================================================
 
-    public static native long pcv4j_ffmpeg2_streamContext_setSource(final long ctxRef, final long mediaDataSourceRef);
+    public static native long pcv4j_ffmpeg2_mediaContext_setSource(final long ctxRef, final long mediaDataSourceRef);
 
-    public static native long pcv4j_ffmpeg2_streamContext_addProcessor(final long ctxRef, final long mediaProcessorRef);
+    public static native long pcv4j_ffmpeg2_mediaContext_addProcessor(final long ctxRef, final long mediaProcessorRef);
 
     /**
      * Set an option for the ffmpeg call (e.g. rtsp_transport = tcp).
      */
-    public native static long pcv4j_ffmpeg2_streamContext_addOption(final long streamCtx, final String key, final String value);
+    public native static long pcv4j_ffmpeg2_mediaContext_addOption(final long streamCtx, final String key, final String value);
 
     /**
      * Play the stream and carry out all of the processing that should have been
      * set up prior to calling this method.
      */
-    public static native long pcv4j_ffmpeg2_streamContext_play(final long ctx);
-
-    public static native long pcv4j_ffmpeg2_streamContext_load(final long ctx);
+    public static native long pcv4j_ffmpeg2_mediaContext_play(final long ctx);
 
     /**
      * Stop a playing stream. If the stream isn't in the PLAY state, then it will return an error.
      * If the stream is already in a STOP state, this will do nothing and return no error.
      */
-    public native static long pcv4j_ffmpeg2_streamContext_stop(final long nativeDef);
+    public native static long pcv4j_ffmpeg2_mediaContext_stop(final long nativeDef);
 
-    public native static int pcv4j_ffmpeg2_streamContext_state(final long nativeDef);
+    public native static int pcv4j_ffmpeg2_mediaContext_state(final long nativeDef);
 
-    public native static void pcv4j_ffmpeg2_streamContext_sync(final long nativeDef);
+    public native static void pcv4j_ffmpeg2_mediaContext_sync(final long nativeDef);
 
     // ==========================================================
     // Encoding

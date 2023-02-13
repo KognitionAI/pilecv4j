@@ -102,7 +102,7 @@ uint64_t Remuxer::setupStreams(AVCodecParameters** in_codecparpp) {
   return iret;
 }
 
-uint64_t Remuxer::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& poptions) {
+uint64_t Remuxer::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& poptions) {
   PILECV4J_TRACE;
   if (!psi)
     return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);

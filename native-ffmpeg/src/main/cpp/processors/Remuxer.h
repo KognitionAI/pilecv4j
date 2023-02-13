@@ -53,7 +53,7 @@ public:
 
   virtual uint64_t close();
 
-  virtual uint64_t setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options);
+  virtual uint64_t setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& options);
 
   virtual uint64_t preFirstFrame();
 

@@ -36,7 +36,7 @@ import org.testcontainers.utility.DockerImageName;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.MediaContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
@@ -55,7 +55,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
         Thread.sleep(100);
 
-        try(final StreamContext c = Ffmpeg.createStreamContext();
+        try(final MediaContext c = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
 
             final AtomicBoolean checkerFailed = new AtomicBoolean(false);
@@ -66,12 +66,11 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
             c
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .peek(sc -> sc.load())
+                .source(STREAM)
                 .peek(sc -> checkerLatch.countDown())
-                .openChain("default")
-                .createRemuxer(Muxer.create("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id"))
-                .streamContext()
+                .chain("default")
+                .remux(Muxer.create("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id"))
+                .mediaContext()
                 .sync()
                 .play();
 
@@ -89,7 +88,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
         try(
             final EncodingContext encoder = Ffmpeg.createEncoder();
-            final StreamContext ctx = Ffmpeg.createStreamContext();
+            final MediaContext ctx = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
@@ -116,16 +115,15 @@ public class TestFfmpegStreamingDocker extends BaseTest {
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
             ctx
-                .createMediaDataSource(STREAM)
-                .load()
+                .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
                     ve1.setFps(details[0].fps_num / details[0].fps_den);
 
                 })
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> {
                     if(firstFrame.get()) {
                         firstFrame.set(false);
                         ve1.enable(f, f.isRgb);
@@ -141,7 +139,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
                         ctx.stop();
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .sync()
                 .play()
 
@@ -164,15 +162,15 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
                 ignore(() -> Thread.sleep(1000));
 
-                try(final StreamContext sc = Ffmpeg.createStreamContext();) {
+                try(final MediaContext sc = Ffmpeg.createMediaContext();) {
 
                     sc
                         .addOption("flags", "low_delay")
                         .addOption("fflags", "nobuffer")
-                        .createMediaDataSource("rtmp://localhost:" + rtmpPort + "/live/feedly-id")
-                        .openChain("default")
-                        .createFirstVideoStreamSelector()
-                        .createVideoFrameProcessor(m -> {
+                        .source("rtmp://localhost:" + rtmpPort + "/live/feedly-id")
+                        .chain("default")
+                        .selectFirstVideoStream()
+                        .processVideoFrames(m -> {
                             if(id != null) {
                                 try(CvMat mat = m.bgr(false);) {
                                     id.update(mat);
@@ -186,7 +184,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
                                 sc.stop();
                             }
                         })
-                        .streamContext()
+                        .mediaContext()
                         .play();
                 }
             } catch(final Exception e) {

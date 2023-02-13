@@ -86,15 +86,18 @@ static inline T align128(T x) {
 /**
  * This will take the current frame and create an opencv Mat. It will set isRgb based
  * on whether or not the mat being returned is rgb or bgr. It will do the least amount
- * of conversion possible but it prefers rgb. This means it will only return a bgr mat
- * if the source frame is already in bgr.
+ * of conversion possible but it prefers pixFmt which should be either AV_PIX_FMT_RGB24
+ * or AV_PIX_FMT_BGR24. If it's anything else the results are undefined.
+ * This means it will only return a non pixFmt mat if the source frame is already in
+ * the other format.
  *
  * The SwsContext** passed will be used if the format hasn't changed and it's not null.
  * Otherwise it will be created and returned through the parameter requiring the caller
  * to eventually free it with sws_freeContext. If it's not null but the format changed
  * then the method will free the existing one before creating the new one.
  */
-uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb, AVPixelFormat& lastFormatUsed) {
+uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb,
+    AVPixelFormat& lastFormatUsed, AVPixelFormat pixFmt) {
   PILECV4J_TRACE;
   if (imaker == nullptr)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
@@ -121,7 +124,7 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCv
               curFormat,
               w,
               h,
-              AV_PIX_FMT_RGB24,
+              pixFmt,
               SWS_POINT,NULL,NULL,NULL
           );
       TIME_CAP(create_color_cvt);
@@ -136,7 +139,7 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCv
     TIME_OPEN(cvt_color);
     sws_scale(swCtx,pFrame->data, pFrame->linesize, 0, h, rgb24, rgb24_stride);
     TIME_CAP(cvt_color);
-    isRgb = 1;
+    isRgb = pixFmt == AV_PIX_FMT_RGB24 ? 1 : 0;
   } else {
     TIME_OPEN(alloc_mat);
     mat = imaker->allocateImageWithCopyOfData(h,w,w * 3,pFrame->data[0]);

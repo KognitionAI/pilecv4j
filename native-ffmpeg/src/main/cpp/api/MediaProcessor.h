@@ -36,7 +36,7 @@ public:
    *
    * NOTE: selected streams can be null.
    */
-  virtual uint64_t setup(PacketSourceInfo* mediaSource, const std::vector<std::tuple<std::string,std::string> >& options) = 0;
+  virtual uint64_t setup(PacketSourceInfo* mediaSource, std::vector<std::tuple<std::string,std::string> >& options) = 0;
 
   /**
    * This will be called just before calling handlePacket for the first time. If timers

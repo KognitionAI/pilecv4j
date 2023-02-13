@@ -248,7 +248,7 @@ public abstract class ImageDisplay implements QuietCloseable {
                 };
         }
 
-        public ImageDisplay dobuild() {
+        protected ImageDisplay dobuild() {
             switch(implementation) {
                 case HIGHGUI: {
                     if(selectCallback != null)

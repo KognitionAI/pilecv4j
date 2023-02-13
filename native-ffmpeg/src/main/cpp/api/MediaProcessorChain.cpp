@@ -28,7 +28,7 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 MediaProcessorChain::~MediaProcessorChain() {
 }
 
-uint64_t MediaProcessorChain::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options) {
+uint64_t MediaProcessorChain::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& options) {
   if (!psi)
     return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
 

@@ -34,6 +34,8 @@ TIME_DECL(handle);
 #define COMPONENT "DEFP"
 #define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
+const std::string PREFER_BGR = "pilecv4j:prefer_bgr";
+
 inline static void llog(LogLevel llevel, const char *fmt, ...) {
   va_list args;
   va_start( args, fmt );
@@ -83,7 +85,7 @@ uint64_t DecodedFrameProcessor::close() {
   return 0;
 }
 
-uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options) {
+uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& options) {
   PILECV4J_TRACE;
   if (!psi)
     return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
@@ -95,6 +97,13 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, const std::vector<s
 
   if (numStreams <= 0)
     return MAKE_P_STAT(NO_STREAM);
+
+  llog(TRACE,"HERE1");
+  std::string preferBgrStr = removeOption(PREFER_BGR, options);
+  llog(TRACE,"HERE2");
+
+  if (preferBgrStr == "1" || preferBgrStr == "true" || preferBgrStr == "TRUE")
+    requestedPixFormat = AV_PIX_FMT_BGR24;
 
   codecs = new CodecDetails*[numStreams];
   for (int i = 0; i < numStreams; i++) {
@@ -123,12 +132,6 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, const std::vector<s
         continue;
       }
     }
-
-//    // this only cares about video so we're going to skip anything else.
-//    if (pLocalCodecParameters->codec_type != AVMEDIA_TYPE_VIDEO) {
-//      codecs[i] = nullptr;
-//      continue;
-//    }
 
     codecs[i] = new CodecDetails();
     codecs[i]->mediaType = pLocalCodecParameters->codec_type;
@@ -224,7 +227,8 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
 
       int32_t isRgb;
       TIME_OPEN(create_mat);
-      uint64_t mat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb, codecDetails->lastFormatUsed /*, frameMat, &frameData */);
+      uint64_t mat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb,
+          codecDetails->lastFormatUsed, requestedPixFormat);
       TIME_CAP(create_mat);
 
       TIME_OPEN(handle);

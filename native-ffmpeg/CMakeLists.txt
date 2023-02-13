@@ -55,7 +55,7 @@ add_library(${PROJECT_NAME} SHARED
   src/main/cpp/utils/ffmpeg_codes.cpp
   src/main/cpp/utils/IMakerManager.cpp
   src/main/cpp/utils/Synchronizer.cpp
-  src/main/cpp/api/StreamContext.cpp
+  src/main/cpp/api/MediaContext.cpp
   src/main/cpp/api/MediaDataSource.cpp
   src/main/cpp/api/MediaProcessor.cpp
   src/main/cpp/api/MediaProcessorChain.cpp

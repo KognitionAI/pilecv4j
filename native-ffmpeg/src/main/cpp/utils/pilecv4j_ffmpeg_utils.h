@@ -106,6 +106,19 @@ static inline int64_t now() {
   ).count());
 }
 
+static inline std::string removeOption(const std::string& key, std::vector<std::tuple<std::string,std::string> >& options) {
+  std::string ret;
+  for (auto iter = options.begin(); iter != options.end(); ++iter) {
+    std::tuple<std::string,std::string> cur = *iter;
+    if (key == std::get<0>(cur)) {
+      ret = std::get<1>(cur);
+      options.erase(iter);
+      return ret;
+    }
+  }
+  return ret;
+}
+
 static inline uint64_t buildOptions(const std::vector<std::tuple<std::string,std::string> >& options, AVDictionary** opts) {
   if (options.size() == 0) {
     if (isEnabled(TRACE))
