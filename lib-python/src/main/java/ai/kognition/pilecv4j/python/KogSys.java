@@ -22,16 +22,26 @@ import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_FATAL;
 import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_INFO;
 import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_TRACE;
 import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_WARN;
+import static net.dempsy.util.Functional.uncheck;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
 import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.Map;
 
 import com.sun.jna.Pointer;
 
+import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.QuietCloseable;
+import net.dempsy.vfs.Path;
+import net.dempsy.vfs.Vfs;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.python.internal.PythonAPI;
@@ -129,6 +139,33 @@ public class KogSys implements QuietCloseable {
             PythonAPI.pilecv4j_python_kogSys_destroy(nativeObj);
     }
 
+    private static final Object pythonExpandedLock = new Object();
+    private static Map<String, File> pythonIsExpanded = new HashMap<>();
+
+    public static File initModule(final String pythonModulePath) {
+        synchronized(pythonExpandedLock) {
+            final File ret = pythonIsExpanded.get(pythonModulePath);
+            if(ret == null) {
+                try (Vfs vfs = new Vfs();) {
+                    final Path path = vfs.toPath(uncheck(() -> new URI(pythonModulePath)));
+                    if(!path.exists() || !path.isDirectory())
+                        throw new IllegalStateException("The python code isn't properly bundled in the jar file.");
+
+                    final File pythonCodeDir = Files.createTempDirectory("python").toFile();
+                    pythonCodeDir.deleteOnExit();
+
+                    copy(path, pythonCodeDir.getAbsolutePath(), true);
+
+                    pythonIsExpanded.put(pythonModulePath, pythonCodeDir);
+                    return pythonCodeDir;
+                } catch(final IOException ioe) {
+                    throw new IllegalStateException("Failed to expand python code.", ioe);
+                }
+            }
+            return ret;
+        }
+    }
+
     public static class KogMatResults implements QuietCloseable {
         private final long nativeObj;
 
@@ -215,6 +252,58 @@ public class KogSys implements QuietCloseable {
             return null;
         else
             return ml.getString(0);
+    }
+
+    private static String stripTrailingSlash(final String path) {
+        if(path.endsWith("/") || path.endsWith("\\"))
+            return path.substring(0, path.length() - 1);
+        else
+            return path;
+    }
+
+    private static String getPath(final URI uri) {
+        final String pathToUse;
+        if("jar".equals(uri.getScheme())) {
+            final String uriStr = uri.toString();
+            int indexOfEx = uriStr.lastIndexOf('!');
+            if(indexOfEx < 0) {
+                // just cut off from the last ':'
+                indexOfEx = uriStr.lastIndexOf(':');
+                if(indexOfEx < 0)
+                    throw new IllegalArgumentException("Cannot interpret the jar uri: " + uriStr);
+            }
+            pathToUse = uriStr.substring(indexOfEx + 1);
+        } else
+            pathToUse = uri.getPath();
+        return pathToUse;
+    }
+
+    private static void copy(final Path from, final String destDirStrX, final boolean skipThisDir) throws IOException {
+        final String destDirStr = stripTrailingSlash(destDirStrX);
+        final File destDir = new File(destDirStr);
+        if(!destDir.exists())
+            destDir.mkdirs();
+        if(!destDir.isDirectory())
+            throw new IOException("The destination \"" + destDir.getAbsolutePath() + "\" was expected to be a directory.");
+
+        // if from is a direrectory, we need to act recursively.
+        if(from.isDirectory()) {
+            final String newDest;
+            if(skipThisDir) {
+                newDest = destDir.getAbsolutePath();
+            } else {
+                final String relativeName = new File(getPath(from.uri())).getName();
+                newDest = destDir.getAbsolutePath() + "/" + relativeName;
+            }
+            for(final Path sp: from.list()) {
+                copy(sp, newDest, false);
+            }
+        } else {
+            final String filename = new File(getPath(from.uri())).getName();
+            try(InputStream is = from.read();) {
+                FileUtils.copyInputStreamToFile(is, new File(destDir, filename));
+            }
+        }
     }
 
     private static long fillPythonDict(final ParamCloser q, final Map<String, Object> kwds) {
