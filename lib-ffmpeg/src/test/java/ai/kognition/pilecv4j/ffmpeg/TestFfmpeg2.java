@@ -50,7 +50,7 @@ import net.dempsy.util.MutableRef;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.MediaContext;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
@@ -79,13 +79,13 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testCreateContext() {
         LOGGER.info("Running test: {}.testCreateContext(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        try(StreamContext c = Ffmpeg.createStreamContext();) {}
+        try(MediaContext c = Ffmpeg.createMediaContext();) {}
     }
 
     @Test(expected = FfmpegException.class)
     public void testPlayNoSource() {
         LOGGER.info("Running test: {}.testPlayNoSource(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        try(StreamContext c = Ffmpeg.createStreamContext();) {
+        try(MediaContext c = Ffmpeg.createMediaContext();) {
             c
                 .optionally(sync, s -> s.sync())
                 .play();
@@ -97,19 +97,19 @@ public class TestFfmpeg2 extends BaseTest {
         LOGGER.info("Running test: {}.testPlayWithStop(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
         final AtomicBoolean stopped = new AtomicBoolean(false);
-        try(final StreamContext c = Ffmpeg.createStreamContext();) {
+        try(final MediaContext c = Ffmpeg.createMediaContext();) {
             c
-                .createMediaDataSource(STREAM)
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
+                .source(STREAM)
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> {
                     if(frameCount.getAndIncrement() > 50L) {
                         LOGGER.debug("Stopping the stream.");
                         c.stop();
                         stopped.set(true);
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play()
 
@@ -125,21 +125,20 @@ public class TestFfmpeg2 extends BaseTest {
     public void testConsumeFrames() {
         LOGGER.info("Running test: {}.testConsumeFrames(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final AtomicLong frameCount = new AtomicLong(0);
-        final MutableRef<Ffmpeg.StreamContext.StreamDetails[]> details = new MutableRef<>(null);
+        final MutableRef<Ffmpeg.MediaContext.StreamDetails[]> details = new MutableRef<>(null);
 //        final Throttle throttle = new Throttle(10, TimingType.FPS, LOGGER);
         try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-            final StreamContext ctx = Ffmpeg.createStreamContext();) {
+            final MediaContext ctx = Ffmpeg.createMediaContext();) {
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .load()
+                .source(STREAM)
                 .peek(s -> {
                     details.ref = s.getStreamDetails();
                     System.out.println(Arrays.toString(details.ref));
                 })
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(
 
                     // "hevc_cuvid",
                     // "h264_cuvid",
@@ -154,7 +153,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
 //                        }
                     })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play()
 
@@ -181,10 +180,10 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
 
-            final StreamContext c = Ffmpeg.createStreamContext();
+            final MediaContext c = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
             c
-                .createMediaDataSource(
+                .source(
 
                     // read bytes from buffer
                     (bb, numBytes) -> {
@@ -215,14 +214,14 @@ public class TestFfmpeg2 extends BaseTest {
                             return -1;
                         return pos.val;
                     })
-                .openChain("default")
-                .createFirstVideoStreamSelector()
+                .chain("default")
+                .selectFirstVideoStream()
 
                 // test the double open
-                .streamContext()
-                .openChain("default")
+                .mediaContext()
+                .chain("default")
 
-                .createVideoFrameProcessor(f -> {
+                .processVideoFrames(f -> {
                     frameCount.getAndIncrement();
                     if(SHOW) {
                         try(final CvMat rgb = f.bgr(false);) {
@@ -230,7 +229,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play();
 
@@ -246,17 +245,17 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
         try(
 
-            final StreamContext c = Ffmpeg.createStreamContext();) {
+            final MediaContext c = Ffmpeg.createMediaContext();) {
             c
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .openChain("default")
-                .createPacketFilter((mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen) -> {
+                .source(STREAM)
+                .chain("default")
+                .filterPackets((mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen) -> {
                     // System.out.println(isKeyFrame ? "keyframe" : "not keyframe");
                     return true;
                 })
-                .createRemuxer(Muxer.create(destination.getAbsolutePath()))
-                .streamContext()
+                .remux(Muxer.create(destination.getAbsolutePath()))
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play();
         }
@@ -275,14 +274,14 @@ public class TestFfmpeg2 extends BaseTest {
         final File destination = new File("/tmp/out"); // tempDir.newFile("out.flv");
         if(destination.exists())
             destination.delete();
-        try(final StreamContext c = Ffmpeg.createStreamContext();) {
+        try(final MediaContext c = Ffmpeg.createMediaContext();) {
 
             c
-                .createMediaDataSource(STREAM)
+                .source(STREAM)
                 // .createMediaDataSource("rtsp://admin:gregormendel1@172.16.2.11:554/")
                 .addOption("flags", "+cgop")
-                .openChain("default")
-                .createRemuxer(Muxer.create(index -> {
+                .chain("default")
+                .remux(Muxer.create(index -> {
                     System.out.println("Muxer #" + index);
                     return Muxer.create("mpegts", String.format("%s_%02d.%s", destination.getAbsolutePath(), index, "ts"));
                 }, new PacketFilter() {
@@ -300,7 +299,7 @@ public class TestFfmpeg2 extends BaseTest {
                         return ret;
                     }
                 }))
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play();
         }
@@ -320,21 +319,21 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
         try(
 
-            final StreamContext c = Ffmpeg.createStreamContext();
+            final MediaContext c = Ffmpeg.createMediaContext();
             final OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
 
         ) {
             c
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .openChain("default")
-                .createRemuxer(Muxer.create("mpegts", (packet, numBytes) -> {
+                .source(STREAM)
+                .chain("default")
+                .remux(Muxer.create("mpegts", (packet, numBytes) -> {
                     packet.rewind();
                     final byte[] pkt = new byte[numBytes];
                     packet.get(pkt);
                     uncheck(() -> os.write(pkt));
                 }))
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play();
         }
@@ -358,15 +357,15 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
 
-            final StreamContext c = Ffmpeg.createStreamContext();
+            final MediaContext c = Ffmpeg.createMediaContext();
 
         ) {
 
             c
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .openChain("default")
-                .createRemuxer(Muxer.create("mp4", (packet, numBytes) -> {
+                .source(STREAM)
+                .chain("default")
+                .remux(Muxer.create("mp4", (packet, numBytes) -> {
                     packet.rewind();
                     final byte[] pkt = new byte[numBytes];
                     packet.get(pkt);
@@ -386,7 +385,7 @@ public class TestFfmpeg2 extends BaseTest {
                             return -1;
                         return bb.position();
                     }))
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play();
 
@@ -415,7 +414,7 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
             final EncodingContext encoder = Ffmpeg.createEncoder();
-            final StreamContext ctx = Ffmpeg.createStreamContext();
+            final MediaContext ctx = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
@@ -445,17 +444,16 @@ public class TestFfmpeg2 extends BaseTest {
 
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .load()
+                .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
                     ve1.setFps(details[0].fps_num / details[0].fps_den);
                     ve2.setFps(details[0].fps_num / details[0].fps_den);
 
                 })
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> {
                     if(firstFrame.get()) {
                         firstFrame.set(false);
                         ve1.enable(f, f.isRgb);
@@ -476,7 +474,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play()
 
@@ -500,7 +498,7 @@ public class TestFfmpeg2 extends BaseTest {
         try(
             OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
             final EncodingContext encoder = Ffmpeg.createEncoder();
-            final StreamContext ctx = Ffmpeg.createStreamContext();
+            final MediaContext ctx = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
@@ -535,17 +533,16 @@ public class TestFfmpeg2 extends BaseTest {
 
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .load()
+                .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
                     ve1.setFps(details[0].fps_num / details[0].fps_den);
                     ve2.setFps(details[0].fps_num / details[0].fps_den);
 
                 })
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> {
                     if(firstFrame.get()) {
                         firstFrame.set(false);
                         ve1.enable(f, f.isRgb);
@@ -566,7 +563,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play()
 
@@ -592,7 +589,7 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
             final EncodingContext encoder = Ffmpeg.createEncoder();
-            final StreamContext ctx = Ffmpeg.createStreamContext();
+            final MediaContext ctx = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
@@ -641,17 +638,16 @@ public class TestFfmpeg2 extends BaseTest {
 
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .load()
+                .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
                     ve1.setFps(details[0].fps_num / details[0].fps_den);
                     ve2.setFps(details[0].fps_num / details[0].fps_den);
 
                 })
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> {
                     if(firstFrame.get()) {
                         firstFrame.set(false);
                         ve1.enable(f, f.isRgb);
@@ -672,7 +668,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play()
 
@@ -703,7 +699,7 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
             final EncodingContext encoder = Ffmpeg.createEncoder();
-            final StreamContext ctx = Ffmpeg.createStreamContext();
+            final MediaContext ctx = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
 
         ) {
@@ -720,14 +716,13 @@ public class TestFfmpeg2 extends BaseTest {
 
             ctx
                 .addOption("rtsp_flags", "prefer_tcp")
-                .createMediaDataSource(STREAM)
-                .load()
+                .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
                     ve1.setEncodingParameters(details[0].fps_num / details[0].fps_den, 4 * 16 * MEG, 8 * MEG, 8 * MEG);
                 })
-                .openChain("default")
-                .createStreamSelector((sd, res) -> {
+                .chain("default")
+                .selectStreams((sd, res) -> {
                     boolean found = false;
                     for(int i = 0; i < sd.length; i++) {
                         res[i] = false;
@@ -739,7 +734,7 @@ public class TestFfmpeg2 extends BaseTest {
 
                     return found;
                 })
-                .createVideoFrameProcessor(f -> {
+                .processVideoFrames(f -> {
                     final long count = framecount.getAndIncrement();
                     if(count > 300)
                         ctx.stop();
@@ -755,7 +750,7 @@ public class TestFfmpeg2 extends BaseTest {
                         }
                     }
                 })
-                .streamContext()
+                .mediaContext()
                 .optionally(sync, s -> s.sync())
                 .play()
 
@@ -772,12 +767,12 @@ public class TestFfmpeg2 extends BaseTest {
     private static long frameCount(final URI uri) {
         final MutableInt ret = new MutableInt(0);
         try(final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
-            final StreamContext c = Ffmpeg.createStreamContext();) {
+            final MediaContext c = Ffmpeg.createMediaContext();) {
             c
-                .createMediaDataSource(uri)
-                .openChain("default")
-                .createFirstVideoStreamSelector()
-                .createVideoFrameProcessor(f -> {
+                .source(uri)
+                .chain("default")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> {
                     if(id != null) {
                         try(final CvMat rgb = f.bgr(false);) {
                             id.update(rgb);
@@ -785,7 +780,7 @@ public class TestFfmpeg2 extends BaseTest {
                     }
                     ret.val++;
                 })
-                .streamContext()
+                .mediaContext()
                 // .optionally(sync, s -> s.sync())
                 .play();
         }

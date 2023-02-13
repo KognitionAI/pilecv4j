@@ -65,7 +65,8 @@ public:
    * to eventually free it with sws_freeContext. If it's not null but the format changed
    * then the method will free the existing one before creating the new one.
    */
-  static uint64_t createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb, AVPixelFormat& lastFormatUsed);
+  static uint64_t createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb,
+      AVPixelFormat& lastFormatUsed, AVPixelFormat pixFmt);
 
   static void freeImage(uint64_t mat);
 

@@ -20,6 +20,8 @@ namespace pilecv4j
 namespace ffmpeg
 {
 
+class MediaContext;
+
 class PacketSourceInfo {
 public:
   virtual ~PacketSourceInfo() = default;

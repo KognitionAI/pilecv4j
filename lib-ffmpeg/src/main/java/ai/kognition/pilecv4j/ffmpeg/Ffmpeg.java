@@ -40,6 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import com.sun.jna.Pointer;
@@ -56,7 +57,7 @@ import net.dempsy.util.MutableRef;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext.StreamDetails;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.MediaContext.StreamDetails;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.fill_buffer_callback;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi.packet_filter_callback;
@@ -147,8 +148,13 @@ public class Ffmpeg {
      * This interface is used for processors that handle decoded video frames.
      */
     @FunctionalInterface
-    public static interface VideoFrameConsumer extends QuietCloseable {
+    public static interface VideoFrameConsumer extends QuietCloseable, Consumer<VideoFrame> {
         public void handle(VideoFrame frame);
+
+        @Override
+        default public void accept(final VideoFrame videoFrame) {
+            handle(videoFrame);
+        }
 
         @Override
         default public void close() {}
@@ -156,7 +162,7 @@ public class Ffmpeg {
 
     /**
      * You can implement a stream selector in java by passing a StreamSelectorCallback
-     * to {@link MediaProcessingChain#createStreamSelector(StreamSelectorCallback)}.
+     * to {@link MediaProcessingChain#selectStreams(StreamSelectorCallback)}.
      */
     @FunctionalInterface
     public static interface StreamSelectorCallback {
@@ -171,31 +177,40 @@ public class Ffmpeg {
     }
 
     /**
-     * Calling {@link Ffmpeg.StreamContext#openChain(String)} returns a {@link Ffmpeg.MediaProcessingChain}
+     * Calling {@link Ffmpeg.MediaContext#chain(String)} returns a {@link Ffmpeg.MediaProcessingChain}
      * which represents a selection of streams and a number of processes that operate on those
      * streams.
      */
     public static class MediaProcessingChain extends MediaProcessor {
 
-        private final StreamContext ctx;
+        private final MediaContext ctx;
         private final List<MediaProcessor> processors = new ArrayList<>();
         private final List<PacketFilterWrap> packetFilters = new ArrayList<>();
         private final String name;
 
-        private MediaProcessingChain(final String name, final long nativeRef, final StreamContext ctx) {
+        private MediaProcessingChain(final String name, final long nativeRef, final MediaContext ctx) {
             super(nativeRef);
             this.ctx = ctx;
             this.name = name;
         }
 
-        public StreamContext streamContext() {
+        /**
+         * Return the underlying {@link MediaContext} for this processing chain.
+         */
+        public MediaContext mediaContext() {
             return ctx;
         }
 
+        /**
+         * What's the name of this processing chain.
+         */
         public String getName() {
             return name;
         }
 
+        /**
+         * Cleanup the underlying resource associated with this {@link MediaProcessingChain}
+         */
         @Override
         public void close() {
 
@@ -212,12 +227,20 @@ public class Ffmpeg {
         // STREAM SELECTOR SUPPORT
         // ======================================================================
 
-        public MediaProcessingChain createFirstVideoStreamSelector() {
+        /**
+         * Add a filter to the processing chain that selects only packets from the first video stream
+         * in the media.
+         */
+        public MediaProcessingChain selectFirstVideoStream() {
             return manage(new PacketFilterWrap(FfmpegApi.pcv4j_ffmpeg2_firstVideoStreamSelector_create()));
         }
 
-        public MediaProcessingChain createStreamSelector(final StreamSelectorCallback callback) {
-            return createStreamSelector(res -> {
+        /**
+         * Create a packet filter that uses the details of the streams in the source to decide which
+         * packets to filter.
+         */
+        public MediaProcessingChain selectStreams(final StreamSelectorCallback callback) {
+            return selectStreams(res -> {
                 final StreamDetails[] sd = ctx.getStreamDetails();
 
                 if(sd == null)
@@ -236,26 +259,31 @@ public class Ffmpeg {
             });
         }
 
+        public MediaProcessingChain preferBgr() {
+            mediaContext().addOption("pilecv4j:prefer_bgr", "true");
+            return this;
+        }
+
         /**
          * Create a video processor that takes the first decodable video stream.
          */
-        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer consumer) {
-            return createVideoFrameProcessor((String)null, consumer);
+        public MediaProcessingChain processVideoFrames(final VideoFrameConsumer consumer) {
+            return processVideoFrames((String)null, consumer);
         }
 
         /**
          * Create a video processor that takes the first decodable video stream and applies the initializer on the
          * first frame and the handler on all of the other frames.
          */
-        public MediaProcessingChain createVideoFrameProcessor(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
-            return createVideoFrameProcessor(null, initializer, handler);
+        public MediaProcessingChain processVideoFrames(final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
+            return processVideoFrames(null, initializer, handler);
         }
 
         /**
          * Create a video processor that takes the first decodable video stream. If decoderName is not null then the decoder
          * will be used to decode the frames.
          */
-        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer consumer) {
+        public MediaProcessingChain processVideoFrames(final String decoderName, final VideoFrameConsumer consumer) {
             final var pfc = wrap(consumer);
 
             final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_decodedFrameProcessor_create(pfc, decoderName);
@@ -267,7 +295,7 @@ public class Ffmpeg {
          * first frame and the handler on all of the other frames. If decoderName is not null then the decoder
          * will be used to decode the frames.
          */
-        public MediaProcessingChain createVideoFrameProcessor(final String decoderName, final VideoFrameConsumer initializer,
+        public MediaProcessingChain processVideoFrames(final String decoderName, final VideoFrameConsumer initializer,
             final VideoFrameConsumer handler) {
             final var pfc = wrap(handler);
 
@@ -285,21 +313,49 @@ public class Ffmpeg {
             return manage(fm);
         }
 
-        public MediaProcessingChain createRemuxer(final Muxer output, final int maxRemuxErrorCount) {
+        /**
+         * Remux the input to the given Muxer.
+         *
+         * @param output is the Muxer to use to remux the streams to.
+         * @param maxRemuxErrorCount is the maximum error count before failing.
+         * @return the current MediaProcessingChain
+         */
+        public MediaProcessingChain remux(final Muxer output, final int maxRemuxErrorCount) {
             return manage(new MediaProcessorWithMuxer(FfmpegApi.pcv4j_ffmpeg2_remuxer_create(output.nativeRef, maxRemuxErrorCount), output));
         }
 
-        public MediaProcessingChain createRemuxer(final Muxer output) {
-            return createRemuxer(output, DEFAULT_MAX_REMUX_ERRORS);
+        /**
+         * Remux the input to the given Muxer. A convenience method for:
+         *
+         * <pre>
+         * <code>
+         *   remux(output, DEFAULT_MAX_REMUX_ERRORS)
+         * </code>
+         * </pre>
+         *
+         * @param output is the Muxer to use to remux the streams to.
+         * @return the current MediaProcessingChain
+         */
+        public MediaProcessingChain remux(final Muxer output) {
+            return remux(output, DEFAULT_MAX_REMUX_ERRORS);
         }
 
+        /**
+         * optionally call the consumer with the current MediaProcessingChain
+         *
+         * @param doIt when {@code true}, the {@code ctxWork} Consumer will be called with the {@code this}
+         */
         public MediaProcessingChain optionally(final boolean doIt, final Consumer<MediaProcessingChain> ctxWork) {
             if(doIt)
                 ctxWork.accept(this);
             return this;
         }
 
-        public MediaProcessingChain createPacketFilter(final PacketFilter cb) {
+        /**
+         * Add a filter to the media processing that suppresses/passes a given
+         * packet based on the packet meta-data passed to the filter.
+         */
+        public MediaProcessingChain filterPackets(final PacketFilter cb) {
             final packet_filter_callback rcb = new packet_filter_callback() {
                 @Override
                 public int packet_filter(final int mediaType, final int stream_index, final int packetNumBytes, final int isKeyFrame, final long pts,
@@ -309,6 +365,17 @@ public class Ffmpeg {
             };
 
             return manage(new CallbackPacketFilter(FfmpegApi.pcv4j_ffmpeg2_javaPacketFilter_create(rcb), rcb));
+        }
+
+        /**
+         * Add a filter to the media processing that suppresses/passes a given
+         * packet based on the packet meta-data passed to the filter.
+         */
+        public MediaProcessingChain filterPackets(final Function<PacketMetadata, Boolean> cb) {
+            return filterPackets((final int mediaType, final int stream_index, final int packetNumBytes, final boolean isKeyFrame, final long pts,
+                final long dts, final int tbNum, final int tbDen) -> {
+                return cb.apply(new PacketMetadata(mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen));
+            });
         }
 
         /**
@@ -389,7 +456,7 @@ public class Ffmpeg {
             public boolean select(boolean[] selection);
         }
 
-        private MediaProcessingChain createStreamSelector(final RawStreamSelectorCallback callback) {
+        private MediaProcessingChain selectStreams(final RawStreamSelectorCallback callback) {
             final var ssc = new select_streams_callback() {
                 @Override
                 public int select_streams(final int numStreams, final Pointer selected) {
@@ -484,7 +551,7 @@ public class Ffmpeg {
      * This is package protected to eliminate any optimization of the strong references
      * required to keep the JNA callbacks from being GCed
      */
-    public static class FrameVideoProcessor extends MediaProcessor {
+    static class FrameVideoProcessor extends MediaProcessor {
         // ======================================================================
         // JNA will only hold a weak reference to the callbacks passed in
         // so if we dynamically allocate them then they will be garbage collected.
@@ -514,14 +581,47 @@ public class Ffmpeg {
         }
     }
 
-    public static StreamContext createStreamContext() {
-        final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_streamContext_create();
-        return new StreamContext(nativeRef);
+    /**
+     * Create a {@link MediaContext} for building a processing chain for a given media source.
+     */
+    public static MediaContext createMediaContext() {
+        final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_mediaContext_create();
+        return new MediaContext(nativeRef);
+    }
+
+    /**
+     * This is a convenience method for:
+     *
+     * <pre>
+     * <code>
+     * MediaContext.createMediaContext()
+     *     .source(source);
+     * </code>
+     * </pre>
+     */
+    public static MediaContext createMediaContext(final String source) {
+        return createMediaContext()
+            .source(source);
+    }
+
+    /**
+     * This is a convenience method for:
+     *
+     * <pre>
+     * <code>
+     * MediaContext.createMediaContext()
+     *     .source(fmt, source);
+     * </code>
+     * </pre>
+     */
+    public static MediaContext createMediaContext(final String fmt, final String source) {
+        return createMediaContext()
+            .source(fmt, source);
     }
 
     /**
      * <p>
-     * A {@link StreamContext} represents the coupling of an input source to a set of
+     * A {@link MediaContext} represents the coupling of an input source to a set of
      * processing on the media streams in that source. It's also a builder for declaring
      * the media source and that processing to be done.
      * </p>
@@ -538,7 +638,7 @@ public class Ffmpeg {
      * a source of media data. There are two main types of MediaDataSource.
      * <ul>
      * <li>The first is a simple URI based input which is instantiated when you use
-     * {@link #createMediaDataSource(String)}. This is the same as the {@code -i} option
+     * {@link #source(String)}. This is the same as the {@code -i} option
      * passed to the {@code ffmpeg} command line.</li>
      * <li>The second is a custom data source where you can supply raw media stream data
      * dynamically by supplying a {@link MediaDataSupplier} callback implementation and
@@ -549,7 +649,7 @@ public class Ffmpeg {
      * </li>
      * <li><b>MediaProcessingChain:</b> Data packets from the MediaDataSource are passed
      * to a series of {@link MediaProcessingChain}s. {@link MediaProcessingChain}s are added
-     * to a {@link StreamContext} using the {@link #openChain(String)} call.
+     * to a {@link MediaContext} using the {@link #chain(String)} call.
      * {@link MediaProcessingChain}s couple a means of selecting which media streams from
      * the MediaDataSource are to be processed with the series of processing.
      * <ul>
@@ -562,10 +662,10 @@ public class Ffmpeg {
      * will likely grow in the future:
      * <ul>
      * <li>A uri remuxer: This will allow the packets to be remuxed and output to a given URI.
-     * You add a remuxer using the call {@link MediaProcessingChain#createRemuxer(String)}</li>
+     * You add a remuxer using the call {@link MediaProcessingChain#remux(String)}</li>
      * <li>A frame processor: The packets will be fully decoded and the frames will be passed
      * to the callback provided. A frame processor can be added by calling
-     * {@link MediaProcessingChain#createVideoFrameProcessor(VideoFrameConsumer)}</li>
+     * {@link MediaProcessingChain#processVideoFrames(VideoFrameConsumer)}</li>
      * </ul>
      * </li>
      * </ul>
@@ -574,11 +674,11 @@ public class Ffmpeg {
      * </p>
      * <p>
      * The processing can then be kicked off by calling {@link #play()} on the fully configured
-     * {@link StreamContext}
+     * {@link MediaContext}
      * </p>
      * <h3>Additional Information</h3>
      * <p>
-     * A {@link StreamContext} goes through the following internal states:
+     * A {@link MediaContext} goes through the following internal states:
      * <ul>
      * <li>FRESH - When a context is instantiated, it's in this state.</li>
      * <li>OPEN - The media data source is opened
@@ -586,14 +686,14 @@ public class Ffmpeg {
      * </ul>
      * </p>
      */
-    public static class StreamContext implements QuietCloseable {
+    public static class MediaContext implements QuietCloseable {
         private final long nativeRef;
 
         private MediaDataSource dataSource = null;
         private final List<MediaProcessingChain> mediaProcesingChains = new ArrayList<>();
         private final Map<String, MediaProcessingChain> mediaProcesingChainsMap = new HashMap<>();
 
-        private StreamContext(final long nativeRef) {
+        private MediaContext(final long nativeRef) {
             if(nativeRef == 0)
                 throw new FfmpegException("Couldn't create new stream context");
 
@@ -635,7 +735,7 @@ public class Ffmpeg {
         public StreamDetails[] getStreamDetails() {
             final IntByReference numStreamsRef = new IntByReference();
             final LongByReference rc = new LongByReference();
-            final FfmpegApi.internal_StreamDetails.ByReference detailsRef = FfmpegApi.pcv4j_ffmpeg2_streamContext_getStreamDetails(nativeRef,
+            final FfmpegApi.internal_StreamDetails.ByReference detailsRef = FfmpegApi.pcv4j_ffmpeg2_mediaContext_getStreamDetails(nativeRef,
                 numStreamsRef,
                 rc);
             try {
@@ -653,49 +753,63 @@ public class Ffmpeg {
             }
         }
 
-        public StreamContext load() {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_load(nativeRef), Ffmpeg.AVERROR_EOF_KOGSTAT);
+        /**
+         * Kick off the media processing
+         */
+        public MediaContext play() {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaContext_play(nativeRef), Ffmpeg.AVERROR_EOF_KOGSTAT);
             return this;
         }
 
-        public StreamContext play() {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_play(nativeRef), Ffmpeg.AVERROR_EOF_KOGSTAT);
+        /**
+         * Add an option to be passed to the processing chain. These are options you would
+         * pass to the ffmpeg command line.
+         */
+        public MediaContext addOption(final String key, final String value) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaContext_addOption(nativeRef, key, value));
             return this;
         }
 
-        public StreamContext addOption(final String key, final String value) {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_addOption(nativeRef, key, value));
-            return this;
-        }
-
-        public StreamContext addOptions(final Map<String, String> options) {
+        /**
+         * Add options to be passed to the processing chain. These are options you would
+         * pass to the ffmpeg command line.
+         */
+        public MediaContext addOptions(final Map<String, String> options) {
             options.entrySet().stream().forEach(e -> addOption(e.getKey(), e.getValue()));
             return this;
         }
 
-        public synchronized StreamContext stop() {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_stop(nativeRef));
+        /**
+         * Stop processing. This will cause the call to {@link MediaContext#play()} to return.
+         */
+        public synchronized MediaContext stop() {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaContext_stop(nativeRef));
             return this;
         }
 
-        public synchronized StreamContext sync() {
-            FfmpegApi.pcv4j_ffmpeg2_streamContext_sync(nativeRef);
+        /**
+         * Synchronize the processing with the media stream's timing.
+         *
+         * NOTE: This should NOT be used if the media source is a live stream.
+         */
+        public synchronized MediaContext sync() {
+            FfmpegApi.pcv4j_ffmpeg2_mediaContext_sync(nativeRef);
             return this;
         }
 
-        public StreamContext optionally(final boolean doIt, final Consumer<StreamContext> ctxWork) {
+        public MediaContext optionally(final boolean doIt, final Consumer<MediaContext> ctxWork) {
             if(doIt)
                 ctxWork.accept(this);
             return this;
         }
 
-        public StreamContext peek(final Consumer<StreamContext> ctxWork) {
+        public MediaContext peek(final Consumer<MediaContext> ctxWork) {
             ctxWork.accept(this);
             return this;
         }
 
         public synchronized int currentState() {
-            return FfmpegApi.pcv4j_ffmpeg2_streamContext_state(nativeRef);
+            return FfmpegApi.pcv4j_ffmpeg2_mediaContext_state(nativeRef);
         }
 
         @Override
@@ -711,7 +825,7 @@ public class Ffmpeg {
                     if(currentState() != FfmpegApi.STREAM_CONTEXT_STATE_ENDED)
                         LOGGER.warn("Couldn't stop the playing stream.");
                 }
-                FfmpegApi.pcv4j_ffmpeg2_streamContext_delete(nativeRef);
+                FfmpegApi.pcv4j_ffmpeg2_mediaContext_delete(nativeRef);
             }
 
             if(dataSource != null)
@@ -732,7 +846,7 @@ public class Ffmpeg {
          * Create a data source from a URI or file name. This sources media data from whatever the
          * URI is pointing to given it's supported by ffmpeg.
          */
-        public StreamContext createMediaDataSource(final String source) {
+        public MediaContext source(final String source) {
             final long nativeVds = FfmpegApi.pcv4j_ffmpeg2_uriMediaDataSource_create(source);
             if(nativeVds == 0)
                 throw new FfmpegException("Failed to create a uri based native MediaDataSource");
@@ -744,7 +858,7 @@ public class Ffmpeg {
          * Create a data source from a URI. This sources media data from whatever the
          * URI is pointing to given it's supported by ffmpeg.
          */
-        public StreamContext createMediaDataSource(final URI url) {
+        public MediaContext source(final URI url) {
             final String uriStr;
 
             // dewindowsfy the URI.
@@ -784,7 +898,7 @@ public class Ffmpeg {
          *
          * @see https://trac.ffmpeg.org/wiki/Capture/Webcam
          */
-        public StreamContext createMediaDataSource(final String fmt, final String rawFile) {
+        public MediaContext source(final String fmt, final String rawFile) {
             final long nativeVds = FfmpegApi.pcv4j_ffmpeg2_uriMediaDataSource_create2(fmt, rawFile);
             if(nativeVds == 0)
                 throw new FfmpegException("Failed to create a uri based native MediaDataSource");
@@ -796,8 +910,8 @@ public class Ffmpeg {
          * Create a raw data source based on FFmpeg customIO. This is the same as calling
          * createMediaDataSource(vds, null);
          */
-        public StreamContext createMediaDataSource(final MediaDataSupplier vds) {
-            return createMediaDataSource(vds, null);
+        public MediaContext source(final MediaDataSupplier vds) {
+            return source(vds, null);
         }
 
         /**
@@ -806,7 +920,7 @@ public class Ffmpeg {
          * put in the buffer. When the MediaDataSeek is not null, it's used to move the stream to the
          * desired location in the stream.
          */
-        public StreamContext createMediaDataSource(final MediaDataSupplier dataSupplier, final MediaDataSeek seek) {
+        public MediaContext source(final MediaDataSupplier dataSupplier, final MediaDataSeek seek) {
 
             final var ret = new CustomMediaDataSource(FfmpegApi.pcv4j_ffmpeg2_customMediaDataSource_create());
 
@@ -839,7 +953,7 @@ public class Ffmpeg {
         /**
          * Create if it doesn't exist, or return the existing, {@link MediaProcessingChain} with the given name.
          */
-        public MediaProcessingChain openChain(final String chainName) {
+        public MediaProcessingChain chain(final String chainName) {
             final MediaProcessingChain cur = mediaProcesingChainsMap.get(chainName);
             if(cur != null)
                 return cur;
@@ -850,28 +964,188 @@ public class Ffmpeg {
             return manage(new MediaProcessingChain(chainName, nativeRef, this));
         }
 
+        // ========================================================================================
+        // Convenience methods for using the default MediaProcessingChain
+        // ========================================================================================
+
         /**
-         * Because it's confusing as to whether or not you're always opening a new chain
-         * when you call this, you should be explicit and use {@link #openChain(String)}
+         * A convenience method for operating on the default chain. It's equivalent to:
          *
-         * @deprecated use {@link #openChain(String)}
-         * @return if it doesn't already exist, a newly created {@link MediaProcessingChain}
-         * with the name {@link Ffmpeg#DEFAULT_CHAIN_NAME}. If it does exist it will
-         * return that already created {@link MediaProcessingChain}
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .selectFirstVideoStream()
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#selectFirstVideoStream()}
          */
-        @Deprecated
-        public MediaProcessingChain openChain() {
-            return openChain(DEFAULT_CHAIN_NAME);
+        public MediaContext selectFirstVideoStream() {
+            return chain(DEFAULT_CHAIN_NAME).selectFirstVideoStream().mediaContext();
         }
 
-        private StreamContext manage(final MediaDataSource vds) {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_setSource(nativeRef, vds.nativeRef));
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .processVideoFrames(consumer)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#processVideoFrames(VideoFrameConsumer)}
+         */
+        public MediaContext processVideoFrames(final VideoFrameConsumer consumer) {
+            return chain(DEFAULT_CHAIN_NAME).processVideoFrames(consumer).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .processVideoFrames(initializer, consumer)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#processVideoFrames(VideoFrameConsumer, VideoFrameConsumer)}
+         */
+        public MediaContext processVideoFrames(final VideoFrameConsumer initializer, final VideoFrameConsumer consumer) {
+            return chain(DEFAULT_CHAIN_NAME).processVideoFrames(initializer, consumer).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .processVideoFrames(decoder, consumer)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#processVideoFrames(String, VideoFrameConsumer)}
+         */
+        public MediaContext processVideoFrames(final String decoder, final VideoFrameConsumer consumer) {
+            return chain(DEFAULT_CHAIN_NAME).processVideoFrames(decoder, consumer).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .processVideoFrames(decoder, initializer, consumer)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#processVideoFrames(String, VideoFrameConsumer, VideoFrameConsumer)}
+         */
+        public MediaContext processVideoFrames(final String decoder, final VideoFrameConsumer initializer, final VideoFrameConsumer consumer) {
+            return chain(DEFAULT_CHAIN_NAME).processVideoFrames(decoder, initializer, consumer).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .remux(muxer)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#remux(Muxer)}
+         */
+        public MediaContext remux(final Muxer muxer) {
+            return chain(DEFAULT_CHAIN_NAME).remux(muxer).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .remux(muxer, maxRemuxErrorCount)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#remux(Muxer, int)}
+         */
+        public MediaContext remux(final Muxer muxer, final int maxRemuxErrorCount) {
+            return chain(DEFAULT_CHAIN_NAME).remux(muxer, maxRemuxErrorCount).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .selectStreams(streamSelector)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#selectStreams(StreamSelector)}
+         */
+        public MediaContext selectStreams(final StreamSelectorCallback streamSelector) {
+            return chain(DEFAULT_CHAIN_NAME).selectStreams(streamSelector).mediaContext();
+        }
+
+        /**
+         * A convenience method for operating on the default chain. It's equivalent to:
+         *
+         * <pre>
+         * <code>
+         *  mediaContext
+         *     .chain(DEFAULT_CHAIN_NAME)
+         *     .filterPackets(packetFilter)
+         *     .mediaContext();
+         * </code>
+         * </pre>
+         *
+         * @see {@link MediaProcessingChain#filterPackets(packetFilter)}
+         */
+        public MediaContext filterPackets(final PacketFilter packetFilter) {
+            return chain(DEFAULT_CHAIN_NAME).filterPackets(packetFilter).mediaContext();
+        }
+
+        public MediaContext filterPackets(final Function<PacketMetadata, Boolean> packetFilter) {
+            return chain(DEFAULT_CHAIN_NAME).filterPackets(packetFilter).mediaContext();
+        }
+
+        public MediaContext preferBgr() {
+            return chain(DEFAULT_CHAIN_NAME).preferBgr().mediaContext();
+        }
+
+        private MediaContext manage(final MediaDataSource vds) {
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaContext_setSource(nativeRef, vds.nativeRef));
             dataSource = vds;
             return this;
         }
 
         private MediaProcessingChain manage(final MediaProcessingChain vds) {
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_streamContext_addProcessor(nativeRef, vds.nativeRef));
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_mediaContext_addProcessor(nativeRef, vds.nativeRef));
             mediaProcesingChains.add(vds);
             mediaProcesingChainsMap.put(vds.getName(), vds);
             return vds;
@@ -994,7 +1268,7 @@ public class Ffmpeg {
 
     public static class EncodingContext implements QuietCloseable {
 
-        public class VideoEncoder implements QuietCloseable {
+        public class VideoEncoder {
             private final long nativeRef;
             boolean inputIsRgb = false;
 
@@ -1122,8 +1396,7 @@ public class Ffmpeg {
                 return EncodingContext.this;
             }
 
-            @Override
-            public void close() {
+            private void close() {
                 if(!closed && nativeRef != 0)
                     FfmpegApi.pcv4j_ffmpeg2_videoEncoder_delete(nativeRef);
                 closed = true;
@@ -1131,7 +1404,7 @@ public class Ffmpeg {
         }
 
         private final long nativeRef;
-        private final LinkedList<QuietCloseable> toClose = new LinkedList<>();
+        private final LinkedList<VideoEncoder> toClose = new LinkedList<>();
         private final Map<String, VideoEncoder> encoders = new HashMap<>();
         private Muxer output = null;
 

@@ -30,7 +30,7 @@ public:
   MediaProcessorChain() = default;
   virtual ~MediaProcessorChain();
 
-  virtual uint64_t setup(PacketSourceInfo* avformatCtx, const std::vector<std::tuple<std::string,std::string> >& options);
+  virtual uint64_t setup(PacketSourceInfo* avformatCtx, std::vector<std::tuple<std::string,std::string> >& options);
   virtual uint64_t preFirstFrame();
   virtual uint64_t handlePacket(AVPacket* pPacket, AVMediaType streamMediaType);
 

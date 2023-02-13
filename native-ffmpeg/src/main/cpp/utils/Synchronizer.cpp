@@ -6,7 +6,6 @@
  */
 
 #include "utils/Synchronizer.h"
-
 #include "utils/log.h"
 
 #include <thread>
@@ -43,7 +42,6 @@ static bool decide(int64_t timeToDiplayFrame, uint64_t maxDelayMillisBeforeDropp
     llog(TRACE, "time to present frame (%" PRId64 ") slightly < now (%" PRId64 ")", timeToDiplayFrame, curTime);
 
   return skipIt;
-
 }
 
 bool Synchronizer::throttle(int64_t pts, AVRational& time_base) {

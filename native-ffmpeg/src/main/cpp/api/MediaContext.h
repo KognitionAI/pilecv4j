@@ -34,7 +34,7 @@ namespace ffmpeg
  *
  * These need to be kept in sync with the java file FfmpegApi2.java
  */
-enum StreamContextState {
+enum MediaContextState {
   FRESH = 0,
   OPEN = 1,
   LOADED = 2,
@@ -49,15 +49,15 @@ struct StreamDetails;
 
 #ifdef _INSIDE_PILECV4J_FFMPEG_STREAMCONTEXT_CPP
 extern "C" {
-  uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx);
-  uint32_t pcv4j_ffmpeg2_streamContext_state(uint64_t ctx);
+  uint64_t pcv4j_ffmpeg2_mediaContext_stop(uint64_t ctx);
+  uint32_t pcv4j_ffmpeg2_mediaContext_state(uint64_t ctx);
 }
 
-class StreamContext;
-static uint64_t process_packets(StreamContext* ctx);
+class MediaContext;
+static uint64_t process_packets(MediaContext* ctx);
 #endif
 
-class StreamContext : public PacketSourceInfo {
+class MediaContext : public PacketSourceInfo {
   /**
    * Current state.
    *
@@ -65,7 +65,7 @@ class StreamContext : public PacketSourceInfo {
    * FRESH <-> OPEN
    *
    */
-  std::atomic<StreamContextState> state;
+  std::atomic<MediaContextState> state;
 
   MediaDataSource* mediaDataSource = nullptr;
 
@@ -93,24 +93,29 @@ class StreamContext : public PacketSourceInfo {
   AVMediaType* streamTypes = nullptr;
 
 #ifdef _INSIDE_PILECV4J_FFMPEG_STREAMCONTEXT_CPP
-  friend uint64_t pcv4j_ffmpeg2_streamContext_stop(uint64_t ctx);
-  friend uint32_t pcv4j_ffmpeg2_streamContext_state(uint64_t ctx);
-  friend uint64_t process_packets(StreamContext* c);
+  friend uint64_t pcv4j_ffmpeg2_mediaContext_stop(uint64_t ctx);
+  friend uint32_t pcv4j_ffmpeg2_mediaContext_state(uint64_t ctx);
+  friend uint64_t process_packets(MediaContext* c);
 #endif
 
+  StreamDetails* streamDetails = nullptr;
+  int numStreamDetails = -1;
+
 public:
-  inline StreamContext() : state(FRESH), stopMe(false) {
+  inline MediaContext() : state(FRESH), stopMe(false) {
     if (isEnabled(TRACE))
       log(TRACE, "STRC", "In StreamContext() for %" PRId64, (uint64_t)this);
   }
 
-  virtual inline ~StreamContext() {
+  virtual inline ~MediaContext() {
     if (isEnabled(TRACE))
       log(TRACE, "STRC", "In ~StreamContext() for %" PRId64, (uint64_t)this);
-    if (formatCtx != nullptr)
-      avformat_free_context(formatCtx);
-    if (streamTypes != nullptr)
+    if (streamDetails)
+      delete [] streamDetails;
+    if (streamTypes)
       delete [] streamTypes;
+    if (formatCtx)
+      avformat_free_context(formatCtx);
   }
 
   // =====================================================
@@ -124,7 +129,6 @@ public:
 
   virtual uint64_t getCodecTag(AVCodecID codecId, unsigned int* tagOut);
   // =====================================================
-
 
   inline void sync() {
     throttle = new Synchronizer();
@@ -201,7 +205,7 @@ public:
   uint64_t getStreamDetails(StreamDetails** ppdetails, int* nb);
 private:
 
-  uint64_t advanceStateTo(StreamContextState toAdvanceTo);
+  uint64_t advanceStateTo(MediaContextState toAdvanceTo);
 
 };
 

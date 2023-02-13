@@ -45,15 +45,17 @@ class DecodedFrameProcessor: public MediaProcessor
   uint64_t decode_packet(CodecDetails* pCodecContext, AVPacket *pPacket);
   uint64_t createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb);
 
+  AVPixelFormat requestedPixFormat = AV_PIX_FMT_RGB24;
+
 public:
   inline DecodedFrameProcessor(push_frame pcallback, const char* pdecoderName) : callback(pcallback),
-       decoderNameSet(pdecoderName ? true : false) /*, frameData(nullptr), frameMat(0L) */ {
+       decoderNameSet(pdecoderName ? true : false) {
     if (pdecoderName)
       decoderName = pdecoderName;
   }
   virtual ~DecodedFrameProcessor() = default;
 
-  virtual uint64_t setup(PacketSourceInfo* psi, const std::vector<std::tuple<std::string,std::string> >& options);
+  virtual uint64_t setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& options);
   virtual uint64_t handlePacket(AVPacket* pPacket, AVMediaType packetMediaType);
 
   virtual uint64_t close();

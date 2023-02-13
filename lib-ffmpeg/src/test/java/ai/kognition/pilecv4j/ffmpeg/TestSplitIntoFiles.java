@@ -32,7 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
-import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.StreamContext;
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.MediaContext;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
@@ -45,12 +45,12 @@ public class TestSplitIntoFiles extends BaseTest {
     private static long spitVideoIntoFiles(final File inputFile, final File destDir) {
         final AtomicLong frameNum = new AtomicLong(0);
 
-        try(final StreamContext sctx = Ffmpeg.createStreamContext()
-            .createMediaDataSource(inputFile.getAbsolutePath())
-            .openChain("default")
+        try(final MediaContext sctx = Ffmpeg.createMediaContext()
+            .source(inputFile.getAbsolutePath())
+            .chain("default")
 
-            .createFirstVideoStreamSelector()
-            .createVideoFrameProcessor(f -> {
+            .selectFirstVideoStream()
+            .processVideoFrames(f -> {
                 final String filename = new File(destDir, "image-" + frameNum.getAndIncrement() + ".jpg").getAbsolutePath();
                 try(CvMat toWrite = f.bgr(false);) {
                     uncheck(() -> ImageFile.writeImageFile(toWrite, filename));
@@ -58,7 +58,7 @@ public class TestSplitIntoFiles extends BaseTest {
                 assertTrue(new File(filename).exists());
             })
 
-            .streamContext()
+            .mediaContext()
 
         ;) {
             sctx.play();
@@ -111,16 +111,16 @@ public class TestSplitIntoFiles extends BaseTest {
 
         if(SHOW) {
             try(ImageDisplay id = new ImageDisplay.Builder().build();
-                StreamContext sc = Ffmpeg.createStreamContext()
-                    .createMediaDataSource(destination.getAbsolutePath())
+                MediaContext sc = Ffmpeg.createMediaContext()
+                    .source(destination.getAbsolutePath())
                     .sync()
-                    .openChain("default")
-                    .createVideoFrameProcessor(f -> {
+                    .chain("default")
+                    .processVideoFrames(f -> {
                         try(CvMat d = f.bgr(false);) {
                             id.update(d);
                         }
                     })
-                    .streamContext();) {
+                    .mediaContext();) {
                 sc.play();
             }
         }
