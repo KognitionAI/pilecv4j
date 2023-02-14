@@ -73,6 +73,9 @@ public class KogSys implements QuietCloseable {
     public ImageSource imageSource = null;
     private long nativeObj = 0L;
 
+    private String currentModule;
+    private String currentFunction;
+
     private final get_image_source callback = new get_image_source() {
         @Override
         public long image_source(final long ptRef) {
@@ -105,6 +108,8 @@ public class KogSys implements QuietCloseable {
     }
 
     public void runPythonFunction(final String module, final String function, final Map<String, Object> kwds) throws PythonException {
+        currentModule = module;
+        currentFunction = function;
         try(final var q = new ParamCloser(PythonAPI.pilecv4j_python_dict_create());) {
             final long dict = fillPythonDict(q, kwds);
             throwIfNecessary(PythonAPI.pilecv4j_python_runPythonFunction(module, function, dict));
@@ -130,6 +135,16 @@ public class KogSys implements QuietCloseable {
         return imageSource != null;
     }
 
+    public void waitUntilSourceInitialized(final long timeout) {
+        final long startTime = System.currentTimeMillis();
+        while(!sourceIsInitialized() && (System.currentTimeMillis() - startTime) < timeout)
+            Thread.yield();
+
+        if(!sourceIsInitialized())
+            throw new PythonException(
+                "The module \"" + currentModule + ".py\" using function \"" + currentFunction + "\" never initialized the image source. Did you call runPythonFunction somewhere?");
+    }
+
     @Override
     public void close() {
         if(imageSource != null)
@@ -142,7 +157,14 @@ public class KogSys implements QuietCloseable {
     private static final Object pythonExpandedLock = new Object();
     private static Map<String, File> pythonIsExpanded = new HashMap<>();
 
-    public static File initModule(final String pythonModulePath) {
+    public static KogSys initModule(final String pythonModuleUri) {
+        final File pythonModulePath = unpackModule(pythonModuleUri);
+        final KogSys ret = new KogSys();
+        ret.addModulePath(pythonModulePath.getAbsolutePath());
+        return ret;
+    }
+
+    public static File unpackModule(final String pythonModulePath) {
         synchronized(pythonExpandedLock) {
             final File ret = pythonIsExpanded.get(pythonModulePath);
             if(ret == null) {
@@ -151,7 +173,7 @@ public class KogSys implements QuietCloseable {
                     if(!path.exists() || !path.isDirectory())
                         throw new IllegalStateException("The python code isn't properly bundled in the jar file.");
 
-                    final File pythonCodeDir = Files.createTempDirectory("python").toFile();
+                    final File pythonCodeDir = Files.createTempDirectory("pilecv4j-lib-python").toFile();
                     pythonCodeDir.deleteOnExit();
 
                     copy(path, pythonCodeDir.getAbsolutePath(), true);
