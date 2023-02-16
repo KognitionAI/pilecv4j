@@ -26,20 +26,26 @@ namespace pilecv4j
 class FakeMutextGuard {
   // false means it's free. true means I need to wait.
   std::atomic<bool>& fmut;
+  bool didIt;
 
 public:
-  inline FakeMutextGuard(std::atomic<bool>& pfmut) : fmut(pfmut) {
-
-    bool mfalse = false;
-    while(!fmut.compare_exchange_weak(mfalse,true)) {
-      mfalse = false;
-    }
+  inline FakeMutextGuard(std::atomic<bool>& pfmut, bool doIt = true) : fmut(pfmut) {
+    if (doIt) {
+      bool mfalse = false;
+      while(!fmut.compare_exchange_weak(mfalse,true)) {
+        mfalse = false;
+      }
+      didIt = true;
+    } else
+      didIt = false;
   }
 
   inline ~FakeMutextGuard() {
-    bool mtrue = true;
-    while(!fmut.compare_exchange_weak(mtrue, false)) {
-      mtrue = true;
+    if (didIt) {
+      bool mtrue = true;
+      while(!fmut.compare_exchange_weak(mtrue, false)) {
+        mtrue = true;
+      }
     }
   }
 };

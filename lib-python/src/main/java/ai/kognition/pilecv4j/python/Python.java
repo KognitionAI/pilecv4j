@@ -47,8 +47,8 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.python.internal.PythonAPI;
 import ai.kognition.pilecv4j.python.internal.PythonAPI.get_image_source;
 
-public class KogSys implements QuietCloseable {
-    private static final Logger LOGGER = LoggerFactory.getLogger(KogSys.class);
+public class Python implements QuietCloseable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(Python.class);
 
     static {
         // find the level
@@ -79,7 +79,7 @@ public class KogSys implements QuietCloseable {
     private final get_image_source callback = new get_image_source() {
         @Override
         public long image_source(final long ptRef) {
-            synchronized(KogSys.this) {
+            synchronized(Python.this) {
                 if(imageSource == null)
                     imageSource = new ImageSource(PythonAPI.pilecv4j_python_imageSource_create(ptRef));
                 return imageSource.imageSourceRef;
@@ -87,7 +87,7 @@ public class KogSys implements QuietCloseable {
         }
     };
 
-    public KogSys() throws PythonException {
+    public Python() throws PythonException {
         nativeObj = PythonAPI.pilecv4j_python_kogSys_create(callback);
         if(nativeObj == 0L)
             throw new PythonException("Failed to instantiate native PyTorch instance.");
@@ -157,9 +157,9 @@ public class KogSys implements QuietCloseable {
     private static final Object pythonExpandedLock = new Object();
     private static Map<String, File> pythonIsExpanded = new HashMap<>();
 
-    public static KogSys initModule(final String pythonModuleUri) {
+    public static Python initModule(final String pythonModuleUri) {
         final File pythonModulePath = unpackModule(pythonModuleUri);
-        final KogSys ret = new KogSys();
+        final Python ret = new Python();
         ret.addModulePath(pythonModulePath.getAbsolutePath());
         return ret;
     }
@@ -334,8 +334,8 @@ public class KogSys implements QuietCloseable {
             dict = q.dict;
             kwds.entrySet().forEach(e -> {
                 final Object val = e.getValue();
-                if(val instanceof KogSys)
-                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((KogSys)val).nativeObj));
+                if(val instanceof Python)
+                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((Python)val).nativeObj));
                 else if(val instanceof Boolean)
                     throwIfNecessary(PythonAPI.pilecv4j_python_dict_putBoolean(dict, e.getKey(), ((Boolean)val).booleanValue() ? 1 : 0));
                 else if(val instanceof Number) {

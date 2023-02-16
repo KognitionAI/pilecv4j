@@ -41,7 +41,7 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
-import ai.kognition.pilecv4j.python.KogSys.KogMatResults;
+import ai.kognition.pilecv4j.python.Python.KogMatResults;
 
 public class TestPython {
     public static final boolean SHOW;
@@ -66,7 +66,7 @@ public class TestPython {
         final AtomicBoolean failed = new AtomicBoolean(false);
 
         try(final Closer closer = new Closer();
-            final KogSys pt = new KogSys();
+            final Python pt = new Python();
             final CvMat mat = ImageFile.readMatFromFile(testImageFilename);) {
 
             // add the module path
@@ -140,7 +140,7 @@ public class TestPython {
         final AtomicBoolean failed = new AtomicBoolean(false);
 
         final AtomicLong frameCount = new AtomicLong(0);
-        try(final KogSys pt = new KogSys();
+        try(final Python pt = new Python();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
             final MediaContext c = Ffmpeg.createMediaContext();) {
 
