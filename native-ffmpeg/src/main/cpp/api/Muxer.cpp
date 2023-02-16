@@ -61,6 +61,10 @@ uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, AV
 uint64_t Muxer::writePacket(const AVPacket* inPacket, const AVRational& time_base, int output_stream_index) {
   AVFormatContext* output_format_context = getFormatContext();
   AVStream* out_stream = output_format_context->streams[output_stream_index];
+
+  if (isEnabled(DEBUG))
+    logPacket(DEBUG, COMPONENT, "Prescaled Packet", inPacket, time_base);
+
   AVPacket* pPacket = av_packet_clone(inPacket);
   if (!pPacket) {
     log(ERROR, COMPONENT, "Failed to clone a packet");
@@ -81,16 +85,38 @@ uint64_t Muxer::writePacket(const AVPacket* inPacket, const AVRational& time_bas
   } else {
 //    if (isEnabled(TRACE))
 //      log(TRACE, COMPONENT, "in tb = %d/%d, out = %d/%d", time_base.num, time_base.den, out_stream->time_base.num, out_stream->time_base.den);
+    if (pPacket->dts == AV_NOPTS_VALUE)
+      pPacket->dts = pPacket->pts;
+
     pPacket->pts = av_rescale_q_rnd(pPacket->pts, time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
     pPacket->dts = av_rescale_q_rnd(pPacket->dts, time_base, out_stream->time_base, (AVRounding)(AV_ROUND_NEAR_INF|AV_ROUND_PASS_MINMAX));
+    if (!starting_ts_offset) {
+      // we need to set up the stream starting offset lookup.
+      nb_streams = output_format_context->nb_streams;
+      starting_ts_offset = new int64_t[nb_streams];
+      for (int i = 0; i < nb_streams; i++)
+        starting_ts_offset[i] = AV_NOPTS_VALUE;
+    }
+    if (starting_ts_offset[output_stream_index] == AV_NOPTS_VALUE) {
+       log(INFO, COMPONENT, "starting Muxer. Saving off stream %d starting offset as %" PRId64, (int)output_stream_index, (int64_t)pPacket->pts);
+       starting_ts_offset[output_stream_index] = pPacket->pts;
+    }
+    const int64_t offset = starting_ts_offset[output_stream_index];
+    if (isEnabled(DEBUG))
+      log(DEBUG, COMPONENT, "starting ts offset = %ld", (long)offset);
+    pPacket->pts -= offset;
+    pPacket->dts -= offset;
+    if (isEnabled(DEBUG))
+      logPacket(DEBUG, COMPONENT, "Shifted Packet", pPacket, output_format_context);
+
     pPacket->duration = av_rescale_q(pPacket->duration, time_base, out_stream->time_base);
   }
   // ======================================================================================
 
-  if (isEnabled(TRACE))
-    logPacket(TRACE, COMPONENT, "Rescaled Packet", pPacket, output_format_context);
+  if (isEnabled(DEBUG))
+    logPacket(DEBUG, COMPONENT, "Rescaled Packet", pPacket, output_format_context);
 
-  int ret = writePacket(pPacket);
+  int ret = writeFinalPacket(pPacket);
   av_packet_free(&pPacket);
   if (ret < 0)
     log(ERROR, COMPONENT, "Error muxing packet \"%s\"", av_err2str(ret));

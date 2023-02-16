@@ -319,34 +319,23 @@ public class FfmpegApi {
 
     public native static long pcv4j_ffmpeg2_videoEncoder_addCodecOption(final long nativeDef, final String key, final String val);
 
-    public native static long pcv4j_ffmpeg2_videoEncoder_enable(final long nativeDef, final long matRef, final int isRgb);
-
-    public native static long pcv4j_ffmpeg2_videoEncoder_enable2(final long nativeDef, final int isRgb, final int width, final int height, final int stride);
-
-    public native static long pcv4j_ffmpeg2_videoEncoder_enable3(final long nativeDef, final int isRgb, final int width, final int height);
-
-    public native static long pcv4j_ffmpeg2_videoEncoder_enable4(final long nativeDef, final long matRef, final int isRgb, final int dstW, final int dstH);
-
-    public native static long pcv4j_ffmpeg2_videoEncoder_enable5(final long nativeDef, final int isRgb, final int width, final int height, final int stride,
+    public native static long pcv4j_ffmpeg2_videoEncoder_enable(final long nativeDef, final int isRgb, final int width, final int height, final int stride,
         final int dstW, final int dstH);
-
-    public native static long pcv4j_ffmpeg2_videoEncoder_enable6(final long nativeDef, final int isRgb, final int width, final int height, final int dstW,
-        final int dstH);
 
     public native static void pcv4j_ffmpeg2_videoEncoder_delete(final long nativeDef);
 
     public native static long pcv4j_ffmpeg2_videoEncoder_encode(final long nativeDef, final long matRef, final int isRgb);
 
-    public native static long pcv4j_ffmpeg2_videoEncoder_setEncodingParameters(final long nativeDef, final int pfps, final int pbufferSize,
-        final long pminBitrate, final long pmaxBitrate);
+    public native static long pcv4j_ffmpeg2_videoEncoder_setFramerate(final long nativeDef, final int pfps_num, final int pfps_den);
 
-    public native static long pcv4j_ffmpeg2_videoEncoder_setFps(final long nativeDef, final int pfps);
+    public native static long pcv4j_ffmpeg2_videoEncoder_setOutputDims(final long nativeDef, final int width, final int height, int preserveAspectRatio,
+        int onlyScaleDown);
 
-    public native static long pcv4j_ffmpeg2_videoEncoder_setBufferSize(final long nativeDef, final int pbufferSize);
+    public native static long pcv4j_ffmpeg2_videoEncoder_setRcBufferSize(final long nativeDef, final int pbufferSize);
 
-    public native static long pcv4j_ffmpeg2_videoEncoder_setBitrate(final long nativeDef, final long pminBitrate, final long pmaxBitrate);
+    public native static long pcv4j_ffmpeg2_videoEncoder_setRcBitrate(final long nativeDef, final long pminBitrate, final long pmaxBitrate);
 
-    public native static long pcv4j_ffmpeg2_videoEncoder_setBitrate2(final long nativeDef, final long pminBitrate);
+    public native static long pcv4j_ffmpeg2_videoEncoder_setTargetBitrate(final long nativeDef, final long pbitrate);
 
     public native static long pcv4j_ffmpeg2_videoEncoder_stop(final long nativeDef);
 

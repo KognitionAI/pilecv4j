@@ -72,7 +72,7 @@ enum Pcv4jStat {
 
 const char* errMessage(uint64_t status);
 
-static inline bool isError(uint64_t stat) {
+inline bool isError(uint64_t stat) {
   // 0 is good and we expect this most of the time so check it first.
   if (stat == 0)
     return false;
@@ -86,7 +86,7 @@ static inline bool isError(uint64_t stat) {
   return false;
 }
 
-static inline bool isAvError(uint64_t stat) {
+inline bool isAvError(uint64_t stat) {
   // 0 is good and we expect this most of the time so check it first.
   if (stat == 0)
     return false;
@@ -100,69 +100,22 @@ static inline bool isAvError(uint64_t stat) {
 /**
  * equivalent of java's System.currentTimeMillis.
  */
-static inline int64_t now() {
+inline int64_t now() {
   return static_cast<int64_t>(std::chrono::duration_cast< std::chrono::milliseconds >(
       std::chrono::system_clock::now().time_since_epoch()
   ).count());
 }
 
-static inline std::string removeOption(const std::string& key, std::vector<std::tuple<std::string,std::string> >& options) {
-  std::string ret;
-  for (auto iter = options.begin(); iter != options.end(); ++iter) {
-    std::tuple<std::string,std::string> cur = *iter;
-    if (key == std::get<0>(cur)) {
-      ret = std::get<1>(cur);
-      options.erase(iter);
-      return ret;
-    }
-  }
-  return ret;
-}
-
-static inline uint64_t buildOptions(const std::vector<std::tuple<std::string,std::string> >& options, AVDictionary** opts) {
-  if (options.size() == 0) {
-    if (isEnabled(TRACE))
-      log(TRACE,"UTIL","No options set. Setting opts to nullptr");
-    *opts = nullptr;
-    return 0;
-  }
-
-  for (auto o : options) {
-    uint64_t result = MAKE_AV_STAT(av_dict_set(opts, std::get<0>(o).c_str(), std::get<1>(o).c_str(), 0 ));
-    if (isError(result))
-      return result;
-  }
-  return 0;
-}
-
-static inline uint64_t buildOptions(const std::map<std::string,std::string>& options, AVDictionary** opts) {
-  if (options.size() == 0) {
-    *opts = nullptr;
-    return 0;
-  }
-
-  uint64_t result = 0;
-  for (std::map<std::string, std::string>::const_iterator it = options.begin(); it != options.end(); it++) {
-    if (!it->second.empty() && !it->first.empty()) {
-      result = MAKE_AV_STAT(av_dict_set(opts, it->first.c_str(), it->second.c_str(), 0));
-      if (isError(result))
-        return result;
-    }
-  }
-
-  return 0;
-}
-
-static inline bool decoderExists(AVCodecID id) {
-  // finds the registered decoder for a codec ID
-  // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-  AVCodec *pLocalCodec = avcodec_find_decoder(id);
-  if (!pLocalCodec)
-    log(WARN, "UTIL", "ERROR unsupported codec (%d)!", id);
-
-  return pLocalCodec != nullptr;
-}
-
+std::string removeOption(const std::string& key, std::vector<std::tuple<std::string,std::string> >& options);
+uint64_t buildOptions(const std::vector<std::tuple<std::string,std::string> >& options, AVDictionary** opts);
+uint64_t buildOptions(const std::map<std::string,std::string>& options, AVDictionary** opts);
+void rebuildOptions(const AVDictionary* opts, std::map<std::string,std::string>& result);
+void rebuildOptions(const AVDictionary* opts, std::vector<std::tuple<std::string,std::string> >& result) ;
+void logRemainingOptions(LogLevel logLevel, const char* component, const char* header,
+                                       const std::vector<std::tuple<std::string,std::string> >& options);
+void logRemainingOptions(LogLevel logLevel, const char* component, const char* header,
+                                       const std::map<std::string,std::string>& options);
+bool decoderExists(AVCodecID id);
 
 extern AVRational millisecondTimeBase;
 

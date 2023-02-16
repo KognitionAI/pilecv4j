@@ -55,10 +55,10 @@ public:
   }
   virtual ~DecodedFrameProcessor() = default;
 
-  virtual uint64_t setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& options);
-  virtual uint64_t handlePacket(AVPacket* pPacket, AVMediaType packetMediaType);
+  virtual uint64_t setup(PacketSourceInfo* psi, std::vector<std::tuple<std::string,std::string> >& options) override;
+  virtual uint64_t handlePacket(AVPacket* pPacket, AVMediaType packetMediaType) override;
 
-  virtual uint64_t close();
+  virtual uint64_t close() override;
 
   inline void replace(push_frame pf) {
     callback = pf;

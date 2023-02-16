@@ -98,9 +98,9 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
   if (numStreams <= 0)
     return MAKE_P_STAT(NO_STREAM);
 
-  llog(TRACE,"HERE1");
+  //llog(TRACE,"HERE1");
   std::string preferBgrStr = removeOption(PREFER_BGR, options);
-  llog(TRACE,"HERE2");
+  //llog(TRACE,"HERE2");
 
   if (preferBgrStr == "1" || preferBgrStr == "true" || preferBgrStr == "TRUE")
     requestedPixFormat = AV_PIX_FMT_BGR24;
@@ -139,6 +139,12 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
     AVDictionary* opts = nullptr;
     buildOptions(options, &opts);
     uint64_t rc = MediaProcessor::open_codec(lStream,&opts,&(codecs[i]->codecCtx), decoderNameSet ? decoderName.c_str() : nullptr);
+    if (isEnabled(INFO) && options.size() > 0 && !isError(rc)) {
+      rebuildOptions(opts, options);
+      std::string header = "after opening the decoder for stream ";
+      header += std::to_string(i);
+      logRemainingOptions(INFO, COMPONENT, header.c_str(), options);
+    }
     if (opts != nullptr)
       av_dict_free(&opts);
     if (isError(rc))

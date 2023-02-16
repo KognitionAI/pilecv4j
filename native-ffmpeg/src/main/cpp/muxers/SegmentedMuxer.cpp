@@ -242,6 +242,19 @@ uint64_t SegmentedMuxer::rotate() {
   return 0;
 }
 
+const AVOutputFormat* SegmentedMuxer::guessOutputFormat() {
+  if (!currentMuxer) {
+    uint64_t result = muxerSupplier(muxCount++, &currentMuxer);
+    if (isError(result)) {
+      currentMuxer = nullptr;
+      llog(ERROR,"Failed to create the first muxer.");
+      return nullptr;
+    }
+  }
+
+  return currentMuxer ? currentMuxer->guessOutputFormat() : nullptr;
+}
+
 //uint64_t SegmentedMuxer::writePacket(AVPacket* outputPacket) {
 //  uint64_t iret;
 //  int stream_index = outputPacket->stream_index;
@@ -292,6 +305,7 @@ uint64_t SegmentedMuxer::writePacket(const AVPacket* inputPacket, const AVRation
   }
 
   return Muxer::writePacket(inputPacket, inputPacketTimeBase, output_stream_index);
+  //return currentMuxer->writePacket(inputPacket, inputPacketTimeBase, output_stream_index);
 }
 
 //========================================================================

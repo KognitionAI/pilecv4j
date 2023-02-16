@@ -24,7 +24,7 @@ namespace pilecv4j
 namespace ffmpeg
 {
 
-#define COMPONENT "SCTX"
+#define COMPONENT "MCTX"
 #define PILECV4J_TRACE RAW_PILECV4J_TRACE(COMPONENT)
 
 TIME_DECL(read_frame);
@@ -83,7 +83,13 @@ uint64_t MediaContext::open() {
       llog(ERROR, "Failed setting build options: %" PRId64 ", %s", iret, errMessage(iret));
       return iret;
     }
+
     rc = mediaDataSource->open(&formatCtx, &opts);
+    if (!isError(rc) && options.size() > 0) {
+      rebuildOptions(opts, options);
+      logRemainingOptions(INFO, COMPONENT, "after opening the input context.", options);
+    }
+
     if (opts != nullptr)
       av_dict_free(&opts);
   }
@@ -194,7 +200,7 @@ uint64_t MediaContext::getStream(int streamIndex, AVStream** streamOut) {
   uint64_t ret = 0;
   if (state < OPEN) {
     if (isError(ret = advanceStateTo(OPEN)))
-        return ret;
+      return ret;
   }
 
   // formatCtx MUST be set or the advanceStateTo(OPEN) would have failed.

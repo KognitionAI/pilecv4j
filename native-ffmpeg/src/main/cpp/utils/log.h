@@ -11,6 +11,7 @@
 
 struct AVPacket;
 struct AVFormatContext;
+struct AVRational;
 
 namespace pilecv4j {
 namespace ffmpeg
@@ -32,7 +33,8 @@ namespace ffmpeg
   void log(LogLevel llevel, const char* component, const char *fmt, ...);
   void log(LogLevel llevel, const char* component, const char* fmt, va_list args);
   void setLogLevel(LogLevel ll);
-  void logPacket(LogLevel ll, const char* component, const char* header, AVPacket* packet, AVFormatContext* ctx);
+  void logPacket(LogLevel ll, const char* component, const char* header, const AVPacket* packet, const AVFormatContext* ctx);
+  void logPacket(LogLevel ll, const char* component, const char* header, const AVPacket* packet, const AVRational& time_base);
 
 #ifdef PILECV4J_ENABLE_TRACE_API
   class TraceGuard

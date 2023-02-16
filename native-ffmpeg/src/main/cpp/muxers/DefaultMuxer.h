@@ -80,9 +80,9 @@ public:
 
   virtual ~DefaultMuxer();
 
-  virtual uint64_t open();
+  virtual uint64_t open() override;
 
-  inline virtual AVFormatContext* getFormatContext() {
+  inline virtual AVFormatContext* getFormatContext() override {
     return output_format_context;
   }
 
@@ -90,30 +90,38 @@ public:
    * This will be called if we have the AVCodecParameters. If we have the actual AVCodec
    * then createNextStream(AVCodec*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodecParameters* codecPars, int* stream_index_out);
+  virtual uint64_t createNextStream(AVCodecParameters* codecPars, int* stream_index_out) override;
 
   /**
    * This will be called if we have the AVCodec. If we only have the AVCodecParameters
    * then createNextStream(AVCodecParameters*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out);
+  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out) override;
 
   /**
    * This is essentially where the avformat_write_header should be called on the output
    */
-  virtual uint64_t ready();
+  virtual uint64_t ready() override;
 
   /**
    * By default, if the output_format_context is not null, this will write the trailer
    * using <em>av_write_trailer</em>
    */
-  virtual uint64_t close();
+  virtual uint64_t close() override;
 
   /**
    * This will be called if a failure occurs in a class using the muxer as a notification to
    * the muxer to clean up resources because of a failure.
    */
-  virtual void fail();
+  virtual void fail() override;
+
+  /**
+   * If the internal AVFormatContext is created and already has an oformat set,
+   * that will be returned since there will be no "guessing" necessary. Otherwise
+   * it will guess based on the format and uri that were specified.
+   */
+  virtual const AVOutputFormat* guessOutputFormat() override;
+
 };
 
 #ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP

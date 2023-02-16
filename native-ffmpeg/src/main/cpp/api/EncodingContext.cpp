@@ -39,12 +39,12 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 EncodingContext::~EncodingContext()
 {
   PILECV4J_TRACE;
-  stop(); // stop if not already stopped
+  stop(true); // stop if not already stopped
 }
 
-uint64_t EncodingContext::stop() {
+uint64_t EncodingContext::stop(bool lock) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(fake_mutex);
+  FakeMutextGuard g(fake_mutex, lock);
 
   if (state == ENC_STOPPED)
     return 0;
@@ -61,7 +61,7 @@ uint64_t EncodingContext::stop() {
 uint64_t EncodingContext::setMuxer(Muxer* pmuxer) {
   PILECV4J_TRACE;
   if (state != ENC_FRESH) {
-    llog(ERROR, "EncodingContext is in the wrong state to set the Muxer. It should have been FRESH but it's in %d.", (int)state);
+    llog(ERROR, "EncodingContext is in the wrong state to set the Muxer. It should have been ENC_FRESH(%d) but it's in %d.", (int)ENC_FRESH, (int)state);
     return MAKE_P_STAT(BAD_STATE);
   }
 
@@ -74,19 +74,16 @@ uint64_t EncodingContext::setMuxer(Muxer* pmuxer) {
     return MAKE_P_STAT(NO_OUTPUT);
   }
   muxer = pmuxer;
-  uint64_t ret = muxer->open();
-  if (!isError(ret))
-    state = ENC_OPEN_CONTEXT;
-  return ret;
+  return muxer->open();
 }
 
-uint64_t EncodingContext::ready() {
+uint64_t EncodingContext::ready(bool lock) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(fake_mutex);
+  FakeMutextGuard g(fake_mutex, lock);
 
-  if (state != ENC_OPEN_STREAMS) {
-    llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_OPEN_STREAMS, (int)state);
-    return MAKE_P_STAT(BAD_STATE);
+  if (encoders.size() == 0) {
+    llog(ERROR, "No encoders were added to the context. There is nothing to do.");
+    return MAKE_P_STAT(NO_SUPPORTED_CODEC);
   }
 
   if (!muxer) {
@@ -101,7 +98,7 @@ uint64_t EncodingContext::ready() {
   }
 
   for (auto ve : encoders) {
-    if (isError(iret = ve->ready()))
+    if (isError(iret = ve->ready(false)))
       return iret;
   }
 
@@ -109,7 +106,7 @@ uint64_t EncodingContext::ready() {
   return 0;
 }
 
-uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
+uint64_t VideoEncoder::enable(bool lock, uint64_t matRef, bool isRgb) {
   PILECV4J_TRACE;
   auto imaker = IMakerManager::getIMaker();
   if (!imaker)
@@ -119,34 +116,60 @@ uint64_t VideoEncoder::enable(uint64_t matRef, bool isRgb, int dstW, int dstH) {
   if (!imaker->extractImageDetails(matRef, isRgb, &details))
     return MAKE_P_STAT(FAILED_CREATE_FRAME);
 
-  return enable(isRgb, details.w, details.h, details.stride, dstW, dstH);
+  return enable(lock, isRgb, details.w, details.h, details.stride, -1, -1);
 }
 
-uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, int dstW, int dstH) {
+static void calcOutputWidth(int width, int height, int outputWidth, int outputHeight, bool preserveAspectRatio, bool onlyScaleDown, int& outputWidthToUse, int& outputHeightToUse) {
+  outputHeightToUse = -1;
+  outputWidthToUse = -1;
+  if ((outputWidth < 0 && outputHeight < 0) || outputWidth == 0 || outputHeight == 0) {
+    if (outputWidth == 0 || outputHeight == 0)
+      llog(WARN, "Can't scale the image if either the output width or height is set to zero. No scaling will take place.");
+    return;
+  }
+
+  // we want to preserve the aspect ratio even if preserveAspectRatio is false as long
+  // as one of the dimensions remains unset.
+  bool par = preserveAspectRatio || outputHeight == -1 || outputWidth == -1;
+  if (par) {
+    double scaleWidth = outputWidth < 0 ? 1E10 : (double)outputWidth / (double)width;
+    double scaleHeight = outputHeight < 0 ? 1E10 : (double)outputHeight / (double)height;
+    double scale = std::min(scaleWidth, scaleHeight);
+    bool widthBiased = scaleWidth < scaleHeight;
+    if (scale > 1.0 && onlyScaleDown)
+      return;
+    outputWidthToUse = widthBiased ? outputWidth : (int)std::round((double)width * scale);
+    outputHeightToUse = widthBiased ? (int)std::round((double)height * scale) : outputHeight;
+  } else {
+    outputWidthToUse = outputWidth;
+    outputHeightToUse = outputHeight;
+  }
+}
+
+uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int stride, int dstW, int dstH) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(enc->fake_mutex);
+  FakeMutextGuard g(enc->fake_mutex, lock);
 
-  AVRational framerate = { fps, 1 };
-
+  int outputWidthToUse;
+  int outputHeightToUse;
+  calcOutputWidth(width, height, outputWidth, outputHeight, preserveAspectRatio, onlyScaleDown, outputWidthToUse, outputHeightToUse);
+  if (dstW < 0)
+    dstW = outputWidthToUse;
   if (dstW < 0)
     dstW = width;
 
   if (dstH < 0)
+    dstH = outputHeightToUse;
+  if (dstH < 0)
     dstH = height;
 
-  // the encoding context state needs to be open
-  if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
-    llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d but it's in %d.", (int)ENC_OPEN_CONTEXT, (int)enc->state);
-    return MAKE_P_STAT(BAD_STATE);
-  }
-
   if (state != VE_FRESH) {
-    llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d but it's in %d.", (int)VE_FRESH, (int)state);
+    llog(ERROR, "VideoEncoder is in the wrong state. It should have been in VE_FRESH(%d) but it's in %d.", (int)VE_FRESH, (int)state);
     return MAKE_P_STAT(BAD_STATE);
   }
 
   if (!enc->muxer) {
-    llog(ERROR, "Cannot enable the encoder without setting a muxer");
+    llog(ERROR, "Cannot enable the encoder without setting a muxer to write the output to.");
     return MAKE_P_STAT(NO_OUTPUT);
   }
 
@@ -155,18 +178,21 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
 
   // llog(TRACE, "STEP 6: set_codec_params");
 
-  // set the options
-  result = buildOptions(options, &opts);
-  if (isError(result)) {
-    if (opts != nullptr)
-      av_dict_free(&opts);
-    return result;
-  }
-
   int avres = 0;
 
   //llog(TRACE, "STEP 3: find codec");
-  video_avc = avcodec_find_encoder_by_name(video_codec.c_str());
+  if (video_codec_isNull) {
+    const AVOutputFormat* avof = enc->muxer->guessOutputFormat();
+    if (!avof) {
+      llog(ERROR, "Cannot infer the appropriate video codec to use for encoding.");
+      result = MAKE_P_STAT(FAILED_CREATE_CODEC);
+      goto fail;
+    }
+    if (avof->video_codec != AV_CODEC_ID_NONE)
+      video_avc = avcodec_find_encoder(avof->video_codec);
+  } else
+    video_avc = avcodec_find_encoder_by_name(video_codec.c_str());
+
   if (!video_avc) {
     llog(ERROR, "could not find the proper codec");
     result = MAKE_P_STAT(FAILED_CREATE_CODEC);
@@ -182,20 +208,22 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
     goto fail;
   }
 
-  if (bufferSize >= 0) {
-    llog(TRACE, "Encoder buffer size: %ld", (long) bufferSize);
-    video_avcc->rc_buffer_size = bufferSize;
+  if (rcBufferSize >= 0) {
+    llog(TRACE, "Encoder buffer size: %ld", (long) rcBufferSize);
+    video_avcc->rc_buffer_size = rcBufferSize;
   }
-  if (maxBitrate >= 0) {
-    llog(TRACE, "Encoder max bit rate: %ld", (long) maxBitrate);
-    video_avcc->rc_max_rate = maxBitrate;
+  if (maxRcBitrate >= 0) {
+    llog(TRACE, "Encoder rate-control max bit rate: %ld", (long) maxRcBitrate);
+    video_avcc->rc_max_rate = maxRcBitrate;
   }
-  if (minBitrate >= 0) {
-    llog(TRACE, "Encoder min bit rate: %ld", (long) minBitrate);
-    video_avcc->rc_min_rate = minBitrate;
+  if (minRcBitrate >= 0) {
+    llog(TRACE, "Encoder rate-control min bit rate: %ld", (long) minRcBitrate);
+    video_avcc->rc_min_rate = minRcBitrate;
   }
-  if (minBitrate >= 0 && maxBitrate == minBitrate)
-    video_avcc->bit_rate = minBitrate;
+  if (bitrate >= 0) {
+    llog(TRACE, "Encoder target bit rate: %ld", (long) bitrate);
+    video_avcc->bit_rate = bitrate;
+  }
 
   llog(TRACE, "Encoder frame rate: %d / %d", (int)framerate.num, (int)framerate.den);
   video_avcc->codec_tag = 0;
@@ -226,12 +254,18 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   if (enc->muxer->getFormatContext()->oformat->flags & AVFMT_GLOBALHEADER)
     video_avcc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-  enc->state = ENC_OPEN_STREAMS;
-
   //llog(TRACE, "STEP 8: avcodec_open2");
 
+  // set the options
+  result = buildOptions(options, &opts);
+  if (isError(result))
+    return result;
   avres = avcodec_open2(video_avcc, video_avc, &opts);
   result = MAKE_AV_STAT(avres);
+  if (!isError(result) && options.size() > 0) {
+    rebuildOptions(opts, options);
+    logRemainingOptions(INFO, COMPONENT, "after opening the video encoder", options);
+  }
   if (opts != nullptr)
     av_dict_free(&opts);
   if (isError(result)) {
@@ -263,12 +297,14 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   // ======================================
 
   result = IMakerManager::setupTransform(width, height, stride, isRgb ? ai::kognition::pilecv4j::RGB24 : ai::kognition::pilecv4j::BGR24, video_avcc, dstW, dstH, &xform);
+  inputWillBeRgb = isRgb;
+
   if (isError(result)) {
     llog(ERROR, "Failed to setup transform");
     goto fail;
   }
 
-  state = VE_SET_UP;
+  state = VE_ENABLED;
 
   return 0;
   fail:
@@ -280,9 +316,9 @@ uint64_t VideoEncoder::enable(bool isRgb, int width, int height, size_t stride, 
   return result;
 }
 
-uint64_t VideoEncoder::streaming() {
+uint64_t VideoEncoder::streaming(bool lock) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(enc->fake_mutex);
+  FakeMutextGuard g(enc->fake_mutex, lock);
 
   // this should NOT already be encoding.
   if (state >= VE_ENCODING) {
@@ -294,7 +330,9 @@ uint64_t VideoEncoder::streaming() {
   return 0;
 }
 
-uint64_t VideoEncoder::ready() {
+uint64_t VideoEncoder::ready(bool lock) {
+  FakeMutextGuard g(enc->fake_mutex, lock);
+
   AVStream* stream = enc->muxer->getStream(video_sindex);
   if (!stream) {
     llog(ERROR, "No stream set ");
@@ -305,13 +343,42 @@ uint64_t VideoEncoder::ready() {
   return 0;
 }
 
-uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
+uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(enc->fake_mutex);
+  FakeMutextGuard g(enc->fake_mutex, lock);
 
   if (!matRef) {
     llog(WARN, "null mat passed to encode. Ignoring");
     return 0;
+  }
+
+  uint64_t result = 0;
+
+  // this should usually be in the VE_ENCODING state except on the first call so we want to check for that first.
+  if (state != VE_ENCODING) {
+    if (state == VE_FRESH) {
+      // this should move the state to VE_ENABLED
+      if (isError(result = enable(false, matRef, isRgb))) {
+        llog(ERROR, "Failed to auto-enable the video encoder.");
+        return result;
+      }
+    }
+
+    if (state == VE_ENABLED) {
+      state = VE_ENCODING;
+      if (sync)
+        sync->start();
+    } else {
+      llog(ERROR, "VideoEncoder is in the wrong state. It should have been in VE_ENABLED(%d) or VE_ENCODING(%d) but it's in %d.", (int)VE_ENABLED, (int)VE_ENCODING, (int)state);
+      return MAKE_P_STAT(BAD_STATE);
+    }
+  }
+
+  if (enc->state < ENC_READY) {
+    if (isError(result = enc->ready(false))) {
+      llog(ERROR, "Failed to ready the encoding context prior to encoding.");
+      return result;
+    }
   }
 
   if (enc->state != ENC_READY) {
@@ -319,20 +386,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
     return MAKE_P_STAT(BAD_STATE);
   }
 
-  uint64_t result = 0;
   int rc = 0;
-
-  // this should usually be in the VE_ENCODING state except on the first call so we want to check for that first.
-  if (state != VE_ENCODING) {
-    if (state == VE_SET_UP) {
-      state = VE_ENCODING;
-      if (sync)
-        sync->start();
-    } else {
-      llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d or %d but it's in %d.", (int)VE_SET_UP, (int)VE_ENCODING, (int)state);
-      return MAKE_P_STAT(BAD_STATE);
-    }
-  }
 
   llog(TRACE, "Creating frame from mat at %" PRId64, matRef);
   result = IMakerManager::createFrameFromMat(&xform, matRef, isRgb, video_avcc, &frame);
@@ -406,8 +460,7 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
             (int)video_stime_base.num, (int)video_stime_base.den);
       }
 
-      enc->muxer->writePacket(&output_packet);
-
+      enc->muxer->writeFinalPacket(&output_packet);
     }
 
     if (packetReceived)
@@ -420,15 +473,10 @@ uint64_t VideoEncoder::encode(uint64_t matRef, bool isRgb) {
 
 uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(enc->fake_mutex);
-
-  if (enc->state != ENC_OPEN_CONTEXT && enc->state != ENC_OPEN_STREAMS) {
-    llog(ERROR, "EncodingContext is in the wrong state. It should have been in %d or %d but it's in %d.", (int)ENC_OPEN_CONTEXT, (int)ENC_OPEN_STREAMS, (int)enc->state);
-    return MAKE_P_STAT(BAD_STATE);
-  }
+  FakeMutextGuard g(enc->fake_mutex, true);
 
   if (state != VE_FRESH) {
-    llog(ERROR, "VideoEncoder is in the wrong state. It should have been in %d but it's in %d.", (int)VE_FRESH, (int)state);
+    llog(ERROR, "VideoEncoder is in the wrong state (%d). You cannot add codec options after it's been enabled.", (int)state);
     return MAKE_P_STAT(BAD_STATE);
   }
 
@@ -439,9 +487,9 @@ uint64_t VideoEncoder::addCodecOption(const char* key, const char* val) {
   return 0;
 }
 
-uint64_t VideoEncoder::stop() {
+uint64_t VideoEncoder::stop(bool lock) {
   PILECV4J_TRACE;
-  FakeMutextGuard g(enc->fake_mutex);
+  FakeMutextGuard g(enc->fake_mutex, lock);
 
   // need to put it back or we get a double free when closing the overall context
   AVStream* video_avs = enc->muxer->getStream(0);
@@ -462,10 +510,8 @@ uint64_t VideoEncoder::stop() {
 
 VideoEncoder::~VideoEncoder() {
   PILECV4J_TRACE;
-  stop(); // stop if not already stopped
-
-  // non-recursive so can't cover stop()
-  FakeMutextGuard g(enc->fake_mutex);
+  FakeMutextGuard g(enc->fake_mutex, true);
+  stop(false); // stop if not already stopped
 
   if (frame) {
     llog(TRACE, "Freeing frame at %" PRId64, (uint64_t)frame );
@@ -522,7 +568,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_ready(uint64_t nativeDef) {
   if (isEnabled(TRACE))
     llog(TRACE, "Readying EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
-  uint64_t ret = (uint64_t)enc->ready();
+  uint64_t ret = (uint64_t)enc->ready(true);
   return ret;
 }
 
@@ -531,7 +577,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_encodingContext_stop(uint64_t nativeDef) {
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping EncodingContext %" PRId64, nativeDef);
   EncodingContext* enc = (EncodingContext*)nativeDef;
-  uint64_t ret = (uint64_t)enc->stop();
+  uint64_t ret = (uint64_t)enc->stop(true);
   return ret;
 }
 
@@ -540,7 +586,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_encode(uint64_t nativeDef, uint64
   if (isEnabled(TRACE))
     llog(TRACE, "Encoding mat at: %" PRId64 " as frame using video encoder at %" PRId64, matRef, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->encode(matRef, isRgb ? true : false);
+  return enc->encode(true, matRef, isRgb ? true : false);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_addCodecOption(uint64_t nativeDef, const char* key, const char* val) {
@@ -551,93 +597,52 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_addCodecOption(uint64_t nativeDef
   return enc->addCodecOption(key,val);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setEncodingParameters(uint64_t nativeDef, int32_t pfps, int32_t pbufferSize, int64_t pminBitrate, int64_t pmaxBitrate) {
-  PILECV4J_TRACE;
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setFramerate(uint64_t nativeDef, int32_t pfps_num, int32_t pfps_den) {
   if (isEnabled(TRACE))
-    llog(TRACE, "setting encoding parameters for video encoder at: %" PRId64 ": fps: %d, bufferSize: %d, min bitrate: %ld, max bitrate: %ld",
-        nativeDef, (int)pfps, (int)pbufferSize, (long)pminBitrate, (long)pmaxBitrate);
+    llog(TRACE, "setting fps for video encoder at: %" PRId64 ": fps: %d/%d",  nativeDef, (int)pfps_num, (int)pfps_den);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->setEncodingParameters(pfps, pbufferSize, pminBitrate, pmaxBitrate);
+  AVRational framerate = { pfps_num, pfps_den };
+  return enc->setFramerate(framerate);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setFps(uint64_t nativeDef, int32_t pfps) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setOutputDims(uint64_t nativeDef, int32_t width, int32_t height, int32_t preserveAspectRatio, int32_t onlyScaleDown) {
   if (isEnabled(TRACE))
-    llog(TRACE, "setting fps for video encoder at: %" PRId64 ": fps: %d",  nativeDef, (int)pfps);
+    llog(TRACE, "setting output dims for video encoder at: %" PRId64 ": %d x %d",  nativeDef, (int)width, (int)height);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->setFps(pfps);
+  return enc->setOutputDims(width, height, preserveAspectRatio ? true : false, onlyScaleDown ? true : false);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBufferSize(uint64_t nativeDef, int32_t pbufferSize) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setRcBufferSize(uint64_t nativeDef, int32_t pbufferSize) {
   PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "setting buffer size for video encoder at: %" PRId64 ": bufferSize: %d",  nativeDef, (int)pbufferSize);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->setBufferSize(pbufferSize);
+  return enc->setRcBufferSize(pbufferSize);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBitrate(uint64_t nativeDef, int64_t pminBitrate, int64_t pmaxBitrate) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setRcBitrate(uint64_t nativeDef, int64_t pminBitrate, int64_t pmaxBitrate) {
   PILECV4J_TRACE;
   if (isEnabled(TRACE))
-    llog(TRACE, "setting bitrate for video encoder at: %" PRId64 ": min bitrate: %ld, max bitrate: %ld",
+    llog(TRACE, "setting rate-control bitrate for video encoder at: %" PRId64 ": min bitrate: %ld, max bitrate: %ld",
         nativeDef, (long)pminBitrate, (long)pmaxBitrate);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->setBitrate(pminBitrate, pmaxBitrate);
+  return enc->setRcBitrate(pminBitrate, pmaxBitrate);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setBitrate2(uint64_t nativeDef, int64_t pminBitrate) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_setTargetBitrate(uint64_t nativeDef, int64_t pbitrate) {
   PILECV4J_TRACE;
   if (isEnabled(TRACE))
-    llog(TRACE, "setting bitrate for video encoder at: %" PRId64 ": bitrate: %ld", nativeDef, (long)pminBitrate);
+    llog(TRACE, "setting target bitrate for video encoder at: %" PRId64 " to: %ld", nativeDef, (long)pbitrate);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->setBitrate(pminBitrate);
+  return enc->setTargetBitrate(pbitrate);
 }
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable(uint64_t nativeDef, uint64_t matRef, int32_t isRgb) {
-  PILECV4J_TRACE;
-  if (isEnabled(TRACE))
-    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
-  VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(matRef, isRgb ? true : false, -1, -1);
-}
-
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable2(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride) {
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride, int32_t dstW, int32_t dstH) {
   PILECV4J_TRACE;
   if (isEnabled(TRACE))
     llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable((bool)(isRgb ? true : false), width, height, stride, -1, -1);
-}
-
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable3(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height) {
-  PILECV4J_TRACE;
-  if (isEnabled(TRACE))
-    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
-  VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(isRgb ? true : false, width, height, -1, -1, -1);
-}
-
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable4(uint64_t nativeDef, uint64_t matRef, int32_t isRgb, int32_t dstW, int32_t dstH) {
-  PILECV4J_TRACE;
-  if (isEnabled(TRACE))
-    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
-  VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(matRef, isRgb ? true : false, dstW, dstH);
-}
-
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable5(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t stride, int32_t dstW, int32_t dstH) {
-  PILECV4J_TRACE;
-  if (isEnabled(TRACE))
-    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
-  VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable((bool)(isRgb ? true : false), width, height, stride, dstW, dstH);
-}
-
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_enable6(uint64_t nativeDef, int32_t isRgb, int32_t width, int32_t height, int32_t dstW, int32_t dstH) {
-  PILECV4J_TRACE;
-  if (isEnabled(TRACE))
-    llog(TRACE, "enabling video encoder at: %" PRId64, nativeDef);
-  VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->enable(isRgb ? true : false, width, height, -1, dstW, dstH);
+  return enc->enable(true, (bool)(isRgb ? true : false), width, height, stride, dstW, dstH);
 }
 
 KAI_EXPORT void pcv4j_ffmpeg2_videoEncoder_delete(uint64_t nativeDef) {
@@ -653,7 +658,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_stop(uint64_t nativeDef) {
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping video encoder at %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->stop();
+  return enc->stop(true);
 }
 
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_streaming(uint64_t nativeDef) {
@@ -661,7 +666,7 @@ KAI_EXPORT uint64_t pcv4j_ffmpeg2_videoEncoder_streaming(uint64_t nativeDef) {
   if (isEnabled(TRACE))
     llog(TRACE, "Stopping video encoder at %" PRId64, nativeDef);
   VideoEncoder* enc = (VideoEncoder*)nativeDef;
-  return enc->streaming();
+  return enc->streaming(true);
 }
 
 } /* extern "C" */

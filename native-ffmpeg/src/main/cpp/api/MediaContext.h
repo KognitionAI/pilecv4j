@@ -123,11 +123,11 @@ public:
   // is basically a wrapper/manager for the input AVFormatContext,
   // this is where all of the PacketSourceInfo comes from
   // =====================================================
-  virtual uint64_t getStream(int streamIndex, AVStream** streamOut);
+  virtual uint64_t getStream(int streamIndex, AVStream** streamOut) override;
 
-  virtual uint64_t numStreams(int* numStreamsOut);
+  virtual uint64_t numStreams(int* numStreamsOut) override;
 
-  virtual uint64_t getCodecTag(AVCodecID codecId, unsigned int* tagOut);
+  virtual uint64_t getCodecTag(AVCodecID codecId, unsigned int* tagOut) override;
   // =====================================================
 
   inline void sync() {

@@ -175,7 +175,7 @@ uint64_t IMakerManager::setupTransform(uint64_t mat, bool isRgb, AVCodecContext*
   return setupTransform(raster.w, raster.h, raster.stride, raster.pixFormat, encoder, raster.w, raster.h, xform);
 }
 
-uint64_t IMakerManager::setupTransform(int srcWidth, int srcHeight, size_t srcStride, ai::kognition::pilecv4j::PixelFormat srcPixfmt, AVCodecContext* avcc, int dstW, int dstH, Transform* xform) {
+uint64_t IMakerManager::setupTransform(int srcWidth, int srcHeight, int srcStride, ai::kognition::pilecv4j::PixelFormat srcPixfmt, AVCodecContext* avcc, int dstW, int dstH, Transform* xform) {
   if (avcc->codec_type != AVMEDIA_TYPE_VIDEO) {
     llog(ERROR, "Cannot create an Transform from an opencv Mat for an encoder that isn't a video encoder.");
     return MAKE_P_STAT(UNSUPPORTED_CODEC);
@@ -218,9 +218,9 @@ uint64_t IMakerManager::setupTransform(int srcWidth, int srcHeight, size_t srcSt
  * If the ppframe returned is not null, then freeing the frame should use freeFrame
  * on this class.
  */
-uint64_t IMakerManager::createFrameFromMat(const Transform* xform, uint64_t mat, bool isRgb, AVCodecContext* encoder, AVFrame** ppframe) {
+uint64_t IMakerManager::createFrameFromMat(const Transform* xform, uint64_t mat, bool matIsRgb, AVCodecContext* encoder, AVFrame** ppframe) {
   ai::kognition::pilecv4j::RawRaster raster;
-  if (!imaker->extractImageDetails(mat, isRgb, &raster)) {
+  if (!imaker->extractImageDetails(mat, matIsRgb, &raster)) {
     llog(ERROR, "Failed to extract image details from the opencv mat");
     return MAKE_P_STAT(FAILED_CREATE_FRAME);
   }

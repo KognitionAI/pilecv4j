@@ -71,16 +71,15 @@ public class TestSplitIntoFiles extends BaseTest {
 
             final EncodingContext ectx = Ffmpeg.createEncoder()
                 .muxer(Muxer.create(outputVideo.getAbsolutePath()))
-                .openVideoEncoder("libx264", "vidEncoder")
+                .videoEncoder("libx264", "vidEncoder")
                 .addCodecOptions("preset", "slow")
                 .addCodecOptions("crf", "40")
-                // .setFps(30)
 
                 .enable(firstFrame, false)
 
         ;) {
 
-            final VideoEncoder ve = ectx.getVideoEncoder("vidEncoder");
+            final VideoEncoder ve = ectx.getExistingVideoEncoder("vidEncoder");
             ectx.ready();
 
             LongStream.range(0, numFrames)

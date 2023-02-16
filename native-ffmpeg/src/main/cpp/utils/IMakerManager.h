@@ -72,7 +72,7 @@ public:
 
   static uint64_t setupTransform(uint64_t mat, bool isRgb, AVCodecContext* encoder, Transform* xform);
 
-  static uint64_t setupTransform(int srcWidth, int srcHeight, size_t srcStride, ai::kognition::pilecv4j::PixelFormat srcPixfmt, AVCodecContext* avcc, int dstW, int dstH, Transform* xform);
+  static uint64_t setupTransform(int srcWidth, int srcHeight, int srcStride, ai::kognition::pilecv4j::PixelFormat srcPixfmt, AVCodecContext* avcc, int dstW, int dstH, Transform* xform);
 
   static uint64_t createFrameFromMat(const Transform* xform, uint64_t mat, bool isRgb, AVCodecContext* encoder, AVFrame** frame);
 

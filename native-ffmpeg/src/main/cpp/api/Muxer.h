@@ -38,6 +38,8 @@ namespace ffmpeg
 class Muxer
 {
   bool loggedPacketPtsDtsMissingAlready = false;
+  int nb_streams = -1;
+  int64_t* starting_ts_offset = nullptr;
 protected:
 
   // some helpers
@@ -57,7 +59,10 @@ protected:
 public:
   inline Muxer() = default;
 
-  virtual ~Muxer() = default;
+  inline virtual ~Muxer() {
+    if (starting_ts_offset)
+      delete [] starting_ts_offset;
+  }
 
   /**
    * Implementers are responsible for cleanup here including rewriting header, closing output,
@@ -83,7 +88,7 @@ public:
    * This will be called if we have the AVCodecParameters. If we have the actual AVCodec
    * then createNextStream(AVCodec*) will be called instead.
    *
-   * It is fine for 'out' to be null.
+   * It is fine for 'stream_index_out' to be null.
    */
   virtual uint64_t createNextStream(AVCodecParameters* codecPars, int* stream_index_out) = 0;
 
@@ -114,13 +119,19 @@ public:
   virtual void fail() = 0;
 
   /**
+   * Have the Muxer try to figure out the output format based. It's possible for this to return null
+   * if it can't figure  it out.
+   */
+  virtual const AVOutputFormat* guessOutputFormat() = 0;
+
+  /**
    * This is a simple interleaved write to the output context.
    *
    * The packet is assumed to have been already translated to the output stream meaning
    * the pts and dts already corresponds to the output stream's time_base and the stream
    * index is the output's stream index.
    */
-  inline virtual uint64_t writePacket(AVPacket* outputPacket) {
+  inline virtual uint64_t writeFinalPacket(AVPacket* outputPacket) {
     int rc = av_interleaved_write_frame(getFormatContext(), outputPacket);
     if (rc != 0) {
       log(ERROR, "MUXR", "Error %d while writing packet to output: %s", rc, av_err2str(rc));
