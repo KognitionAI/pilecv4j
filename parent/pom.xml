@@ -15,7 +15,7 @@
   <description>An image and video processing library for java.</description>
 
   <properties>
-    <tensorflow-core-api.version>0.4.0</tensorflow-core-api.version>    
+    <tensorflow-core-api.version>0.4.2</tensorflow-core-api.version>    
     <slf4j.version>1.7.30</slf4j.version>
 
     <dempsy-commons.version>2.4.1-SNAPSHOT</dempsy-commons.version>
