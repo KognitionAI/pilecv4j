@@ -98,17 +98,28 @@ void log(LogLevel llevel, const char* component, const char *fmt, ...)
 
 static AVRational nullRat{ -1, -1 };
 
-void logPacket(LogLevel ll, const char* component, const char* header, AVPacket* packet, AVFormatContext* ctx) {
-  if (isEnabled(TRACE)) {
+void logPacket(LogLevel ll, const char* component, const char* header, const AVPacket* packet, const AVFormatContext* ctx) {
+  if (isEnabled(ll)) {
     const int stream_index = packet->stream_index;
     const AVStream* stream = (stream_index >= 0 && stream_index < ctx->nb_streams) ? ctx->streams[stream_index] : nullptr;
     const AVMediaType mt = stream ? (stream->codecpar ? stream->codecpar->codec_type : AVMEDIA_TYPE_UNKNOWN) : AVMEDIA_TYPE_UNKNOWN;
     const AVRational* tb = stream ? &(stream->time_base) : &nullRat;
 
-    log(TRACE, component, "%s: %s, stream: %d, num bytes: %d, key frame: %s, pts: %" PRId64 ", dts: %" PRId64 ", timebase: [ %d / %d ]",
+    log(ll, component, "%s: %s, stream: %d, num bytes: %d, key frame: %s, pts: %" PRId64 ", dts: %" PRId64 ", timebase: [ %d / %d ], dur: %" PRId64,
         header == nullptr ? "" : header, av_get_media_type_string(mt), stream_index, packet->size,
-        (packet->flags & AV_PKT_FLAG_KEY) ? "true" : "false", packet->pts, packet->dts,
-            tb->num, tb->den);
+        (packet->flags & AV_PKT_FLAG_KEY) ? "true" : "false", (int64_t)packet->pts, (int64_t)packet->dts,
+            (int)tb->num, (int)tb->den, (int64_t)packet->duration);
+  }
+}
+
+void logPacket(LogLevel ll, const char* component, const char* header, const AVPacket* packet, const AVRational& tb) {
+  if (isEnabled(ll)) {
+    const int stream_index = packet->stream_index;
+
+    log(ll, component, "%s: stream: %d, num bytes: %d, key frame: %s, pts: %" PRId64 ", dts: %" PRId64 ", timebase: [ %d / %d ], dur: %" PRId64,
+        header == nullptr ? "" : header, stream_index, packet->size,
+        (packet->flags & AV_PKT_FLAG_KEY) ? "true" : "false", (int64_t)packet->pts, (int64_t)packet->dts,
+            (int)tb.num, (int)tb.den, (int64_t)packet->duration);
   }
 }
 

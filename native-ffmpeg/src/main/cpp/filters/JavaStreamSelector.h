@@ -37,9 +37,9 @@ public:
   inline JavaStreamSelector(select_streams cb) : callback(cb) {}
   virtual ~JavaStreamSelector() = default;
 
-  virtual uint64_t setup(PacketSourceInfo* mediaSource, const std::vector<std::tuple<std::string,std::string> >& options);
+  virtual uint64_t setup(PacketSourceInfo* mediaSource, const std::vector<std::tuple<std::string,std::string> >& options) override;
 
-  virtual bool filter(AVPacket* pPacket, AVMediaType streamMediaType);
+  virtual bool filter(AVPacket* pPacket, AVMediaType streamMediaType) override;
 };
 
 }

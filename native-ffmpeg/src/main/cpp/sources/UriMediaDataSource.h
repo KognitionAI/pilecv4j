@@ -30,9 +30,9 @@ public:
 
   virtual ~UriMediaDataSource() = default;
 
-  virtual uint64_t open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** options);
+  virtual uint64_t open(AVFormatContext** preallocatedAvFormatCtx, AVDictionary** options) override;
 
-  inline std::string toString() {
+  inline std::string toString() override {
     return uriNull ? "null" : uri;
   }
 

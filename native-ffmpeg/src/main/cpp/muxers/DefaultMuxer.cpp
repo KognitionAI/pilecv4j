@@ -119,6 +119,7 @@ void DefaultMuxer::cleanup(bool writeTrailer) {
     ioContext = nullptr;
   }
   //========================================================================
+
   if (ioBufferToWriteToJava) {
     free(ioBufferToWriteToJava);
     ioBufferToWriteToJava = nullptr;
@@ -142,6 +143,10 @@ uint64_t DefaultMuxer::allocateOutputContext(AVFormatContext** ofcpp) {
     fail();
     return ret < 0 ? MAKE_AV_STAT(ret) : MAKE_AV_STAT(AVERROR_UNKNOWN);
   }
+
+  // trying to handle problems with live stream. Not sure if this should be set universally
+  // or if I should only set this when I'm remuxing from a live feed.
+  (*ofcpp)->flags |= AVFMT_FLAG_SORT_DTS;
 
   return 0;
 }
@@ -274,6 +279,13 @@ uint64_t DefaultMuxer::createNextStream(AVCodecContext* codecc, int* stream_inde
       llog(ERROR, "could not fill codec parameters");
   }
   return ret;
+}
+
+const AVOutputFormat* DefaultMuxer::guessOutputFormat() {
+  if (output_format_context && output_format_context->oformat)
+    return output_format_context->oformat;
+  else
+    return av_guess_format(fmtNull ? nullptr : fmt.c_str(), outputUriNull ? nullptr : outputUri.c_str(), nullptr);
 }
 
 //========================================================================

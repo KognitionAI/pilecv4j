@@ -102,7 +102,7 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
             encoder
                 .muxer(Muxer.create("flv", "rtmp://localhost:" + rtmpPort + "/live/feedly-id"))
-                .openVideoEncoder("libx264", "default")
+                .videoEncoder("libx264", "default")
                 .addCodecOptions("profile", "baseline")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("tune", "zerolatency")
@@ -111,14 +111,14 @@ public class TestFfmpegStreamingDocker extends BaseTest {
 
             ;
 
-            final VideoEncoder ve1 = encoder.getVideoEncoder("default");
+            final VideoEncoder ve1 = encoder.getExistingVideoEncoder("default");
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
             ctx
                 .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
-                    ve1.setFps(details[0].fps_num / details[0].fps_den);
+                    ve1.setFps(details[0].fps_num, details[0].fps_den);
 
                 })
                 .chain("default")

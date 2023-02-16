@@ -21,8 +21,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.net.URI;
@@ -30,11 +32,13 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
-import org.junit.Ignore;
+import org.apache.commons.io.IOUtils;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -267,36 +271,54 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(frameCount(destination.toURI()) > 1000);
     }
 
-    @Ignore
+    @Test
+    public void testDumpTiming() throws Exception {
+        LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+
+        try(final MediaContext c = Ffmpeg.createMediaContext("/tmp/out_00.ts")
+            .filterPackets(p -> {
+                System.out.println("pts: " + p.pts() + ", dts: " + p.dts() + " time_base: [ " + p.tbNum() + " / " + p.tbDen() + " ]");
+                return true;
+            })
+            .play();
+
+        ) {
+
+        }
+    }
+
+    // @Ignore
     @Test
     public void testSegmentedRemux() throws Exception {
         LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        final File destination = new File("/tmp/out"); // tempDir.newFile("out.flv");
+        final File destination = new File("/tmp/out"); // tempDir.newFile("out");
         if(destination.exists())
             destination.delete();
+        // we're going to
         try(final MediaContext c = Ffmpeg.createMediaContext();) {
 
             c
                 .source(STREAM)
-                // .createMediaDataSource("rtsp://admin:gregormendel1@172.16.2.11:554/")
+                // .source("rtsp://admin:gregormendel1@172.16.2.11:554/")
                 .addOption("flags", "+cgop")
                 .chain("default")
+//                .selectFirstVideoStream()
                 .remux(Muxer.create(index -> {
                     System.out.println("Muxer #" + index);
                     return Muxer.create("mpegts", String.format("%s_%02d.%s", destination.getAbsolutePath(), index, "ts"));
                 }, new PacketFilter() {
 
-                    private long startTime = -1;
+                    private long frameCount = 0;
 
                     @Override
                     public boolean test(final int mediaType, final int stream_index, final int packetNumBytes, final boolean isKeyFrame, final long pts,
                         final long dts, final int tbNum, final int tbDen) {
-                        if(startTime < 0)
-                            startTime = System.currentTimeMillis();
-                        final boolean ret = ((startTime + 2000) < System.currentTimeMillis());
-                        if(ret)
-                            startTime = System.currentTimeMillis();
-                        return ret;
+                        frameCount++;
+                        if(frameCount > (5 * 30)) {
+                            frameCount = 0;
+                            return true;
+                        }
+                        return false;
                     }
                 }))
                 .mediaContext()
@@ -304,11 +326,28 @@ public class TestFfmpeg2 extends BaseTest {
                 .play();
         }
 
-        assertTrue(destination.exists());
-        assertTrue(destination.isFile());
-        assertTrue(destination.length() > 0);
+        final File dir = destination.getParentFile();
+        assertTrue(dir.exists());
+        final List<File> tsFiles = Arrays.stream(dir.listFiles())
+            .filter(f -> f.getAbsolutePath().endsWith(".ts"))
+            .sorted((o1, o2) -> o1.getAbsolutePath().compareTo(o2.getAbsolutePath()))
+            .collect(Collectors.toList());
 
-        assertTrue(frameCount(destination.toURI()) > 1000);
+        assertTrue(tsFiles.size() > 1);
+        final File destFile = new File(dir, "out.ts");
+        try(var os = new BufferedOutputStream(new FileOutputStream(destFile));) {
+            for(final File f: tsFiles) {
+                try(var is = new BufferedInputStream(new FileInputStream(f));) {
+                    IOUtils.copy(is, os);
+                }
+            }
+        }
+
+        assertTrue(destFile.exists());
+        assertTrue(destFile.isFile());
+        assertTrue(destFile.length() > 0);
+
+        assertTrue(frameCount(destFile.toURI()) > 1000);
     }
 
     @Test
@@ -406,6 +445,41 @@ public class TestFfmpeg2 extends BaseTest {
     }
 
     @Test
+    public void testEncodingSimple() throws Exception {
+        LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        final File destination = tempDir.newFile("out.mp4");
+        // final File destination = new File("/tmp/out.mp4");
+        if(destination.exists())
+            destination.delete();
+
+        try(
+            final MediaContext ctx = Ffmpeg.createMediaContext(STREAM);
+            // final MediaContext ctx = Ffmpeg.createMediaContext("rtsp://admin:gregormendel1@172.16.2.11:554/");
+            final EncodingContext encoder = Ffmpeg.createEncoder(destination.getAbsolutePath())
+                .setFps(ctx)
+                .setOutputDims(900, 200, true, true);
+            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
+
+        ) {
+
+            ctx
+                .addOption("rtsp_flags", "prefer_tcp")
+                .selectFirstVideoStream()
+                .processVideoFrames(f -> encoder.encode(f))
+                .optionally(sync, s -> s.sync())
+                .play()
+
+            ;
+        }
+
+        assertTrue(destination.exists());
+        assertTrue(destination.isFile());
+        assertTrue(destination.length() > 0);
+
+        assertTrue(frameCount(destination.toURI()) > 1000);
+    }
+
+    @Test
     public void testEncoding() throws Exception {
         LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.mp4");
@@ -421,25 +495,21 @@ public class TestFfmpeg2 extends BaseTest {
 
             encoder
                 .muxer(Muxer.create(destination.getAbsolutePath()))
-                .openVideoEncoder("libx265", "first")
+                .videoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
                 .addCodecOptions("flags", "low_delay")
-                .setBufferSize(4 * 16 * MEG)
-                .setBitrate(2 * MEG)
                 .encodingContext()
-                .openVideoEncoder("libx265", "second")
+                .videoEncoder("libx265", "second")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
                 .addCodecOptions("flags", "low_delay")
-                .setBufferSize(4 * 16 * MEG)
-                .setBitrate(2 * MEG)
                 .encodingContext()
 
             ;
 
-            final VideoEncoder ve1 = encoder.getVideoEncoder("first");
-            final VideoEncoder ve2 = encoder.getVideoEncoder("second");
+            final VideoEncoder ve1 = encoder.getExistingVideoEncoder("first");
+            final VideoEncoder ve2 = encoder.getExistingVideoEncoder("second");
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
             ctx
@@ -447,8 +517,8 @@ public class TestFfmpeg2 extends BaseTest {
                 .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
-                    ve1.setFps(details[0].fps_num / details[0].fps_den);
-                    ve2.setFps(details[0].fps_num / details[0].fps_den);
+                    ve1.setFps(details[0].fps_num, details[0].fps_den);
+                    ve2.setFps(details[0].fps_num, details[0].fps_den);
 
                 })
                 .chain("default")
@@ -496,7 +566,7 @@ public class TestFfmpeg2 extends BaseTest {
             destination.delete();
 
         try(
-            OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
+            final OutputStream os = new BufferedOutputStream(new FileOutputStream(destination));
             final EncodingContext encoder = Ffmpeg.createEncoder();
             final MediaContext ctx = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
@@ -510,25 +580,23 @@ public class TestFfmpeg2 extends BaseTest {
                     packet.get(pkt);
                     uncheck(() -> os.write(pkt));
                 }))
-                .openVideoEncoder("libx265", "first")
+                .videoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
                 .addCodecOptions("flags", "low_delay")
-                .setBufferSize(4 * 16 * MEG)
-                .setBitrate(2 * MEG)
+                .setTargetBitrate(2 * MEG)
                 .encodingContext()
-                .openVideoEncoder("libx265", "second")
+                .videoEncoder("libx265", "second")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
                 .addCodecOptions("flags", "low_delay")
-                .setBufferSize(4 * 16 * MEG)
-                .setBitrate(2 * MEG)
+                .setTargetBitrate(2 * MEG)
                 .encodingContext()
 
             ;
 
-            final VideoEncoder ve1 = encoder.getVideoEncoder("first");
-            final VideoEncoder ve2 = encoder.getVideoEncoder("second");
+            final VideoEncoder ve1 = encoder.getExistingVideoEncoder("first");
+            final VideoEncoder ve2 = encoder.getExistingVideoEncoder("second");
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
             ctx
@@ -536,8 +604,8 @@ public class TestFfmpeg2 extends BaseTest {
                 .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
-                    ve1.setFps(details[0].fps_num / details[0].fps_den);
-                    ve2.setFps(details[0].fps_num / details[0].fps_den);
+                    ve1.setFps(details[0].fps_num, details[0].fps_den);
+                    ve2.setFps(details[0].fps_num, details[0].fps_den);
 
                 })
                 .chain("default")
@@ -615,25 +683,24 @@ public class TestFfmpeg2 extends BaseTest {
                             return -1;
                         return bb.position();
                     }))
-                .openVideoEncoder("libx265", "first")
+                .videoEncoder("libx265", "first")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
                 .addCodecOptions("flags", "low_delay")
-                .setBufferSize(4 * 16 * MEG)
-                .setBitrate(2 * MEG)
+                .setRcBufferSize(4 * 16 * MEG)
+                .setRcBitrate(2 * MEG, 3 * MEG)
                 .encodingContext()
-                .openVideoEncoder("libx265", "second")
+                .videoEncoder("libx265", "second")
                 .addCodecOptions("preset", "ultrafast")
                 .addCodecOptions("x265-params", "keyint=60:min-keyint=60:scenecut=0")
                 .addCodecOptions("flags", "low_delay")
-                .setBufferSize(4 * 16 * MEG)
-                .setBitrate(2 * MEG)
+                .setTargetBitrate(2 * MEG)
                 .encodingContext()
 
             ;
 
-            final VideoEncoder ve1 = encoder.getVideoEncoder("first");
-            final VideoEncoder ve2 = encoder.getVideoEncoder("second");
+            final VideoEncoder ve1 = encoder.getExistingVideoEncoder("first");
+            final VideoEncoder ve2 = encoder.getExistingVideoEncoder("second");
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
             ctx
@@ -641,8 +708,8 @@ public class TestFfmpeg2 extends BaseTest {
                 .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
-                    ve1.setFps(details[0].fps_num / details[0].fps_den);
-                    ve2.setFps(details[0].fps_num / details[0].fps_den);
+                    ve1.setFps(details[0].fps_num, details[0].fps_den);
+                    ve2.setFps(details[0].fps_num, details[0].fps_den);
 
                 })
                 .chain("default")
@@ -706,12 +773,12 @@ public class TestFfmpeg2 extends BaseTest {
 
             encoder
                 .muxer(Muxer.create(destination.getAbsolutePath()))
-                .openVideoEncoder("mjpeg", "first")
+                .videoEncoder("mjpeg", "first")
                 .encodingContext()
 
             ;
 
-            final VideoEncoder ve1 = encoder.getVideoEncoder("first");
+            final VideoEncoder ve1 = encoder.getExistingVideoEncoder("first");
             final AtomicBoolean firstFrame = new AtomicBoolean(true);
 
             ctx
@@ -719,7 +786,7 @@ public class TestFfmpeg2 extends BaseTest {
                 .source(STREAM)
                 .peek(s -> {
                     final var details = s.getStreamDetails();
-                    ve1.setEncodingParameters(details[0].fps_num / details[0].fps_den, 4 * 16 * MEG, 8 * MEG, 8 * MEG);
+                    ve1.setFps(details[0].fps_num, details[0].fps_den);
                 })
                 .chain("default")
                 .selectStreams((sd, res) -> {

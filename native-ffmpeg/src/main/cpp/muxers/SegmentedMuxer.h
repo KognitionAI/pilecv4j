@@ -53,21 +53,21 @@ public:
 
   virtual ~SegmentedMuxer();
 
-  virtual uint64_t open();
+  virtual uint64_t open() override;
 
-  virtual AVFormatContext* getFormatContext();
+  virtual AVFormatContext* getFormatContext() override;
 
   /**
    * This will be called if we have the AVCodecParameters. If we have the actual AVCodec
    * then createNextStream(AVCodec*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodecParameters* codecPars, int* stream_index_out);
+  virtual uint64_t createNextStream(AVCodecParameters* codecPars, int* stream_index_out) override;
 
   /**
    * This will be called if we have the AVCodec. If we only have the AVCodecParameters
    * then createNextStream(AVCodecParameters*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out);
+  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out) override;
 
   /**
    * This is essentially where the avformat_write_header should be called on the output
@@ -80,7 +80,7 @@ public:
    * to the output time_base before writing (the inputPacket will not be touched, hence the const) and
    * will be written to the provided output_stream_index
    */
-  virtual uint64_t writePacket(const AVPacket* inputPacket, const AVRational& inputPacketTimeBase, int output_stream_index);
+  virtual uint64_t writePacket(const AVPacket* inputPacket, const AVRational& inputPacketTimeBase, int output_stream_index) override;
 
 //  /**
 //   * The packet is assumed to have been already translated to the output stream meaning
@@ -93,13 +93,21 @@ public:
    * By default, if the output_format_context is not null, this will write the trailer
    * using <em>av_write_trailer</em>
    */
-  virtual uint64_t close();
+  virtual uint64_t close() override;
 
   /**
    * This will be called if a failure occurs in a class using the muxer as a notification to
    * the muxer to clean up resources because of a failure.
    */
-  virtual void fail();
+  virtual void fail() override;
+
+  /**
+   * THIS CALL IS NOT THREAD SAFE AND SHOULD NOT BE CALLED ON A RUNNING MUXER.
+   *
+   * This will use the underlying muxer to guess the output format.
+   */
+  virtual const AVOutputFormat* guessOutputFormat() override;
+
 };
 
 #ifdef __INSIDE_CUSTOM_OUTPUT_SOURCE_CPP

@@ -96,6 +96,9 @@ public class Ffmpeg {
     // This needs to be kept in sync with the value in EncodingContext.h
     public static final int DEFAULT_FPS = 30;
 
+    /**
+     * The default latency to allow in the encoding of a live stream before duplicating frames.
+     */
     public static final long DEFAULT_MAX_LATENCY_MILLIS = 500;
 
     static {
@@ -587,6 +590,21 @@ public class Ffmpeg {
     public static MediaContext createMediaContext() {
         final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_mediaContext_create();
         return new MediaContext(nativeRef);
+    }
+
+    /**
+     * This is a convenience method for:
+     *
+     * <pre>
+     * <code>
+     * MediaContext.createMediaContext()
+     *     .source(source);
+     * </code>
+     * </pre>
+     */
+    public static MediaContext createMediaContext(final URI source) {
+        return createMediaContext()
+            .source(source);
     }
 
     /**
@@ -1156,12 +1174,30 @@ public class Ffmpeg {
     // ENCODER
     // ======================================================================
 
+    /**
+     * Create an encoding context.
+     */
     public static EncodingContext createEncoder() {
         final long nativeRef = FfmpegApi.pcv4j_ffmpeg2_encodingContext_create();
         return new EncodingContext(nativeRef);
     }
 
-    public static class StreamingEncoder implements QuietCloseable {
+    /**
+     * Create an encoding context with a predefined muxer. This is a convenience method for:
+     *
+     * <pre>
+     *  <code>
+     *  createEncoder()
+     *      .muxer(Muxer.create(outputUri))
+     *  </code>
+     * </pre>
+     */
+    public static EncodingContext createEncoder(final String outputUri) {
+        return createEncoder()
+            .muxer(Muxer.create(outputUri));
+    }
+
+    public static class LiveFeedEncoder implements QuietCloseable {
         private static final AtomicLong threadCount = new AtomicLong(0);
 
         private final VideoEncoder videoEncoder;
@@ -1188,11 +1224,11 @@ public class Ffmpeg {
             }
         }
 
-        private StreamingEncoder(final VideoEncoder ctx) {
+        private LiveFeedEncoder(final VideoEncoder ctx) {
             this.videoEncoder = ctx;
         }
 
-        public StreamingEncoder deepCopy(final boolean deepCopy) {
+        public LiveFeedEncoder deepCopy(final boolean deepCopy) {
             this.deepCopy = deepCopy;
             return this;
         }
@@ -1256,6 +1292,7 @@ public class Ffmpeg {
                     try {
                         videoEncoder.encode(toEncode.frame, toEncode.isRgb);
                     } catch(final RuntimeException rte) {
+                        LOGGER.error("Live stream encoding thread threw an exception while encoding.", rte);
                         failure.set(rte);
                         break;
                     }
@@ -1263,135 +1300,256 @@ public class Ffmpeg {
 
             }, "Encoding Thread " + threadCount.getAndIncrement()), t -> t.start());
         }
-
     }
 
+    /**
+     * Class to encode streams to a Muxer. An {@code EncodingContext} can have many
+     * {@code Encoder}s. Currently the only supported encoding type is the {@link VideoEncoder}.
+     */
     public static class EncodingContext implements QuietCloseable {
 
+        public static final String DEFAULT_VIDEO_ENCODER_NAME = "pilecv4j:default:videoEncoder";
+
+        /**
+         * An {@code Encoder} within an {@link EncodingContext} that encodes a single stream
+         * to be muxed by the {@link EncodingContext}'s {@link Muxer}.
+         */
         public class VideoEncoder {
             private final long nativeRef;
-            boolean inputIsRgb = false;
 
-            int fps = DEFAULT_FPS;
-            boolean closed = false;
-            boolean enabled = false;
-
-            StreamingEncoder se = null;
+            private boolean closed = false;
 
             private VideoEncoder(final long nativeRef) {
                 this.nativeRef = nativeRef;
             }
 
+            /**
+             * Add codec specific options to this video encoder.
+             */
             public VideoEncoder addCodecOptions(final String key, final String values) {
                 throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_addCodecOption(nativeRef, key, values));
                 return this;
             }
 
-            public VideoEncoder setEncodingParameters(final int pfps, final int pbufferSize, final long pminBitrate, final long pmaxBitrate) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setEncodingParameters(nativeRef, pfps, pbufferSize, pminBitrate, pmaxBitrate));
+            /**
+             *
+             * Set the frame rate as a rational.
+             *
+             * @param num - numerator
+             * @param den - denominator
+             */
+            public VideoEncoder setFps(final int num, final int den) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setFramerate(nativeRef, num, den));
                 return this;
             }
 
-            public VideoEncoder setFps(final int pfps) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setFps(nativeRef, pfps));
+            /**
+             * <p>
+             * Set the encoder's output picture resolution.<.p>
+             *
+             * <p>
+             * You can also make sure the aspect ratio is preserved in which case the requested
+             * width or height will be adjusted so that the image will fit within the bounds but
+             * it will maintain the same aspect ratio.
+             * </p>
+             *
+             * <p>
+             * You can set either width or height to -1 in which case it will calculate that
+             * value from the other assuming the aspect ratio is being preserved. Note that if you
+             * do this then the {@code preserveAspectRatio} flag is ignored.
+             * </p>
+             *
+             * <p>
+             * If you specify {@code onlyScaleDown} and the frames being encoded are already smaller
+             * than the width and height requested, no scaling will take place.
+             * </p>
+             */
+            public VideoEncoder setOutputDims(final int width, final int height, final boolean preserveAspectRatio, final boolean onlyScaleDown) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setOutputDims(nativeRef, width, height,
+                    preserveAspectRatio ? 1 : 0, onlyScaleDown ? 1 : 0));
                 return this;
             }
 
-            public VideoEncoder setBufferSize(final int pbufferSize) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setBufferSize(nativeRef, pbufferSize));
+            /**
+             * Some encoders support setting the rate control buffer. This is done in conjunction with setting
+             * the rate cotrol min and max bit rate. See {@link https://trac.ffmpeg.org/wiki/Encode/H.264} discussion
+             * on rate control
+             */
+            public VideoEncoder setRcBufferSize(final int pbufferSize) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setRcBufferSize(nativeRef, pbufferSize));
                 return this;
             }
 
-            public VideoEncoder setBitrate(final long pminBitrate, final long pmaxBitrate) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setBitrate(nativeRef, pminBitrate, pmaxBitrate));
+            /**
+             * Some encoders support setting the bitrate. This is done in conjunction with setting a buffer size.
+             * See {@link https://trac.ffmpeg.org/wiki/Encode/H.264} discussion on rate control
+             */
+            public VideoEncoder setRcBitrate(final long pminBitrate, final long pmaxBitrate) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setRcBitrate(nativeRef, pminBitrate, pmaxBitrate));
                 return this;
             }
 
-            public VideoEncoder setBitrate(final long pminBitrate) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setBitrate2(nativeRef, pminBitrate));
+            /**
+             * Some encoders support setting the target bitrate.
+             * See {@link https://trac.ffmpeg.org/wiki/Encode/H.264}
+             */
+            public VideoEncoder setTargetBitrate(final long bitrate) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setTargetBitrate(nativeRef, bitrate));
                 return this;
             }
 
-            public EncodingContext enable(final Mat frame, final boolean isRgb) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
-                inputIsRgb = isRgb;
-                enabled = true;
-                if(se != null)
-                    se.start();
-                return EncodingContext.this;
-            }
-
-            public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride) {
-                inputIsRgb = isRgb;
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable2(nativeRef, isRgb ? 1 : 0, width, height, stride));
-                inputIsRgb = isRgb;
-                enabled = true;
-                if(se != null)
-                    se.start();
-                return EncodingContext.this;
-            }
-
-            public EncodingContext enable(final boolean isRgb, final int width, final int height) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable3(nativeRef, isRgb ? 1 : 0, width, height));
-                inputIsRgb = isRgb;
-                enabled = true;
-                if(se != null)
-                    se.start();
-                return EncodingContext.this;
-            }
-
-            public EncodingContext enable(final Mat frame, final boolean isRgb, final int destWidth, final int destHeight) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable4(nativeRef, frame.nativeObj, isRgb ? 1 : 0, destWidth, destHeight));
-                inputIsRgb = isRgb;
-                enabled = true;
-                if(se != null)
-                    se.start();
-                return EncodingContext.this;
-            }
-
+            /**
+             * Enabling a video context sets up the transformation from input to output. This needs to
+             * be called before encoding begins but will be called automatically if it isn't. You can pass
+             * -1 for stride, destWidth, and/or destHeight and the values will be inferred from the input
+             * values.
+             *
+             * @param stride is the number of bytes in a row of pixels of the input to the encoder. If it's
+             *     set to -1 it will be assumed to be 3 * width.
+             * @param width is the destination encoded video picture width. If it's set to -1 it will be assumed
+             *     to be the same as the input width.
+             * @param height is the destination encoded video picture height. If it's set to -1 it will be assumed
+             *     to be the same as the input height.
+             */
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride, final int destWidth,
                 final int destHeight) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable5(nativeRef, isRgb ? 1 : 0, width, height, stride, destWidth, destHeight));
-                inputIsRgb = isRgb;
-                enabled = true;
-                if(se != null)
-                    se.start();
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable(nativeRef, isRgb ? 1 : 0, width, height, stride, destWidth, destHeight));
                 return EncodingContext.this;
             }
 
+            /**
+             * Enabling a video context sets up the transformation from input to output. This call
+             * assumes the video output will match the input specs. It's a convenience method for:
+             *
+             * <pre>
+             * <code>
+             * enable(isRgb, frame.width(), frame.height(), (int)frame.step1(), -1, -1);
+             * </code>
+             * </pre>
+             *
+             * @see {@link EncodingContext.VideoEncoder#enable(boolean, int, int, int, int, int)}
+             */
+            public EncodingContext enable(final Mat frame, final boolean isRgb) {
+                return enable(isRgb, frame.width(), frame.height(), (int)frame.step1(), -1, -1);
+            }
+
+            /**
+             * Enabling a video context sets up the transformation from input to output. This call
+             * assumes the video output will match the input specs. It's a convenience method for:
+             *
+             * <pre>
+             * <code>
+             * enable(isRgb, width, height, stride, -1, -1);
+             * </code>
+             * </pre>
+             *
+             * @see {@link EncodingContext.VideoEncoder#enable(boolean, int, int, int, int, int)}
+             */
+            public EncodingContext enable(final boolean isRgb, final int width, final int height, final int stride) {
+                return enable(isRgb, width, height, stride, -1, -1);
+            }
+
+            /**
+             * Enabling a video context sets up the transformation from input to output. This call
+             * assumes the video output will match the input specs. It's a convenience method for:
+             *
+             * <pre>
+             * <code>
+             * enable(isRgb, width, height, -1, -1, -1);
+             * </code>
+             * </pre>
+             *
+             * @see {@link EncodingContext.VideoEncoder#enable(boolean, int, int, int, int, int)}
+             */
+            public EncodingContext enable(final boolean isRgb, final int width, final int height) {
+                return enable(isRgb, width, height, -1, -1, -1);
+            }
+
+            /**
+             * Enabling a video context sets up the transformation from input to output. This call
+             * assumes the video output will match the input specs. It's a convenience method for:
+             *
+             * <pre>
+             * <code>
+             * enable(isRgb, frame.width(), frame.height(), (int)frame.step1(), destWidth, destHeight);
+             * </code>
+             * </pre>
+             *
+             * @see {@link EncodingContext.VideoEncoder#enable(boolean, int, int, int, int, int)}
+             */
+            public EncodingContext enable(final Mat frame, final boolean isRgb, final int destWidth, final int destHeight) {
+                return enable(isRgb, frame.width(), frame.height(), (int)frame.step1(), destWidth, destHeight);
+            }
+
+            /**
+             * Enabling a video context sets up the transformation from input to output. This call
+             * assumes the video output will match the input specs. It's a convenience method for:
+             *
+             * <pre>
+             * <code>
+             * enable(isRgb, width, height, -1, destWidth, destHeight);
+             * </code>
+             * </pre>
+             *
+             * @see {@link VideoEncoder#enable(boolean, int, int, int, int, int)}
+             */
             public EncodingContext enable(final boolean isRgb, final int width, final int height, final int destWidth, final int destHeight) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_enable6(nativeRef, isRgb ? 1 : 0, width, height, destWidth, destHeight));
-                inputIsRgb = isRgb;
-                enabled = true;
-                if(se != null)
-                    se.start();
-                return EncodingContext.this;
+                return enable(isRgb, width, height, -1, destWidth, destHeight);
             }
 
+            /**
+             * Encode the given image. If the {@link VideoEncoder} has not been explicitly {@code enable}d, it will be done
+             * prior to encoding the first frame and will assume the output parameters are equivalent to the given frame
+             */
             public void encode(final Mat frame, final boolean isRgb) {
                 throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, isRgb ? 1 : 0));
             }
 
-            public void encode(final Mat frame) {
-                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, inputIsRgb ? 1 : 0));
+            /**
+             * Encode the given image. If the {@link VideoEncoder} has not been explicitly {@code enable}d, it will be done
+             * prior to encoding the first frame and will assume the output parameters are equivalent to the given frame
+             */
+            public void encode(final VideoFrame frame) {
+                throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_encode(nativeRef, frame.nativeObj, frame.isRgb ? 1 : 0));
             }
 
+            /**
+             * Stop the current encoding process on this stream
+             */
             public void stop() {
                 throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_stop(nativeRef));
             }
 
-            public StreamingEncoder streamingEncoder(final long maxLatencyMillis) {
+            /**
+             * If the destination for the encoding is a live stream, this will allow for the decoupling
+             * of the input from the output. If the input slows down, the output will send duplicate frames.
+             */
+            public LiveFeedEncoder liveFeedEncoder(final long maxLatencyMillis) {
                 throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_streaming(nativeRef));
-                final var r = new StreamingEncoder(this);
-                if(enabled)
-                    r.start();
+                final var r = new LiveFeedEncoder(this);
+                // if(enabled)
+                r.start();
                 return r;
             }
 
-            public StreamingEncoder streamingEncoder() {
-                return streamingEncoder(DEFAULT_MAX_LATENCY_MILLIS);
+            /**
+             * If the destination for the encoding is a live stream, this will allow for the decoupling
+             * of the input from the output. If the input slows down, the output will send duplicate frames.
+             * This is a convenience method for:
+             *
+             * <pre>
+             * <code>
+             * liveFeedEncoder(DEFAULT_MAX_LATENCY_MILLIS);
+             * </code>
+             * </pre>
+             */
+            public LiveFeedEncoder liveFeedEncoder() {
+                return liveFeedEncoder(DEFAULT_MAX_LATENCY_MILLIS);
             }
 
+            /**
+             * Return the {@link EncodingContext} associated with this {@link VideoEncoder}.
+             */
             public EncodingContext encodingContext() {
                 return EncodingContext.this;
             }
@@ -1403,61 +1561,180 @@ public class Ffmpeg {
             }
         }
 
-        private final long nativeRef;
+        private long nativeRef;
         private final LinkedList<VideoEncoder> toClose = new LinkedList<>();
         private final Map<String, VideoEncoder> encoders = new HashMap<>();
         private Muxer output = null;
+        private VideoEncoder firstVideoEncoder = null;
 
         private EncodingContext(final long nativeRef) {
             this.nativeRef = nativeRef;
         }
 
+        /**
+         * Explicitly set the muxer for the encoding context output.
+         */
         public EncodingContext muxer(final Muxer muxer) {
             this.output = muxer;
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_setMuxer(nativeRef, muxer.nativeRef));
             return this;
         }
 
-        public VideoEncoder openVideoEncoder(final String codec, final String name) {
-            if(encoders.containsKey(name))
-                throw new FfmpegException("Cannot add a second encoder with the name \"" + name + "\"");
+        /**
+         * Fetch the video encoder by name or create it if it doesn't exist yet using
+         * the the given codec. If the codec string is null then the codec will be inferred
+         * from the output muxer details.
+         */
+        public VideoEncoder videoEncoder(final String codec, final String name) {
+            final var existing = encoders.get(name);
+            if(existing != null)
+                return existing;
             final var ret = new VideoEncoder(FfmpegApi.pcv4j_ffmpeg2_encodingContext_openVideoEncoder(nativeRef, codec));
+            if(firstVideoEncoder == null)
+                firstVideoEncoder = ret;
             toClose.addFirst(ret);
             encoders.put(name, ret);
             return ret;
         }
 
-        public VideoEncoder openVideoEncoder(final String codec) {
-            return openVideoEncoder(codec, codec);
+        /**
+         * The default video encoder is the first one created. If one hasn't been created yet
+         * then the codec will be inferred from the output muxer, created, and returned.
+         */
+        public VideoEncoder defaultVideoEncoder() {
+            if(firstVideoEncoder != null)
+                return firstVideoEncoder;
+            else
+                return videoEncoder(null, DEFAULT_VIDEO_ENCODER_NAME);
         }
 
-        public VideoEncoder getVideoEncoder(final String encoderName) {
+        /**
+         * Fetch an existing video encoder by name. Return null if the encoder doesn't exist yet.
+         */
+        public VideoEncoder getExistingVideoEncoder(final String encoderName) {
             return encoders.get(encoderName);
         }
 
+        /**
+         * Explicitly ready the encoding context for encoding. If this is not called prior to
+         * encoding the first image, the encoding context will be readied automatically.
+         */
         public EncodingContext ready() {
             throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_ready(nativeRef));
             return this;
         }
 
-        public EncodingContext stop() {
-            encoders.values().forEach(v -> v.stop());
-            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_stop(nativeRef));
-            return this;
-        }
-
+        /**
+         * Close the encoding context. This will finalize the underlying stream flushing buffers
+         * and writing trailers.
+         */
         @Override
         public void close() {
+            if(nativeRef == 0)
+                return;
             ignore(() -> stop(), re -> LOGGER.error("Failed on stopping the EncodingContext", re));
 
             toClose.forEach(q -> q.close());
+            toClose.clear();
 
             // output should be closed ONLY after the video encoders
             if(output != null)
                 output.close();
+            output = null;
 
-            if(nativeRef != 0)
+            if(nativeRef != 0) {
                 FfmpegApi.pcv4j_ffmpeg2_encodingContext_delete(nativeRef);
+                nativeRef = 0;
+            }
+        }
+
+        /**
+         * This is a convenience method for accessing the default video encoder. It's
+         * equivalent to:
+         *
+         * <pre>
+         * <code>
+         * defaultVideoEncoder().setOutputDims(width, height, preserveAspectRatio, onlyScaleDown);
+         * </code>
+         * </pre>
+         *
+         */
+        public EncodingContext setOutputDims(final int width, final int height, final boolean preserveAspectRatio, final boolean onlyScaleDown) {
+            defaultVideoEncoder().setOutputDims(width, height, preserveAspectRatio, onlyScaleDown);
+            return this;
+        }
+
+        /**
+         * This is a convenience method for accessing the default video encoder. It's
+         * equivalent to:
+         *
+         * <pre>
+         * <code>
+         * defaultVideoEncoder().setFps(num, den);
+         * </code>
+         * </pre>
+         *
+         */
+        public EncodingContext setFps(final int num, final int den) {
+            defaultVideoEncoder().setFps(num, den);
+            return this;
+        }
+
+        /**
+         * This is a convenience method for accessing the default video encoder. It's
+         * equivalent to:
+         *
+         * <pre>
+         * <code>
+         * defaultVideoEncoder().addCodecOptions(optionName, optionValue);
+         * </code>
+         * </pre>
+         *
+         */
+        public EncodingContext addCodecOptions(final String optionName, final String optionValue) {
+            defaultVideoEncoder().addCodecOptions(optionName, optionValue);
+            return this;
+        }
+
+        /**
+         * This is a convenience method for accessing the default video encoder. It's
+         * equivalent to:
+         *
+         * <pre>
+         * <code>
+         * defaultVideoEncoder().encode(frame);
+         * </code>
+         * </pre>
+         *
+         */
+        public EncodingContext encode(final VideoFrame frame) {
+            defaultVideoEncoder().encode(frame);
+            return this;
+        }
+
+        /**
+         * Initialize the encoding context and default video encoder with the
+         * details from the given media context. This will find the first video
+         * stream in the {@link MediaContext} and assume set up the output to
+         * encode frames from that source.
+         */
+        public EncodingContext setFps(final MediaContext ctx) {
+            final StreamDetails sd = Arrays.stream(ctx.getStreamDetails())
+                .filter(d -> d.mediaType == Ffmpeg.AVMEDIA_TYPE_VIDEO)
+                .findFirst()
+                .orElseThrow(
+                    () -> new FfmpegException("There doesn't appear to be any video streams in the given " + MediaContext.class.getSimpleName() + " source."));
+
+            defaultVideoEncoder()
+                .setFps(sd.fps_num, sd.fps_den);
+
+            return this;
+        }
+
+        private EncodingContext stop() {
+            encoders.values().forEach(v -> v.stop());
+            throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_encodingContext_stop(nativeRef));
+            return this;
         }
     }
 
