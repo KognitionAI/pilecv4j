@@ -36,6 +36,7 @@ import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
 
+@SuppressWarnings("deprecation")
 public class UtilsForTesting {
 
     public static final Map<Integer, Integer> biTypeToPixDelta = new HashMap<>();

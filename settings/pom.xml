@@ -28,7 +28,7 @@
     <!-- <opencv-base.version>${opencv-build.version}-rc</opencv-base.version> -->
 
     <!-- The artifact version -->
-    <opencv.version>0.17-opencv${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
+    <opencv.version>1.0-opencv${opencv-base.version}${opencv-gpu.version-extention}</opencv.version>
 
     <!-- generator and platform.options are set in the profile -->
     <cmake.generator>${generator}</cmake.generator>

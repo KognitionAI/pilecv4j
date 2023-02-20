@@ -18,6 +18,21 @@
     <common.include>${project.basedir}/../native-common-include/include</common.include>
   </properties>
 
+  <dependencies>
+    <!-- This is a helper. Any time you're going to use native-python -->
+    <!-- you'll also need native-image. In order to facilitate that   -->
+    <!-- this dependency is included as a runtime dep                 -->
+    <!-- NOTE: the above was changed to a compile time dep because    -->
+    <!--   currently the native-image jar file is how opencv itself is-->
+    <!--   pulled in an the definition of Mat will be needed anywhere -->
+    <!--   lib/native-python is used.                                 -->
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-image-${platform}</artifactId>
+      <classifier>bin</classifier>
+    </dependency>
+  </dependencies>
+
   <build>
     <directory>${basedir}/target/${platform}-${build.type}</directory>
     <sourceDirectory>.</sourceDirectory>

@@ -29,8 +29,6 @@ import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
-
 public class CvMatWithColorInformation extends CvMat {
     public final boolean iCC;
     public final boolean isLinearRGBspace;

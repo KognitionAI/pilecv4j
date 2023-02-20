@@ -44,6 +44,7 @@ import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.image.display.ImageDisplay.Implementation;
 
+@SuppressWarnings("deprecation")
 public class TestUtils {
     // private static final Logger LOGGER = LoggerFactory.getLogger(TestUtils.class);
     final String testImageFilename = translateClasspath("test-images/people.jpeg");

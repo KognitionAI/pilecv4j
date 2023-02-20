@@ -37,6 +37,7 @@ import ai.kognition.pilecv4j.image.CvRaster.GetChannelValueAsInt;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.image.display.ImageDisplay.Implementation;
 
+@SuppressWarnings("deprecation")
 public class CvRasterTest {
 
     public final static boolean SHOW; /// can only set this to true when building on a machine with a display

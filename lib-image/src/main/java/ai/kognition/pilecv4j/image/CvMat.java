@@ -254,28 +254,29 @@ public class CvMat extends Mat implements QuietCloseable {
      * without doing a conversion. That is it simply reinterprets the raw binary buffer
      * as being a different type.
      * </p>
-     * 
-     * <p>
-     * @param maxSize is the total number of bytes that should not be exceeded. It
-     * should be the number of bytes that the mat's backing buffer contains and is
-     * used as a safety check (as in C/C++'s {@code strncpy} for example). This
-     * number can be greater than the number of bytes required by {@code sizes} and 
-     * {@code type} but it cannot be less. 
-     * </p>
-     * 
-     * <p>
-     * DO NOT USE THIS METHOD UNLESS YOU REALLY KNOW WHAT YOU'RE DOING!
-     * </p>
-     * 
-     * <p>
-     * This method has the unfortunate side effect of unreferencing the underlying data.
-     * </p>
      *
      * <p>
-     * The memory representing this {@link CvMat} must be under the management of another mechanism.
-     * Therefore, either this must be a shallow copy of another Mat that outlives this Mat, OR
-     * the mat would have been constructed from a data buffer (that also must outlive this Mat).
-     * </p>
+     *
+     * @param maxSize is the total number of bytes that should not be exceeded. It
+     *     should be the number of bytes that the mat's backing buffer contains and is
+     *     used as a safety check (as in C/C++'s {@code strncpy} for example). This
+     *     number can be greater than the number of bytes required by {@code sizes} and
+     *     {@code type} but it cannot be less.
+     *     </p>
+     *
+     *     <p>
+     *     DO NOT USE THIS METHOD UNLESS YOU REALLY KNOW WHAT YOU'RE DOING!
+     *     </p>
+     *
+     *     <p>
+     *     This method has the unfortunate side effect of unreferencing the underlying data.
+     *     </p>
+     *
+     *     <p>
+     *     The memory representing this {@link CvMat} must be under the management of another mechanism.
+     *     Therefore, either this must be a shallow copy of another Mat that outlives this Mat, OR
+     *     the mat would have been constructed from a data buffer (that also must outlive this Mat).
+     *     </p>
      */
     public boolean inplaceRemake(final int[] sizes, final int type, final long maxSize) {
         final int ndims = sizes.length;
@@ -329,12 +330,63 @@ public class CvMat extends Mat implements QuietCloseable {
     }
 
     /**
+     * Apply the given {@link Function} to a {@link ByteBuffer} containing the raw image data for this {@link CvMat}.
+     *
+     *
+     * @throws IllegalArgumentException will be thrown if the underlying data can't be retrieved either because it's
+     *     not continuous, or if the underlying mat is invalid it will throw
+     * @param function is the {@link Consumer} to pass the {@link ByteBuffer} to.
+     */
+    public void bulkAccess(final Consumer<ByteBuffer> bulkAccessor) {
+        bulkAccess(this, bulkAccessor);
+    }
+
+    /**
+     * Apply the given {@link Function} to a {@link ByteBuffer} containing the raw image data for this {@link CvMat}.
+     *
+     * @throws IllegalArgumentException will be thrown if the underlying data can't be retrieved either because it's
+     *     not continuous, or if the underlying mat is invalid it will throw
+     * @param function is the {@link Consumer} to pass the {@link ByteBuffer} to.
+     */
+    public static void bulkAccess(final Mat mat, final Consumer<ByteBuffer> bulkAccessor) {
+        bulkAccessor.accept(_getData(mat));
+    }
+
+    /**
+     * Apply the given {@link Function} to a {@link ByteBuffer} containing the raw image data for this {@link CvMat}.
+     *
+     *
+     * @throws IllegalArgumentException will be thrown if the underlying data can't be retrieved either because it's
+     *     not continuous, or if the underlying mat is invalid it will throw
+     * @param function is the {@link Function} to pass the {@link ByteBuffer} to.
+     * @return the return value of the provided {@code bulkAccessor}
+     */
+    public <T> T bulkAccessOp(final Function<ByteBuffer, T> bulkAccessor) {
+        return bulkAccessOp(this, bulkAccessor);
+    }
+
+    /**
+     * Apply the given {@link Function} to a {@link ByteBuffer} containing the raw image data for this {@link CvMat}.
+     *
+     *
+     * @throws IllegalArgumentException will be thrown if the underlying data can't be retrieved either because it's
+     *     not continuous, or if the underlying mat is invalid it will throw
+     * @param function is the {@link Function} to pass the {@link ByteBuffer} to.
+     * @return the return value of the provided {@code bulkAccessor}
+     */
+    public static <T> T bulkAccessOp(final Mat mat, final Function<ByteBuffer, T> bulkAccessor) {
+        return bulkAccessor.apply(_getData(mat));
+    }
+
+    /**
      * Apply the given {@link Function} to a {@link CvRaster} containing the image data for this {@link CvMat}
      *
      * @param function is the {@link Function} to pass the {@link CvRaster} to.
      * @return the return value of the pro)vided {@code function}
      * @see CvRaster
+     * @deprecated use {@link #bulkAccessOp(Function)} instead.
      */
+    @Deprecated
     public <T> T rasterOp(final Function<CvRaster, T> function) {
         try(final CvRaster raster = CvRaster.makeInstance(this)) {
             return function.apply(raster);
@@ -346,7 +398,9 @@ public class CvMat extends Mat implements QuietCloseable {
      *
      * @param function is the {@link Consumer} to pass the {@link CvRaster} to.
      * @see CvRaster
+     * @deprecated use {@link #bulkAccess(Consumer)} instead
      */
+    @Deprecated
     public void rasterAp(final Consumer<CvRaster> function) {
         try(final CvRaster raster = CvRaster.makeInstance(this)) {
             function.accept(raster);
@@ -354,10 +408,53 @@ public class CvMat extends Mat implements QuietCloseable {
     }
 
     /**
+     * Helper function for applying a {@link Function} to the a {@link CvRaster} built from the given
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     *
+     * @param mat <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to build the
+     *     {@link CvRaster} from.
+     * @param function is the {@link Function} to pass the {@link CvRaster} to.
+     * @return the return value of the provided {@code function}
+     * @see CvRaster
+     * @deprecated use {@link #bulkAccessOp(Mat, Function)} instead.
+     */
+    @Deprecated
+    public static <T> T rasterOp(final Mat mat, final Function<CvRaster, T> function) {
+        if(mat instanceof CvMat)
+            return ((CvMat)mat).rasterOp(function);
+        else {
+            try(final CvRaster raster = CvRaster.makeInstance(mat)) {
+                return function.apply(raster);
+            }
+        }
+    }
+
+    /**
+     * Helper function for applying a {@link Consumer} to the a {@link CvRaster} built from the given
+     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
+     *
+     * @param mat <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to build the
+     *     {@link CvRaster} from.
+     * @param function is the {@link Consumer} to pass the {@link CvRaster} to.
+     * @see CvRaster
+     * @deprecated use {@link #bulkAccess(Mat, Consumer)} instead.
+     */
+    @Deprecated
+    public static void rasterAp(final Mat mat, final Consumer<CvRaster> function) {
+        if(mat instanceof CvMat)
+            ((CvMat)mat).rasterAp(function);
+        else {
+            try(final CvRaster raster = CvRaster.makeInstance(mat)) {
+                function.accept(raster);
+            }
+        }
+    }
+
+    /**
      * @return How many bytes constitute the image data.
      */
     public long numBytes() {
-        return elemSize() * rows() * cols();
+        return elemSize() * total();
     }
 
     /**
@@ -398,45 +495,6 @@ public class CvMat extends Mat implements QuietCloseable {
     @Override
     public String toString() {
         return "CvMat: (" + getClass().getName() + "@" + Integer.toHexString(hashCode()) + ") " + (deletedAlready ? "" : super.toString());
-    }
-
-    /**
-     * Helper function for applying a {@link Function} to the a {@link CvRaster} built from the given
-     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *
-     * @param mat <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to build the
-     *     {@link CvRaster} from.
-     * @param function is the {@link Function} to pass the {@link CvRaster} to.
-     * @return the return value of the provided {@code function}
-     * @see CvRaster
-     */
-    public static <T> T rasterOp(final Mat mat, final Function<CvRaster, T> function) {
-        if(mat instanceof CvMat)
-            return ((CvMat)mat).rasterOp(function);
-        else {
-            try(final CvRaster raster = CvRaster.makeInstance(mat)) {
-                return function.apply(raster);
-            }
-        }
-    }
-
-    /**
-     * Helper function for applying a {@link Consumer} to the a {@link CvRaster} built from the given
-     * <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a>
-     *
-     * @param mat <a href="https://docs.opencv.org/4.0.1/d3/d63/classcv_1_1Mat.html">Mat</a> to build the
-     *     {@link CvRaster} from.
-     * @param function is the {@link Consumer} to pass the {@link CvRaster} to.
-     * @see CvRaster
-     */
-    public static void rasterAp(final Mat mat, final Consumer<CvRaster> function) {
-        if(mat instanceof CvMat)
-            ((CvMat)mat).rasterAp(function);
-        else {
-            try(final CvRaster raster = CvRaster.makeInstance(mat)) {
-                function.accept(raster);
-            }
-        }
     }
 
     /**
@@ -716,4 +774,14 @@ public class CvMat extends Mat implements QuietCloseable {
             close();
         }
     }
+
+    private static ByteBuffer _getData(final Mat mat) {
+        if(!mat.isContinuous())
+            throw new IllegalArgumentException("Cannot create a CvRaster from a Mat without a continuous buffer.");
+        final Pointer dataPtr = ImageAPI.pilecv4j_image_CvRaster_getData(mat.nativeObj);
+        if(Pointer.nativeValue(dataPtr) == 0)
+            throw new IllegalArgumentException("Cannot access raw data in Mat. It may be uninitialized.");
+        return dataPtr.getByteBuffer(0, mat.elemSize() * mat.total());
+    }
+
 }

@@ -335,7 +335,9 @@ uint64_t VideoEncoder::ready(bool lock) {
 
   AVStream* stream = enc->muxer->getStream(video_sindex);
   if (!stream) {
-    llog(ERROR, "No stream set ");
+    llog(ERROR, "The muxer doesn't appear to have a stream at index %d. Was the encoder enabled?", (int)video_sindex);
+    if (enc->encoders.size() > 1)
+      llog(ERROR, "   When you have multiple encoders in an encoding context you need to enable them all before using any of them to encode.", (int)video_sindex);
     return MAKE_P_STAT(NO_STREAM);
   }
 
@@ -492,7 +494,7 @@ uint64_t VideoEncoder::stop(bool lock) {
   FakeMutextGuard g(enc->fake_mutex, lock);
 
   // need to put it back or we get a double free when closing the overall context
-  AVStream* video_avs = enc->muxer->getStream(0);
+  AVStream* video_avs = enc->muxer->getStream(video_sindex);
   if (streams_original_set && video_avs) {
     if (isEnabled(TRACE))
       llog(TRACE, "Resetting video_avs(%" PRId64 ")->codecpar(%" PRId64 ")->extradata(%" PRId64 ") to %" PRId64,

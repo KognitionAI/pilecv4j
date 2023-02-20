@@ -24,6 +24,12 @@
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-image</artifactId>
     </dependency>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>native-image-${platform}</artifactId>
+      <classifier>bin</classifier>
+      <optional>true</optional>
+    </dependency>
     
     <!-- Third party deps -->
     <dependency> <!-- Needed for the NativeLibraryLoader -->

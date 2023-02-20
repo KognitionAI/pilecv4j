@@ -147,7 +147,7 @@ public class SwtUtils {
             final int elemSize = CvType.ELEM_SIZE(toUse.type());
 
             final ImageData id = new ImageData(width, height, elemSize * 8, palette, 1, new byte[width * height * elemSize]);
-            CvMat.rasterAp(toUse, raster -> raster.underlying().get(id.data));
+            CvMat.bulkAccess(toUse, raster -> raster.get(id.data));
             return id;
         }
     }

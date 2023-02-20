@@ -138,6 +138,11 @@ public class Ffmpeg {
 
     @FunctionalInterface
     public static interface MediaDataSupplier {
+
+        /**
+         * The {@link MediaContext} will request {@code numBytes} be placed in the buffer.
+         * You should return the number of bytes actually placed in the buffer.
+         */
         public int fillBuffer(ByteBuffer buf, int numBytes);
     }
 
@@ -1340,6 +1345,19 @@ public class Ffmpeg {
              */
             public VideoEncoder setFps(final int num, final int den) {
                 throwIfNecessary(FfmpegApi.pcv4j_ffmpeg2_videoEncoder_setFramerate(nativeRef, num, den));
+                return this;
+            }
+
+            public VideoEncoder setFps(final MediaContext ctx) {
+                final StreamDetails sd = Arrays.stream(ctx.getStreamDetails())
+                    .filter(d -> d.mediaType == Ffmpeg.AVMEDIA_TYPE_VIDEO)
+                    .findFirst()
+                    .orElseThrow(
+                        () -> new FfmpegException(
+                            "There doesn't appear to be any video streams in the given " + MediaContext.class.getSimpleName() + " source."));
+
+                setFps(sd.fps_num, sd.fps_den);
+
                 return this;
             }
 

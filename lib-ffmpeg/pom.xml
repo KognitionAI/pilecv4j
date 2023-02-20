@@ -32,7 +32,7 @@
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-image</artifactId>
     </dependency>
-      <dependency>
+    <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>native-ffmpeg-${platform}</artifactId>
       <classifier>bin</classifier>
@@ -74,12 +74,6 @@
     <dependency>
       <groupId>net.dempsy</groupId>
       <artifactId>dempsy-vfs.api</artifactId>
-      <scope>test</scope>
-    </dependency>
-    <dependency>
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-image-${platform}</artifactId>
-      <classifier>bin</classifier>
       <scope>test</scope>
     </dependency>
   </dependencies>
