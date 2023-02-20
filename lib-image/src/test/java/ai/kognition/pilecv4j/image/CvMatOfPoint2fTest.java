@@ -27,9 +27,10 @@ import org.opencv.core.Size;
 
 import ai.kognition.pilecv4j.image.CvRaster.FlatFloatPixelConsumer;
 
+@SuppressWarnings("deprecation")
 public class CvMatOfPoint2fTest {
     @Test
-    public void canOpenClose() {
+    public void canOpenCloseTest() {
         try(final CvMatOfPoint2f empty = new CvMatOfPoint2f();
             final CvMatOfPoint2f notEmpty = new CvMatOfPoint2f(IntStream.range(0, 3)
                 .mapToObj(i -> new Point(i, i))
@@ -44,7 +45,7 @@ public class CvMatOfPoint2fTest {
     }
 
     @Test
-    public void canFlattenAndTranspose() {
+    public void canFlattenAndTransposeTest() {
         try(final CvMatOfPoint2f matOfPoint = new CvMatOfPoint2f(IntStream.range(0, 3)
             .mapToObj(i -> new Point(i, i))
             .toArray(Point[]::new));
@@ -60,7 +61,7 @@ public class CvMatOfPoint2fTest {
     }
 
     @Test
-    public void canMakeToAndFromCvMat() {
+    public void canMakeToAndFromCvMatTest() {
         final int numPoints = 10;
         try(final CvMatOfPoint2f matOfPoint = new CvMatOfPoint2f(IntStream.range(0, numPoints)
             .mapToDouble(i -> i)

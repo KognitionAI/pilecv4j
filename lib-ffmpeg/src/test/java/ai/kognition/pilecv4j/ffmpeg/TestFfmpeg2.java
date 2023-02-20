@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.IOUtils;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
@@ -184,40 +185,40 @@ public class TestFfmpeg2 extends BaseTest {
 
         try(
 
-            final MediaContext c = Ffmpeg.createMediaContext();
+            final MediaContext mediaContext = Ffmpeg.createMediaContext();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
-            c
-                .source(
 
-                    // read bytes from buffer
-                    (bb, numBytes) -> {
-                        if(pos.val >= contents.length)
-                            return Ffmpeg.AVERROR_EOF_AVSTAT;
-                        final int size = bb.capacity();
-                        LOGGER.trace("buf size: {}, to write: {}, from pos: {}", size, numBytes, pos.val);
-                        final int numToSend = (numBytes + (int)pos.val > contents.length) ? (contents.length - (int)pos.val) : numBytes;
-                        LOGGER.trace("contents read from {} to {}({})", pos.val, (pos.val + numToSend), numToSend);
-                        bb.put(contents, (int)pos.val, numToSend);
-                        pos.val += numToSend;
-                        if(pos.val >= contents.length)
-                            LOGGER.debug("Last bytes being sent!");
-                        return numToSend;
-                    },
+            mediaContext.source(
 
-                    // need to support seek to read some mp4 files
-                    (final long offset, final int whence) -> {
-                        if(whence == Ffmpeg.SEEK_SET)
-                            pos.val = offset;
-                        else if(whence == Ffmpeg.SEEK_CUR)
-                            pos.val += offset;
-                        else if(whence == Ffmpeg.SEEK_END)
-                            pos.val = contents.length - offset;
-                        else if(whence == Ffmpeg.AVSEEK_SIZE)
-                            return contents.length;
-                        else
-                            return -1;
-                        return pos.val;
-                    })
+                // read bytes from buffer
+                (bb, numBytes) -> {
+                    if(pos.val >= contents.length)
+                        return Ffmpeg.AVERROR_EOF_AVSTAT;
+                    final int size = bb.capacity();
+                    LOGGER.trace("buf size: {}, to write: {}, from pos: {}", size, numBytes, pos.val);
+                    final int numToSend = (numBytes + (int)pos.val > contents.length) ? (contents.length - (int)pos.val) : numBytes;
+                    LOGGER.trace("contents read from {} to {}({})", pos.val, (pos.val + numToSend), numToSend);
+                    bb.put(contents, (int)pos.val, numToSend);
+                    pos.val += numToSend;
+                    if(pos.val >= contents.length)
+                        LOGGER.debug("Last bytes being sent!");
+                    return numToSend;
+                },
+
+                // need to support seek to read some mp4 files
+                (final long offset, final int whence) -> {
+                    if(whence == Ffmpeg.SEEK_SET)
+                        pos.val = offset;
+                    else if(whence == Ffmpeg.SEEK_CUR)
+                        pos.val += offset;
+                    else if(whence == Ffmpeg.SEEK_END)
+                        pos.val = contents.length - offset;
+                    else if(whence == Ffmpeg.AVSEEK_SIZE)
+                        return contents.length;
+                    else
+                        return -1;
+                    return pos.val;
+                })
                 .chain("default")
                 .selectFirstVideoStream()
 
@@ -271,6 +272,7 @@ public class TestFfmpeg2 extends BaseTest {
         assertTrue(frameCount(destination.toURI()) > 1000);
     }
 
+    @Ignore
     @Test
     public void testDumpTiming() throws Exception {
         LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);

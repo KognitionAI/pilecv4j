@@ -74,8 +74,8 @@ public class Transform {
         final int height = mat.rows();
         final int width = mat.cols();
 
-        return gradient.rasterOp(gradientRaster -> mat.rasterOp(raster -> {
-            final long gradientDirImage = gradientRaster == null ? 0 : gradientRaster.getNativeAddressOfData();
+        {
+            final long gradientDirImage = gradient.getNativeAddressOfData();
 
             // the size of the hough space should be quantFactor smaller
             final int htheight = (int)((height) / quantFactor) + 1;
@@ -101,7 +101,7 @@ public class Transform {
             final int colstart = (colstartp < 0) ? 0 : colstartp;
             final int colend = (colendp >= width) ? width - 1 : colendp;
 
-            ImageAPI.pilecv4j_image_Transform_houghTransformNative(raster.getNativeAddressOfData(), width, height, gradientDirImage,
+            ImageAPI.pilecv4j_image_Transform_houghTransformNative(mat.getNativeAddressOfData(), width, height, gradientDirImage,
                 mask.mask, mask.mwidth, mask.mheight, mask.maskcr, mask.maskcc,
                 gradDirMask.mask, gradDirMask.mwidth, gradDirMask.mheight, gradDirMask.maskcr, gradDirMask.maskcc,
                 gradientDirSlopDeg, quantFactor, ret, htwidth, htheight, cb, houghThreshold,
@@ -110,7 +110,7 @@ public class Transform {
             hsem.entryMap.clear(); // help the gc
 
             return new HoughSpace(ret, htwidth, htheight, quantFactor, hsem.entries);
-        }));
+        }
     }
 
     public List<Cluster> cluster(final List<HoughSpaceEntry> houghEntries, final double percentModelCoverage) {
@@ -219,10 +219,8 @@ public class Transform {
             final byte[] overlayRemovedEdgePixel = new byte[] {overlayPixelValueRemovedEdge};
             if(ti != null) {
                 if(pruned.size() > 0) {
-                    ti.rasterAp(raster -> {
-                        for(final java.awt.Point p: pruned)
-                            raster.set(p.y, p.x, overlayRemovedEdgePixel);
-                    });
+                    for(final java.awt.Point p: pruned)
+                        ti.put(p.y, p.x, overlayPixelValueRemovedEdge);
                 }
             }
 
@@ -235,10 +233,8 @@ public class Transform {
 
         if(ti != null) {
             final byte[] overlayPixelEdge = new byte[] {overlayPixelValueEdge};
-            ti.rasterAp(raster -> {
-                for(final java.awt.Point p: edgeVals)
-                    raster.set(p.y, p.x, overlayPixelEdge);
-            });
+            for(final java.awt.Point p: edgeVals)
+                ti.put(p.y, p.x, overlayPixelEdge);
         }
 
         return new Fit(result[1], result[0], result[3], result[2], cluster, stdDev, edgeVals);

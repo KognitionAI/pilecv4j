@@ -17,6 +17,15 @@
   <properties>
     <common.include>${project.basedir}/../native-common-include/include</common.include>
   </properties>
+  
+  <dependencies>
+    <dependency>
+      <groupId>ai.kognition.pilecv4j</groupId>
+      <artifactId>opencv-${platform}</artifactId>
+      <classifier>withlib</classifier>
+      <version>${opencv.version}</version>
+    </dependency>
+  </dependencies>
 
   <build>
     <directory>${basedir}/target/${platform}-${build.type}</directory>

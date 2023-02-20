@@ -29,8 +29,8 @@ import org.opencv.video.KalmanFilter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import ai.kognition.pilecv4j.image.Closer;
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.Utils;
 
 /**

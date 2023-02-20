@@ -16,24 +16,18 @@
 
 package ai.kognition.pilecv4j.image;
 
-import static net.dempsy.util.Functional.uncheck;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 import java.nio.ShortBuffer;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.function.Function;
 
 import com.sun.jna.Pointer;
 
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-
-import net.dempsy.util.QuietCloseable;
 
 /**
  * <p>
@@ -72,6 +66,7 @@ import net.dempsy.util.QuietCloseable;
  * </pre>
  *
  */
+@Deprecated
 public abstract class CvRaster implements AutoCloseable {
 
     public final Mat mat;
@@ -589,31 +584,6 @@ public abstract class CvRaster implements AutoCloseable {
     @FunctionalInterface
     public static interface FlatDoublePixelSetter extends FlatPixelSetter<double[]> {}
     // ==================================================================
-
-    public static class Closer implements AutoCloseable {
-        private final List<AutoCloseable> toClose = new LinkedList<>();
-
-        public <T extends AutoCloseable> T add(final T mat) {
-            if(mat != null)
-                toClose.add(0, mat);
-            return mat;
-        }
-
-        public <T extends Mat> T addMat(final T mat) {
-            if(mat == null)
-                return null;
-            if(mat instanceof AutoCloseable)
-                add((AutoCloseable)mat);
-            else
-                toClose.add(0, (QuietCloseable)() -> CvMat.closeRawMat(mat));
-            return mat;
-        }
-
-        @Override
-        public void close() {
-            toClose.stream().forEach(r -> uncheck(() -> r.close()));
-        }
-    }
 
     @FunctionalInterface
     public static interface PixelAggregate<P, R> {

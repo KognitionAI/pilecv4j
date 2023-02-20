@@ -22,6 +22,7 @@ import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_FATAL;
 import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_INFO;
 import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_TRACE;
 import static ai.kognition.pilecv4j.python.internal.PythonAPI.LOG_LEVEL_WARN;
+import static net.dempsy.util.Functional.chain;
 import static net.dempsy.util.Functional.uncheck;
 
 import java.io.File;
@@ -32,6 +33,8 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.jna.Pointer;
 
@@ -47,8 +50,8 @@ import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.python.internal.PythonAPI;
 import ai.kognition.pilecv4j.python.internal.PythonAPI.get_image_source;
 
-public class Python implements QuietCloseable {
-    private static final Logger LOGGER = LoggerFactory.getLogger(Python.class);
+public class PythonHandle implements QuietCloseable {
+    private static final Logger LOGGER = LoggerFactory.getLogger(PythonHandle.class);
 
     static {
         // find the level
@@ -79,7 +82,7 @@ public class Python implements QuietCloseable {
     private final get_image_source callback = new get_image_source() {
         @Override
         public long image_source(final long ptRef) {
-            synchronized(Python.this) {
+            synchronized(PythonHandle.this) {
                 if(imageSource == null)
                     imageSource = new ImageSource(PythonAPI.pilecv4j_python_imageSource_create(ptRef));
                 return imageSource.imageSourceRef;
@@ -87,7 +90,7 @@ public class Python implements QuietCloseable {
         }
     };
 
-    public Python() throws PythonException {
+    public PythonHandle() throws PythonException {
         nativeObj = PythonAPI.pilecv4j_python_kogSys_create(callback);
         if(nativeObj == 0L)
             throw new PythonException("Failed to instantiate native PyTorch instance.");
@@ -116,12 +119,42 @@ public class Python implements QuietCloseable {
         }
     }
 
+    public static class PythonRunResults {
+        public final AtomicBoolean isRunning = new AtomicBoolean(false);
+        public final AtomicReference<RuntimeException> failed = new AtomicReference<>();
+    }
+
+    public PythonRunResults runPythonFunctionAsynch(final String module, final String function, final Map<String, Object> kwds) {
+        final var ret = new PythonRunResults();
+        final AtomicBoolean started = new AtomicBoolean(false);
+        chain(
+            new Thread(() -> {
+                ret.isRunning.set(true);
+                started.set(true);
+                try {
+                    runPythonFunction(module, function, kwds);
+                } catch(final RuntimeException rte) {
+                    rte.printStackTrace();
+                    throw rte;
+                } finally {
+                    ret.isRunning.set(false);
+                }
+            }, "Python Thread"),
+            t -> t.setDaemon(true),
+            t -> t.start());
+
+        while(started.get() == false)
+            Thread.yield();
+
+        return ret;
+    }
+
     public void addModulePath(final String dir) {
         final String absDir = FileSystems.getDefault().getPath(dir).normalize().toAbsolutePath().toString();
         PythonAPI.pilecv4j_python_addModulePath(absDir);
     }
 
-    public KogMatResults sendMat(final CvMat mat, final boolean isRgb, final Map<String, Object> params) {
+    public PythonResults sendMat(final CvMat mat, final boolean isRgb, final Map<String, Object> params) {
         if(imageSource != null)
             return imageSource.send(mat, isRgb, params);
         throw new IllegalStateException("There's no current image source");
@@ -142,7 +175,8 @@ public class Python implements QuietCloseable {
 
         if(!sourceIsInitialized())
             throw new PythonException(
-                "The module \"" + currentModule + ".py\" using function \"" + currentFunction + "\" never initialized the image source. Did you call runPythonFunction somewhere?");
+                "The module \"" + currentModule + ".py\" using function \"" + currentFunction
+                    + "\" never initialized the image source. Did you call runPythonFunction somewhere?");
     }
 
     @Override
@@ -157,9 +191,9 @@ public class Python implements QuietCloseable {
     private static final Object pythonExpandedLock = new Object();
     private static Map<String, File> pythonIsExpanded = new HashMap<>();
 
-    public static Python initModule(final String pythonModuleUri) {
+    public static PythonHandle initModule(final String pythonModuleUri) {
         final File pythonModulePath = unpackModule(pythonModuleUri);
-        final Python ret = new Python();
+        final PythonHandle ret = new PythonHandle();
         ret.addModulePath(pythonModulePath.getAbsolutePath());
         return ret;
     }
@@ -168,7 +202,7 @@ public class Python implements QuietCloseable {
         synchronized(pythonExpandedLock) {
             final File ret = pythonIsExpanded.get(pythonModulePath);
             if(ret == null) {
-                try (Vfs vfs = new Vfs();) {
+                try(Vfs vfs = new Vfs();) {
                     final Path path = vfs.toPath(uncheck(() -> new URI(pythonModulePath)));
                     if(!path.exists() || !path.isDirectory())
                         throw new IllegalStateException("The python code isn't properly bundled in the jar file.");
@@ -188,10 +222,10 @@ public class Python implements QuietCloseable {
         }
     }
 
-    public static class KogMatResults implements QuietCloseable {
+    public static class PythonResults implements QuietCloseable {
         private final long nativeObj;
 
-        KogMatResults(final long nativeObj) {
+        PythonResults(final long nativeObj) {
             this.nativeObj = nativeObj;
         }
 
@@ -232,11 +266,11 @@ public class Python implements QuietCloseable {
             this.imageSourceRef = imageSourceRef;
         }
 
-        public KogMatResults send(final CvMat mat, final boolean isRgb) {
+        public PythonResults send(final CvMat mat, final boolean isRgb) {
             return send(mat, isRgb, 0L);
         }
 
-        public KogMatResults send(final CvMat mat, final boolean isRgb, final Map<String, Object> parameters) {
+        public PythonResults send(final CvMat mat, final boolean isRgb, final Map<String, Object> parameters) {
             if(parameters == null || parameters.size() == 0)
                 return send(mat, isRgb, 0L);
             try(var q = new ParamCloser(PythonAPI.pilecv4j_python_dict_create());) {
@@ -254,13 +288,13 @@ public class Python implements QuietCloseable {
             PythonAPI.pilecv4j_python_imageSource_destroy(imageSourceRef);
         }
 
-        private KogMatResults send(final CvMat mat, final boolean isRgb, final long dictRef) {
+        private PythonResults send(final CvMat mat, final boolean isRgb, final long dictRef) {
             final long result;
             if(mat != null)
                 result = PythonAPI.pilecv4j_python_imageSource_send(imageSourceRef, dictRef, mat.nativeObj, (isRgb ? 1 : 0));
             else
                 result = PythonAPI.pilecv4j_python_imageSource_send(imageSourceRef, dictRef, 0L, 0);
-            return (result == 0L) ? null : new KogMatResults(result);
+            return (result == 0L) ? null : new PythonResults(result);
         }
     }
 
@@ -334,8 +368,8 @@ public class Python implements QuietCloseable {
             dict = q.dict;
             kwds.entrySet().forEach(e -> {
                 final Object val = e.getValue();
-                if(val instanceof Python)
-                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((Python)val).nativeObj));
+                if(val instanceof PythonHandle)
+                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((PythonHandle)val).nativeObj));
                 else if(val instanceof Boolean)
                     throwIfNecessary(PythonAPI.pilecv4j_python_dict_putBoolean(dict, e.getKey(), ((Boolean)val).booleanValue() ? 1 : 0));
                 else if(val instanceof Number) {

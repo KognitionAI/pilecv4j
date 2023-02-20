@@ -54,8 +54,6 @@ import org.slf4j.LoggerFactory;
 import net.dempsy.util.Functional;
 import net.dempsy.util.MutableInt;
 
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
-
 public class ImageFile {
     private static final Logger LOGGER = LoggerFactory.getLogger(ImageFile.class);
 

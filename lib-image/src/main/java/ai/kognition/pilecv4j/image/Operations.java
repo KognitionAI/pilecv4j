@@ -99,15 +99,15 @@ public class Operations {
             final int numPixelsInGradient = dx.rows() * dx.cols();
             final byte[] dirsa = new byte[numPixelsInGradient];
 
-            final short[] tmpdx = new short[numPixelsInGradient];
-            dx.get(0, 0, tmpdx);
-
-            dx.rasterAp(dxr -> {
-                dy.rasterAp(dyr -> {
+            dx.bulkAccess(dxr -> {
+                dx.elemSize();
+                final var dxsb = dxr.asShortBuffer();
+                dy.bulkAccess(dyr -> {
+                    final var dysb = dyr.asShortBuffer();
                     for(int pos = 0; pos < numPixelsInGradient; pos++) {
                         // calculate the angle
-                        final double dxv = ((short[])dxr.get(pos))[0];
-                        final double dyv = 0.0 - ((short[])dyr.get(pos))[0]; // flip y axis.
+                        final double dxv = dxsb.get(pos);
+                        final double dyv = 0.0 - dysb.get(pos); // flip y axis.
                         dirsa[pos] = angle_byte(dxv, dyv);
                     }
                 });

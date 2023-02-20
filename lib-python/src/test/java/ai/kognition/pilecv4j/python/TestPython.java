@@ -37,11 +37,11 @@ import net.dempsy.utils.test.ConditionPoll;
 
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.MediaContext;
+import ai.kognition.pilecv4j.image.Closer;
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
-import ai.kognition.pilecv4j.python.Python.KogMatResults;
+import ai.kognition.pilecv4j.python.PythonHandle.PythonResults;
 
 public class TestPython {
     public static final boolean SHOW;
@@ -66,7 +66,7 @@ public class TestPython {
         final AtomicBoolean failed = new AtomicBoolean(false);
 
         try(final Closer closer = new Closer();
-            final Python pt = new Python();
+            final PythonHandle pt = new PythonHandle();
             final CvMat mat = ImageFile.readMatFromFile(testImageFilename);) {
 
             // add the module path
@@ -93,7 +93,7 @@ public class TestPython {
 
             final long startTime = System.currentTimeMillis();
 
-            KogMatResults prev = null;
+            PythonResults prev = null;
 
             for(int count = 0; count < NUM_IMAGE_PASS && !failed.get(); count++) {
 
@@ -103,9 +103,9 @@ public class TestPython {
                     while(pt.imageSource.peek() != 0L) // waits until the current one is gone.
                         Thread.yield();
 
-                    final KogMatResults results = pt.sendMat(toSend, false, null);
+                    final PythonResults results = pt.sendMat(toSend, false, null);
                     if(prev != null) {
-                        final KogMatResults fprev = prev;
+                        final PythonResults fprev = prev;
                         assertTrue(ConditionPoll.poll(o -> fprev.hasResult()));
                         assertTrue(prev.hasResult());
                         try(final CvMat resMat = prev.getResultMat();) {
@@ -140,7 +140,7 @@ public class TestPython {
         final AtomicBoolean failed = new AtomicBoolean(false);
 
         final AtomicLong frameCount = new AtomicLong(0);
-        try(final Python pt = new Python();
+        try(final PythonHandle pt = new PythonHandle();
             final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;
             final MediaContext c = Ffmpeg.createMediaContext();) {
 
@@ -173,7 +173,7 @@ public class TestPython {
                 .processVideoFrames(f -> {
                     frameCount.getAndIncrement();
 
-                    try(final KogMatResults results = pt.sendMat(f, true, fakeParams);) {
+                    try(final PythonResults results = pt.sendMat(f, true, fakeParams);) {
                         assertTrue(uncheck(() -> ConditionPoll.poll(o -> results.hasResult())));
 
                         try(CvMat result = results.getResultMat();) {

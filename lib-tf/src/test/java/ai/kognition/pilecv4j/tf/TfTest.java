@@ -21,6 +21,7 @@ import org.tensorflow.types.TFloat32;
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.Utils;
+import ai.kognition.pilecv4j.image.Utils.LetterboxDetails;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 
 // Interrogate the saved model in order to get the input/output
@@ -84,13 +85,13 @@ public class TfTest {
                 Arrays.stream(dir.listFiles()).forEach(f -> {
 
                     try(final CvMat mat = uncheck(() -> ImageFile.readMatFromFile(f.getAbsolutePath()));
-                        final CvMat lb = Utils.letterbox(mat, MODEL_INPUT_DIM);
-                        final CvMat rgb = chain(new CvMat(), m -> Imgproc.cvtColor(lb, m, Imgproc.COLOR_BGR2RGB));
+                        final LetterboxDetails lbd = Utils.letterbox(mat, MODEL_INPUT_DIM);
+                        final CvMat rgb = chain(new CvMat(), m -> Imgproc.cvtColor(lbd.mat(), m, Imgproc.COLOR_BGR2RGB));
                         CvMat maybe = chain(new CvMat(), m -> rgb.convertTo(m, CvType.CV_32FC3, 1 / 255.0));
                         CvMat ready = maybe.isContinuous() ? CvMat.shallowCopy(maybe) : CvMat.deepCopy(maybe);
                         Tensor tensor = TensorUtils.toTensor(ready, TFloat32.class);) {
 
-                        id.update(lb);
+                        id.update(lbd.mat());
 
                         // Interrogate the saved model in order to get the input/output
                         // Operation names using the process described here:

@@ -30,14 +30,14 @@
       <artifactId>lib-nr</artifactId>
       <optional>true</optional>
     </dependency>
-    
-    <!-- Third party deps -->
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>native-image-${platform}</artifactId>
       <classifier>bin</classifier>
       <optional>true</optional>
     </dependency>
+    
+    <!-- Third party deps -->
     <dependency> <!-- Needed for the NativeLibraryLoader -->
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
@@ -52,11 +52,6 @@
     </dependency>
 
     <!-- needed for image work but not numerical recipies -->
-    <dependency>
-      <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>opencv-${platform}</artifactId>
-      <classifier>withlib</classifier>
-    </dependency>
     <dependency>
       <groupId>net.dempsy</groupId>
       <artifactId>dempsy-utils</artifactId>

@@ -77,11 +77,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import net.dempsy.util.Functional;
+import net.dempsy.util.MutableDouble;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.DoublePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.FlatDoublePixelSetter;
@@ -95,6 +95,7 @@ import ai.kognition.pilecv4j.image.geometry.PerpendicularLine;
 import ai.kognition.pilecv4j.image.geometry.Point;
 import ai.kognition.pilecv4j.image.geometry.SimplePoint;
 
+@SuppressWarnings("deprecation")
 public class Utils {
     private static final Logger LOGGER = LoggerFactory.getLogger(Utils.class);
 
@@ -236,28 +237,24 @@ public class Utils {
     public static BufferedImage mat2Img(final Mat in) {
         final int inChannels = in.channels();
         if(inChannels == 1) { // assume gray
-            final int type;
-
-            final Function<BufferedImage, Object> toRawData;
+            final BufferedImage out;
 
             switch(CvType.depth(in.type())) {
                 case CV_8U:
                 case CV_8S:
-                    type = BufferedImage.TYPE_BYTE_GRAY;
-                    toRawData = bi -> ((DataBufferByte)bi.getRaster().getDataBuffer()).getData();
+                    out = new BufferedImage(in.width(), in.height(), BufferedImage.TYPE_BYTE_GRAY);
+                    in.get(0, 0, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
                     break;
                 case CV_16U:
                 case CV_16S:
-                    type = BufferedImage.TYPE_USHORT_GRAY;
-                    toRawData = bi -> ((DataBufferUShort)bi.getRaster().getDataBuffer()).getData();
+                    out = new BufferedImage(in.width(), in.height(), BufferedImage.TYPE_USHORT_GRAY);
+                    in.get(0, 0, ((DataBufferUShort)out.getRaster().getDataBuffer()).getData());
                     break;
                 default:
                     throw new IllegalArgumentException(
                         "Cannot convert a Mat with a type of " + CvType.typeToString(in.type()) + " to a BufferedImage");
             }
 
-            final BufferedImage out = new BufferedImage(in.width(), in.height(), type);
-            CvRaster.copyToPrimitiveArray(in, toRawData.apply(out));
             return out;
         } else if(inChannels == 3) {
             final int cvDepth = CvType.depth(in.type());
@@ -265,7 +262,7 @@ public class Utils {
                 throw new IllegalArgumentException("Cannot convert BGR Mats with elements larger than a byte yet.");
 
             final BufferedImage out = new BufferedImage(in.width(), in.height(), BufferedImage.TYPE_3BYTE_BGR);
-            CvRaster.copyToPrimitiveArray(in, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
+            in.get(0, 0, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
             return out;
         } else if(inChannels == 4) { // assumption here is we have a BGRA
             final int cvDepth = CvType.depth(in.type());
@@ -283,7 +280,7 @@ public class Utils {
                 final CvMat xformed = typed.mm(bgra2abgr);
                 final CvMat xformedAndShaped = CvMat.move(xformed.reshape(4, height));
                 final CvMat it = Functional.chain(new CvMat(), m -> xformedAndShaped.convertTo(m, cvDepth));) {
-                CvRaster.copyToPrimitiveArray(it, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
+                it.get(0, 0, ((DataBufferByte)out.getRaster().getDataBuffer()).getData());
                 return out;
             }
         } else
@@ -315,7 +312,7 @@ public class Utils {
 
         out = new BufferedImage(in.cols(), in.rows(), BufferedImage.TYPE_BYTE_INDEXED, colorModel);
 
-        out.getRaster().setDataElements(0, 0, in.cols(), in.rows(), CvRaster.copyToPrimitiveArray(in));
+        out.getRaster().setDataElements(0, 0, in.cols(), in.rows(), copyToPrimitiveArray(in));
         return out;
     }
 
@@ -365,79 +362,89 @@ public class Utils {
      * @param numCols limit the number of columns to the given number. Supply -1 for
      *     the all columns.
      */
-//    public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
-//        CvMat.rasterAp(mat, raster -> dump(raster, out, 0, numRows, 0, numCols));
-//    }
-//
+    public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
+        CvMat.rasterAp(mat, raster -> dump(raster, out, 0, numRows, 0, numCols));
+    }
+
     public static void dump(final Mat mat, final PrintStream out, final int startRow, final int numRows, final int startCol, final int numCols) {
         CvMat.rasterAp(mat, raster -> dump(raster, out, startRow, numRows, startCol, numCols));
     }
 
-    /**
-     * Many deep learning models have a fixed size input and so there's a requirement for
-     * <em>letterboxing</em> the input image to the network size. That is, scale the input
-     * image to the network input dimensions while preserving the aspect ratio and filling
-     * in the border with a given pixel value.
-     */
-    public static CvMat letterbox(final Mat mat, final Size networkDim) {
-        return letterbox(mat, networkDim, DEFAULT_PADDING);
-    }
+    public static record LetterboxDetails(CvMat mat, double scale, int width, int height, int topPadding, int bottomPadding, int leftPadding, int rightPadding)
+        implements QuietCloseable {
 
-    /**
-     * Many deep learning models have a fixed size input and so there's a requirement for
-     * <em>letterboxing</em> the input image to the network size. That is, scale the input
-     * image to the network input dimensions while preserving the aspect ratio and filling
-     * in the border with a given pixel value.
-     */
-    public static CvMat letterbox(final Mat mat, final int dim) {
-        return letterbox(mat, new Size(dim, dim), DEFAULT_PADDING);
-    }
-
-    /**
-     * Many deep learning models have a fixed size input and so there's a requirement for
-     * <em>letterboxing</em> the input image to the network size. That is, scale the input
-     * image to the network input dimensions while preserving the aspect ratio and filling
-     * in the border with a given pixel value.
-     */
-    public static CvMat letterbox(final Mat mat, final int dim, final Scalar padding) {
-        return letterbox(mat, new Size(dim, dim), padding);
-    }
-
-    public static double averageError(Mat mat, float[] expected) {
-        System.out.println(mat);
-        int numTotalElements = (int)(mat.total() * mat.channels());
-        if (expected.length != numTotalElements)
-            throw new IllegalArgumentException("Mat size doesn't match expected size. Mat size is " + 
-               numTotalElements + " while the number of expected elements is " + expected.length);
-        
-        try (var flat = CvMat.move(mat.reshape(1, new int[] { 1, numTotalElements }));) {
-            double err = 0;
-            for (int i =0; i < numTotalElements; i++) {
-                err += Math.abs((double)expected[i] - flat.get(0, i)[0]);
-            }
-            return err / (double)numTotalElements;
+        @Override
+        public void close() {
+            if(mat != null)
+                mat.close();
         }
     }
-    
-    public static double averageError(Mat mat, double[] expected) {
+
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
+    public static LetterboxDetails letterbox(final Mat mat, final Size networkDim) {
+        return letterbox(mat, networkDim, DEFAULT_PADDING, null);
+    }
+
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
+    public static LetterboxDetails letterbox(final Mat mat, final int dim) {
+        return letterbox(mat, new Size(dim, dim), DEFAULT_PADDING, null);
+    }
+
+    /**
+     * Many deep learning models have a fixed size input and so there's a requirement for
+     * <em>letterboxing</em> the input image to the network size. That is, scale the input
+     * image to the network input dimensions while preserving the aspect ratio and filling
+     * in the border with a given pixel value.
+     */
+    public static LetterboxDetails letterbox(final Mat mat, final int dim, final Scalar padding) {
+        return letterbox(mat, new Size(dim, dim), padding, null);
+    }
+
+    public static double averageError(final Mat mat, final float[] expected) {
         System.out.println(mat);
-        int numTotalElements = (int)(mat.total() * mat.channels());
-        if (expected.length != numTotalElements)
-            throw new IllegalArgumentException("Mat size doesn't match expected size. Mat size is " + 
-               numTotalElements + " while the number of expected elements is " + expected.length);
-        
-        try (var flat = CvMat.move(mat.reshape(1, new int[] { 1, numTotalElements }));) {
+        final int numTotalElements = (int)(mat.total() * mat.channels());
+        if(expected.length != numTotalElements)
+            throw new IllegalArgumentException("Mat size doesn't match expected size. Mat size is " +
+                numTotalElements + " while the number of expected elements is " + expected.length);
+
+        try(var flat = CvMat.move(mat.reshape(1, new int[] {1,numTotalElements}));) {
             double err = 0;
-            for (int i =0; i < numTotalElements; i++) {
-                err += Math.abs((double)expected[i] - flat.get(0, i)[0]);
+            for(int i = 0; i < numTotalElements; i++) {
+                err += Math.abs(expected[i] - flat.get(0, i)[0]);
             }
-            return err / (double)numTotalElements;
+            return err / numTotalElements;
         }
     }
-    
-    public static double averageErrorFloat(Mat mat, File rawDataFile) throws IOException {
+
+    public static double averageError(final Mat mat, final double[] expected) {
+        System.out.println(mat);
+        final int numTotalElements = (int)(mat.total() * mat.channels());
+        if(expected.length != numTotalElements)
+            throw new IllegalArgumentException("Mat size doesn't match expected size. Mat size is " +
+                numTotalElements + " while the number of expected elements is " + expected.length);
+
+        try(var flat = CvMat.move(mat.reshape(1, new int[] {1,numTotalElements}));) {
+            double err = 0;
+            for(int i = 0; i < numTotalElements; i++) {
+                err += Math.abs(expected[i] - flat.get(0, i)[0]);
+            }
+            return err / numTotalElements;
+        }
+    }
+
+    public static double averageErrorFloat(final Mat mat, final File rawDataFile) throws IOException {
         final float[] expected;
-        try (var in = new FileInputStream(rawDataFile);) {
+        try(var in = new FileInputStream(rawDataFile);) {
             final ByteBuffer expectedBb = ByteBuffer.wrap(IOUtils.toByteArray(in));
             expectedBb.order(ByteOrder.LITTLE_ENDIAN);
             final FloatBuffer expectedFb = expectedBb.asFloatBuffer();
@@ -448,9 +455,9 @@ public class Utils {
         return averageError(mat, expected);
     }
 
-    public static double averageErrorDouble(Mat mat, File rawDataFile) throws IOException {
+    public static double averageErrorDouble(final Mat mat, final File rawDataFile) throws IOException {
         final double[] expected;
-        try (var in = new FileInputStream(rawDataFile);) {
+        try(var in = new FileInputStream(rawDataFile);) {
             final ByteBuffer expectedBb = ByteBuffer.wrap(IOUtils.toByteArray(in));
             expectedBb.order(ByteOrder.LITTLE_ENDIAN);
             final DoubleBuffer expectedFb = expectedBb.asDoubleBuffer();
@@ -461,15 +468,15 @@ public class Utils {
         return averageError(mat, expected);
     }
 
-    public static double averageErrorUint8(Mat mat, File rawDataFile) throws IOException {
+    public static double averageErrorUint8(final Mat mat, final File rawDataFile) throws IOException {
         final float[] expected;
-        try (var in = new FileInputStream(rawDataFile);) {
+        try(var in = new FileInputStream(rawDataFile);) {
             final ByteBuffer expectedBb = ByteBuffer.wrap(IOUtils.toByteArray(in));
             expectedBb.order(ByteOrder.LITTLE_ENDIAN);
 
             expected = new float[expectedBb.capacity()];
-            for (int i = 0; i < expected.length; i++) {
-                expected[i] = (float)(expectedBb.get() & 0xff);
+            for(int i = 0; i < expected.length; i++) {
+                expected[i] = expectedBb.get() & 0xff;
             }
         }
         return averageError(mat, expected);
@@ -481,13 +488,15 @@ public class Utils {
      * image to the network input dimensions while preserving the aspect ratio and filling
      * in the border with a given pixel value.
      */
-    public static CvMat letterbox(final Mat mat, final Size networkDim, final Scalar padding) {
+    public static LetterboxDetails letterbox(final Mat mat, final Size networkDim, final Scalar padding, final MutableDouble scaleOut) {
         // may want to return these
         final int top, bottom, left, right;
 
+        final MutableDouble scale = scaleOut == null ? new MutableDouble(-1) : scaleOut;
+
         if(!networkDim.equals(mat.size())) {
             // resize the mat
-            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, networkDim);
+            final Size toResizeTo = Utils.scaleWhilePreservingAspectRatio(mat, networkDim, scale);
             try(CvMat resized = new CvMat();
                 CvMat toUse = new CvMat();) {
                 Imgproc.resize(mat, resized, toResizeTo);
@@ -505,11 +514,11 @@ public class Utils {
                 }
 
                 Core.copyMakeBorder(resized, toUse, top, bottom, left, right, Core.BORDER_CONSTANT, padding);
-                return toUse.returnMe();
+                return new LetterboxDetails(toUse.returnMe(), scale.val, (int)networkDim.width, (int)networkDim.height, top, bottom, left, right);
             }
         } else {
             top = bottom = left = right = 0;
-            return CvMat.shallowCopy(mat);
+            return new LetterboxDetails(CvMat.shallowCopy(mat).returnMe(), scale.val, (int)networkDim.width, (int)networkDim.height, top, bottom, left, right);
         }
     }
 
@@ -517,13 +526,13 @@ public class Utils {
         final StringBuilder sb = new StringBuilder("[");
         IntStream.range(0, length - 1)
             .forEach(i -> {
-                //sb.append(Long.toHexString(valueGetter.apply(i) & mask));
+                // sb.append(Long.toHexString(valueGetter.apply(i) & mask));
                 sb.append(valueGetter.apply(i) & mask);
                 sb.append(", ");
             });
 
         if(length > 0)
-            //sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
+            // sb.append(Long.toHexString(valueGetter.apply(length - 1) & mask));
             sb.append(valueGetter.apply(length - 1) & mask);
         sb.append("]");
         return sb.toString();
@@ -571,11 +580,11 @@ public class Utils {
      *     the all columns.
      */
     @SuppressWarnings("unchecked")
-    private static void dump(final CvRaster raster, final PrintStream out, int startRow, int numRows, int startCol, int numCols) {
-        int endRow = (numRows < 0) ? (raster.rows() - 1 - startRow) : Math.min((startRow + numRows - 1), raster.rows() - 1);
-        int endCol = (numCols < 0) ? (raster.cols() - 1 - startCol) : Math.min((startCol + numCols - 1), raster.cols() - 1);
+    private static void dump(final CvRaster raster, final PrintStream out, final int startRow, final int numRows, final int startCol, final int numCols) {
+        final int endRow = (numRows < 0) ? (raster.rows() - 1 - startRow) : Math.min((startRow + numRows - 1), raster.rows() - 1);
+        final int endCol = (numCols < 0) ? (raster.cols() - 1 - startCol) : Math.min((startCol + numCols - 1), raster.cols() - 1);
 
-        out.println(raster.mat);
+        out.println(raster);
         @SuppressWarnings("rawtypes")
         final PixelConsumer pp = makePixelPrinter(out, raster.type());
         for(int r = startRow; r <= endRow; r++) {
@@ -1469,12 +1478,16 @@ public class Utils {
             : new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale));
     }
 
-    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
-        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, true);
+    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize, final MutableDouble scaleOut) {
+        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, true, scaleOut);
     }
 
-    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize, boolean round) {
-        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, round);
+    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
+        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, true, null);
+    }
+
+    public static Size scaleWhilePreservingAspectRatio(final Mat mat, final Size maxSize, final boolean round) {
+        return scaleWhilePreservingAspectRatio(mat.size(), maxSize, round, null);
     }
 
     public static double scaleFactorWhilePreservingAspectRatio(final Mat mat, final Size maxSize) {
@@ -1490,15 +1503,16 @@ public class Utils {
      */
     public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {
         // calculate the appropriate resize
-        return scaleWhilePreservingAspectRatio(originalMatSize, maxSize, true);
+        return scaleWhilePreservingAspectRatio(originalMatSize, maxSize, true, null);
     }
 
-    public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize, boolean round) {
+    public static Size scaleWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize, final boolean round, final MutableDouble scaleOut) {
         // calculate the appropriate resize
         final double scale = scaleFactorWhilePreservingAspectRatio(originalMatSize, maxSize);
-        return round ?
-                new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale)) :
-                    new Size((long)(originalMatSize.width * scale), (long)(originalMatSize.height * scale));
+        if(scaleOut != null)
+            scaleOut.val = scale;
+        return round ? new Size(Math.round(originalMatSize.width * scale), Math.round(originalMatSize.height * scale))
+            : new Size((long)(originalMatSize.width * scale), (long)(originalMatSize.height * scale));
     }
 
     public static double scaleFactorWhilePreservingAspectRatio(final Size originalMatSize, final Size maxSize) {
@@ -1506,6 +1520,50 @@ public class Utils {
         final double fh = maxSize.height / originalMatSize.height;
         final double fw = maxSize.width / originalMatSize.width;
         return Math.min(fw, fh);
+    }
+
+    /**
+     * Copy the entire image to a primitive array of the appropriate type.
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T copyToPrimitiveArray(final Mat m) {
+        final int rows = m.rows();
+        final int cols = m.cols();
+        final int type = m.type();
+        final int channels = CvType.channels(type);
+        final int depth = CvType.depth(type);
+
+        switch(depth) {
+            case CvType.CV_8S:
+            case CvType.CV_8U: {
+                final byte[] data = new byte[rows * cols * channels];
+                m.get(0, 0, data);
+                return (T)data;
+            }
+            case CvType.CV_16U:
+            case CvType.CV_16S: {
+                final short[] data = new short[rows * cols * channels];
+                m.get(0, 0, data);
+                return (T)data;
+            }
+            case CvType.CV_32S: {
+                final int[] data = new int[rows * cols * channels];
+                m.get(0, 0, data);
+                return (T)data;
+            }
+            case CvType.CV_32F: {
+                final float[] data = new float[rows * cols * channels];
+                m.get(0, 0, data);
+                return (T)data;
+            }
+            case CvType.CV_64F: {
+                final double[] data = new double[rows * cols * channels];
+                m.get(0, 0, data);
+                return (T)data;
+            }
+            default:
+                throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
+        }
     }
 
     private static Point closest(final Point x, final double perpRefX, final double perpRefY) {

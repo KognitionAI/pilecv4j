@@ -48,7 +48,7 @@ This project will provide a basis for building video processing chains meant for
 Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are several to take note of.
 
 1. [FFMpeg](https://ffmpeg.org/) which probably needs no introduction if you're on this page.
-1. [Python](https://www.python.org/). In this case you'll need the development libraries installed for Python3
+1. [Python](https://www.python.org/). In this case you'll need the development libraries installed for Python3 and also numpy installed into the python environment you'll be building in.
 
 *Note:* You shouldn't need [OpenCV](https://opencv.org/) installed since there is a pre-built [OpenCV](https://opencv.org/) bundled in a jar file that will be automatically picked up as a dependency.
 
@@ -351,7 +351,7 @@ To process a source of media data you construct a `StreamContext`, declare the s
 
 A `StreamContext` represents the coupling of an input source to a set of processing on the media streams in that source. It's also a builder for declaring the media source and that processing to be done.
 <p align="center">Fig 1.</p>
-<p align="center"><img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/Stream%20Context.png" width="500"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/Media%20Context.png" width="500"></p>
 
 A `StreamContext` is a Java *resource* so we should manage it using a *try-with-resource*
 

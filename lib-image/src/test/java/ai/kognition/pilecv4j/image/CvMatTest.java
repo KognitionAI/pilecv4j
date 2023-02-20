@@ -28,11 +28,12 @@ import org.opencv.core.Scalar;
 
 import ai.kognition.pilecv4j.image.CvRaster.FloatPixelConsumer;
 
+@SuppressWarnings("deprecation")
 public class CvMatTest {
     private static final double EPSILON = 10e-8;
 
     @Test
-    public void ones() {
+    public void onesTest() {
         final int rows = 3;
         final int cols = 4;
         try(final CvMat ones = CvMat.ones(rows, cols, CV_8UC1)) {
@@ -47,7 +48,7 @@ public class CvMatTest {
     }
 
     @Test
-    public void identity() {
+    public void identityTest() {
         final int rows = 3;
         final int cols = 4;
         try(final CvMat identity = CvMat.identity(rows, cols, CV_32FC1, new Scalar(1f))) {

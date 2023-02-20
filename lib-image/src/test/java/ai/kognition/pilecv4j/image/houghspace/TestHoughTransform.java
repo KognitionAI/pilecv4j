@@ -40,8 +40,8 @@ import org.opencv.core.CvType;
 import org.opencv.core.Size;
 import org.opencv.imgproc.Imgproc;
 
+import ai.kognition.pilecv4j.image.Closer;
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.CvRaster.Closer;
 import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.Operations;
 import ai.kognition.pilecv4j.image.Operations.GradientImages;
