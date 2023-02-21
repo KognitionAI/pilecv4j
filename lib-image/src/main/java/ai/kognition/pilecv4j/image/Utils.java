@@ -56,6 +56,8 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.DoubleBuffer;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -81,15 +83,9 @@ import net.dempsy.util.MutableDouble;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.image.CvRaster.BytePixelConsumer;
-import ai.kognition.pilecv4j.image.CvRaster.BytePixelSetter;
-import ai.kognition.pilecv4j.image.CvRaster.DoublePixelConsumer;
-import ai.kognition.pilecv4j.image.CvRaster.DoublePixelSetter;
-import ai.kognition.pilecv4j.image.CvRaster.FlatDoublePixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.FlatFloatPixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.FloatPixelConsumer;
-import ai.kognition.pilecv4j.image.CvRaster.FloatPixelSetter;
 import ai.kognition.pilecv4j.image.CvRaster.IntPixelConsumer;
-import ai.kognition.pilecv4j.image.CvRaster.PixelConsumer;
 import ai.kognition.pilecv4j.image.CvRaster.ShortPixelConsumer;
 import ai.kognition.pilecv4j.image.geometry.PerpendicularLine;
 import ai.kognition.pilecv4j.image.geometry.Point;
@@ -363,11 +359,7 @@ public class Utils {
      *     the all columns.
      */
     public static void dump(final Mat mat, final PrintStream out, final int numRows, final int numCols) {
-        CvMat.rasterAp(mat, raster -> dump(raster, out, 0, numRows, 0, numCols));
-    }
-
-    public static void dump(final Mat mat, final PrintStream out, final int startRow, final int numRows, final int startCol, final int numCols) {
-        CvMat.rasterAp(mat, raster -> dump(raster, out, startRow, numRows, startCol, numCols));
+        dump(mat, out, 0, numRows, 0, numCols);
     }
 
     public static record LetterboxDetails(CvMat mat, double scale, int width, int height, int topPadding, int bottomPadding, int leftPadding, int rightPadding)
@@ -538,23 +530,59 @@ public class Utils {
         return sb.toString();
     }
 
-    private static PixelConsumer<?> makePixelPrinter(final PrintStream stream, final int type) {
+    private static interface PixelPrinter {
+        void print(int pixelPos);
+    }
+
+    private static PixelPrinter makePixelPrinter(final PrintStream stream, final int type, final ByteBuffer bb) {
+        final int channels = CvType.channels(type);
         switch(CvType.depth(type)) {
             case CvType.CV_8S:
-            case CvType.CV_8U:
-                return (BytePixelConsumer)(final int r, final int c, final byte[] pixel) -> stream
-                    .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffL));
+            case CvType.CV_8U: {
+                final byte[] pixelBuf = new byte[channels];
+
+                return pixelPos -> {
+                    bb.get(pixelPos * channels, pixelBuf);
+                    stream.print(arrayToHexString(i -> (long)pixelBuf[i], pixelBuf.length, 0xffL));
+                };
+            }
             case CvType.CV_16S:
-            case CvType.CV_16U:
-                return (ShortPixelConsumer)(final int r, final int c, final short[] pixel) -> stream
-                    .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffL));
-            case CvType.CV_32S:
-                return (IntPixelConsumer)(final int r, final int c, final int[] pixel) -> stream
-                    .print(arrayToHexString(i -> (long)pixel[i], pixel.length, 0xffffffffL));
-            case CvType.CV_32F:
-                return (FloatPixelConsumer)(final int r, final int c, final float[] pixel) -> stream.print(Arrays.toString(pixel));
-            case CvType.CV_64F:
-                return (DoublePixelConsumer)(final int r, final int c, final double[] pixel) -> stream.print(Arrays.toString(pixel));
+            case CvType.CV_16U: {
+                final short[] pixelBuf = new short[channels];
+                final ShortBuffer buf = bb.asShortBuffer();
+
+                return pixelPos -> {
+                    buf.get(pixelPos * channels, pixelBuf);
+                    stream.print(arrayToHexString(i -> (long)pixelBuf[i], pixelBuf.length, 0xffffL));
+                };
+            }
+            case CvType.CV_32S: {
+                final int[] pixelBuf = new int[channels];
+                final IntBuffer buf = bb.asIntBuffer();
+
+                return pixelPos -> {
+                    buf.get(pixelPos * channels, pixelBuf);
+                    stream.print(arrayToHexString(i -> (long)pixelBuf[i], pixelBuf.length, 0xffffffffL));
+                };
+            }
+            case CvType.CV_32F: {
+                final float[] pixelBuf = new float[channels];
+                final FloatBuffer buf = bb.asFloatBuffer();
+
+                return pixelPos -> {
+                    buf.get(pixelPos * channels, pixelBuf);
+                    stream.print(Arrays.toString(pixelBuf));
+                };
+            }
+            case CvType.CV_64F: {
+                final double[] pixelBuf = new double[channels];
+                final DoubleBuffer buf = bb.asDoubleBuffer();
+
+                return pixelPos -> {
+                    buf.get(pixelPos * channels, pixelBuf);
+                    stream.print(Arrays.toString(pixelBuf));
+                };
+            }
             default:
                 throw new IllegalArgumentException("Can't handle CvType with value " + CvType.typeToString(type));
         }
@@ -579,25 +607,26 @@ public class Utils {
      * @param numCols limit the number of columns to the given number. Supply -1 for
      *     the all columns.
      */
-    @SuppressWarnings("unchecked")
-    private static void dump(final CvRaster raster, final PrintStream out, final int startRow, final int numRows, final int startCol, final int numCols) {
+    private static void dump(final Mat raster, final PrintStream out, final int startRow, final int numRows, final int startCol, final int numCols) {
         final int endRow = (numRows < 0) ? (raster.rows() - 1 - startRow) : Math.min((startRow + numRows - 1), raster.rows() - 1);
         final int endCol = (numCols < 0) ? (raster.cols() - 1 - startCol) : Math.min((startCol + numCols - 1), raster.cols() - 1);
 
+        final int numColsInImage = raster.cols();
         out.println(raster);
-        @SuppressWarnings("rawtypes")
-        final PixelConsumer pp = makePixelPrinter(out, raster.type());
-        for(int r = startRow; r <= endRow; r++) {
-            out.print("[");
-            for(int c = startCol; c < endCol; c++) {
+        CvMat.bulkAccess(raster, bb -> {
+            final PixelPrinter pp = makePixelPrinter(out, raster.type(), bb);
+            for(int r = startRow; r <= endRow; r++) {
+                out.print("[");
+                for(int c = startCol; c < endCol; c++) {
+                    out.print(" ");
+                    pp.print(r * numColsInImage + c);
+                    out.print(",");
+                }
                 out.print(" ");
-                pp.accept(r, c, raster.get(r, c));
-                out.print(",");
+                pp.print(r * numColsInImage + endCol);
+                out.println("]");
             }
-            out.print(" ");
-            pp.accept(r, endCol, raster.get(r, endCol));
-            out.println("]");
-        }
+        });
     }
 
     private static int[] determineShifts(final int[] masks) {
@@ -704,17 +733,24 @@ public class Utils {
         final int[] shifty = hasAlpha ? new int[] {16,8,0,24} : new int[] {16,8,0};
         try(CvMat ret = new CvMat(bufferedImage.getHeight(), bufferedImage.getWidth(), hasAlpha ? CvType.CV_8UC4 : CvType.CV_8UC3);) {
             final byte[] tmpPixel = new byte[hasAlpha ? 4 : 3];
-            ret.rasterAp(r -> {
-                r.apply((BytePixelSetter)(row, col) -> {
-                    final int color = bufferedImage.getRGB(col, row);
 
-                    tmpPixel[2] = (byte)((color >> shifty[0]) & 0xff);
-                    tmpPixel[1] = (byte)((color >> shifty[1]) & 0xff);
-                    tmpPixel[0] = (byte)((color >> shifty[2]) & 0xff);
-                    if(hasAlpha)
-                        tmpPixel[3] = (byte)((color >> shifty[3]) & 0xff);
-                    return tmpPixel;
-                });
+            final int oirows = ret.rows();
+            final int oicols = ret.cols();
+            ret.bulkAccess(bb -> {
+                int pos = 0;
+                for(int r = 0; r < oirows; r++) {
+                    for(int c = 0; c < oicols; c++) {
+                        final int color = bufferedImage.getRGB(c, r);
+
+                        tmpPixel[2] = (byte)((color >> shifty[0]) & 0xff);
+                        tmpPixel[1] = (byte)((color >> shifty[1]) & 0xff);
+                        tmpPixel[0] = (byte)((color >> shifty[2]) & 0xff);
+                        if(hasAlpha)
+                            tmpPixel[3] = (byte)((color >> shifty[3]) & 0xff);
+                        bb.put(pos * tmpPixel.length, tmpPixel);
+                        pos++;
+                    }
+                }
             });
 
             return ret.returnMe();
@@ -1416,7 +1452,10 @@ public class Utils {
     public static CvMat toMat(final double[] a, final boolean row) {
         final int len = a.length;
         try(final CvMat ret = new CvMat(row ? 1 : len, row ? len : 1, CvType.CV_64FC1);) {
-            ret.rasterAp(raster -> raster.apply((FlatDoublePixelSetter)i -> new double[] {a[i]}));
+            ret.bulkAccess(bb -> {
+                final DoubleBuffer buffer = bb.asDoubleBuffer();
+                buffer.put(a);
+            });
             return ret.returnMe();
         }
     }
@@ -1426,7 +1465,11 @@ public class Utils {
         final int cols = a[0].length;
 
         try(final CvMat ret = new CvMat(rows, cols, CvType.CV_64FC1);) {
-            ret.rasterAp(raster -> raster.apply((DoublePixelSetter)(r, c) -> new double[] {a[r][c]}));
+            ret.bulkAccess(bb -> {
+                final DoubleBuffer buffer = bb.asDoubleBuffer();
+                for(int r = 0; r < rows; r++)
+                    buffer.put(a[r]);
+            });
             return ret.returnMe();
         }
     }
@@ -1436,7 +1479,11 @@ public class Utils {
         final int cols = a[0].length;
 
         try(final CvMat ret = new CvMat(rows, cols, CvType.CV_32FC1);) {
-            ret.rasterAp(raster -> raster.apply((FloatPixelSetter)(r, c) -> new float[] {a[r][c]}));
+            ret.bulkAccess(bb -> {
+                final FloatBuffer buffer = bb.asFloatBuffer();
+                for(int r = 0; r < rows; r++)
+                    buffer.put(a[r]);
+            });
             return ret.returnMe();
         }
     }

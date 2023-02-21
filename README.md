@@ -28,7 +28,7 @@ This project contains several tools for creating image and video processing appl
     - [Miscellaneous](#miscellaneous)
 - [Video Processing](#video-processing)
   - [Reading And Processing Media](#reading-and-processing-media)
-    - [The Stream Context](#the-stream-context)
+    - [The Media Context](#the-media-context)
     - [Defining The Source of Media Data](#defining-the-source-of-media-data)
     - [Adding Stream Processing](#adding-stream-processing)
   - [Encoding Video](#encoding-video)
@@ -68,7 +68,7 @@ Here is a simple example to get started. We'll write java code that plays a vide
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>lib-ffmpeg</artifactId>
-      <version>0.17</version>
+      <version>1.0</version>
     </dependency>
 ```
 
@@ -79,11 +79,11 @@ You'll also need the platform specific native libraries. For linux you can use:
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>native-ffmpeg-${platform}</artifactId>
       <classifier>bin</classifier>
-      <version>0.17</version>
+      <version>1.0</version>
     </dependency>
 ```
 
-The currently supported `platform` values include: `linux-x86_64` and `windows-x86_64`
+The currently supported `platform` values include: `linux-x86_64` , `windows-x86_64` and `aarch64`
 
 We'll need a video file to work with. If you need one you can use the `.mp4` from here: https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/small_bunny_1080p_60fps.mp4
 
@@ -93,49 +93,37 @@ For the purposes of this example we'll assume there's a video file at `/tmp/test
 
 
 ``` java
-// Most components are java resources (Closeables)
-try(
+        // Most components are java resources (AutoCloseables)
+        try(
 
-    // We will create an ImageDisplay in order to show the frames from the video
-    ImageDisplay window = new ImageDisplay.Builder().windowName("Tutorial 1").build();
+            // We will create an ImageDisplay in order to show the frames from the video
+            ImageDisplay window = new ImageDisplay.Builder()
+                .windowName("Tutorial 1")
+                .build();
 
-    // Create a StreamContext using Ffmpeg2. StreamContexts represent
-    // a source of media data and a set of processing to be done on that data.
-    final StreamContext sctx = Ffmpeg2.createStreamContext()
+            // create a StreamContext using Ffmpeg2. StreamContexts represent
+            // a source of media data and a set of processing to be done on that data.
+            final MediaContext sctx = Ffmpeg.createMediaContext(TEST_VIDEO)
 
-        // Create a media data source for the StreamContext. In this case the source
-        // of media data will be our file.
-        .createMediaDataSource("file:///tmp/test-video.mp4")
+                // We are simply going to pick the first video stream from the file.
+                .selectFirstVideoStream()
 
-        // We need to open a processing chain. A processing chain is a
-        // grouping of a stream selector, with a series of media stream
-        // processors.
-        .openChain("my chain")
+                // Then we can add a processor. In this case we want the system to call us
+                // with each subsequent frame as an OpenCV Mat.
+                .processVideoFrames(videoFrame -> {
 
-        // We are simply going to pick the first video stream from the file.
-        .createFirstVideoStreamSelector()
+                    // we want to display each frame. PileCV4J extends the OpenCV Mat functionality
+                    // for better native resource/memory management. So we can use a try-with-resource.
+                    try(CvMat mat = videoFrame.bgr(false);) { // Note, we want to make sure the Mat is BGR
+                        // Display the image.
+                        window.update(mat);
+                    }
 
-        // Then we can add a processor. In this case we want the system to call us
-        // with each subsequent frame as an OpenCV Mat.
-        .createVideoFrameProcessor(videoFrame -> {
+                })
+                // play the media stream.
+                .play();
 
-            // We want to display each frame. PileCV4J extends the OpenCV Mat functionality
-            // for better native resource/memory management. So we can use a try-with-resource.
-            try(CvMat mat = videoFrame.bgr(false);) { // Note, we want to make sure the Mat is BGR
-                // Display the image.
-                window.update(mat);
-            }
-
-        })
-
-        // We need the resulting streaming context returned.
-        .streamContext();
-
-) {
-
-    // play the media stream.
-    sctx.play();
-}
+        ) {}
 ```
 
 # Project Overview
@@ -243,8 +231,7 @@ The cleanest way work with the raw `ByteBuffer` of pixel data is to use the `CvM
 
 ``` java
     CvMat mat = ....;
-    mat.rasterAp(raster -> {
-        ByteBuffer pixelData = raster->underlying();
+    CvMat.bulkAccess(mat, (ByteByffer pixelData) -> {
         // do something with/to the pixel data
         ...
     });
@@ -345,18 +332,18 @@ There's a custom `MJPEGWriter` which can take a series of JPG images and dump th
 
 ## Reading And Processing Media
 
-### The Stream Context
+### The Media Context
 
-To process a source of media data you construct a `StreamContext`, declare the source of media data, and define a set of processing chains to process the media.
+To process a source of media data you construct a `MediaContext`, declare the source of media data, and define a set of processing chains to process the media.
 
-A `StreamContext` represents the coupling of an input source to a set of processing on the media streams in that source. It's also a builder for declaring the media source and that processing to be done.
+A `MediaContext` represents the coupling of an input source to a set of processing on the media streams in that source. It's also a builder for declaring the media source and that processing to be done.
 <p align="center">Fig 1.</p>
 <p align="center"><img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/Media%20Context.png" width="500"></p>
 
 A `StreamContext` is a Java *resource* so we should manage it using a *try-with-resource*
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
+    try (final MediaContext mctx = Ffmpeg.createMediaContext()
     ...
 ```
 
@@ -367,8 +354,8 @@ A `StreamContext` needs exactly one source of media data. There are two supporte
 The first is a simple URI based data source which is defined through `StreamContext.createMediaDataSource(String)`. This is the same as the `-i` option passed to the `ffmpeg` command line.
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source("[media uri]")
         ...
 ```
 
@@ -377,8 +364,8 @@ The second type of media data source is a custom data source, where you can supp
 You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaDataSeek` callback. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream. You pass these callbacks to `StreamContext.createMediaDataSource(MediaDataSupplier[, MediaDataSeek])`.
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource( (ByteBuffer buf, int numBytes) -> {
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source( (ByteBuffer buf, int numBytes) -> {
             // you need to respond to this callback by filling the byte buffer with *up to*
             // the `numBytes` requested
             ...
@@ -392,7 +379,7 @@ You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaD
 If the underlying source of data is seekable, you can also supply an implementation of `MediaDataSeek`.
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
+    try (final StreamContext sctx = Ffmpeg.createStreamContext()
         .createMediaDataSource( 
             // MediaDataSupplier
             (ByteBuffer buf, int numBytes) -> {...},
@@ -406,7 +393,7 @@ If the underlying source of data is seekable, you can also supply an implementat
         ...
 ```
 
-The values for `whence` that will be passed to the callback will be either `Ffmpeg2.SEEK_SET`, `Ffmpeg2.SEEK_CUR`, or `Ffmpeg2.SEEK_END`. These values are synonymous with the C language stdio parameters to the function [fseek()](https://man7.org/linux/man-pages/man3/fseek.3.html). From the man page:
+The values for `whence` that will be passed to the callback will be either `Ffmpeg.SEEK_SET`, `Ffmpeg.SEEK_CUR`, or `Ffmpeg.SEEK_END`. These values are synonymous with the C language stdio parameters to the function [fseek()](https://man7.org/linux/man-pages/man3/fseek.3.html). From the man page:
 
 > The [...] function sets the [...] position indicator for the
 > stream [...].  The new position, measured in bytes, is obtained
@@ -420,55 +407,55 @@ The values for `whence` that will be passed to the callback will be either `Ffmp
 To process media data you need to add at least one `MediaProcessingChain` using the `openChain(String)` on the `StreamContext`. 
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
-        .openChain("default")
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source("[media uri]")
+        .chain("default")
         ...
 ```
 
-The string passed to `openChain` can be anything you want and is simply for disambiguation later on. You can re-open any given chain by passing the same string to the `openChain` call again.
+The string passed to `chain` can be anything you want and is simply for disambiguation later on. You can re-open any given chain by passing the same string to the `chain` call again.
 
-A `MediaProcessingChain` contains at most one `StreamSelector` and one or more `MediaProcessor`s. 
+A `MediaProcessingChain` contains at zero or more `PacketFilter`s and one or more `MediaProcessor`s. 
 
-Since sources for media data, for example, an MP4 file, contain multiple streams (video streams, audio streams, subtitle streams, data streams). A `StreamSelector` sets up a simple filter that determines which streams are going to be processed in this `MediaProcessingChain`. A `StreamSelector` is added to a `MediaProcessingChain` by calling one of the `create*StreamSelector(...)` methods.
+Since sources for media data, for example, an MP4 file, contain multiple streams (video streams, audio streams, subtitle streams, data streams). A series of `PacketFilter`s determines which packets from which streams are going to be processed in this `MediaProcessingChain`. 
 
-The simplest stream selector currently available is one that will simply take the first decodable video stream in the source. To use this selector in your chain you call `createFirstVideoStreamSelector()` on an open chain:
+The simplest packet filter currently available is one that will simply take the first decodable video stream in the source and pass all of those packets. To use this selector in your chain you call `selectFirstVideoStream()` on an open chain:
 
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
-        .openChain("default")
-        .createFirstVideoStreamSelector()
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source("[media uri]")
+        .chain("default")
+        .selectFirstVideoStream()
         ...
 ```
 
-You can supply a more sophisticated selection criteria by supplying a callback that will be passed the details of each stream and needs to return `true` if the stream is to be processed; `false` otherwise.
+You can supply a more sophisticated packet filtering criteria by supplying a callback that will be passed the details of each stream and needs to return `true` if the stream is to be processed; `false` otherwise.
 
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
-        .openChain("default")
-        .createStreamSelector((StreamDetails[] details, boolean[] selection) -> {
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source("[media uri]")
+        .chain("default")
+        .selectStreams((StreamDetails[] details, boolean[] selection) -> {
            // use the stream details and fill out the selection array with `true`
            // where you want to process the coresponding stream
         })
         ...
 ```
 
-If you don't supply a `StreamSelector` then all packets from all streams in the media source will be selected.
+If you don't supply a `PacketFilter` then all packets from all streams in the media source will be passed on to the processors.
 
 Finally we need to decide what we want to do with the media data that's been selected in this chain. We do that by adding a set of (at least one) `MediaProcessor`s to the chain. There are currently two different processor types that can be added to a chain. 
 
 The first is a remuxer that will remux the selected input stream to a given output destination.
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
-        .openChain("default")
-        .createFirstVideoStreamSelector()
-        .createUriRemuxer(DESTINATION_URI)
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source("[media uri]")
+        .chain("default")
+        .selectFirstVideoStream()
+        .remux(DESTINATION_URI)
         ...
 ```
 
@@ -476,18 +463,18 @@ where the `DESTINATION_URI` is a string pointing to any output supported by ffmp
 
 ``` java
        ...
-       .createUriRemuxer("flv", "rtmp://myhost:1935/live...")
+       .remux("flv", "rtmp://myhost:1935/live...")
        ...
 ```
 
 The second type of `MediaProcessor` provides access to video frames from the selected video feeds. You supply a callback that will be given `VideoFrame`s.
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
-        .openChain("default")
-        .createFirstVideoStreamSelector()
-        .createVideoFrameProcessor((VideoFrame frame) -> {
+    try (final MediaContext sctx = Ffmpeg.createMediaContext()
+        .source("[media uri]")
+        .chain("default")
+        .selectFirstVideoStream()
+        .processVideoFrames((VideoFrame frame) -> {
            // do something with the video frame
         })
         ...
@@ -497,7 +484,7 @@ A `VideoFrame` is a `CvMat` and so is also an OpenCV `Mat` and therefore can be 
 
 ``` java
     ...
-    .createVideoFrameProcessor((VideoFrame frame) -> {
+    .processVideoFrames((VideoFrame frame) -> {
         try (CvMat bgrMat = frame.bgr(false);) {
             // do something with the BGR mat
         }
@@ -508,19 +495,19 @@ A `VideoFrame` is a `CvMat` and so is also an OpenCV `Mat` and therefore can be 
 Once the chain is defined with at most one `StreamSelector` and at least one `MediaProcessor`, you need to return the original `StreamContext` which effectively closes the chain's setup.
 
 ``` java
-    try (final StreamContext sctx = Ffmpeg2.createStreamContext()
-        .createMediaDataSource("[media uri]")
-        .openChain("default")
-        .createFirstVideoStreamSelector()
-        .createVideoFrameProcessor((VideoFrame frame) -> { ... })
-        .streamContext()
+    try (final MediaContext sctx = Ffmpeg2.createMediaContext()
+        .source("[media uri]")
+        .chain("default")
+        .selectFirstVideoStream()
+        .processVideoFrames((VideoFrame frame) -> { ... })
+        .mediaContext()
         ....); {
     }
 ```
 
 You can define additional chains if you want.
 
-Ultimately you'll need to start the processing by calling `play()` on the configured `StreamContext`. The [Short Example](#short-example) puts it all together.
+Ultimately you'll need to start the processing by calling `play()` on the configured `MediaContext`. The [Short Example](#short-example) puts it all together.
 
 ## Encoding Video
 
@@ -529,14 +516,14 @@ Ultimately you'll need to start the processing by calling `play()` on the config
 You can also you the library to encode videos and video streams. The first thing you need to do is define an `EncodingContext`. As with the `StreamContext` the `EncodingContext` is a Java resource and therefore should be managed with a *try-with-resource*
 
 ``` java
-    try (final EncodingContext ectx = Ffmpeg2.createEncoder()
+    try (final EncodingContext ectx = Ffmpeg.createEncoder()
     ...
 ```
 
 First you need to define where the media data is going. You do this using the `muxer` method.
 
 ``` java
-    try (final EncodingContext ectx = Ffmpeg2.createEncoder()
+    try (final EncodingContext ectx = Ffmpeg.createEncoder()
         .muxer(OUTPUT_FILE_OR_STREAM_URI)
         ...
 ```
@@ -556,7 +543,7 @@ You need to select at least one encoder to add to the context. You can do that w
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
         .muxer(OUTPUT_FILE_OR_STREAM_URI)
-        .openVideoEncoder("libx264", "my encoder")
+        .videoEncoder("libx264", "my encoder")
         ...
 ```
 
@@ -564,7 +551,7 @@ The first parameter is the name of an FFMpeg support encoder. The second paramet
 
 ``` java
         ...
-        .openVideoEncoder("libx264")
+        .videoEncoder("libx264")
         ...
 ```
 
@@ -573,7 +560,7 @@ You can fine tune the parameters for the codec using `addCodecOption`. You can a
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
         .muxer(OUTPUT_FILE_OR_STREAM_URI)
-        .openVideoEncoder("libx264")
+        .videoEncoder("libx264")
         .addCodecOptions("preset","slow")
         .addCodecOptions("crf", "40")
         ...
@@ -584,7 +571,7 @@ You should set the encoder's frame rate explicitly using `setFps`. If you don't 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
         .muxer(OUTPUT_FILE_OR_STREAM_URI)
-        .openVideoEncoder("libx264")
+        .videoEncoder("libx264")
         .setFps(10)
         ...
 ```
@@ -620,9 +607,9 @@ After that you can start sending frames to the encoder using the `encode()` meth
 
 ``` java
     Mat firstFrame = ...;
-    try (final EncodingContext ectx = Ffmpeg2.createEncoder()
+    try (final EncodingContext ectx = Ffmpeg.createEncoder()
         .muxer(OUTPUT_FILE_OR_STREAM_URI)
-        .openVideoEncoder("libx264", "my encoder")
+        .videoEncoder("libx264", "my encoder")
         .addCodecOptions("preset","slow")
         .addCodecOptions("crf", "40")
         .setFps(10)
