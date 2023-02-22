@@ -8,7 +8,6 @@ This project contains several tools for creating image and video processing appl
 - [Introduction](#introduction)
 - [Prerequisites](#prerequisites)
 - [Jumping Right In](#jumping-right-in)
-  - [Quick Start Video Tutorial](#quick-start-video-tutorial)
   - [Short Example](#short-example)
 - [Project Overview](#project-overview)
   - [lib-image](#lib-image)
@@ -53,12 +52,6 @@ Most dependencies will be picked up automatically from [maven central](https://w
 *Note:* You shouldn't need [OpenCV](https://opencv.org/) installed since there is a pre-built [OpenCV](https://opencv.org/) bundled in a jar file that will be automatically picked up as a dependency.
 
 # Jumping Right In
-
-## Quick Start Video Tutorial
-
-A video Quick Start Tutorial can be found here:
-
-[![PileCV4J Quick Start Tutorial Video](https://img.youtube.com/vi/8mfDk9NLp6w/0.jpg)](https://www.youtube.com/watch?v=8mfDk9NLp6w)
 
 ## Short Example
 
@@ -231,7 +224,7 @@ The cleanest way work with the raw `ByteBuffer` of pixel data is to use the `CvM
 
 ``` java
     CvMat mat = ....;
-    CvMat.bulkAccess(mat, (ByteByffer pixelData) -> {
+    CvMat.bulkAccess(mat, (ByteBuffer pixelData) -> {
         // do something with/to the pixel data
         ...
     });
@@ -340,7 +333,7 @@ A `MediaContext` represents the coupling of an input source to a set of processi
 <p align="center">Fig 1.</p>
 <p align="center"><img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/Media%20Context.png" width="500"></p>
 
-A `StreamContext` is a Java *resource* so we should manage it using a *try-with-resource*
+A `MediaContext` is a Java *resource* so we should manage it using a *try-with-resource*
 
 ``` java
     try (final MediaContext mctx = Ffmpeg.createMediaContext()
@@ -349,9 +342,9 @@ A `StreamContext` is a Java *resource* so we should manage it using a *try-with-
 
 ### Defining The Source of Media Data
 
-A `StreamContext` needs exactly one source of media data. There are two supported types of media data sources.
+A `MediaContext` needs exactly one source of media data. There are two supported types of media data sources.
 
-The first is a simple URI based data source which is defined through `StreamContext.createMediaDataSource(String)`. This is the same as the `-i` option passed to the `ffmpeg` command line.
+The first is a simple URI based data source which is defined through `MediaContext.source(String)`. This is the same as the `-i` option passed to the `ffmpeg` command line.
 
 ``` java
     try (final MediaContext sctx = Ffmpeg.createMediaContext()
@@ -359,9 +352,16 @@ The first is a simple URI based data source which is defined through `StreamCont
         ...
 ```
 
+Note, in the simple example, there is a convenience method that will allow this to be done in one step, but under the covers you're creating `MediaContext` and adding a media source.
+
+``` java
+    try (final MediaContext sctx = Ffmpeg.createMediaContext("[media uri]")
+        ...
+```
+
 The second type of media data source is a custom data source, where you can supply raw media stream data dynamically. Using this source of media data you could, for example, play an MP4 file out of system memory. 
 
-You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaDataSeek` callback. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream. You pass these callbacks to `StreamContext.createMediaDataSource(MediaDataSupplier[, MediaDataSeek])`.
+You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaDataSeek` callback. These will be called by the system in order to fetch more data or, when a `MediaDataSeek` is supplied, move around the current position in the stream. 
 
 ``` java
     try (final MediaContext sctx = Ffmpeg.createMediaContext()
@@ -375,6 +375,8 @@ You do this by supplying a `MediaDataSupplier` callback and optionally a `MediaD
         ...
 
 ```
+
+Again, there is a convenience method that allows you to pass these directly to `MediaContext.createMediaContext(...)`.
 
 If the underlying source of data is seekable, you can also supply an implementation of `MediaDataSeek`.
 
@@ -404,7 +406,7 @@ The values for `whence` that will be passed to the callback will be either `Ffmp
 
 ### Adding Stream Processing
 
-To process media data you need to add at least one `MediaProcessingChain` using the `openChain(String)` on the `StreamContext`. 
+To process media data you need to add at least one `MediaProcessingChain` using the `chain(String)` on the `MediaContext`. 
 
 ``` java
     try (final MediaContext sctx = Ffmpeg.createMediaContext()
@@ -415,7 +417,7 @@ To process media data you need to add at least one `MediaProcessingChain` using 
 
 The string passed to `chain` can be anything you want and is simply for disambiguation later on. You can re-open any given chain by passing the same string to the `chain` call again.
 
-A `MediaProcessingChain` contains at zero or more `PacketFilter`s and one or more `MediaProcessor`s. 
+A `MediaProcessingChain` contains zero or more `PacketFilter`s and one or more `MediaProcessor`s. 
 
 Since sources for media data, for example, an MP4 file, contain multiple streams (video streams, audio streams, subtitle streams, data streams). A series of `PacketFilter`s determines which packets from which streams are going to be processed in this `MediaProcessingChain`. 
 
@@ -455,7 +457,7 @@ The first is a remuxer that will remux the selected input stream to a given outp
         .source("[media uri]")
         .chain("default")
         .selectFirstVideoStream()
-        .remux(DESTINATION_URI)
+        .remux(Muxer.create(DESTINATION_URI))
         ...
 ```
 
@@ -463,7 +465,7 @@ where the `DESTINATION_URI` is a string pointing to any output supported by ffmp
 
 ``` java
        ...
-       .remux("flv", "rtmp://myhost:1935/live...")
+       .remux(Muxer.create("flv", "rtmp://myhost:1935/live..."))
        ...
 ```
 
@@ -492,7 +494,7 @@ A `VideoFrame` is a `CvMat` and so is also an OpenCV `Mat` and therefore can be 
     ...
 ```
 
-Once the chain is defined with at most one `StreamSelector` and at least one `MediaProcessor`, you need to return the original `StreamContext` which effectively closes the chain's setup.
+Once the chain is defined with at most one `MediaContext` and at least one `MediaProcessor`, you need to return the original `StreamContext` which effectively closes the chain's setup.
 
 ``` java
     try (final MediaContext sctx = Ffmpeg2.createMediaContext()
@@ -513,7 +515,7 @@ Ultimately you'll need to start the processing by calling `play()` on the config
 
 ### Defining The Destination For The Encoded Streams
 
-You can also you the library to encode videos and video streams. The first thing you need to do is define an `EncodingContext`. As with the `StreamContext` the `EncodingContext` is a Java resource and therefore should be managed with a *try-with-resource*
+You can also you the library to encode videos and video streams. The first thing you need to do is define an `EncodingContext`. As with the `MediaContext` the `EncodingContext` is a Java resource and therefore should be managed with a *try-with-resource*
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg.createEncoder()
@@ -524,7 +526,7 @@ First you need to define where the media data is going. You do this using the `m
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg.createEncoder()
-        .muxer(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(Muxer.create(OUTPUT_FILE_OR_STREAM_URI))
         ...
 ```
 
@@ -532,7 +534,7 @@ You can also explicitly define the format. This is often necessary for streaming
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .muxer("flv", "rtmp://myhost:1935/live...")
+        .muxer(Muxer.create("flv", "rtmp://myhost:1935/live..."))
         ...
 ```
 
@@ -542,7 +544,7 @@ You need to select at least one encoder to add to the context. You can do that w
 
 ``` java
     try (final EncodingContext ectx = Ffmpeg2.createEncoder()
-        .muxer(OUTPUT_FILE_OR_STREAM_URI)
+        .muxer(Muxer.create(OUTPUT_FILE_OR_STREAM_URI))
         .videoEncoder("libx264", "my encoder")
         ...
 ```
