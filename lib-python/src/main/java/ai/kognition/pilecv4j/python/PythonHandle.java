@@ -52,6 +52,8 @@ import ai.kognition.pilecv4j.python.internal.PythonAPI.get_image_source;
 
 public class PythonHandle implements QuietCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(PythonHandle.class);
+    private static final Object pythonExpandedLock = new Object();
+    private static Map<String, File> pythonIsExpanded = new HashMap<>();
 
     static {
         // find the level
@@ -74,6 +76,7 @@ public class PythonHandle implements QuietCloseable {
     }
 
     public ImageSource imageSource = null;
+
     private long nativeObj = 0L;
 
     private String currentModule;
@@ -96,18 +99,15 @@ public class PythonHandle implements QuietCloseable {
             throw new PythonException("Failed to instantiate native PyTorch instance.");
     }
 
-    private static class ParamCloser implements QuietCloseable {
-        public final long dict;
+    public String[] retrieveModelLabels() {
+        // how many labels does the model handle.
+        final int numModelLabels = numModelLabels();
 
-        ParamCloser(final long dict) {
-            this.dict = dict;
-        }
-
-        @Override
-        public void close() {
-            if(dict != 0L)
-                PythonAPI.pilecv4j_python_dict_destroy(dict);
-        }
+        // retrieve the model labels from the python side
+        final String[] labels = new String[numModelLabels];
+        for(int i = 0; i < numModelLabels; i++)
+            labels[i] = getModelLabel(i);
+        return labels;
     }
 
     public void runPythonFunction(final String module, final String function, final Map<String, Object> kwds) throws PythonException {
@@ -187,9 +187,6 @@ public class PythonHandle implements QuietCloseable {
         if(nativeObj != 0)
             PythonAPI.pilecv4j_python_kogSys_destroy(nativeObj);
     }
-
-    private static final Object pythonExpandedLock = new Object();
-    private static Map<String, File> pythonIsExpanded = new HashMap<>();
 
     public static PythonHandle initModule(final String pythonModuleUri) {
         final File pythonModulePath = unpackModule(pythonModuleUri);
@@ -308,6 +305,20 @@ public class PythonHandle implements QuietCloseable {
             return null;
         else
             return ml.getString(0);
+    }
+
+    private static class ParamCloser implements QuietCloseable {
+        public final long dict;
+
+        ParamCloser(final long dict) {
+            this.dict = dict;
+        }
+
+        @Override
+        public void close() {
+            if(dict != 0L)
+                PythonAPI.pilecv4j_python_dict_destroy(dict);
+        }
     }
 
     private static String stripTrailingSlash(final String path) {
