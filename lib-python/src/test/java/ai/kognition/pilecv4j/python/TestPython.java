@@ -17,7 +17,6 @@
 package ai.kognition.pilecv4j.python;
 
 import static ai.kognition.pilecv4j.python.UtilsForTesting.translateClasspath;
-import static net.dempsy.util.Functional.chain;
 import static net.dempsy.util.Functional.uncheck;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -26,8 +25,6 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.File;
 import java.net.URI;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -46,7 +43,10 @@ import ai.kognition.pilecv4j.python.PythonHandle.PythonResults;
 public class TestPython {
     public static final boolean SHOW;
 
-    private static final Map<String, Object> fakeParams = Map.of("int", 1, "float", 1.0, "string", "hello");
+    private static final ParamBlock fakeParams = ParamBlock.builder()
+        .arg("int", 1)
+        .arg("float", 1.0)
+        .arg("string", "hello");
 
     static {
         final String sysOpSHOW = System.getProperty("pilecv4j.SHOW");
@@ -72,24 +72,11 @@ public class TestPython {
             // add the module path
             pt.addModulePath("./src/test/resources/python");
 
-            final Map<String, Object> params = new HashMap<>();
-            params.put("kogsys", pt);
-
-            final Thread thread = chain(
-                new Thread(() -> {
-                    try {
-                        pt.runPythonFunction("testFunction", "func", params);
-                    } catch(final RuntimeException rte) {
-                        failed.set(true);
-                        rte.printStackTrace();
-                        throw rte;
-                    }
-                }, "Python Thread"),
-                t -> t.setDaemon(true),
-                t -> t.start());
+            final var res = pt.runPythonFunctionAsynch("testFunction", "func", ParamBlock.builder()
+                .arg("kogsys", pt));
 
             // wait for the script to get an image source
-            assertTrue(ConditionPoll.poll(o -> pt.sourceIsInitialized()));
+            assertTrue(ConditionPoll.poll(o -> res.sourceIsInitialized()));
 
             final long startTime = System.currentTimeMillis();
 
@@ -125,7 +112,7 @@ public class TestPython {
 
             assertFalse(failed.get());
             pt.eos(); // EOS
-            assertTrue(ConditionPoll.poll(o -> !thread.isAlive()));
+            assertTrue(ConditionPoll.poll(o -> !res.thread.isAlive()));
             assertNotNull(pt.imageSource);
             assertEquals(0L, pt.imageSource.peek());
 
@@ -146,24 +133,10 @@ public class TestPython {
 
             pt.addModulePath("./src/test/resources/python");
 
-            final Map<String, Object> params = new HashMap<>();
-            params.put("kogsys", pt);
-
-            final Thread thread = chain(
-                new Thread(() -> {
-                    try {
-                        pt.runPythonFunction("testFunction2", "func", params);
-                    } catch(final RuntimeException rte) {
-                        failed.set(true);
-                        rte.printStackTrace();
-                        throw rte;
-                    }
-                }, "Python Thread"),
-                t -> t.setDaemon(true),
-                t -> t.start());
+            final var res = pt.runPythonFunctionAsynch("testFunction2", "func", ParamBlock.builder().arg(pt));
 
             // wait for the script to get an image source
-            assertTrue(ConditionPoll.poll(o -> pt.sourceIsInitialized()));
+            assertTrue(ConditionPoll.poll(o -> res.sourceIsInitialized()));
 
             c
                 .addOption("rtsp_flags", "prefer_tcp")
@@ -185,11 +158,11 @@ public class TestPython {
                     }
                 })
                 .mediaContext()
-                .sync()
+                // .sync()
                 .play();
 
             pt.eos(); // EOS
-            assertTrue(ConditionPoll.poll(o -> !thread.isAlive()));
+            assertTrue(ConditionPoll.poll(o -> !res.thread.isAlive()));
             assertNotNull(pt.imageSource);
             assertEquals(0L, pt.imageSource.peek());
 

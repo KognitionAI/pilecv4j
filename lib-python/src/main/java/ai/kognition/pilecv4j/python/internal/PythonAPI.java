@@ -61,7 +61,7 @@ public class PythonAPI {
 
     public static native void pilecv4j_python_addModulePath(String absDir);
 
-    public static native int pilecv4j_python_runPythonFunction(String module, String function, long dictRef);
+    public static native int pilecv4j_python_runPythonFunction(String module, String function, long args, long dictRef);
 
     // ===================================================
     // KogSys lifecycle and methods
@@ -97,7 +97,24 @@ public class PythonAPI {
     public static native int pilecv4j_python_kogMatResults_isAbandoned(long nativeObj);
 
     // ==============================================================
-    // Python Dict lifecycle and methods
+    // Python Tuple lifecycle and methods
+    // ==============================================================
+    public static native long pilecv4j_python_tuple_create(int size);
+
+    public static native void pilecv4j_python_tuple_destroy(long tupleRef);
+
+    public static native int pilecv4j_python_tuple_putString(long tupleRef, int index, String valRaw);
+
+    public static native int pilecv4j_python_tuple_putInt(long tupleRef, int index, long valRaw);
+
+    public static native int pilecv4j_python_tuple_putFloat(long tupleRef, int index, double valRaw);
+
+    public static native int pilecv4j_python_tuple_putKogSys(long tupleRef, int index, long nativeObj);
+
+    public static native int pilecv4j_python_tuple_putBoolean(long tupleRef, int index, int i);
+
+    // ==============================================================
+    // Python Tuple lifecycle and methods
     // ==============================================================
     public static native long pilecv4j_python_dict_create();
 

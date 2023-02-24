@@ -8,6 +8,7 @@
 #include "KogSystem.h"
 
 #include "common/kog_exports.h"
+#include <cinttypes>
 
 int initModule_kognition();
 
@@ -15,23 +16,33 @@ static bool inited = false;
 
 using namespace pilecv4j::python;
 
-//static void dumpDict(PyObject* module) {
+//static void dumpDict(PyObject* dict) {
 //  PyObject *key, *value;
 //  Py_ssize_t pos = 0;
+//  fprintf(stderr,"Dumping dict\n");
+//  log(ERROR, "HERE1");
+//  while (PyDict_Next(dict, &pos, &key, &value)) {
+//    log(ERROR, "HERE2");
+//    PyObject_Print(key, stderr, Py_PRINT_RAW);
+//    log(ERROR, "HERE3");
+//    fprintf(stderr, " = ");
+//    log(ERROR, "HERE4");
+//    PyObject_Print(value, stderr, Py_PRINT_RAW);
+//    log(ERROR, "HERE5");
+//    fprintf(stderr, "\n=============\n");
+//    log(ERROR, "HERE6");
+//    fflush(stderr);
+//  }
+//}
 //
+//static void dumpModuleDict(PyObject* module) {
 //  fprintf(stderr,"Dumping dict for %s\n", PyModule_GetName(module));
 //  PyObject* dict = PyModule_GetDict(module);
 //  if (!dict) {
 //    log(ERROR, "Failed to get dict from module %s", PyModule_GetName(module));
 //    return;
 //  }
-//  while (PyDict_Next(dict, &pos, &key, &value)) {
-//    PyObject_Print(key, stderr, Py_PRINT_RAW);
-//    fprintf(stderr, " = ");
-//    PyObject_Print(value, stderr, Py_PRINT_RAW);
-//    fprintf(stderr, "\n=============\n");
-//    fflush(stderr);
-//  }
+//  dumpDict(dict);
 //}
 
 // this is in module.cpp
@@ -63,10 +74,15 @@ extern "C" {
     return (int32_t)OK;
   }
 
-  KAI_EXPORT int32_t pilecv4j_python_runPythonFunction(const char* moduleName, const char* functionName, uint64_t paramDictRef) {
+  KAI_EXPORT int32_t pilecv4j_python_runPythonFunction(const char* moduleName, const char* functionName, uint64_t ptupleArgs, uint64_t paramDictRef) {
     PyObject* paramDict = (PyObject*)paramDictRef;
+    PyObject* tupleArgs = (PyObject*)ptupleArgs;
     PythonEnvironment* p = PythonEnvironment::instance();
-    return p->runModel(moduleName, functionName, paramDict);
+
+//    if (isEnabled(TRACE))
+//      dumpDict(paramDict);
+
+    return p->runFunction(moduleName, functionName, tupleArgs, paramDict);
   }
 
   KAI_EXPORT void pilecv4j_python_addModulePath(const char* modPath) {
@@ -200,7 +216,7 @@ extern "C" {
     PyObject* dict = (PyObject*)dictRef;
     PyObject* val = PyLong_FromLongLong((long long)valRef);
     if (PyDict_SetItemString(dict, key, val) != 0) {
-      log(ERROR, "Failed to insert parameter (%s : %s) into dictionary", key, (valRef ? "True" : "False"));
+      log(ERROR, "Failed to insert parameter (%s : %d) into dictionary", key, (int)valRef);
       result = FAILED_TO_INSERT_INTO_DICTIONARY;
     }
     Py_DECREF(val);
@@ -213,7 +229,7 @@ extern "C" {
     PyObject* dict = (PyObject*)dictRef;
     PyObject* val = PyFloat_FromDouble((double)valRef);
     if (PyDict_SetItemString(dict, key, val) != 0) {
-      log(ERROR, "Failed to insert parameter (%s : %s) into dictionary", key, (valRef ? "True" : "False"));
+      log(ERROR, "Failed to insert parameter (%s : %f) into dictionary", key, (float)valRef);
       result = FAILED_TO_INSERT_INTO_DICTIONARY;
     }
     Py_DECREF(val);
@@ -235,24 +251,112 @@ extern "C" {
   }
 
   KAI_EXPORT int32_t pilecv4j_python_dict_putKogSys(uint64_t dictRef, const char* key, uint64_t valRef) {
+    if (isEnabled(TRACE))
+      log(TRACE, "adding JavaHandle(%" PRId64 ") to dictionary at %s", valRef, key);
+
     CallPythonGuard gg;
     PythonEnvironment::instance()->loadKognitionModule();
     PyObject* pytorch = convert((KogSystem*)valRef);
-    if (!pytorch)
+    if (!pytorch) {
+      log (ERROR, "Failed to convert a JavaHandle instance to a PyObject");
       return CANT_INSTANTIATE_PYTHON_OBJECT;
+    }
 
     int result = OK;
+
+    PyObject* dict = (PyObject*)dictRef;
+    if (PyDict_SetItemString(dict, key, pytorch) != 0) {
+      log(ERROR, "Failed to insert parameter (%s : %" PRId64 ") into dictionary", key, valRef);
+      result = FAILED_TO_INSERT_INTO_DICTIONARY;
+    }
+    Py_DECREF(pytorch);
+    return result;
+  }
+
+  // ==============================================================
+  // Python Tuple lifecycle and methods
+  // ==============================================================
+  KAI_EXPORT uint64_t pilecv4j_python_tuple_create(int32_t size) {
+    CallPythonGuard gg;
+    return (uint64_t)(PyObject*) PyTuple_New(size);
+  }
+
+  KAI_EXPORT void pilecv4j_python_tuple_destroy(uint64_t tupleRef) {
+    CallPythonGuard gg;
+    Py_DECREF((PyObject*)tupleRef);
+  }
+
+  KAI_EXPORT int32_t pilecv4j_python_tuple_putBoolean(uint64_t tupleRef, int32_t index, int32_t valRef) {
+    StatusCode result = OK;
+    CallPythonGuard gg;
+    PyObject* tuple = (PyObject*)tupleRef;
+    PyObject* val = valRef ? Py_True : Py_False;
+    Py_INCREF(val);
+    if (PyTuple_SetItem(tuple, index, val) != 0) {
+      log(ERROR, "Failed to insert parameter (%s) into tuple at %d", (valRef ? "True" : "False"), (int)index);
+      result = FAILED_TO_INSERT_INTO_DICTIONARY;
+      Py_DECREF(val); // PyTuple_SetItem steals a reference while PyDict_SetItemString does not
+    }
+    return (int32_t)result;
+  }
+
+  KAI_EXPORT int32_t pilecv4j_python_tuple_putInt(uint64_t tupleRef, int32_t index, int64_t valRef) {
+    StatusCode result = OK;
+    CallPythonGuard gg;
+    PyObject* tuple = (PyObject*)tupleRef;
+    PyObject* val = PyLong_FromLongLong((long long)valRef);
+    if (PyTuple_SetItem(tuple, index, val) != 0) {
+      log(ERROR, "Failed to insert parameter (%ld) into tuple at %d", (long)valRef, (int)index);
+      result = FAILED_TO_INSERT_INTO_DICTIONARY;
+      Py_DECREF(val); // PyTuple_SetItem steals a reference while PyDict_SetItemString does not
+    }
+    return (int32_t)result;
+  }
+
+  KAI_EXPORT int32_t pilecv4j_python_tuple_putFloat(uint64_t tupleRef, int32_t index, float64_t valRef) {
+    StatusCode result = OK;
+    CallPythonGuard gg;
+    PyObject* tuple = (PyObject*)tupleRef;
+    PyObject* val = PyFloat_FromDouble((double)valRef);
+    if (PyTuple_SetItem(tuple, index, val) != 0) {
+      log(ERROR, "Failed to insert parameter (%f) into tuple at %d", (float)valRef, (int)index);
+      result = FAILED_TO_INSERT_INTO_DICTIONARY;
+      Py_DECREF(val); // PyTuple_SetItem steals a reference while PyDict_SetItemString does not
+    }
+    return (int32_t)result;
+  }
+
+
+  KAI_EXPORT int32_t pilecv4j_python_tuple_putString(uint64_t tupleRef, int32_t index, const char* valRaw) {
+    StatusCode result = OK;
+    CallPythonGuard gg;
+    PyObject* tuple = (PyObject*)tupleRef;
+    PyObject* val = PyUnicode_FromString(valRaw);
+    if (PyTuple_SetItem(tuple, index, val) != 0) {
+      log(ERROR, "Failed to insert parameter (%s) into tuple at %d", valRaw, (int)index);
+      result = FAILED_TO_INSERT_INTO_DICTIONARY;
+      Py_DECREF(val); // PyTuple_SetItem steals a reference while PyDict_SetItemString does not
+    }
+    return (int32_t)result;
+  }
+
+  KAI_EXPORT int32_t pilecv4j_python_tuple_putKogSys(int64_t tupleRef, int32_t index, uint64_t valRef) {
+    CallPythonGuard gg;
+    PythonEnvironment::instance()->loadKognitionModule();
+    PyObject* pytorch = convert((KogSystem*)valRef);
     if (!pytorch) {
       log (ERROR, "Failed to convert a PyTorch instance to a PyObject");
       return CANT_INSTANTIATE_PYTHON_OBJECT;
     }
 
-    PyObject* dict = (PyObject*)dictRef;
-    if (PyDict_SetItemString(dict, key, pytorch) != 0) {
-      log(ERROR, "Failed to insert parameter (%s : %s) into dictionary", key, valRef);
+    int result = OK;
+
+    PyObject* tuple = (PyObject*)tupleRef;
+    if (PyTuple_SetItem(tuple, index, pytorch) != 0) {
+      log(ERROR, "Failed to insert parameter (JavaHandle: %" PRId64 ") into tuple at %d", valRef, (int)index);
       result = FAILED_TO_INSERT_INTO_DICTIONARY;
+      Py_DECREF(pytorch); // PyTuple_SetItem steals a reference while PyDict_SetItemString does not
     }
-    Py_DECREF(pytorch);
     return result;
   }
 
