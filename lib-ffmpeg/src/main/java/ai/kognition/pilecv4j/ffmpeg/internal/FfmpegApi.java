@@ -67,13 +67,13 @@ public class FfmpegApi {
 
         if(!inited.getAndSet(true)) {
             NativeLibraryLoader.loader()
-                .library(LIBNAME)
-                .destinationDir(new File(System.getProperty("java.io.tmpdir"), LIBNAME).getAbsolutePath())
-                .addPreLoadCallback((dir, libname, oslibname) -> {
-                    LOGGER.info("scanning dir:{}, libname:{}, oslibname:{}", dir, libname, oslibname);
-                    NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
-                })
-                .load();
+            .library(LIBNAME)
+            .destinationDir(new File(System.getProperty("java.io.tmpdir"), LIBNAME).getAbsolutePath())
+            .addPreLoadCallback((dir, libname, oslibname) -> {
+                LOGGER.info("scanning dir:{}, libname:{}, oslibname:{}", dir, libname, oslibname);
+                NativeLibrary.addSearchPath(libname, dir.getAbsolutePath());
+            })
+            .load();
 
             Native.register(LIBNAME);
 
@@ -226,7 +226,7 @@ public class FfmpegApi {
 
     public static native void pcv4j_ffmpeg2_mediaProcessor_destroy(final long vdsRef);
 
-    public static native long pcv4j_ffmpeg2_decodedFrameProcessor_create(final push_frame_callback cb, final String decoderName);
+    public static native long pcv4j_ffmpeg2_decodedFrameProcessor_create(final push_frame_callback cb, final int maxDim, final String decoderName);
 
     public static native void pcv4j_ffmpeg2_decodedFrameProcessor_replace(final long nativeRef, final push_frame_callback cb);
 
