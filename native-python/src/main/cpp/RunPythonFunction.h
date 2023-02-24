@@ -8,6 +8,7 @@ namespace python {
   class RunPythonFunction {
     const char * moduleName;
     const char * funcName;
+    PyObject* tupleArgs;
     PyObject* paramDict;
 
   public:
@@ -15,9 +16,11 @@ namespace python {
 
     inline RunPythonFunction(const char* pModuleName,
                     const char* pFuncName,
+                    PyObject* ptupleArgs,
                     PyObject* pparamDict) :
        moduleName(pModuleName),
        funcName(pFuncName),
+       tupleArgs(ptupleArgs),
        paramDict(pparamDict) {
       if (paramDict)
         Py_INCREF(paramDict);

@@ -130,14 +130,12 @@ namespace python {
     }
   }
 
-  PyObject* ImageSource::convertMatToNumPyArray(cv::Mat* mat, bool ownsMatPassed, bool deepcopy, int* statusCode, bool fromPython) {
+  PyObject* ImageSource::convertMatToNumPyArray(cv::Mat* mat, ConvertMode convertMode, int* statusCode, bool fromPython) {
     *statusCode = OK;
     if (!PythonEnvironment::instance()->numpyImported) {
       import_array();
       PythonEnvironment::instance()->numpyImported = true;
     }
-
-    std::unique_ptr<cv::Mat> ig(ownsMatPassed ? mat : nullptr);
 
     // This should indicate the end of available images.
     if (mat == nullptr) {
@@ -155,17 +153,28 @@ namespace python {
 
     npy_intp dimensions[3] = {mat->rows, mat->cols, mat->channels()};
     int nbytes = mat->rows * mat->cols * mat->channels();
+    const bool deepcopy = convertMode == DEEP_COPY;
     uchar* bytes = deepcopy ? (uchar*)malloc(nbytes) : mat->data;
     if (deepcopy)
       std::memcpy(bytes,mat->data,nbytes);
 
     PyObject* ret = PyArray_SimpleNewFromData(mat->dims + 1, dimensions, lookupFromCvToNp[mat->depth()], bytes);
-    if (deepcopy)
+    if (deepcopy && ret)
       PyArray_ENABLEFLAGS((PyArrayObject*) ret, NPY_ARRAY_OWNDATA);
+    if (convertMode == MOVE && ret) {
+      PyArray_ENABLEFLAGS((PyArrayObject*) ret, NPY_ARRAY_OWNDATA);
+      cv::Mat empty;
+      (*mat) = empty;
+    }
     return ret;
   }
 
-  cv::Mat* ImageSource::convertNumPyArrayToMat(PyObject* npArrayObj, bool deepcopy, int* statusCode, bool fromPython) {
+  cv::Mat* ImageSource::convertNumPyArrayToMat(PyObject* npArrayObj, ConvertMode convertMode, int* statusCode, bool fromPython) {
+    if (convertMode == MOVE) {
+      log(ERROR, "Cannot transfer ownership of the data buffer from a numpy array to a cv::Mat.");
+      *statusCode = ILLEGAL_ARGUMENT;
+      return NULL;
+    }
     *statusCode = OK;
 
     if (!PythonEnvironment::instance()->numpyImported) {
@@ -173,7 +182,7 @@ namespace python {
       PythonEnvironment::instance()->numpyImported = true;
     }
 
-    log(TRACE,"ImageSource::convertNumPyArrayToMat (%ld,%s).",static_cast<long>((uint64_t)npArrayObj),deepcopy ? "True" : "False");
+    log(TRACE,"ImageSource::convertNumPyArrayToMat (%ld,%d).",static_cast<long>((uint64_t)npArrayObj), (int)convertMode);
     if (!npArrayObj || npArrayObj == Py_None) {
       log(WARN,"Null NumPy array passed to convert to Mat. Returning nullptr");
       *statusCode = ILLEGAL_ARGUMENT;
@@ -233,7 +242,7 @@ namespace python {
 
     // This is Zero Copy
     cv::Mat* tmp = new cv::Mat(ndims, size, type, PyArray_DATA(npArray), step);
-    if (deepcopy) {
+    if (convertMode == DEEP_COPY) {
       cv::Mat* ret = new cv::Mat();
       *ret = tmp->clone();
       delete tmp;

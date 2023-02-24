@@ -85,7 +85,7 @@ static PyObject* KogMatWithResults_setResult(PKogMatWithResults* self, PyObject*
 
   int statusCode;
   log(TRACE, "setResult on %ld", static_cast<long>((uint64_t)(self->kmat)));
-  self->kmat->setResult(ImageSource::convertNumPyArrayToMat(npArrayObj, true, &statusCode, true),true);
+  self->kmat->setResult(ImageSource::convertNumPyArrayToMat(npArrayObj, DEEP_COPY, &statusCode, true),true);
   if (statusCode != OK) {
     PyErr_SetString(PyExc_TypeError, getStatusMessage(statusCode));
   }
@@ -169,7 +169,7 @@ static PyObject* ImageSource_steal(PImageSource* imsrc, PyObject* args)
   ret->npArray = nullptr;
 
   int statusCode;
-  ret->npArray = ImageSource::convertMatToNumPyArray(kmat->mat, false, false, &statusCode, true);
+  ret->npArray = ImageSource::convertMatToNumPyArray(kmat->mat, SHALLOW_COPY, &statusCode, true);
   if (!ret->npArray) {
     kmat->decrement();
     return NULL;

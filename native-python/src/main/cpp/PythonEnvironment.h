@@ -43,7 +43,7 @@ namespace python {
     // GIL must be Ensured already
     int32_t getFunctionFromModuleAtomic(const char* moduleName, const char* funcName, PyObject** callable);
 
-    int32_t runModel(const char* moduleName, const char* functionName, PyObject* paramDict);
+    int32_t runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict);
 
     // GIL must be Ensured already
     inline void loadKognitionModule() {

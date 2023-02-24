@@ -47,6 +47,8 @@ import net.dempsy.vfs.Path;
 import net.dempsy.vfs.Vfs;
 
 import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.python.ParamBlock.Dict;
+import ai.kognition.pilecv4j.python.ParamBlock.Tuple;
 import ai.kognition.pilecv4j.python.internal.PythonAPI;
 import ai.kognition.pilecv4j.python.internal.PythonAPI.get_image_source;
 
@@ -77,7 +79,7 @@ public class PythonHandle implements QuietCloseable {
 
     public ImageSource imageSource = null;
 
-    private long nativeObj = 0L;
+    long nativeObj = 0L;
 
     private String currentModule;
     private String currentFunction;
@@ -86,8 +88,7 @@ public class PythonHandle implements QuietCloseable {
         @Override
         public long image_source(final long ptRef) {
             synchronized(PythonHandle.this) {
-                if(imageSource == null)
-                    imageSource = new ImageSource(PythonAPI.pilecv4j_python_imageSource_create(ptRef));
+                if(imageSource == null) imageSource = new ImageSource(PythonAPI.pilecv4j_python_imageSource_create(ptRef));
                 return imageSource.imageSourceRef;
             }
         }
@@ -110,30 +111,62 @@ public class PythonHandle implements QuietCloseable {
         return labels;
     }
 
-    public void runPythonFunction(final String module, final String function, final Map<String, Object> kwds) throws PythonException {
-        currentModule = module;
-        currentFunction = function;
-        try(final var q = new ParamCloser(PythonAPI.pilecv4j_python_dict_create());) {
-            final long dict = fillPythonDict(q, kwds);
-            throwIfNecessary(PythonAPI.pilecv4j_python_runPythonFunction(module, function, dict));
+    public void runPythonFunction(final String module, final String function, final ParamBlock params) {
+        try(Tuple args = params.buildArgs();
+            Dict kwds = params.buildKeywordArgs();) {
+
+            throwIfNecessary(PythonAPI.pilecv4j_python_runPythonFunction(module, function, args.tupleRef(), kwds.dictRef()));
         }
     }
 
-    public static class PythonRunResults {
+    public static class PythonRunningState {
         public final AtomicBoolean isRunning = new AtomicBoolean(false);
         public final AtomicReference<RuntimeException> failed = new AtomicReference<>();
+        public Thread thread = null;
+
+        private final PythonHandle system;
+
+        private PythonRunningState(final PythonHandle system) {
+            this.system = system;
+        }
+
+        public boolean hasFailed() {
+            return failed.get() != null;
+        }
+
+        public boolean sourceIsInitialized() {
+            return system.imageSource != null;
+        }
+
+        public void waitUntilSourceInitialized(final long timeout) {
+            final long startTime = System.currentTimeMillis();
+            while(!sourceIsInitialized() && (System.currentTimeMillis() - startTime) < timeout && !hasFailed())
+                Thread.yield();
+
+            if(hasFailed())
+                throw new PythonException(
+                    "The module \"" + system.currentModule + ".py\" using function \"" + system.currentFunction
+                        + "\" failed with the following exception before it ever initialized the source:" +
+                        failed.get());
+            if(!sourceIsInitialized())
+                throw new PythonException(
+                    "The module \"" + system.currentModule + ".py\" using function \"" + system.currentFunction
+                        + "\" never initialized the image source. Did you call runPythonFunction somewhere?");
+        }
+
     }
 
-    public PythonRunResults runPythonFunctionAsynch(final String module, final String function, final Map<String, Object> kwds) {
-        final var ret = new PythonRunResults();
+    public PythonRunningState runPythonFunctionAsynch(final String module, final String function, final ParamBlock pb) {
+        final var ret = new PythonRunningState(this);
         final AtomicBoolean started = new AtomicBoolean(false);
         chain(
-            new Thread(() -> {
+            ret.thread = new Thread(() -> {
                 ret.isRunning.set(true);
                 started.set(true);
                 try {
-                    runPythonFunction(module, function, kwds);
+                    runPythonFunction(module, function, pb);
                 } catch(final RuntimeException rte) {
+                    LOGGER.error("Python function call {} (from module {}) with parameters {} failed", function, module, pb, rte);
                     rte.printStackTrace();
                     throw rte;
                 } finally {
@@ -154,7 +187,7 @@ public class PythonHandle implements QuietCloseable {
         PythonAPI.pilecv4j_python_addModulePath(absDir);
     }
 
-    public PythonResults sendMat(final CvMat mat, final boolean isRgb, final Map<String, Object> params) {
+    public PythonResults sendMat(final CvMat mat, final boolean isRgb, final ParamBlock params) {
         if(imageSource != null)
             return imageSource.send(mat, isRgb, params);
         throw new IllegalStateException("There's no current image source");
@@ -162,21 +195,6 @@ public class PythonHandle implements QuietCloseable {
 
     public void eos() {
         sendMat(null, false, null);
-    }
-
-    public boolean sourceIsInitialized() {
-        return imageSource != null;
-    }
-
-    public void waitUntilSourceInitialized(final long timeout) {
-        final long startTime = System.currentTimeMillis();
-        while(!sourceIsInitialized() && (System.currentTimeMillis() - startTime) < timeout)
-            Thread.yield();
-
-        if(!sourceIsInitialized())
-            throw new PythonException(
-                "The module \"" + currentModule + ".py\" using function \"" + currentFunction
-                    + "\" never initialized the image source. Did you call runPythonFunction somewhere?");
     }
 
     @Override
@@ -267,12 +285,11 @@ public class PythonHandle implements QuietCloseable {
             return send(mat, isRgb, 0L);
         }
 
-        public PythonResults send(final CvMat mat, final boolean isRgb, final Map<String, Object> parameters) {
-            if(parameters == null || parameters.size() == 0)
+        public PythonResults send(final CvMat mat, final boolean isRgb, final ParamBlock params) {
+            if(params == null)
                 return send(mat, isRgb, 0L);
-            try(var q = new ParamCloser(PythonAPI.pilecv4j_python_dict_create());) {
-                fillPythonDict(q, parameters);
-                return send(mat, isRgb, q.dict);
+            try(Dict kwds = params.buildKeywordArgs();) {
+                return send(mat, isRgb, kwds.dictRef());
             }
         }
 
@@ -307,19 +324,19 @@ public class PythonHandle implements QuietCloseable {
             return ml.getString(0);
     }
 
-    private static class ParamCloser implements QuietCloseable {
-        public final long dict;
-
-        ParamCloser(final long dict) {
-            this.dict = dict;
-        }
-
-        @Override
-        public void close() {
-            if(dict != 0L)
-                PythonAPI.pilecv4j_python_dict_destroy(dict);
-        }
-    }
+//    private static class ParamCloserX implements QuietCloseable {
+//        public final long dict;
+//
+//        ParamCloserX(final long dict) {
+//            this.dict = dict;
+//        }
+//
+//        @Override
+//        public void close() {
+//            if(dict != 0L)
+//                PythonAPI.pilecv4j_python_dict_destroy(dict);
+//        }
+//    }
 
     private static String stripTrailingSlash(final String path) {
         if(path.endsWith("/") || path.endsWith("\\"))
@@ -373,32 +390,32 @@ public class PythonHandle implements QuietCloseable {
         }
     }
 
-    private static long fillPythonDict(final ParamCloser q, final Map<String, Object> kwds) {
-        final long dict;
-        if(kwds != null && kwds.size() > 0) {
-            dict = q.dict;
-            kwds.entrySet().forEach(e -> {
-                final Object val = e.getValue();
-                if(val instanceof PythonHandle)
-                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((PythonHandle)val).nativeObj));
-                else if(val instanceof Boolean)
-                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putBoolean(dict, e.getKey(), ((Boolean)val).booleanValue() ? 1 : 0));
-                else if(val instanceof Number) {
-                    if(val instanceof Integer || val instanceof Byte || val instanceof Long)
-                        throwIfNecessary(PythonAPI.pilecv4j_python_dict_putInt(dict, e.getKey(), ((Number)val).longValue()));
-                    else if(val instanceof Float || val instanceof Double)
-                        throwIfNecessary(PythonAPI.pilecv4j_python_dict_putFloat(dict, e.getKey(), ((Number)val).doubleValue()));
-                    else
-                        throw new PythonException("Unknown number type:" + val.getClass().getName());
-                } else
-                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putString(dict, e.getKey(), val.toString()));
-            });
-        } else
-            dict = 0L;
-        return dict;
-    }
+//    private static long fillPythonDict(final ParamCloser q, final Map<String, Object> kwds) {
+//        final long dict;
+//        if(kwds != null && kwds.size() > 0) {
+//            dict = q.dict;
+//            kwds.entrySet().forEach(e -> {
+//                final Object val = e.getValue();
+//                if(val instanceof PythonHandle)
+//                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((PythonHandle)val).nativeObj));
+//                else if(val instanceof Boolean)
+//                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putBoolean(dict, e.getKey(), ((Boolean)val).booleanValue() ? 1 : 0));
+//                else if(val instanceof Number) {
+//                    if(val instanceof Integer || val instanceof Byte || val instanceof Long)
+//                        throwIfNecessary(PythonAPI.pilecv4j_python_dict_putInt(dict, e.getKey(), ((Number)val).longValue()));
+//                    else if(val instanceof Float || val instanceof Double)
+//                        throwIfNecessary(PythonAPI.pilecv4j_python_dict_putFloat(dict, e.getKey(), ((Number)val).doubleValue()));
+//                    else
+//                        throw new PythonException("Unknown number type:" + val.getClass().getName());
+//                } else
+//                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putString(dict, e.getKey(), val.toString()));
+//            });
+//        } else
+//            dict = 0L;
+//        return dict;
+//    }
 
-    private static void throwIfNecessary(final int status) throws PythonException {
+    static void throwIfNecessary(final int status) throws PythonException {
         if(status != 0) {
             final Pointer p = PythonAPI.pilecv4j_python_status_message(status);
             try(final QuietCloseable qc = () -> PythonAPI.pilecv4j_python_status_freeMessage(p);) {

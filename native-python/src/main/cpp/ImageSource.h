@@ -81,6 +81,13 @@ namespace python {
     }
   };
 
+  enum ConvertMode {
+    SHALLOW_COPY,  /* note, this does not transfer ownership so the source will need to outlive the destination */
+    DEEP_COPY,
+    MOVE           /* note, the transfer of ownership of the underlying data means the source should not be */
+                   /*     referenced after a convert is done in this mode. */
+  };
+
   class ImageSource {
     KogMatWithResults* ondeck;
     std::mutex ondeckMutex;
@@ -107,9 +114,9 @@ namespace python {
       return ondeck;
     }
 
-    static PyObject* convertMatToNumPyArray(cv::Mat* toConvert, bool ownsMatPassed, bool deepcopy, int* statusCode, bool fromPython);
-    static cv::Mat* convertNumPyArrayToMat(PyObject* npArray, bool deepcopy, int* statusCode, bool fromPython);
-  public:
+    static PyObject* convertMatToNumPyArray(cv::Mat* toConvert, ConvertMode converMode, int* statusCode, bool fromPython);
+    static cv::Mat* convertNumPyArrayToMat(PyObject* npArray, ConvertMode converMode, int* statusCode, bool fromPython);
+
     // it will increment the count. needs to be decremented.
     KogMatWithResults* next();
   };

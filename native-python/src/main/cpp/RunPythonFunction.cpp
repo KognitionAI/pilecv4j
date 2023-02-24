@@ -28,7 +28,12 @@ namespace python {
 
     log(DEBUG, "Calling model factory %s in module %s", funcName, moduleName );
     // New reference
-    PyObject* args = PyTuple_New(0);
+    PyObject* args;
+    if (tupleArgs) {
+      args = tupleArgs;
+      Py_INCREF(args);
+    } else
+      args = PyTuple_New(0);
     result = PyObject_Call(pFunc, args, paramDict);
     Py_DECREF(args);
 
@@ -44,7 +49,6 @@ namespace python {
     }
     return result;
   }
-
 }
 }
 

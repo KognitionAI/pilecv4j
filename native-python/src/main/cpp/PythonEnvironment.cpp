@@ -134,33 +134,6 @@ namespace python {
     return pModule;
   }
 
-//  PyObject* PythonEnvironment::getModuleOrNew(const char* moduleName) {
-//    // New reference
-//    PyObject* pName = PyUnicode_FromString(moduleName);
-//    log(TRACE, "Checking module %s", moduleName);
-//    PyObject *pModule;
-//    // New reference
-//    pModule = PyImport_GetModule(pName);
-//    if (!pModule) {
-//      log(TRACE, "Creating new module %s", moduleName);
-//      // New reference
-//      pModule = PyModule_New(moduleName);
-//      if (pModule) {
-//        log(TRACE, "Created new module %s", moduleName);
-//        PyModule_AddStringConstant(pModule, "__file__", "");
-//      }
-//      else
-//        log(TRACE, "Failed to create new module %s", moduleName);
-//    } else {
-//      log(TRACE, "Module %s exists already", moduleName);
-//    }
-//
-//    if (pName)
-//      Py_DECREF(pName);
-//
-//    return pModule;
-//  }
-
   void PythonEnvironment::addModulePath(const char* filedir) {
     CallPythonGuard gg;
 
@@ -204,10 +177,10 @@ namespace python {
     return s_instance;
   }
 
-  int32_t PythonEnvironment::runModel(const char* moduleName, const char* functionName, PyObject* paramDict) {
+  int32_t PythonEnvironment::runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict) {
     CallPythonGuard gg;
     {
-      RunPythonFunction func(moduleName, functionName, paramDict);
+      RunPythonFunction func(moduleName, functionName, tupleArgs, paramDict);
       PyObject* obj = func.execute();
       log(TRACE, "func %s returned object %ld", functionName, static_cast<long>((uint64_t)obj));
       if (obj) {
