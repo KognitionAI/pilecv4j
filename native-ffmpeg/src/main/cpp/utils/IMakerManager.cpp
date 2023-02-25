@@ -126,7 +126,7 @@ uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, int dstMaxDim, SwsCo
 
         // We ONLY scale down. Never up. So if both the w and h are
         // already less than or = dim, we skip scaling.
-        if (frameW <= dstMaxDim || frameH <= dstMaxDim) {
+        if (frameW <= dstMaxDim && frameH <= dstMaxDim) {
           dstW = frameW;
           dstH = frameH;
         } else {
