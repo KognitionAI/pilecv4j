@@ -32,8 +32,7 @@ public class BaseTest {
         boolean show = ("".equals(sysOpSHOW) || Boolean.parseBoolean(sysOpSHOW));
         if(!sysOpSet)
             show = Boolean.parseBoolean(System.getenv("PILECV4J_SHOW"));
-        // SHOW = show;
-        SHOW = true;
+        SHOW = show;
     }
 
     public final static File STREAM_FILE;
