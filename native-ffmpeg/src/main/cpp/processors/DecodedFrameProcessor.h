@@ -47,9 +47,11 @@ class DecodedFrameProcessor: public MediaProcessor
 
   AVPixelFormat requestedPixFormat = AV_PIX_FMT_RGB24;
 
+  int maxDim;
+
 public:
-  inline DecodedFrameProcessor(push_frame pcallback, const char* pdecoderName) : callback(pcallback),
-       decoderNameSet(pdecoderName ? true : false) {
+  inline DecodedFrameProcessor(push_frame pcallback, int pmaxDim, const char* pdecoderName) : callback(pcallback),
+       decoderNameSet(pdecoderName ? true : false), maxDim(pmaxDim) {
     if (pdecoderName)
       decoderName = pdecoderName;
   }

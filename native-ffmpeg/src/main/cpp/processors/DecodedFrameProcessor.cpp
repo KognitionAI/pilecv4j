@@ -58,6 +58,9 @@ struct CodecDetails {
 
   AVMediaType mediaType;
 
+  int dstW = -1;
+  int dstH = -1;
+
   inline void close() {
     if (colorCvrt != nullptr)
       sws_freeContext(colorCvrt);
@@ -233,8 +236,8 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
 
       int32_t isRgb;
       TIME_OPEN(create_mat);
-      uint64_t mat = IMakerManager::createMatFromFrame(pFrame, &(codecDetails->colorCvrt), isRgb,
-          codecDetails->lastFormatUsed, requestedPixFormat);
+      uint64_t mat = IMakerManager::createMatFromFrame(pFrame, maxDim, &(codecDetails->colorCvrt), isRgb,
+          codecDetails->lastFormatUsed, codecDetails->dstW, codecDetails->dstH, requestedPixFormat);
       TIME_CAP(create_mat);
 
       TIME_OPEN(handle);
@@ -263,8 +266,8 @@ void displayDecodeTiming() {
 
 extern "C" {
 
-KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf, const char* decoderName) {
-  DecodedFrameProcessor* ret = new DecodedFrameProcessor(pf, decoderName);
+KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf, int32_t maxDim, const char* decoderName) {
+  DecodedFrameProcessor* ret = new DecodedFrameProcessor(pf, (int)maxDim, decoderName);
 
   return (uint64_t)((MediaProcessor*)ret);
 }

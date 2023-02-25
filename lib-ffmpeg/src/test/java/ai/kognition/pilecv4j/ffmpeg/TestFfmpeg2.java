@@ -143,10 +143,10 @@ public class TestFfmpeg2 extends BaseTest {
                 })
                 .chain("default")
                 .selectFirstVideoStream()
-                .processVideoFrames(
+                .processVideoFrames(150,
 
-                    // "hevc_cuvid",
-                    // "h264_cuvid",
+                // "hevc_cuvid",
+//                    "h264_cuvid",
 
                     f -> {
                         frameCount.getAndIncrement();
