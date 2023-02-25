@@ -269,6 +269,8 @@ extern "C" {
 KAI_EXPORT uint64_t pcv4j_ffmpeg2_decodedFrameProcessor_create(push_frame pf, int32_t maxDim, const char* decoderName) {
   DecodedFrameProcessor* ret = new DecodedFrameProcessor(pf, (int)maxDim, decoderName);
 
+  llog(INFO, "Creating DecodedFrameProcessor with maxDim %d", (int)maxDim);
+
   return (uint64_t)((MediaProcessor*)ret);
 }
 
