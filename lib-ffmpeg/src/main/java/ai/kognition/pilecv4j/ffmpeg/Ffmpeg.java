@@ -56,6 +56,7 @@ import net.dempsy.util.Functional;
 import net.dempsy.util.MutableRef;
 import net.dempsy.util.QuietCloseable;
 
+import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.EncodingContext.VideoEncoder;
 import ai.kognition.pilecv4j.ffmpeg.Ffmpeg.MediaContext.StreamDetails;
 import ai.kognition.pilecv4j.ffmpeg.internal.FfmpegApi;
@@ -223,12 +224,12 @@ public class Ffmpeg {
         public void close() {
 
             Functional.reverseRange(0, processors.size())
-            .mapToObj(i -> processors.get(i))
-            .forEach(p -> p.close());
+                .mapToObj(i -> processors.get(i))
+                .forEach(p -> p.close());
 
             Functional.reverseRange(0, packetFilters.size())
-            .mapToObj(i -> packetFilters.get(i))
-            .forEach(p -> p.close());
+                .mapToObj(i -> packetFilters.get(i))
+                .forEach(p -> p.close());
         }
 
         // ======================================================================
@@ -300,26 +301,30 @@ public class Ffmpeg {
          * first frame and the handler on all of the other frames. If decoderName is not null then the decoder
          * will be used to decode the frames.
          */
-        public MediaProcessingChain processVideoFrames( final String decoderName, final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
+        public MediaProcessingChain processVideoFrames(final String decoderName, final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
             return processVideoFrames(-1, decoderName, initializer, handler);
         }
+
         /**
-         * Create a video processor that takes the first decodable video stream.
+         * Create a video processor that produces frames no larger than the given {@code maxDim}
+         * that takes the first decodable video stream.
          */
         public MediaProcessingChain processVideoFrames(final int maxDim, final VideoFrameConsumer consumer) {
             return processVideoFrames(maxDim, (String)null, consumer);
         }
 
         /**
-         * Create a video processor that takes the first decodable video stream and applies the initializer on the
-         * first frame and the handler on all of the other frames.
+         * Create a video processor that produces frames no larger than the given {@code maxDim}
+         * that takes the first decodable video stream and applies the initializer on the
+         * first frame and the handler on all of the frames (including the first frame).
          */
         public MediaProcessingChain processVideoFrames(final int maxDim, final VideoFrameConsumer initializer, final VideoFrameConsumer handler) {
             return processVideoFrames(maxDim, null, initializer, handler);
         }
 
         /**
-         * Create a video processor that takes the first decodable video stream. If decoderName is not null then the decoder
+         * Create a video processor that produces frames no larger than the given {@code maxDim}
+         * that takes the first decodable video stream. If decoderName is not null then the decoder
          * will be used to decode the frames.
          */
         public MediaProcessingChain processVideoFrames(final int maxDim, final String decoderName, final VideoFrameConsumer consumer) {
@@ -330,7 +335,8 @@ public class Ffmpeg {
         }
 
         /**
-         * Create a video processor that takes the first decodable video stream and applies the initializer on the
+         * Create a video processor that produces frames no larger than the given {@code maxDim}
+         * that takes the first decodable video stream and applies the initializer on the
          * first frame and the handler on all of the other frames. If decoderName is not null then the decoder
          * will be used to decode the frames.
          */
@@ -413,8 +419,8 @@ public class Ffmpeg {
         public MediaProcessingChain filterPackets(final Function<PacketMetadata, Boolean> cb) {
             return filterPackets((final int mediaType, final int stream_index, final int packetNumBytes, final boolean isKeyFrame, final long pts,
                 final long dts, final int tbNum, final int tbDen) -> {
-                    return cb.apply(new PacketMetadata(mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen));
-                });
+                return cb.apply(new PacketMetadata(mediaType, stream_index, packetNumBytes, isKeyFrame, pts, dts, tbNum, tbDen));
+            });
         }
 
         /**
@@ -886,8 +892,8 @@ public class Ffmpeg {
                 dataSource.close();
 
             Functional.reverseRange(0, mediaProcesingChains.size())
-            .mapToObj(i -> mediaProcesingChains.get(i))
-            .forEach(p -> p.close());
+                .mapToObj(i -> mediaProcesingChains.get(i))
+                .forEach(p -> p.close());
 
             mediaProcesingChains.clear();
         }
@@ -991,11 +997,11 @@ public class Ffmpeg {
                 }
             },
                 seek != null ? new seek_buffer_callback() {
-                @Override
-                public long seek_buffer(final long offset, final int whence) {
-                    return seek.seekBuffer(offset, whence);
-                }
-            } : null);
+                    @Override
+                    public long seek_buffer(final long offset, final int whence) {
+                        return seek.seekBuffer(offset, whence);
+                    }
+                } : null);
 
             return manage(ret);
         }
@@ -1180,7 +1186,8 @@ public class Ffmpeg {
          *
          * @see {@link MediaProcessingChain#processVideoFrames(int, String, VideoFrameConsumer, VideoFrameConsumer)}
          */
-        public MediaContext processVideoFrames(final int maxDim, final String decoder, final VideoFrameConsumer initializer, final VideoFrameConsumer consumer) {
+        public MediaContext processVideoFrames(final int maxDim, final String decoder, final VideoFrameConsumer initializer,
+            final VideoFrameConsumer consumer) {
             return chain(DEFAULT_CHAIN_NAME).processVideoFrames(maxDim, decoder, initializer, consumer).mediaContext();
         }
 
@@ -1847,7 +1854,7 @@ public class Ffmpeg {
                     () -> new FfmpegException("There doesn't appear to be any video streams in the given " + MediaContext.class.getSimpleName() + " source."));
 
             defaultVideoEncoder()
-            .setFps(sd.fps_num, sd.fps_den);
+                .setFps(sd.fps_num, sd.fps_den);
 
             return this;
         }

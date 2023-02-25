@@ -96,53 +96,85 @@ static inline T align128(T x) {
  * to eventually free it with sws_freeContext. If it's not null but the format changed
  * then the method will free the existing one before creating the new one.
  */
-uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, SwsContext** colorCvrt, int32_t& isRgb,
-    AVPixelFormat& lastFormatUsed, AVPixelFormat pixFmt) {
+uint64_t IMakerManager::createMatFromFrame(AVFrame *pFrame, int dstMaxDim, SwsContext** colorCvrt, int32_t& isRgb,
+    AVPixelFormat& lastFormatUsed, int& dstWo, int& dstHo, AVPixelFormat pixFmt) {
   PILECV4J_TRACE;
   if (imaker == nullptr)
     return MAKE_P_STAT(NO_IMAGE_MAKER_SET);
 
-  const int32_t w = pFrame->width;
-  const int32_t h = pFrame->height;
-
   uint64_t mat;
+
+  const int32_t frameW = pFrame->width;
+  const int32_t frameH = pFrame->height;
+
   AVPixelFormat curFormat = (AVPixelFormat)pFrame->format;
   curFormat = upgradePixFormatIfNecessary(curFormat);
-  if (curFormat != AV_PIX_FMT_RGB24 && curFormat != AV_PIX_FMT_BGR24) {
+  if ((curFormat != AV_PIX_FMT_RGB24 && curFormat != AV_PIX_FMT_BGR24) || dstMaxDim > 0) {
     TIME_OPEN(create_color_cvt);
     // use the existing setup if it's there already.
     SwsContext* swCtx = *colorCvrt;
-    if (swCtx == nullptr || lastFormatUsed != curFormat) {
+    if (swCtx == nullptr || lastFormatUsed != curFormat || dstWo < 0) {
       lastFormatUsed = curFormat;
       if (swCtx)
         sws_freeContext(swCtx);
 
+      int dstW;
+      int dstH;
+      int flag = SWS_POINT;
+
+      if (dstMaxDim > 0) {
+
+        // We ONLY scale down. Never up. So if both the w and h are
+        // already less than or = dim, we skip scaling.
+        if (frameW <= dstMaxDim || frameH <= dstMaxDim) {
+          dstW = frameW;
+          dstH = frameH;
+        } else {
+          const double dw = (double)frameW;
+          const double dh = (double)frameH;
+          const double originalWOrH = frameW > frameH ? dw : dh;
+          const double scale = (double)dstMaxDim / originalWOrH;
+          dstW = (int)(dw * scale);
+          dstH = (int)(dh * scale);
+          flag = SWS_BICUBIC;
+          llog(INFO, "Scaling the decoding to %d X %d", dstW, dstH);
+        }
+      } else {
+        dstW = frameW;
+        dstH = frameH;
+      }
+
+      dstWo = dstW;
+      dstHo = dstH;
+
       *colorCvrt = swCtx =
           sws_getContext(
-              w,
-              h,
+              frameW,
+              frameH,
               curFormat,
-              w,
-              h,
+              dstW,
+              dstH,
               pixFmt,
-              SWS_POINT,NULL,NULL,NULL
+              flag,NULL,NULL,NULL
           );
       TIME_CAP(create_color_cvt);
     }
 
-    int32_t stride = 3 * w;
-    ai::kognition::pilecv4j::MatAndData matPlus = imaker->allocateImage(h,w);
+    const int dstW = dstWo;
+    const int dstH = dstHo;
+    const int32_t dstStride = 3 * dstW;
+    ai::kognition::pilecv4j::MatAndData matPlus = imaker->allocateImage(dstH, dstW);
     mat = matPlus.mat;
     uint8_t* matData = (uint8_t*)matPlus.data;
     uint8_t *rgb24[1] = { matData };
-    int rgb24_stride[1] = { stride };
+    int rgb24_stride[1] = { dstStride };
     TIME_OPEN(cvt_color);
-    sws_scale(swCtx,pFrame->data, pFrame->linesize, 0, h, rgb24, rgb24_stride);
+    sws_scale(swCtx,pFrame->data, pFrame->linesize, 0, frameH, rgb24, rgb24_stride);
     TIME_CAP(cvt_color);
     isRgb = pixFmt == AV_PIX_FMT_RGB24 ? 1 : 0;
   } else {
     TIME_OPEN(alloc_mat);
-    mat = imaker->allocateImageWithCopyOfData(h,w,w * 3,pFrame->data[0]);
+    mat = imaker->allocateImageWithCopyOfData(frameH,frameW,frameW * 3,pFrame->data[0]);
     TIME_CAP(alloc_mat);
     isRgb = (curFormat == AV_PIX_FMT_RGB24) ? 1 : 0;
   }
