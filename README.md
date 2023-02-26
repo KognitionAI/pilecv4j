@@ -13,6 +13,7 @@ This project contains several tools for creating image and video processing appl
   - [lib-image](#lib-image)
   - [lib-ffmpeg](#lib-ffmpeg)
   - [lib-python](#lib-python)
+  - [lib-ipc](#lib-ipc)
   - [lib-tf](#lib-tf)
   - [lib-nr](#lib-nr)
   - [lib-util](#lib-util)
@@ -38,7 +39,7 @@ This project contains several tools for creating image and video processing appl
 
 # Introduction to the Project
 
-An introduction and overview of the project was presented to the Philly Java Users Group on Feb 22, 2023. It starts off at a very basic level.
+An introduction and overview of the project was presented to the Philly Java Users Group on Feb 22, 2023. It starts off at a very basic level so it should be easy for anyone that already knows Java to follow.
 
 [![Image and Video Processing using OpenCV and Pilecv4j](https://img.youtube.com/vi/FrSOjOil1o8/1.jpg)](https://www.youtube.com/watch?v=FrSOjOil1o8)
 
@@ -147,6 +148,14 @@ For the purposes of this example we'll assume there's a video file at `/tmp/test
 ## lib-python
 
 Because many deep learning systems use Python (e.g. [PyTorch](https://pytorch.org/)), lib-python allows you to use these frameworks from your Java code.
+
+## lib-ipc
+
+This is an extension of system IPC functionality for "shared memory" for use from Java and specifically geared toward passing `Mat`s between processes. It has three different implementations:
+
+1. Posix Shared Memory - this is the default on Linux
+2. System V Shared Memory - optionally, this can be selected on Linux platforms
+3. Windows - this is the only implementation available on Windows since Windows doesn't support Posix or System V.
 
 ## lib-tf
 
