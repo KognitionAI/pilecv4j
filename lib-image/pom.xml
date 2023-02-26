@@ -64,7 +64,7 @@
       <optional>true</optional>
     </dependency>
     <dependency> <!-- Used for the SwtImageDisplay -->
-      <groupId>org.eclipse.swt</groupId>
+      <groupId>${swtgroup}</groupId>
       <artifactId>${swtartifact}</artifactId>
       <optional>true</optional>
     </dependency>

@@ -9,8 +9,6 @@
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-ffmpeg</artifactId>
-  <name>lib-ffmpeg (${project.version})</name>
-  <description></description>
   
   <dependencies>
     <dependency>
@@ -66,7 +64,7 @@
       <scope>test</scope>
     </dependency>
     <dependency> <!-- Used for the SwtImageDisplay -->
-      <groupId>org.eclipse.swt</groupId>
+      <groupId>${swtgroup}</groupId>
       <artifactId>${swtartifact}</artifactId>
       <scope>test</scope>
       <optional>true</optional>

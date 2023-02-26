@@ -61,7 +61,6 @@
       <activation>
         <os>
           <family>linux</family>
-          <arch>amd64</arch>
         </os>
         <property>
           <name>!native-only</name>
