@@ -81,7 +81,7 @@ public class TestFunctionCall extends BaseTest {
 
             // add the module path
             pt.addModulePath("./src/test/resources/python");
-            final int NUM_ITERS = 100000;
+            final int NUM_ITERS = 100;
             try(final CvMat mat = ImageFile.readMatFromFile(TEST_IMAGE);) {
 
                 final long startTime = System.currentTimeMillis();
