@@ -7,6 +7,7 @@ This project contains several tools for creating image and video processing appl
   - [Table of Contents](#table-of-contents)
 - [Introduction](#introduction)
 - [Prerequisites](#prerequisites)
+- [Introduction to the Project](#introduction-to-the-project)
 - [Jumping Right In](#jumping-right-in)
   - [Short Example](#short-example)
 - [Project Overview](#project-overview)
@@ -51,11 +52,19 @@ Most dependencies will be picked up automatically from [maven central](https://w
 
 *Note:* You shouldn't need [OpenCV](https://opencv.org/) installed since there is a pre-built [OpenCV](https://opencv.org/) bundled in a jar file that will be automatically picked up as a dependency.
 
+# Introduction to the Project
+
+An introduction and overview of the project was presented to the Philly Java Users Group on Feb 22, 2023. It starts off at a very basic level.
+
+[![Image and Video Processing using OpenCV and Pilecv4j](https://img.youtube.com/vi/FrSOjOil1o8/1.jpg)](https://www.youtube.com/watch?v=FrSOjOil1o8)
+
 # Jumping Right In
 
 ## Short Example
 
-Here is a simple example to get started. We'll write java code that plays a video and does some minimal manipulation. To use the video processing include the following in your project (or the gradle equivalent).
+*For the full code of this example, see:*
+
+Here is a simple example to get started. We'll write java code that plays a video. To use the video processing include the following in your project (or the gradle equivalent).
 
 ``` xml
     <dependency>
@@ -78,11 +87,11 @@ You'll also need the platform specific native libraries. For linux you can use:
 
 The currently supported `platform` values include: `linux-x86_64` , `windows-x86_64` and `aarch64`
 
-We'll need a video file to work with. If you need one you can use the `.mp4` from here: https://github.com/leandromoreira/ffmpeg-libav-tutorial/blob/master/small_bunny_1080p_60fps.mp4
+You will need a video file to work with, or you can use a live stream from an RTSP camera or even your webcam (see the Note below the example).
 
 The following is a simple example that will play display the video to a window (note, there is no audio processing in the library).
 
-For the purposes of this example we'll assume there's a video file at `/tmp/test-video.mp4`.
+For the purposes of this example we'll assume there's a video file at `/tmp/test-video.mp4` and `TEST_VIDEO` is set to that string.
 
 
 ``` java
@@ -97,6 +106,10 @@ For the purposes of this example we'll assume there's a video file at `/tmp/test
             // create a StreamContext using Ffmpeg2. StreamContexts represent
             // a source of media data and a set of processing to be done on that data.
             final MediaContext sctx = Ffmpeg.createMediaContext(TEST_VIDEO)
+
+                // Tell the decoding that, if you need to convert the color anyway,
+                // you might as well convert it to BGR rather than RGB.
+                .preferBgr()
 
                 // We are simply going to pick the first video stream from the file.
                 .selectFirstVideoStream()
@@ -118,6 +131,8 @@ For the purposes of this example we'll assume there's a video file at `/tmp/test
 
         ) {}
 ```
+
+**Note:** to use a webcam on Linux you can instantiate the `MediaContext` using `Ffmpeg.createMediaContext("v4l2", "/dev/video0")` or whatever device your webcam is.
 
 # Project Overview
 
