@@ -20,6 +20,8 @@ import com.sun.jna.Callback;
 import com.sun.jna.Native;
 import com.sun.jna.NativeLibrary;
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 
 import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.util.NativeLibraryLoader;
@@ -61,7 +63,14 @@ public class PythonAPI {
 
     public static native void pilecv4j_python_addModulePath(String absDir);
 
-    public static native int pilecv4j_python_runPythonFunction(String module, String function, long args, long dictRef);
+    public static native int pilecv4j_python_runPythonFunction(String module, String function, long args, long dictRef,
+        PointerByReference result, IntByReference resultSize);
+
+    public static native int pilecv4j_python_freeFunctionResults(Pointer resultBuf);
+
+    public static native void pilecv4j_python_pyObject_decref(long nativeRef);
+
+    public static native void pilecv4j_python_pyObject_incref(long nativeRef);
 
     // ===================================================
     // KogSys lifecycle and methods
@@ -105,6 +114,10 @@ public class PythonAPI {
 
     public static native int pilecv4j_python_tuple_putString(long tupleRef, int index, String valRaw);
 
+    public static native int pilecv4j_python_tuple_putMat(long tupleRef, int index, long valRef);
+
+    public static native int pilecv4j_python_tuple_putPyObject(long tupleRef, int index, long valRef);
+
     public static native int pilecv4j_python_tuple_putInt(long tupleRef, int index, long valRaw);
 
     public static native int pilecv4j_python_tuple_putFloat(long tupleRef, int index, double valRaw);
@@ -121,6 +134,10 @@ public class PythonAPI {
     public static native void pilecv4j_python_dict_destroy(long dictRef);
 
     public static native int pilecv4j_python_dict_putString(long dictRef, String key, String valRaw);
+
+    public static native int pilecv4j_python_dict_putMat(long dictRef, String key, long valRef);
+
+    public static native int pilecv4j_python_dict_putPyObject(long dictRef, String key, long valRef);
 
     public static native int pilecv4j_python_dict_putInt(long dictRef, String key, long valRaw);
 

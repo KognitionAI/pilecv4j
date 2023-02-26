@@ -6,7 +6,7 @@
 #include <Python.h>
 
 #include "GilGuard.h"
-#include "KogSystem.h"
+#include "JavaHandle.h"
 #include "log.h"
 
 #define KOGNITION_MODULE "pilecv4j"
@@ -25,7 +25,8 @@ namespace python {
     ILLEGAL_ARGUMENT = 7,
     CANT_FIND_PYTHON_CLASS = 8,
     CANT_INSTANTIATE_PYTHON_OBJECT = 9,
-    FAILED_TO_INSERT_INTO_DICTIONARY = 10
+    FAILED_TO_INSERT_INTO_DICTIONARY = 10,
+    BAD_DATA = 11
   };
 
   const char* getStatusMessage(uint32_t status);
@@ -43,7 +44,7 @@ namespace python {
     // GIL must be Ensured already
     int32_t getFunctionFromModuleAtomic(const char* moduleName, const char* funcName, PyObject** callable);
 
-    int32_t runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict);
+    int32_t runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict, PyObject** result);
 
     // GIL must be Ensured already
     inline void loadKognitionModule() {

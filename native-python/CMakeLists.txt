@@ -19,6 +19,9 @@ if(NOT DEFINED COMMON_INCLUDE)
   endif()
 endif()
 
+add_definitions( -DPILECV4J_ENABLE_TRACE_API )
+add_definitions( -DLOGGING )
+
 INCLUDE(${COMMON_INCLUDE}/../CMakeHelpers.cmake)
 
 find_package(Python3 COMPONENTS Interpreter Development NumPy REQUIRED)
@@ -29,7 +32,7 @@ add_library(pilecv4jpython SHARED
   src/main/cpp/log.cpp
   src/main/cpp/RunPythonFunction.cpp
   src/main/cpp/PythonEnvironment.cpp
-  src/main/cpp/KogSystem.cpp
+  src/main/cpp/JavaHandle.cpp
   src/main/cpp/ImageSource.cpp
   src/main/cpp/module.cpp
   src/main/cpp/kognition.cpp

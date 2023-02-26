@@ -1,17 +1,17 @@
-#include "KogSystem.h"
+#include <JavaHandle.h>
 
 namespace pilecv4j {
 namespace python {
-  ImageSource* KogSystem::getImageSource() {
+  ImageSource* JavaHandle::getImageSource() {
     return (ImageSource*)(getImageSourceCb((uint64_t) this));
   }
 
-  static KogSystem* instance;
-  void KogSystem::set(KogSystem* pinstance) {
+  static JavaHandle* instance;
+  void JavaHandle::set(JavaHandle* pinstance) {
     instance = pinstance;
   }
 
-  KogSystem* convertPyTorch() {
+  JavaHandle* convertPyTorch() {
     if (isEnabled(TRACE))
       log(TRACE, "converting PyTorch instance at %ld to python", static_cast<long>((uint64_t)instance));
     return instance;

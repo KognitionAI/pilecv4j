@@ -29,14 +29,20 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.sun.jna.Pointer;
+import com.sun.jna.ptr.IntByReference;
+import com.sun.jna.ptr.PointerByReference;
 
 import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
@@ -52,10 +58,77 @@ import ai.kognition.pilecv4j.python.ParamBlock.Tuple;
 import ai.kognition.pilecv4j.python.internal.PythonAPI;
 import ai.kognition.pilecv4j.python.internal.PythonAPI.get_image_source;
 
+/**
+ * <p>
+ * This object can be used to call functions in Python. It can be used to simply
+ * call a function or it can be used to set up a message exchange between a
+ * a function running in Python in one thread, and a function running in Java
+ * in another thread. The more straightforward way is to just call a function.
+ * </p>
+ * <p>
+ * As an example of how to simply call a function. First you create a {@link PythonHandle}.
+ *
+ * <pre>
+ * <code>
+ * try (final PythonHandle python = new PythonHandle();) {
+ * </code>
+ * </pre>
+ * </p>
+ *
+ * <p>
+ * You can add paths for modules. This is typical since you're probably
+ * running a script that's not already on the PYTHONPATH. For example.
+ * </p>
+ *
+ * <pre>
+ * <code>
+ * python.addModulePath("/path/to/directory/with/python_files");
+ * </code>
+ * </pre>
+ * </p>
+ *
+ * <p>
+ * You can also have the PythonHandle expand python modules that are in
+ * jar files on the classpath. In the following example, there's a directory
+ * in the jar file called "python" that has scripts in it.
+ * </p>
+ *
+ * <pre>
+ * <code>
+ * python.unpackAndAddModule("classpath:///python");
+ * </code>
+ * </pre>
+ * </p>
+ *
+ * <p>
+ * Finally, you can do this in one step while creating the python handle.
+ * </p>
+ *
+ * <pre>
+ * <code>
+ * try (PythonHandle python = PythonHandle.initModule("classpath:///python");) {
+ * </code>
+ * </pre>
+ * </p>
+ *
+ * There are two different modes that communication with Python can operate. You
+ * can simply synchronously call a function in a Python *.py file (<em>SYNCHRONOUS</em>
+ * mode), or you can start a Python function in a separate thread and set up
+ * a hand-off between Java and Python that allows for passing images and retrieving
+ * results (ASYNCHRONOUS mode).
+ */
 public class PythonHandle implements QuietCloseable {
     private static final Logger LOGGER = LoggerFactory.getLogger(PythonHandle.class);
     private static final Object pythonExpandedLock = new Object();
     private static Map<String, File> pythonIsExpanded = new HashMap<>();
+
+    private static final int PyResultNONE = 0;
+    private static final int PyResultLONG = 1;
+    private static final int PyResultFLOAT = 2;
+    private static final int PyResultSTRING = 3;
+    private static final int PyResultMAT = 4;
+    private static final int PyResultPyObject = 5;
+    private static final int PyResultLIST = 6;
 
     static {
         // find the level
@@ -94,31 +167,85 @@ public class PythonHandle implements QuietCloseable {
         }
     };
 
+    /**
+     * Create a {@link PythonHandle}
+     *
+     * @throws PythonException if the underlying Python environment couldn't be instantiated
+     */
     public PythonHandle() throws PythonException {
         nativeObj = PythonAPI.pilecv4j_python_kogSys_create(callback);
         if(nativeObj == 0L)
             throw new PythonException("Failed to instantiate native PyTorch instance.");
     }
 
-    public String[] retrieveModelLabels() {
-        // how many labels does the model handle.
-        final int numModelLabels = numModelLabels();
-
-        // retrieve the model labels from the python side
-        final String[] labels = new String[numModelLabels];
-        for(int i = 0; i < numModelLabels; i++)
-            labels[i] = getModelLabel(i);
-        return labels;
-    }
-
-    public void runPythonFunction(final String module, final String function, final ParamBlock params) {
+    /**
+     * Run a Python function. Once you have the modules set up (see {@link PythonHandle})
+     * you can invoke a function in from a *.py file. For example, if you have a python file
+     * called "python_script.py" that has a function in it called "def func(...):" then
+     * you can invoke it with parameters as follows:
+     *
+     * <pre>
+     * <code>
+     * try (ResultBlock results = python.runPythonFunction("python_script", "fumc",
+     *               ParamBlock.builder()
+     *                 .arg(arg1)
+     *                 .arg(arg2)
+     *                 .arg("keyword",kwdArg)
+     *                 ...);) {
+     * </code>
+     * </pre>
+     *
+     * <p>
+     * You can pass parameters of the following types:
+     * </p>
+     * <ul>
+     * <li>String</li>
+     * <li>An numeric type.</li>
+     * <li>A {@link CvMat}</li>
+     * <li>The PythonHandle itself. This is primarily used to set up a communication channel between
+     * a running Python script and the Java side.</li>
+     * <li>A list of any of these (including another list)</li>
+     * </ul>
+     *
+     * <p>
+     * The ResultBlock will hold the return from the function. If the function has no return
+     * value then the ResultBlock will be null. You can retrieve any of the following types:
+     * </p>
+     *
+     * <ul>
+     * <li>String</li>
+     * <li>An numeric type.</li>
+     * <li>A {@link CvMat} - you will get a shallow copy.</li>
+     * <li>A PyObject. This will be an opaque handle to an underlying Python return object.
+     * It can passed back into another script</li>
+     * <li>A list of any of these (including another list)</li>
+     * </ul>
+     *
+     */
+    public ResultBlock runPythonFunction(final String module, final String function, final ParamBlock params) {
         try(Tuple args = params.buildArgs();
             Dict kwds = params.buildKeywordArgs();) {
 
-            throwIfNecessary(PythonAPI.pilecv4j_python_runPythonFunction(module, function, args.tupleRef(), kwds.dictRef()));
+            final PointerByReference result = new PointerByReference();
+            final IntByReference resultSizeByRef = new IntByReference();
+
+            throwIfNecessary(PythonAPI.pilecv4j_python_runPythonFunction(module, function, args.tupleRef(),
+                kwds.dictRef(), result, resultSizeByRef));
+
+            final int resultSize = resultSizeByRef.getValue();
+
+            final Pointer p = result.getValue();
+            if(resultSize == 0 || p.equals(Pointer.NULL))
+                return null;
+
+            return new ResultBlock(p, resultSize);
         }
     }
 
+    /**
+     * When running a Python script asynchronously, this object will represent the state
+     * of the Python script.
+     */
     public static class PythonRunningState {
         public final AtomicBoolean isRunning = new AtomicBoolean(false);
         public final AtomicReference<RuntimeException> failed = new AtomicReference<>();
@@ -156,6 +283,29 @@ public class PythonHandle implements QuietCloseable {
 
     }
 
+    /**
+     * When in SYNCHRONOUS mode, given the use of calling Python in PileCV4J is to call
+     * a neural network, you can write the script to hand the labels (classes) back to Java.
+     * This is usually done on the script side before initializing the source and on the Java
+     * side this should then be called after the source is initialized
+     * (see {@link PythonRunningState#waitUntilSourceInitialized(long)}) and then call this method.
+     */
+    public String[] retrieveModelLabels() {
+        // how many labels does the model handle.
+        final int numModelLabels = numModelLabels();
+
+        // retrieve the model labels from the python side
+        final String[] labels = new String[numModelLabels];
+        for(int i = 0; i < numModelLabels; i++)
+            labels[i] = getModelLabel(i);
+        return labels;
+    }
+
+    /**
+     * Run the script asynchronously. It is assumed the python function will loop and
+     * communicate back with the Java side through the {@link ImageSource}. If you just want
+     * to call a Python function you should use {@link PythonHandle#runPythonFunction(String, String, ParamBlock)}.
+     */
     public PythonRunningState runPythonFunctionAsynch(final String module, final String function, final ParamBlock pb) {
         final var ret = new PythonRunningState(this);
         final AtomicBoolean started = new AtomicBoolean(false);
@@ -182,21 +332,37 @@ public class PythonHandle implements QuietCloseable {
         return ret;
     }
 
+    /**
+     * Add a path to the Python environment where Python should search for modules (*.py files).
+     */
     public void addModulePath(final String dir) {
         final String absDir = FileSystems.getDefault().getPath(dir).normalize().toAbsolutePath().toString();
         PythonAPI.pilecv4j_python_addModulePath(absDir);
     }
 
+    /**
+     * While running in ASYNCHRONOUS mode, you can send a {@link CvMat} vide the
+     * image source to the running Python script. Obviously, on the Pthon side, you
+     * will have needed to write the script to read from the ImageSource.
+     */
     public PythonResults sendMat(final CvMat mat, final boolean isRgb, final ParamBlock params) {
         if(imageSource != null)
             return imageSource.send(mat, isRgb, params);
         throw new IllegalStateException("There's no current image source");
     }
 
+    /**
+     * While running in ASYNCHRONOUS mode, send an indication to the Python script that
+     * we're finished.
+     */
     public void eos() {
         sendMat(null, false, null);
     }
 
+    /**
+     * Clean up the resources. This will close the ImageSource if it's been created
+     * for communication in ASYNCHRONOUS mode, and also close done the Python interpreter.
+     */
     @Override
     public void close() {
         if(imageSource != null)
@@ -206,6 +372,11 @@ public class PythonHandle implements QuietCloseable {
             PythonAPI.pilecv4j_python_kogSys_destroy(nativeObj);
     }
 
+    /**
+     * Create the {@link PythonHandle), unpack the Python module located at
+     * {@code pythonModuleUri} (e.g. "classpath:///python"), and add the
+     * unpacked module to the Python path.
+     */
     public static PythonHandle initModule(final String pythonModuleUri) {
         final File pythonModulePath = unpackModule(pythonModuleUri);
         final PythonHandle ret = new PythonHandle();
@@ -213,12 +384,25 @@ public class PythonHandle implements QuietCloseable {
         return ret;
     }
 
-    public static File unpackModule(final String pythonModulePath) {
+    /**
+     * This is will unpack a module and add it to the path that Python searches
+     * for *.py modules.
+     */
+    public void unpackAndAddModule(final String pythonModuleUri) {
+        final File tmpDirWithPythonModule = unpackModule(pythonModuleUri);
+        addModulePath(tmpDirWithPythonModule.getAbsolutePath());
+    }
+
+    /**
+     * This is will unpack a module into a temp directory and return
+     * to you the path where it was unpacked.
+     */
+    public static File unpackModule(final String pythonModuleUri) {
         synchronized(pythonExpandedLock) {
-            final File ret = pythonIsExpanded.get(pythonModulePath);
+            final File ret = pythonIsExpanded.get(pythonModuleUri);
             if(ret == null) {
                 try(Vfs vfs = new Vfs();) {
-                    final Path path = vfs.toPath(uncheck(() -> new URI(pythonModulePath)));
+                    final Path path = vfs.toPath(uncheck(() -> new URI(pythonModuleUri)));
                     if(!path.exists() || !path.isDirectory())
                         throw new IllegalStateException("The python code isn't properly bundled in the jar file.");
 
@@ -227,7 +411,7 @@ public class PythonHandle implements QuietCloseable {
 
                     copy(path, pythonCodeDir.getAbsolutePath(), true);
 
-                    pythonIsExpanded.put(pythonModulePath, pythonCodeDir);
+                    pythonIsExpanded.put(pythonModuleUri, pythonCodeDir);
                     return pythonCodeDir;
                 } catch(final IOException ioe) {
                     throw new IllegalStateException("Failed to expand python code.", ioe);
@@ -237,6 +421,13 @@ public class PythonHandle implements QuietCloseable {
         }
     }
 
+    /**
+     * When communicating an ASYNCHRONOUS mode you send a Mat using {@link PythonHandle#sendMat(CvMat, boolean, ParamBlock)}
+     * and you'll get a {@link PythonResults} back. This acts like a Java Future. The script should eventually
+     * set a result Mat from the CNN operation in response to the {@code sendMat}. At that point
+     * {@link PythonResults#hasResult()} will return true and {@link PythonResults#getResultMat()} will
+     * return the results that were set from the Python script.
+     */
     public static class PythonResults implements QuietCloseable {
         private final long nativeObj;
 
@@ -244,6 +435,11 @@ public class PythonHandle implements QuietCloseable {
             this.nativeObj = nativeObj;
         }
 
+        /**
+         * Once the Python script has set the result of an operation that was started using
+         * {@link PythonHandle#sendMat(CvMat, boolean, ParamBlock)}, this will return those results. Until
+         * then it will return null. You can poll for the result using {PythonResults{@link #hasResult()}.
+         */
         public CvMat getResultMat() {
             if(nativeObj != 0L) {
                 final long resRef = PythonAPI.pilecv4j_python_kogMatResults_getResults(nativeObj);
@@ -255,12 +451,21 @@ public class PythonHandle implements QuietCloseable {
             throw new NullPointerException("Illegal KogMatResults. Null underlying reference.");
         }
 
+        /**
+         * Clean up the underlying resources. The {@link PythonResults} should not be used
+         * after they have been closed.
+         */
         @Override
         public void close() {
             if(nativeObj != 0L)
                 PythonAPI.pilecv4j_python_kogMatResults_destroy(nativeObj);
         }
 
+        /**
+         * Once the Python script has set the result of an operation that was started using
+         * {@link PythonHandle#sendMat(CvMat, boolean, ParamBlock)}, this will return true and
+         * any actual results can be retrieved using {@link PythonResults#getResultMat()}.
+         */
         public boolean hasResult() {
             if(nativeObj != 0L)
                 return PythonAPI.pilecv4j_python_kogMatResults_hasResult(nativeObj) == 0 ? false : true;
@@ -274,7 +479,7 @@ public class PythonHandle implements QuietCloseable {
         }
     }
 
-    public static class ImageSource implements QuietCloseable {
+    static class ImageSource implements QuietCloseable {
         private final long imageSourceRef;
 
         ImageSource(final long imageSourceRef) {
@@ -312,37 +517,75 @@ public class PythonHandle implements QuietCloseable {
         }
     }
 
-    public int numModelLabels() {
-        return PythonAPI.pilecv4j_python_kogSys_numModelLabels(nativeObj);
+    static Object parseResult(final ByteBuffer bb) {
+        final byte type = bb.get();
+        switch(type) {
+            case PyResultNONE:
+                return null;
+            case PyResultLONG:
+                return bb.getLong();
+            case PyResultFLOAT:
+                return bb.getDouble();
+            case PyResultSTRING: {
+                final int size = bb.getInt();
+                final byte[] strBytes = new byte[size];
+                bb.get(strBytes);
+                return new String(strBytes, StandardCharsets.UTF_8);
+            }
+            case PyResultMAT: {
+                final long nativeRef = bb.getLong();
+                try(var qc = new UnmanagedMat(nativeRef);) {
+                    return qc;
+                }
+            }
+            case PyResultPyObject: {
+                final long nativeRef = bb.getLong();
+                final var ret = new PyObject(nativeRef, true);
+                return ret;
+            }
+            case PyResultLIST: {
+                final int size = bb.getInt();
+                final List<Object> ret = new ArrayList<>(size);
+                for(int i = 0; i < size; i++) {
+                    ret.add(parseResult(bb));
+                }
+                return ret;
+            }
+            default:
+                throw new IllegalArgumentException("Can't handle result type:" + type);
+        }
     }
 
-    public String getModelLabel(final int i) {
-        final Pointer ml = PythonAPI.pilecv4j_python_kogSys_modelLabel(nativeObj, i);
-        if(Pointer.nativeValue(ml) == 0L)
-            return null;
-        else
-            return ml.getString(0);
+    static void throwIfNecessary(final int status) throws PythonException {
+        if(status != 0) {
+            final Pointer p = PythonAPI.pilecv4j_python_status_message(status);
+            try(final QuietCloseable qc = () -> PythonAPI.pilecv4j_python_status_freeMessage(p);) {
+                if(Pointer.nativeValue(p) == 0L)
+                    throw new PythonException("Null status message. Status code:" + status);
+                else {
+                    final String message = p.getString(0);
+                    throw new PythonException(message);
+                }
+            }
+        }
     }
-
-//    private static class ParamCloserX implements QuietCloseable {
-//        public final long dict;
-//
-//        ParamCloserX(final long dict) {
-//            this.dict = dict;
-//        }
-//
-//        @Override
-//        public void close() {
-//            if(dict != 0L)
-//                PythonAPI.pilecv4j_python_dict_destroy(dict);
-//        }
-//    }
 
     private static String stripTrailingSlash(final String path) {
         if(path.endsWith("/") || path.endsWith("\\"))
             return path.substring(0, path.length() - 1);
         else
             return path;
+    }
+
+    private static class UnmanagedMat extends CvMat {
+        private UnmanagedMat(final long nativeRef) {
+            super(nativeRef);
+        }
+
+        // we're skipping the delete because this mat is actually
+        // managed by the result block
+        @Override
+        protected void doNativeDelete() {}
     }
 
     private static String getPath(final URI uri) {
@@ -390,42 +633,15 @@ public class PythonHandle implements QuietCloseable {
         }
     }
 
-//    private static long fillPythonDict(final ParamCloser q, final Map<String, Object> kwds) {
-//        final long dict;
-//        if(kwds != null && kwds.size() > 0) {
-//            dict = q.dict;
-//            kwds.entrySet().forEach(e -> {
-//                final Object val = e.getValue();
-//                if(val instanceof PythonHandle)
-//                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putKogSys(dict, e.getKey(), ((PythonHandle)val).nativeObj));
-//                else if(val instanceof Boolean)
-//                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putBoolean(dict, e.getKey(), ((Boolean)val).booleanValue() ? 1 : 0));
-//                else if(val instanceof Number) {
-//                    if(val instanceof Integer || val instanceof Byte || val instanceof Long)
-//                        throwIfNecessary(PythonAPI.pilecv4j_python_dict_putInt(dict, e.getKey(), ((Number)val).longValue()));
-//                    else if(val instanceof Float || val instanceof Double)
-//                        throwIfNecessary(PythonAPI.pilecv4j_python_dict_putFloat(dict, e.getKey(), ((Number)val).doubleValue()));
-//                    else
-//                        throw new PythonException("Unknown number type:" + val.getClass().getName());
-//                } else
-//                    throwIfNecessary(PythonAPI.pilecv4j_python_dict_putString(dict, e.getKey(), val.toString()));
-//            });
-//        } else
-//            dict = 0L;
-//        return dict;
-//    }
+    private String getModelLabel(final int i) {
+        final Pointer ml = PythonAPI.pilecv4j_python_kogSys_modelLabel(nativeObj, i);
+        if(Pointer.nativeValue(ml) == 0L)
+            return null;
+        else
+            return ml.getString(0);
+    }
 
-    static void throwIfNecessary(final int status) throws PythonException {
-        if(status != 0) {
-            final Pointer p = PythonAPI.pilecv4j_python_status_message(status);
-            try(final QuietCloseable qc = () -> PythonAPI.pilecv4j_python_status_freeMessage(p);) {
-                if(Pointer.nativeValue(p) == 0L)
-                    throw new PythonException("Null status message. Status code:" + status);
-                else {
-                    final String message = p.getString(0);
-                    throw new PythonException(message);
-                }
-            }
-        }
+    private int numModelLabels() {
+        return PythonAPI.pilecv4j_python_kogSys_numModelLabels(nativeObj);
     }
 }

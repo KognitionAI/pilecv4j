@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
+import org.opencv.core.Mat;
 
+import net.dempsy.util.MutableInt;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.python.internal.PythonAPI;
@@ -16,6 +18,10 @@ public class ParamBlock {
 
     private final List<LongConsumer> dictCreator = new ArrayList<>(50);
     private final List<LongConsumer> tupleCreator = new ArrayList<>(50);
+
+    public static ParamBlock builder() {
+        return new ParamBlock();
+    }
 
     public ParamBlock arg(final String kwd, final String val) {
         dictCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_dict_putString(l2, kwd, val)));
@@ -42,9 +48,37 @@ public class ParamBlock {
         return this;
     }
 
+    public ParamBlock arg(final String kwd, final Mat val) {
+        dictCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_dict_putMat(l2, kwd, val.nativeObj)));
+        return this;
+    }
+
+    public ParamBlock arg(final String kwd, final PyObject val) {
+        dictCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_dict_putPyObject(l2, kwd, val.nativeRef)));
+        return this;
+    }
+
     public ParamBlock arg(final String val) {
         final int index = tupleCreator.size();
         tupleCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putString(l2, index, val)));
+        return this;
+    }
+
+    public ParamBlock arg(final Mat val) {
+        final int index = tupleCreator.size();
+        tupleCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putMat(l2, index, val.nativeObj)));
+        return this;
+    }
+
+    public ParamBlock arg(final List<?> val) {
+        final int index = tupleCreator.size();
+        tupleCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putPyObject(l2, index, parseTuple(val))));
+        return this;
+    }
+
+    public ParamBlock arg(final PyObject val) {
+        final int index = tupleCreator.size();
+        tupleCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putPyObject(l2, index, val.nativeRef)));
         return this;
     }
 
@@ -120,7 +154,25 @@ public class ParamBlock {
         return new Dict(dictRef);
     }
 
-    public static ParamBlock builder() {
-        return new ParamBlock();
+    private static long parseTuple(final List<?> val) {
+        final long pyList = PythonAPI.pilecv4j_python_tuple_create(val.size());
+        final MutableInt pyListIndex = new MutableInt(0);
+        val.forEach(o -> {
+            if(o instanceof String)
+                throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putString(pyList, (int)pyListIndex.val++, (String)o));
+            else if(o instanceof Number) {
+                final Number p = (Number)o;
+                if(o instanceof Long || o instanceof Integer || o instanceof Short || o instanceof Byte)
+                    throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putInt(pyList, (int)pyListIndex.val++, p.longValue()));
+                else
+                    throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putFloat(pyList, (int)pyListIndex.val++, p.doubleValue()));
+            } else if(o instanceof Mat)
+                throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putMat(pyList, (int)pyListIndex.val++, ((Mat)o).nativeObj));
+            else if(o instanceof PythonHandle)
+                throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putKogSys(pyList, (int)pyListIndex.val++, ((PythonHandle)o).nativeObj));
+            else if(o instanceof List)
+                throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putPyObject(pyList, (int)pyListIndex.val++, parseTuple((List<?>)o)));
+        });
+        return pyList;
     }
 }

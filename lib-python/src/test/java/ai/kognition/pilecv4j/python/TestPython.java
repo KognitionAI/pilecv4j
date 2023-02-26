@@ -16,7 +16,6 @@
 
 package ai.kognition.pilecv4j.python;
 
-import static ai.kognition.pilecv4j.python.UtilsForTesting.translateClasspath;
 import static net.dempsy.util.Functional.uncheck;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -40,26 +39,10 @@ import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
 import ai.kognition.pilecv4j.python.PythonHandle.PythonResults;
 
-public class TestPython {
-    public static final boolean SHOW;
-
-    private static final ParamBlock fakeParams = ParamBlock.builder()
-        .arg("int", 1)
-        .arg("float", 1.0)
-        .arg("string", "hello");
-
-    static {
-        final String sysOpSHOW = System.getProperty("pilecv4j.SHOW");
-        final boolean sysOpSet = sysOpSHOW != null;
-        boolean show = ("".equals(sysOpSHOW) || Boolean.parseBoolean(sysOpSHOW));
-        if(!sysOpSet)
-            show = Boolean.parseBoolean(System.getenv("PILECV4J_SHOW"));
-        SHOW = show;
-    }
+public class TestPython extends BaseTest {
 
     @Test
     public void testModel() throws Exception {
-        final String testImageFilename = translateClasspath("test-data/people.jpeg");
 
         final int NUM_IMAGE_PASS = 1000;
 
@@ -67,7 +50,7 @@ public class TestPython {
 
         try(final Closer closer = new Closer();
             final PythonHandle pt = new PythonHandle();
-            final CvMat mat = ImageFile.readMatFromFile(testImageFilename);) {
+            final CvMat mat = ImageFile.readMatFromFile(TEST_IMAGE);) {
 
             // add the module path
             pt.addModulePath("./src/test/resources/python");
@@ -81,7 +64,6 @@ public class TestPython {
             final long startTime = System.currentTimeMillis();
 
             PythonResults prev = null;
-
             for(int count = 0; count < NUM_IMAGE_PASS && !failed.get(); count++) {
 
                 try(CvMat toSend = CvMat.shallowCopy(mat);) {
@@ -115,7 +97,48 @@ public class TestPython {
             assertTrue(ConditionPoll.poll(o -> !res.thread.isAlive()));
             assertNotNull(pt.imageSource);
             assertEquals(0L, pt.imageSource.peek());
+        }
+    }
 
+    @Test
+    public void testImagePassingPerformance() throws Exception {
+
+        final int NUM_IMAGE_PASS = 1000;
+
+        final AtomicBoolean failed = new AtomicBoolean(false);
+
+        try(final PythonHandle pt = new PythonHandle();
+            final CvMat mat = ImageFile.readMatFromFile(TEST_IMAGE);) {
+
+            // add the module path
+            pt.addModulePath("./src/test/resources/python");
+
+            final var res = pt.runPythonFunctionAsynch("testReceiveMat2", "func", ParamBlock.builder()
+                .arg("kogsys", pt));
+
+            // wait for the script to get an image source
+            assertTrue(ConditionPoll.poll(o -> res.sourceIsInitialized()));
+
+            final long startTime = System.currentTimeMillis();
+
+            for(int count = 0; count < NUM_IMAGE_PASS && !failed.get(); count++) {
+                try(CvMat toSend = CvMat.shallowCopy(mat);) {
+                    final PythonResults results = pt.sendMat(toSend, false, null);
+                    while(!results.hasResult());
+                    try(final CvMat resMat = results.getResultMat();) {
+                        assertNotNull(resMat);
+                    }
+                }
+            }
+
+            final long endTime = System.currentTimeMillis();
+            System.out.println("Rate: " + ((double)(NUM_IMAGE_PASS * 1000) / (endTime - startTime)) + " det/sec");
+
+            assertFalse(failed.get());
+            pt.eos(); // EOS
+            assertTrue(ConditionPoll.poll(o -> !res.thread.isAlive()));
+            assertNotNull(pt.imageSource);
+            assertEquals(0L, pt.imageSource.peek());
         }
     }
 

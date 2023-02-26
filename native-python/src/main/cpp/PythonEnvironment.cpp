@@ -177,20 +177,33 @@ namespace python {
     return s_instance;
   }
 
-  int32_t PythonEnvironment::runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict) {
+  int32_t PythonEnvironment::runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict, PyObject** result) {
+    if (result)
+      *result = nullptr;
     CallPythonGuard gg;
     {
       RunPythonFunction func(moduleName, functionName, tupleArgs, paramDict);
       PyObject* obj = func.execute();
-      log(TRACE, "func %s returned object %ld", functionName, static_cast<long>((uint64_t)obj));
+      log(TRACE, "func %s returned object %ld, refcnt: %d", functionName, static_cast<long>((uint64_t)obj), (int)(obj ? obj->ob_refcnt : -1));
       if (obj) {
         if (obj == Py_None) {
           log(TRACE, "func %s returned object is None", functionName);
-          Py_DECREF(obj);
+          if (result)
+            *result = obj;
+          else
+            Py_DECREF(obj);
           return func.statusCode;
         }
-        log(TRACE, "decrementing return value (refCnt pre-dec: %d)", obj->ob_refcnt);
-        Py_DECREF(obj);
+        if (result)
+          *result = obj;
+        else {
+          log(TRACE, "decrementing return value (refCnt pre-dec: %d)", obj->ob_refcnt);
+          Py_DECREF(obj);
+        }
+      } else {
+        log(TRACE, "Failed calling function %s in module %d", functionName, moduleName);
+        PyErr_Print();
+        return PYTHON_ERROR;
       }
       return func.statusCode;
     }

@@ -67,6 +67,12 @@ static const char* lookupCvTypeName(int cvType) {
 namespace pilecv4j {
 namespace python {
 
+#define numpyImportCheck \
+    if (!PythonEnvironment::instance()->numpyImported) { \
+      import_array(); \
+      PythonEnvironment::instance()->numpyImported = true; \
+    }
+
   ImageSource::ImageSource() : ondeck(nullptr), eos(false) {
     log(TRACE,"instantiating ImageSource %ld", (uint64_t)this );
   }
@@ -128,6 +134,23 @@ namespace python {
       prev->abandoned = true;
       prev->decrement();
     }
+  }
+
+  bool ImageSource::isNumpyArray(PyObject* amI, int32_t* status) {
+    if (status)
+      *status = OK;
+    if (!PythonEnvironment::instance()->numpyImported) {
+      {
+        CallPythonGuard gg;
+        if (_import_array() < 0) {
+          if (status)
+            *status = CANT_OPEN_PYTHON_MODULE;
+          return false;
+        }
+      }
+      PythonEnvironment::instance()->numpyImported = true;
+    }
+    return PyArray_Check(amI);
   }
 
   PyObject* ImageSource::convertMatToNumPyArray(cv::Mat* mat, ConvertMode convertMode, int* statusCode, bool fromPython) {
