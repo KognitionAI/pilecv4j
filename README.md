@@ -62,7 +62,7 @@ An introduction and overview of the project was presented to the Philly Java Use
 
 ## Short Example
 
-*For the full code of this example, see:*
+*For the full code of this example, see:* [Pilecv4j Tutorial 0 code](https://github.com/KognitionAI/pilecv4j-tutorials/tree/master/tutorial-0-simple-example)
 
 Here is a simple example to get started. We'll write java code that plays a video. To use the video processing include the following in your project (or the gradle equivalent).
 
