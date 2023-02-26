@@ -5,7 +5,7 @@
   <parent>
     <groupId>ai.kognition.pilecv4j</groupId>
     <artifactId>pilecv4j-settings</artifactId>
-    <version>0.18-SNAPSHOT</version>
+    <version>1.0</version>
     <relativePath>../settings/pom.xml</relativePath>
   </parent>
 
