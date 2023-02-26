@@ -245,7 +245,7 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testRemux() throws Exception {
         LOGGER.info("Running test: {}.testRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        final File destination = new File("/tmp/out.flv");// tempDir.newFile("out.flv");
+        final File destination = tempDir.newFile("out.flv");
         if(destination.exists())
             destination.delete();
         try(
@@ -293,7 +293,7 @@ public class TestFfmpeg2 extends BaseTest {
     @Test
     public void testSegmentedRemux() throws Exception {
         LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
-        final File destination = new File("/tmp/out"); // tempDir.newFile("out");
+        final File destination = tempDir.newFile("out");
         if(destination.exists())
             destination.delete();
         // we're going to
@@ -448,7 +448,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testEncodingSimple() throws Exception {
-        LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        LOGGER.info("Running test: {}.testEncodingSimple(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.mp4");
         // final File destination = new File("/tmp/out.mp4");
         if(destination.exists())
@@ -562,7 +562,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testEncodingCustomOutput() throws Exception {
-        LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        LOGGER.info("Running test: {}.testEncodingCustomOutput(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.ts");
         if(destination.exists())
             destination.delete();
@@ -649,7 +649,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testEncodingCustomOutputWithSeek() throws Exception {
-        LOGGER.info("Running test: {}.testEncoding(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        LOGGER.info("Running test: {}.testEncodingCustomOutputWithSeek(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.mp4");
         if(destination.exists())
             destination.delete();
