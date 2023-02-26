@@ -275,7 +275,7 @@ public class TestFfmpeg2 extends BaseTest {
     @Ignore
     @Test
     public void testDumpTiming() throws Exception {
-        LOGGER.info("Running test: {}.testSegmentedRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        LOGGER.info("Running test: {}.testDumpTiming(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
 
         try(final MediaContext c = Ffmpeg.createMediaContext("/tmp/out_00.ts")
             .filterPackets(p -> {
@@ -388,7 +388,7 @@ public class TestFfmpeg2 extends BaseTest {
 
     @Test
     public void testCustomRemuxWithSeek() throws Exception {
-        LOGGER.info("Running test: {}.testCustomRemux(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
+        LOGGER.info("Running test: {}.testCustomRemuxWithSeek(sync={})", TestFfmpeg2.class.getSimpleName(), sync);
         final File destination = tempDir.newFile("out.mp4");
         if(destination.exists())
             destination.delete();
