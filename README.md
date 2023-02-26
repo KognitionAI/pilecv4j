@@ -5,9 +5,8 @@ This project contains several tools for creating image and video processing appl
 ## Table of Contents
 - [What is this project?](#what-is-this-project)
   - [Table of Contents](#table-of-contents)
-- [Introduction](#introduction)
-- [Prerequisites](#prerequisites)
 - [Introduction to the Project](#introduction-to-the-project)
+- [Prerequisites](#prerequisites)
 - [Jumping Right In](#jumping-right-in)
   - [Short Example](#short-example)
 - [Project Overview](#project-overview)
@@ -37,11 +36,11 @@ This project contains several tools for creating image and video processing appl
 - [Building](#building)
 - [History](#history)
 
-# Introduction
+# Introduction to the Project
 
-The documentation for this project is in its infancy (and likely perpetually out of date).
+An introduction and overview of the project was presented to the Philly Java Users Group on Feb 22, 2023. It starts off at a very basic level.
 
-This project will provide a basis for building video processing chains meant for operationalizing AI models. In my own projects I'm currently using various AI frameworks like [Pytorch](https://pytorch.org/) using the `lib-python` functionality. [TensorFlow](https://www.tensorflow.org/) using `lib-tf` and even [Darknet](https://pjreddie.com/darknet/) with some minimal custom native glue code.
+[![Image and Video Processing using OpenCV and Pilecv4j](https://img.youtube.com/vi/FrSOjOil1o8/1.jpg)](https://www.youtube.com/watch?v=FrSOjOil1o8)
 
 # Prerequisites
 
@@ -51,12 +50,6 @@ Most dependencies will be picked up automatically from [maven central](https://w
 1. [Python](https://www.python.org/). In this case you'll need the development libraries installed for Python3 and also numpy installed into the python environment you'll be building in.
 
 *Note:* You shouldn't need [OpenCV](https://opencv.org/) installed since there is a pre-built [OpenCV](https://opencv.org/) bundled in a jar file that will be automatically picked up as a dependency.
-
-# Introduction to the Project
-
-An introduction and overview of the project was presented to the Philly Java Users Group on Feb 22, 2023. It starts off at a very basic level.
-
-[![Image and Video Processing using OpenCV and Pilecv4j](https://img.youtube.com/vi/FrSOjOil1o8/1.jpg)](https://www.youtube.com/watch?v=FrSOjOil1o8)
 
 # Jumping Right In
 
