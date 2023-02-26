@@ -32,6 +32,7 @@ public class PlatformDetection {
     public static String ARCH_PPC = "ppc";
     public static String ARCH_X86_32 = "x86_32";
     public static String ARCH_X86_64 = "x86_64";
+    public static String ARCH_ARM_64 = "aarch64";
 
     public PlatformDetection() {
         // resolve OS
@@ -57,6 +58,7 @@ public class PlatformDetection {
         archMap.put("x86_64", ARCH_X86_64);
         archMap.put("amd64", ARCH_X86_64);
         archMap.put("powerpc", ARCH_PPC);
+        archMap.put("aarch64", ARCH_ARM_64);
         this.arch = archMap.get(SystemUtils.OS_ARCH);
         if(this.arch == null) {
             throw new IllegalArgumentException("Unknown architecture " + SystemUtils.OS_ARCH);
