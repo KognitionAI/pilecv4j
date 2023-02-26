@@ -49,8 +49,8 @@ struct StreamDetails;
 
 #ifdef _INSIDE_PILECV4J_FFMPEG_STREAMCONTEXT_CPP
 extern "C" {
-  uint64_t pcv4j_ffmpeg2_mediaContext_stop(uint64_t ctx);
-  uint32_t pcv4j_ffmpeg2_mediaContext_state(uint64_t ctx);
+  KAI_EXPORT uint64_t pcv4j_ffmpeg2_mediaContext_stop(uint64_t ctx);
+  KAI_EXPORT uint32_t pcv4j_ffmpeg2_mediaContext_state(uint64_t ctx);
 }
 
 class MediaContext;

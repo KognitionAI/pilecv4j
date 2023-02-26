@@ -19,6 +19,8 @@ extern "C" {
 #include <libavutil/opt.h>
 }
 
+#include <cmath>
+
 using namespace ai::kognition::pilecv4j;
 
 namespace pilecv4j
