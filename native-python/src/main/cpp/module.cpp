@@ -1,9 +1,9 @@
+#include <JavaHandle.h>
 #include <Python.h>
 #include <mutex>
 
 #include "PythonEnvironment.h"
 #include "ImageSource.h"
-#include "KogSystem.h"
 
 using namespace pilecv4j::python;
 
@@ -223,7 +223,7 @@ static void initImageSource_Type()
 //-----------------------------------------------------------
 typedef struct {
   PyObject_HEAD
-  KogSystem* kogSys;
+  JavaHandle* kogSys;
 } PKogSystem;
 
 //------------------
@@ -269,7 +269,7 @@ static PyObject* KogSystem_modelLabels(PKogSystem* pt, PyObject* args)
   }
 
   Py_ssize_t sz = PyList_Size(list);
-  const char** nlist = KogSystem::emptyModelLabels(sz);
+  const char** nlist = JavaHandle::emptyModelLabels(sz);
 
   for (int i = 0; i < sz; i++) {
     PyObject* cur = PyList_GetItem(list, i);
@@ -289,7 +289,7 @@ static PyObject* KogSystem_modelLabels(PKogSystem* pt, PyObject* args)
 
   error:
   Py_DECREF(list);
-  KogSystem::freeModelLabels(nlist, sz);
+  JavaHandle::freeModelLabels(nlist, sz);
   PyErr_SetString(PyExc_TypeError, "Invalid parameter. One of the list elements was not a string");
   return NULL;
 
@@ -331,7 +331,7 @@ static void initKogSystem_Type()
   PKogSystem_Type.tp_new = 0;
 }
 
-PyObject* convert(KogSystem* pt) {
+PyObject* convert(JavaHandle* pt) {
   PKogSystem* ret = (PKogSystem*)(PKogSystem_Type.tp_alloc(&PKogSystem_Type, 0));
   if (!ret) {
     return NULL;

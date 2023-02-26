@@ -2,8 +2,6 @@
 
 #include <stdarg.h>
 
-#define LOGGING
-
 // =====================================================
 // Utilities: logging
 // =====================================================
@@ -29,11 +27,36 @@ namespace python {
   }
 
 #ifdef LOGGING
+#ifdef PILECV4J_ENABLE_TRACE_API
+  class TraceGuard
+  {
+    const char* function;
+    const char* component;
+  public:
+    TraceGuard* parent;
+    int depth;
+
+    const char* getSpaces();
+
+    explicit TraceGuard(const char* _component, const char* _function);
+    TraceGuard();
+    ~TraceGuard();
+  };
+
+#ifdef _MSC_VER
+#define __PRETTY_FUNCTION__ __FUNCTION__
+#endif
+
+#define RAW_PILECV4J_TRACE(c) TraceGuard _tg(c, __PRETTY_FUNCTION__)
+#else
+#define RAW_PILECV4J_TRACE(c)
+#endif
   void log(LogLevel llevel, const char *fmt, ...);
   void setLogLevel(LogLevel ll);
 #else
   inline static void log(...) {}
   inline static void setLogLevel(LogLevel ll) {}
+#define RAW_PILECV4J_TRACE(c)
 #endif
 }
 }

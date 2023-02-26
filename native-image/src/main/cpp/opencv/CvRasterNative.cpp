@@ -53,6 +53,11 @@ extern "C" {
   KAI_EXPORT uint64_t pilecv4j_image_CvRaster_copy(uint64_t native) {
     cv::Mat* mat = (cv::Mat*) native;
 
+    if (mat->dims == 0) { // if there's no data, just return an empty mat
+      cv::Mat* newMat = new cv::Mat();
+      return (uint64_t)newMat;
+    }
+
     if (!mat->isContinuous())
       return 0L;
 

@@ -12,17 +12,17 @@ namespace python {
   typedef uint64_t (*get_image_source)(uint64_t ptref);
   class ImageSource;
 
-  class KogSystem {
+  class JavaHandle {
     get_image_source getImageSourceCb;
     const char** modelLabels;
     int numLabels;
 
   public:
-    inline KogSystem(get_image_source cb) : getImageSourceCb(cb), modelLabels(nullptr), numLabels(0) {
+    inline JavaHandle(get_image_source cb) : getImageSourceCb(cb), modelLabels(nullptr), numLabels(0) {
       log(TRACE, "Instantiating PyTorch(callback=%ld)", (uint64_t)cb);
     };
 
-    static void set(KogSystem* instance);
+    static void set(JavaHandle* instance);
 
     inline static void freeModelLabels(const char** modelLabels, int numLabels) {
       if (modelLabels) {
@@ -38,7 +38,7 @@ namespace python {
       return (index < 0 || index >= numLabels) ? nullptr :  modelLabels[index];
     }
 
-    inline ~KogSystem() {
+    inline ~JavaHandle() {
       log(TRACE, "Deleting PyTorch(callback=%ld)", static_cast<long>( (uint64_t)((void*)getImageSourceCb)));
       freeModelLabels(modelLabels, numLabels);
     }
@@ -60,6 +60,6 @@ namespace python {
 
   };
 
-  KogSystem* convertPyTorch();
+  JavaHandle* convertPyTorch();
 }
 }

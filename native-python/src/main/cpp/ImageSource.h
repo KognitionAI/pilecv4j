@@ -116,6 +116,7 @@ namespace python {
 
     static PyObject* convertMatToNumPyArray(cv::Mat* toConvert, ConvertMode converMode, int* statusCode, bool fromPython);
     static cv::Mat* convertNumPyArrayToMat(PyObject* npArray, ConvertMode converMode, int* statusCode, bool fromPython);
+    static bool isNumpyArray(PyObject* npArray, int32_t* status);
 
     // it will increment the count. needs to be decremented.
     KogMatWithResults* next();

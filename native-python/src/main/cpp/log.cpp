@@ -40,6 +40,55 @@ namespace python {
       fflush(stderr);
     }
   }
+#ifdef PILECV4J_ENABLE_TRACE_API
+  static thread_local TraceGuard* tlParent;
+
+  static char** getSpacesArray(int size)
+  {
+    char** ret = new char*[size];
+    for (int i = 0; i < size; i++)
+    {
+      ret[i] = new char[i + 1];
+
+      int j;
+      for (j = 0; j < i; j++)
+        ret[i][j] = ' ';
+      ret[i][j] = 0;
+    }
+    return ret;
+  }
+
+  static char** spaces = getSpacesArray(256);
+
+  const char* TraceGuard::getSpaces() { return spaces[depth]; }
+
+  TraceGuard::TraceGuard(const char* _component, const char* _function) :component(_component), function(_function)
+  {
+    parent = tlParent;
+    depth = parent == NULL ? 0 : parent->depth + 1;
+
+    tlParent = this;
+
+    log(TRACE, "%s[%s] Entering %s", spaces[depth], component, function);
+  }
+
+  TraceGuard::TraceGuard() : component(nullptr), function(nullptr)
+  {
+    parent = tlParent;
+    depth = parent == NULL ? 0 : parent->depth + 1;
+    tlParent = this;
+    // silent
+  }
+
+  TraceGuard::~TraceGuard()
+  {
+    if (function)
+      log(TRACE, "%s[%s] Leaving %s", spaces[depth], component, function);
+
+    // need to pop the stack
+    tlParent = this->parent;
+  }
+#endif
 #endif
 }
 }
