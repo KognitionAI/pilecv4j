@@ -42,6 +42,8 @@ An introduction and overview of the project was presented to the Philly Java Use
 
 [![Image and Video Processing using OpenCV and Pilecv4j](https://img.youtube.com/vi/FrSOjOil1o8/1.jpg)](https://www.youtube.com/watch?v=FrSOjOil1o8)
 
+All of the code (and then some) walked through in the presentation can be found in the sister project [pilecv4j-tutorials](https://github.com/KognitionAI/pilecv4j-tutorials). The code for this presentation is in the subdirectory of the project at [philly-jug-examples](https://github.com/KognitionAI/pilecv4j-tutorials/tree/master/philly-jug-examples)
+
 # Prerequisites
 
 Most dependencies will be picked up automatically from [maven central](https://www.mvnrepository.com/) but there are several to take note of.
