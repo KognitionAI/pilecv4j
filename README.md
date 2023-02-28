@@ -10,14 +10,6 @@ This project contains several tools for creating image and video processing appl
 - [Jumping Right In](#jumping-right-in)
   - [Short Example](#short-example)
 - [Project Overview](#project-overview)
-  - [lib-image](#lib-image)
-  - [lib-ffmpeg](#lib-ffmpeg)
-  - [lib-python](#lib-python)
-  - [lib-ipc](#lib-ipc)
-  - [lib-tf](#lib-tf)
-  - [lib-nr](#lib-nr)
-  - [lib-util](#lib-util)
-  - [lib-tracker](#lib-tracker)
 - [Image Processing](#image-processing)
   - [OpenCv Mat Resource Management](#opencv-mat-resource-management)
   - [Direct Bulk Access To Pixel Data From Java](#direct-bulk-access-to-pixel-data-from-java)
@@ -58,7 +50,7 @@ Most dependencies will be picked up automatically from [maven central](https://w
 
 ## Short Example
 
-*For the full code of this example, see:* [Pilecv4j Tutorial 0 code](https://github.com/KognitionAI/pilecv4j-tutorials/tree/master/tutorial-0-simple-example)
+*For the full code of this example, see:* [Pilecv4j Tutorial 0 Simple Example code](https://github.com/KognitionAI/pilecv4j-tutorials/tree/master/tutorial-0-simple-example)
 
 Here is a simple example to get started. We'll write java code that plays a video. To use the video processing include the following in your project (or the gradle equivalent).
 
@@ -132,38 +124,38 @@ For the purposes of this example we'll assume there's a video file at `/tmp/test
 
 # Project Overview
 
-## lib-image
+**1. lib-image**
 
 `lib-image` contains the main image processing routines and OpenCv functionality. It contains some decent general purpose classes but also some more esoteric implementations that might be hard to find in other places. When using the Java API for OpenCv with video you are very likely to run into memory problems. This is because the management of OpenCv's native, off-heap (off of the Java heap management), memory is done using Java's finalizers. Garbage collection in Java doesn't track off-heap memory and so when processing video you quickly run out of system memory. This library, among many other things, augments OpenCv's Java API to use Java `AutoCloseable`s.
 
-## lib-ffmpeg
+**2. lib-ffmpeg**
 
 `lib-ffmpeg` contains video processing capability. A short list of capabilities include:
 
-1. Connecting to streaming as well as file based video sources.
-2. Decoding video frames and receiving them in your Java code as OpenCv Mat's.
-3. Remuxing any input to any output.
-4. Encoding raw frames back to both streaming and file endpoints
+    1. Connecting to streaming as well as file based video sources.
+    2. Decoding video frames and receiving them in your Java code as OpenCv Mat's.
+    3. Remuxing any input to any output.
+    4. Encoding raw frames back to both streaming and file endpoints
 
-## lib-python
+**3. lib-python**
 
 Because many deep learning systems use Python (e.g. [PyTorch](https://pytorch.org/)), lib-python allows you to use these frameworks from your Java code.
 
-## lib-ipc
+**4. lib-ipc**
 
 This is an extension of system IPC functionality for "shared memory" for use from Java and specifically geared toward passing `Mat`s between processes. It has three different implementations:
 
-1. Posix Shared Memory - this is the default on Linux
-2. System V Shared Memory - optionally, this can be selected on Linux platforms
-3. Windows - this is the only implementation available on Windows since Windows doesn't support Posix or System V.
+    1. Posix Shared Memory - this is the default on Linux
+    2. System V Shared Memory - optionally, this can be selected on Linux platforms
+    3. Windows - this is the only implementation available on Windows since Windows doesn't support Posix or System V.
 
-## lib-tf
+**5. lib-tf**
 
 `lib-tf` is a small and lightweight simple wrapper for Google's [Tensorflow](https://www.tensorflow.org/) that ties it into the remaining libraries here so you can easily use Tensorflow with images from [lib-image](#lib-image) and (therefore) video frames from [lib-ffmpeg](#lib-ffmpeg).
 
-## lib-nr
+**6. lib-nr**
 
-`lib-nr` is an implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method). As a simple example of how to use this library, you pass a function to be minimized to a Minimizer. Suppose I wanted to minimize the simple polynomial `(x-2)^2 - 3`. In this case, it's obvious the minimum is at `[2, -3]` but if we wanted to use the `Minimizer` to determine that we would pass the function to the minimizer and kick it off with an initial value as follows:
+`lib-nr` is an implementation of [Powell's method](https://en.wikipedia.org/wiki/Powell%27s_method). As a simple example of how to use this library, you pass a function to be minimized to a Minimizer. Suppose I wanted to minimize the simple polynomial `(x-2)^2 - 3`. In this case, it's obvious the minimum is at `[2, -3]` but if we wanted to use the `Minimizer` to determine that we would pass the function to the minimizer and kick it off with an initial value as follows (*Note: The spelling error in `getFinalPostion` is in version 1.0 but will be deprecated and fixed going forward.*):
 
 ``` java
         final Minimizer m = new Minimizer(x -> ((x[0] - 2.0) * (x[0] - 2.0)) - 3.0);
@@ -177,11 +169,11 @@ This is an extension of system IPC functionality for "shared memory" for use fro
 
 Powell's method is actually implemented using the algorithm from [Numerical Recipes in C](http://www.numerical.recipes/) and called using [JNA](https://github.com/java-native-access/jna). It currently isn't thread safe but from Java there's a global lock to prevent multiple simultaneous entries. Contributions welcome.
 
-## lib-util
+**7. lib-util**
 
 You probably don't need to worry about `lib-util`. `lib-util` is a library with some utilities used by the other projects here that are primarily helpers for managing access to native code bases.
 
-## lib-tracker
+**8. lib-tracker**
 
 This is a bit of an oddity but it's basically an abstraction for object tracking in video with several OpenCv implementations.
 
@@ -191,7 +183,7 @@ In OpenCV's C/C++ API, the developer is responsible for managing the resources. 
 
 OpenCv's Java Mat's manage native resource and rely on the class' finalizer and therefore the garbage collector, to eventually clean up those resources. This includes the raw image data. The problem with doing this is that the Java VM and it's garbage collector *can't see* the image memory referred to by the Mat. This memory is ["off-heap"](https://dev.to/jeissonflorez29/off-heap-memory-in-java-4dd1) from the perspective of the Java VM.
 
-`lib-image` is an augmentation for [OpenCv](https://opencv.org/)'s Java API. It's primary purpose is to allow the user to handle [OpenCv](https://opencv.org/) [Mat](https://docs.opencv.org/4.5.3/d3/d63/classcv_1_1Mat.html)s as Java resources (that is `Closable`s).
+`lib-image` is an augmentation for [OpenCv](https://opencv.org/)'s Java API. It's primary purpose is to allow the user to handle [OpenCv](https://opencv.org/) [Mat](https://docs.opencv.org/4.5.3/d3/d63/classcv_1_1Mat.html)s as Java resources (that is `AutoCloseable`s).
 
 ## OpenCv Mat Resource Management
 
@@ -301,7 +293,7 @@ If you're going to use the SWT implementation you need to explicitly add the dep
 
 ``` xml
   <dependency> <!-- Used for the SwtImageDisplay -->
-    <groupId>org.eclipse.swt</groupId>
+    <groupId>${swtgroup}</groupId>
     <artifactId>${swtartifact}</artifactId>
     <version></version>
   </dependency>
@@ -317,7 +309,7 @@ If you're going to use the SWT implementation you need to explicitly add the dep
 
 Newer versions of SWT need to be manually installed into your maven repository after being downloaded from https://download.eclipse.org/eclipse/downloads/
 
-*swtartifact* is platform specific. For 64-bit Linux it's `org.eclipse.swt.gtk.linux.x86_64`. For 64-bit Windows it's `org.eclipse.swt.win32.win32.x86_64`
+*swtartifact* and *swtgroup* is platform specific. For 64-bit Linux *swtartifact* `org.eclipse.swt.gtk.linux.x86_64`. For 64-bit Windows it's `org.eclipse.swt.win32.win32.x86_64` and for Aarch64 it's `org.eclipse.swt.gtk.linux.aarch64`. For *swtgroup* it's `org.eclipse.swt` for all supported platforms except Aarch64 where it's `org.eclipse.platform`.
 
 ## Other Image Processing and Image Handling
 
