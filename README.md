@@ -342,7 +342,7 @@ To process a source of media data you construct a `MediaContext`, declare the so
 
 A `MediaContext` represents the coupling of an input source to a set of processing on the media streams in that source. It's also a builder for declaring the media source and that processing to be done.
 <p align="center">Fig 1.</p>
-<p align="center"><img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/Media%20Context.png" width="500"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/KognitionAI/pilecv4j/master/docs/MediaContext.png" width="500"></p>
 
 A `MediaContext` is a Java *resource* so we should manage it using a *try-with-resource*
 
