@@ -227,19 +227,33 @@ public CvMat copyMe(Mat src, boolean deepCopy) {
 
 ## Direct Bulk Access To Pixel Data From Java
 
-Pilecv4j also provides a means of accessing a `Mat`'s pixel data directly as a Java `ByteBuffer`. You do this with the `CvRaster` class.
+Pilecv4j also provides a means of accessing a `Mat`'s pixel data directly as a Java `ByteBuffer`. You do this with the `CvMat.bulkAccess*` call.
 
 **Note:** doing pixel operations from Java is not efficient. You should look to apply OpenCv operations to your data instead.
 
-The cleanest way work with the raw `ByteBuffer` of pixel data is to use the `CvMat` functions `rasterAp` and `rasterOp`. Each take a callback. The only difference is that `rasterOp` can return a value while `rasterAp` returns `void`. Here's an example:
+Here's an example:
 
 ``` java
-    CvMat mat = ....;
+    Mat mat = ....;
     CvMat.bulkAccess(mat, (ByteBuffer pixelData) -> {
         // do something with/to the pixel data
         ...
     });
 ```
+
+If you want to return a value from your lambda you can use `CvMat.bulkAccessOp`.
+
+``` java
+    Mat mat = ....;
+
+    var result = CvMat.bulkAccessOp(mat, (ByteBuffer pixelData) -> {
+        // do something with/to the pixel data
+        ...
+        return something;
+    });
+```
+
+Note, you can return the actual `ByteBuffer` (e.g. `ByteBuffer result = CvMat.bulkAccessOp(mat, bb -> bb);`) but you'll be responsible for making sure the data survives your use.
 
 ## Image Display
 
@@ -251,7 +265,7 @@ As seen in the example and quick start, there's a handy `ImageDisplay`.
     }
 ```
 
-`ImageDisplay` is very basic and not really meant for developing sophisticated Java based GUIs in but it does support some rudimentary event handling. You can set a callback for:
+`ImageDisplay` is very basic and not really meant for developing sophisticated Java based GUIs, but it does support some rudimentary event handling. You can set a callback for:
 
 - **select** when someone clicks in the display. The callback should return a `boolean` telling the display whether or not to `close`. Returning `true` will close the display.
 ``` java
@@ -309,7 +323,7 @@ If you're going to use the SWT implementation you need to explicitly add the dep
 
 Newer versions of SWT need to be manually installed into your maven repository after being downloaded from https://download.eclipse.org/eclipse/downloads/
 
-*swtartifact* and *swtgroup* is platform specific. For 64-bit Linux *swtartifact* `org.eclipse.swt.gtk.linux.x86_64`. For 64-bit Windows it's `org.eclipse.swt.win32.win32.x86_64` and for Aarch64 it's `org.eclipse.swt.gtk.linux.aarch64`. For *swtgroup* it's `org.eclipse.swt` for all supported platforms except Aarch64 where it's `org.eclipse.platform`.
+*swtartifact* and *swtgroup* is platform specific. For 64-bit Linux *swtartifact* is `org.eclipse.swt.gtk.linux.x86_64`. For 64-bit Windows it's `org.eclipse.swt.win32.win32.x86_64` and for Aarch64 it's `org.eclipse.swt.gtk.linux.aarch64`. For *swtgroup* it's `org.eclipse.swt` for all supported platforms except Aarch64 where it's `org.eclipse.platform`.
 
 ## Other Image Processing and Image Handling
 
