@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <groupId>ai.kognition.pilecv4j</groupId>
-  <version>1.0</version>
+  <version>1.0.1-SNAPSHOT</version>
   <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>pilecv4j-settings</artifactId>
@@ -175,7 +175,7 @@
         <plugin>
           <groupId>com.googlecode.cmake-maven-project</groupId>
           <artifactId>cmake-maven-plugin</artifactId>
-          <version>3.23.2-b1</version>
+          <version>3.25.2-b1</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
