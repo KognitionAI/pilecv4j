@@ -4,6 +4,11 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#include "utils/log.h"
+
+#define COMPONENT "POSI"
+#define PCV4K_IPC_TRACE RAW_PCV4J_IPC_TRACE(COMPONENT)
+
 namespace pilecv4j {
 namespace ipc {
 
@@ -14,6 +19,7 @@ const char* SharedMemory::implementationName() {
 }
 
 bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) {
+  PCV4K_IPC_TRACE;
   *fd = shm_open(name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <----------+
   if (*fd == -1)                                       //                 |
     return false;                                      //                 |
@@ -30,24 +36,29 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
 }
 
 bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep) {
+  PCV4K_IPC_TRACE;
   *fd = shm_open(name, O_RDWR, S_IRUSR | S_IWUSR);
   return (*fd != -1);
 }
 
 bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size) {
+  PCV4K_IPC_TRACE;
   *addr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
   return (*addr != MAP_FAILED);
 }
 
 bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
+  PCV4K_IPC_TRACE;
   return munmap(addr, size) != -1;
 }
 
 bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) {
+  PCV4K_IPC_TRACE;
   return !shm_unlink(name);
 }
 
 SharedMemory* SharedMemory::instantiate(const char* name, int32_t nameRep) {
+  PCV4K_IPC_TRACE;
   return new SharedMemoryImpl(name, nameRep);
 }
 

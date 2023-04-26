@@ -196,6 +196,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   this->owner = powner;
 
   if (!mmapSharedMemorySegment(&addr, fd, totalSize)) {
+    log(ERROR, COMPONENT, "Failed to map memory segment");
     errMsgPrefix = "Failed to map memory segment";
     goto error;
   }
