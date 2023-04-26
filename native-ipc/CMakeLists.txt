@@ -39,7 +39,7 @@ endif()
 message(STATUS "ipc implementation is " ${IPC_TYPE})
 
 # comment this out to remove logging from the underlying code. Though it's also gated in the code so it's likely unnecessary
-#add_definitions( -DENABLE_TRACE_API )
+add_definitions( -DENABLE_TRACE_API )
 add_definitions( -DLOGGING )
 add_definitions( -DTIMING )
 add_definitions( -DIPC_TYPE=1 -DIPC_TYPE_${IPC_TYPE}=1 )
