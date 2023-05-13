@@ -5,9 +5,7 @@ import static net.dempsy.util.Functional.uncheck;
 
 import java.io.File;
 import java.util.Arrays;
-import java.util.List;
 
-import org.junit.Ignore;
 import org.junit.Test;
 import org.opencv.core.CvType;
 import org.opencv.imgproc.Imgproc;
@@ -28,7 +26,7 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 // Operation names using the process described here:
 // https://stackoverflow.com/questions/59263406/how-to-find-operation-names-in-tensorflow-graph
 
-@Ignore
+//@Ignore
 public class TfTest {
 
     // public static final String MODEL = "/data/jim/kog/data/EV-models.testing/saved_ev_model_efficientnetv2-xl-21k";
@@ -59,7 +57,7 @@ public class TfTest {
 
                 b.getGpuOptionsBuilder()
                     .setAllowGrowth(true)
-                    .setPerProcessGpuMemoryFraction(0.04)
+                    .setPerProcessGpuMemoryFraction(0.4)
                     // .setExperimental(e)
                     .build()
 
@@ -98,7 +96,7 @@ public class TfTest {
                         // https://stackoverflow.com/questions/59263406/how-to-find-operation-names-in-tensorflow-graph
                         final Runner runner = session.runner();
 
-                        final List<Tensor> result = runner.feed("serving_default_input_1:0", tensor)
+                        final var result = runner.feed("serving_default_input_1:0", tensor)
                             // .fetch("dense/kernel:0")
                             .fetch("StatefulPartitionedCall:0")
                             .run();

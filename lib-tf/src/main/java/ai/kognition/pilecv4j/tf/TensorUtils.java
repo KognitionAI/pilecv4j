@@ -36,25 +36,12 @@ import org.tensorflow.types.family.TType;
 import net.dempsy.util.QuietCloseable;
 
 import ai.kognition.pilecv4j.image.CvMat;
-import ai.kognition.pilecv4j.image.CvRaster;
 
 public class TensorUtils {
     public static final Logger LOGGER = LoggerFactory.getLogger(TensorUtils.class);
 
-    public static Tensor toTensor(final CvRaster raster, final Class<? extends TType> clazz) {
-        final Shape shape = Shape.of(new long[] {1,raster.rows(),raster.cols(),raster.channels()});
-        final ByteBuffer bb = raster.underlying();
-        bb.rewind();
-        try(QuietCloseable qc = () -> bb.rewind();) {
-            final ByteDataBuffer bdb = DataBuffers.of(bb);
-            return Tensor.of(clazz, shape, bdb);
-        }
-    }
-
     public static Tensor toTensor(final CvMat mat, final Class<? extends TType> clazz) {
-        return mat.rasterOp(raster -> {
-            return TensorUtils.toTensor(raster, clazz);
-        });
+        return mat.bulkAccessOp(bb -> TensorUtils.toTensor(bb, mat.rows(), mat.cols(), mat.channels(), clazz));
     }
 
     public static Graph inflate(final byte[] graphBytes) throws InvalidProtocolBufferException {
@@ -95,6 +82,15 @@ public class TensorUtils {
             }
         }
         return matrix[0];
+    }
+
+    private static Tensor toTensor(final ByteBuffer bb, final int rows, final int cols, final int channels, final Class<? extends TType> clazz) {
+        final Shape shape = Shape.of(new long[] {1,rows,cols,channels});
+        bb.rewind();
+        try(QuietCloseable qc = () -> bb.rewind();) {
+            final ByteDataBuffer bdb = DataBuffers.of(bb);
+            return Tensor.of(clazz, shape, bdb);
+        }
     }
 
 }
