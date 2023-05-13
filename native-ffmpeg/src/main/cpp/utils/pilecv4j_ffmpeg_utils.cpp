@@ -2,6 +2,8 @@
 #include "common/kog_exports.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 
+#include <libavutil/hwcontext.h>
+
 AVRational pilecv4j::ffmpeg::millisecondTimeBase = AVRational{1,1000};
 
 // status message descriptions corresponding to the custom codes.
@@ -188,6 +190,18 @@ extern "C" {
   KAI_EXPORT void pcv4j_ffmpeg2_utils_freeString(char* str) {
     if (str)
       delete[] str;
+  }
+
+  KAI_EXPORT int32_t pcv4j_ffmpeg2_utils_isGpuAvailable() {
+      AVHWDeviceType type = AV_HWDEVICE_TYPE_NONE;
+      while ((type = av_hwdevice_iterate_types(type)) != AV_HWDEVICE_TYPE_NONE) {
+          AVBufferRef *hw_device_ctx = nullptr;
+          if (av_hwdevice_ctx_create(&hw_device_ctx, type, nullptr, nullptr, 0) == 0) {
+              av_buffer_unref(&hw_device_ctx);
+              return 1;
+          }
+      }
+      return 0;
   }
 }
 
