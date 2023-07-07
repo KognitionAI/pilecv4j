@@ -282,13 +282,13 @@ public class ShmQueue implements QuietCloseable {
         return access(bbconsumer, TRY_LOCK);
     }
 
-    /**
-     * Mark the data in the shared memory to be read by another process. This
-     * is equivalent to calling {@code post(0)} and assumes simplex communication.
-     */
-    public void post() {
-        post(0);
-    }
+//    /**
+//     * Mark the data in the shared memory to be read by another process. This
+//     * is equivalent to calling {@code post(0)} and assumes simplex communication.
+//     */
+//    public void post() {
+//        post(0);
+//    }
 
     /**
      * Mark a particular mailbox as ready for the data in the shared memory to be read
@@ -298,13 +298,13 @@ public class ShmQueue implements QuietCloseable {
         throwIfNecessary(IpcApi.pilecv4j_ipc_shmQueue_postMessage(nativeRef, mailbox), true);
     }
 
-    /**
-     * Mark the data in the shared memory as having been read and so another process can write
-     * the next message. This is equivalent to calling {@code post(0)} and assumes simplex communication.
-     */
-    public void unpost() {
-        unpost(0);
-    }
+//    /**
+//     * Mark the data in the shared memory as having been read and so another process can write
+//     * the next message. This is equivalent to calling {@code post(0)} and assumes simplex communication.
+//     */
+//    public void unpost() {
+//        unpost(0);
+//    }
 
     /**
      * Mark the data in the shared memory as having been read through the given mailbox and so another process can write
@@ -633,7 +633,9 @@ public class ShmQueue implements QuietCloseable {
 
     @Override
     public String toString() {
-        return "ShmQueue [nativeRef=" + nativeRef + ", name=" + name + ", size=" + size + "]";
+        return "ShmQueue [nativeRef=" + nativeRef + ", name=" + name
+            + ", data=" + (isOpen() ? "*notopen*" : ("0x" + Long.toHexString(getRawBuffer(0))))
+            + ", size=" + size + "]";
     }
 
     /**
