@@ -216,7 +216,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     goto error;
   }
 #endif
-  log(TRACE, COMPONENT, "Clearing addr 0x%" PRIx64 " of size %ld", (uint64_t)addr, (long)totalSize);
+  log(TRACE, COMPONENT, "Clearing addr 0x%" PRIx64 " of size %ld for %s", (uint64_t)addr, (long)totalSize, name.c_str());
   memset(addr,0,totalSize);
   log(TRACE, COMPONENT, "Clearing magic number at Header base 0x%" PRIx64 " field 'magic' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->magic)));
   hptr->magic = 0L; // in case this is being reopened
