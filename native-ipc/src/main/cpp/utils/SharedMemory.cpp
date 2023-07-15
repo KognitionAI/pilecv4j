@@ -14,6 +14,7 @@
 
 #include "utils/cvtypes.h"
 #include <inttypes.h>
+#include <unistd.h>
 
 #define COMPONENT "SHMQ"
 #define PCV4K_IPC_TRACE RAW_PCV4J_IPC_TRACE(COMPONENT)
@@ -185,9 +186,14 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   // we need to round UP to the nearest 64 byte boundary
   offsetToBuffer = align64(sizeof(Header) + (numMailboxes * sizeof(std::size_t)));
 
-  totalSize = align64(numBytes + offsetToBuffer);
-  if (isEnabled(DEBUG))
-    log(DEBUG, COMPONENT, "  the total size including the header is %ld bytes with an offset of %d", (long)totalSize, (int)offsetToBuffer);
+  {
+    size_t size = align64(numBytes + offsetToBuffer);
+    size_t pagesize = sysconf(_SC_PAGESIZE);
+    totalSize = ((size % pagesize) != 0) ? (size_t)(((size / pagesize) + 1) * pagesize) : size;
+    if (isEnabled(DEBUG))
+      log(DEBUG, COMPONENT, "  the total size including the header and an even number of pages is %ld bytes with an offset of %d. Needed size is %ld and page size is %d",
+          (long)totalSize, (int)offsetToBuffer, (long)size, (int)pagesize);
+  }
 
   if (!createSharedMemorySegment(&fd, name.c_str(), nameRep, totalSize)) {
     errMsgPrefix = "Failed to create shared memory segment";
