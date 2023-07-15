@@ -6,6 +6,7 @@
 
 #include "utils/log.h"
 #include <inttypes.h>
+#include <sys/stat.h>
 
 #define COMPONENT "POSI"
 #define PCV4K_IPC_TRACE RAW_PCV4J_IPC_TRACE(COMPONENT)
@@ -35,6 +36,14 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
   log(TRACE, COMPONENT, "truncating shm fd %d to %ld", (int)(*fd), (long)size);
   if (ftruncate(*fd, size) == -1)
     return false;
+  {
+    struct stat file_stat;
+    if (fstat(*fd, &file_stat) == -1) {
+      log(ERROR, COMPONENT, "Failed to stat the newly ftruncated mmap file descriptor: fd %d of requested size %ld", (int)(*fd), (long)size);
+      return false;
+    }
+    log(TRACE, COMPONENT, "ftruncated file of requested size %ld is actually %ld", (long)size, (long)(file_stat.st_size));
+  }
   return true;
 }
 
