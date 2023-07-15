@@ -202,7 +202,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     goto error;
   }
 
-  log(TRACE, COMPONENT, "Casting addr 0x%" PRIx64 " of size %l to Header", (uint64_t)addr, (long)totalSize);
+  log(TRACE, COMPONENT, "Casting addr 0x%" PRIx64 " of size %ld to Header", (uint64_t)addr, (long)totalSize);
   hptr = (Header*)addr;
 #ifdef LOCKING
   if (sem_init(&(hptr->sem), 1, 1) == -1) {
