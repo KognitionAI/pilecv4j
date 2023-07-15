@@ -45,7 +45,7 @@ bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const
 bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size) {
   PCV4K_IPC_TRACE;
   if (isEnabled(TRACE))
-    log(TRACE, COMPONENT, "mmap fd %d of size %l", (int)fd, (long)size);
+    log(TRACE, COMPONENT, "mmap fd %d of size %ld", (int)fd, (long)size);
   *addr = mmap(NULL, size, PROT_WRITE | PROT_READ, MAP_SHARED, fd, 0);
   if (isEnabled(TRACE))
     log(TRACE, COMPONENT, "mmap completed 0x%" PRIx64, (uint64_t)addr);
