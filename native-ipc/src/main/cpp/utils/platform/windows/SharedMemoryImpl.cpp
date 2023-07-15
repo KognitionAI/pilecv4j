@@ -39,7 +39,7 @@ bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescript
   return (addr != nullptr);
 }
 
-bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
+bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size, const bool closing) {
     return UnmapViewOfFile(addr) != 0;
 }
 

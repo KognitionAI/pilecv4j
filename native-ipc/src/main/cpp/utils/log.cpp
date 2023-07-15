@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <string>
 #include <thread>
+#include <atomic>
 
 #define LOGGING_IOSTREAM stderr
 
@@ -48,16 +49,27 @@ void setLogLevel(LogLevel ll) {
     fputs( logLevelNames[llevel], LOGGING_IOSTREAM ); \
     fputs( "] ", LOGGING_IOSTREAM)
 
+static std::atomic_bool log_lock{false};
 
 void log(LogLevel llevel, const char* component, const char *fmt, ...)
 {
   if (logLevel <= llevel) {
+    {
+      bool expected = false;
+      while(!log_lock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
+        expected = false;
+      }
+    }
     va_list args;
     LOG_PREAMBLE;
     va_start( args, fmt );
     vfprintf( LOGGING_IOSTREAM, fmt, args );
     va_end( args );
     fputs( "\n", LOGGING_IOSTREAM );
+    fflush(LOGGING_IOSTREAM);
+    {
+      log_lock.store(false, std::memory_order_release);
+    }
   }
 }
 
