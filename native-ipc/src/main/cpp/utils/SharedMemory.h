@@ -47,7 +47,7 @@ public:
   inline virtual bool implementationRequiresCreatorToBeOwner() { return false; }
   virtual bool createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) = 0;
   virtual bool openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep) = 0;
-  virtual bool closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) = 0;
+  virtual bool unlinkSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) = 0;
   virtual bool mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size) = 0;
   virtual bool unmmapSharedMemorySegment(void* addr, std::size_t size) = 0;
 

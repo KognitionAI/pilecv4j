@@ -122,7 +122,7 @@ bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
   return shmdt(addr) ? false : true;
 }
 
-bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) {
+bool SharedMemoryImpl::unlinkSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) {
   return !shmctl(fd, IPC_RMID, nullptr);
 }
 
