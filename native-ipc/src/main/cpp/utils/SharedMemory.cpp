@@ -132,7 +132,7 @@ void SharedMemory::cleanup() {
       Header* header = (Header*)addr;
       header->magic = 0x0;
     }
-    if (!unmmapSharedMemorySegment(addr, totalSize)) {
+    if (!unmmapSharedMemorySegment(addr, totalSize, true)) {
       ErrnoType err = getLastError();
       std::string errMsgStr = getErrorMessage(err);
       log(ERROR, COMPONENT, "Failed to un-mmap the shared memory segment. Error %d: %s", (int)err, errMsgStr.c_str());
@@ -185,15 +185,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
 
   // we need to round UP to the nearest 64 byte boundary
   offsetToBuffer = align64(sizeof(Header) + (numMailboxes * sizeof(std::size_t)));
-
-  {
-    size_t size = align64(numBytes + offsetToBuffer);
-    size_t pagesize = sysconf(_SC_PAGESIZE);
-    totalSize = ((size % pagesize) != 0) ? (size_t)(((size / pagesize) + 1) * pagesize) : size;
-    if (isEnabled(DEBUG))
-      log(DEBUG, COMPONENT, "  the total size including the header and an even number of pages is %ld bytes with an offset of %d. Needed size is %ld and page size is %d",
-          (long)totalSize, (int)offsetToBuffer, (long)size, (int)pagesize);
-  }
+  totalSize = align64(numBytes + offsetToBuffer);
 
   if (!createSharedMemorySegment(&fd, name.c_str(), nameRep, totalSize)) {
     errMsgPrefix = "Failed to create shared memory segment";
@@ -329,7 +321,7 @@ uint64_t SharedMemory::open(bool powner) {
   if (isEnabled(TRACE))
     log(TRACE, COMPONENT, "Unmapping the header to remap the segment for the total at %ld bytes", (long)lheader.totalSize);
 
-  if (!unmmapSharedMemorySegment(header, sizeof(Header))) {
+  if (!unmmapSharedMemorySegment(header, sizeof(Header), false)) {
     err = getLastError();
     errMsgPrefix = "Failed to unmap previously mapped header";
     goto error;

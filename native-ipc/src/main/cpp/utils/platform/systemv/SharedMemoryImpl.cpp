@@ -118,7 +118,7 @@ bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescript
   return (*addr != (void*)-1);
 }
 
-bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
+bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size, const bool closing) {
   return shmdt(addr) ? false : true;
 }
 

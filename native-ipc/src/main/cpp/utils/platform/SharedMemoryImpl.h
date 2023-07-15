@@ -15,7 +15,7 @@ public:
 	virtual bool openSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep);
 	virtual bool unlinkSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep);
 	virtual bool mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size);
-	virtual bool unmmapSharedMemorySegment(void* addr, std::size_t size);
+	virtual bool unmmapSharedMemorySegment(void* addr, std::size_t size, const bool closing);
 };
 
 }
