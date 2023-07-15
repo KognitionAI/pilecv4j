@@ -22,6 +22,7 @@ const char* SharedMemory::implementationName() {
 bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, const char* name, int32_t nameRep, std::size_t size) {
   PCV4K_IPC_TRACE;
   *fd = shm_open(name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);// <----------+
+  log(TRACE, COMPONENT, "opened shm and received a fd: %d", (int)(*fd));
   if (*fd == -1)                                       //                 |
     return false;                                      //                 |
   //       There is a race condition here which is "fixed" with a STUPID hack.
@@ -31,6 +32,7 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
   //  +--- to minimize this gap.
   //  |
   //  v
+  log(TRACE, COMPONENT, "truncating shm fd %d to %l", (int)(*fd), (long)size);
   if (ftruncate(*fd, size) == -1)
     return false;
   return true;
