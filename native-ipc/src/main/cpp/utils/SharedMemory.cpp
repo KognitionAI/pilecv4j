@@ -13,6 +13,7 @@
 #include "utils/SharedMemory.h"
 
 #include "utils/cvtypes.h"
+#include <inttypes.h>
 
 #define COMPONENT "SHMQ"
 #define PCV4K_IPC_TRACE RAW_PCV4J_IPC_TRACE(COMPONENT)
@@ -201,6 +202,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     goto error;
   }
 
+  log(TRACE, COMPONENT, "Casting addr 0x%" PRIx64 " of size %l to Header", (uint64_t)addr, (long)totalSize);
   hptr = (Header*)addr;
 #ifdef LOCKING
   if (sem_init(&(hptr->sem), 1, 1) == -1) {
@@ -208,16 +210,24 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
     goto error;
   }
 #endif
+  log(TRACE, COMPONENT, "Clearing addr 0x%" PRIx64 " of size %l", (uint64_t)addr, (long)totalSize);
   memset(addr,0,totalSize);
+  log(TRACE, COMPONENT, "Clearing magic number at Header base 0x%" PRIx64 " field 'magic' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->magic)));
   hptr->magic = 0L; // in case this is being reopened
 
   // set the sizes
+  log(TRACE, COMPONENT, "Setting totalSize at Header base 0x%" PRIx64 " field 'totalSize' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->totalSize)));
   hptr->totalSize = totalSize;
+  log(TRACE, COMPONENT, "Setting numBytes at Header base 0x%" PRIx64 " field 'numBytes' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->numBytes)));
   hptr->numBytes = numBytes;
+  log(TRACE, COMPONENT, "Setting offset at Header base 0x%" PRIx64 " field 'offset' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->offset)));
   hptr->offset = offsetToBuffer;
+  log(TRACE, COMPONENT, "Setting numMailboxes at Header base 0x%" PRIx64 " field 'numMailboxes' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->numMailboxes)));
   hptr->numMailboxes = numMailboxes;
-  for (std::size_t i = 0; i < numMailboxes; i++)
+  for (std::size_t i = 0; i < numMailboxes; i++) {
+    log(TRACE, COMPONENT, "Clearing mailbox %d at Header base 0x%" PRIx64 " field 'messageAvailable[%d]' at 0x%" PRIx64, (int)i, (uint64_t)hptr, (int)i, (uint64_t)(&(hptr->messageAvailable[i])));
     hptr->messageAvailable[i] = 0;
+  }
 
   data = ((uint8_t*)addr) + offsetToBuffer;
   if (isEnabled(DEBUG))
