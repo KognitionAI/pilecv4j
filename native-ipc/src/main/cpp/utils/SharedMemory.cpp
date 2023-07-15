@@ -157,7 +157,7 @@ uint64_t SharedMemory::unlink() {
   if (!owner)
     log(WARN, COMPONENT, "unlinking the shared memory segment \"%s\" though I'm not the owner.", name.c_str());
 
-  if (!closeSharedMemorySegment(fd, name.c_str(), nameRep)) {
+  if (!unlinkSharedMemorySegment(fd, name.c_str(), nameRep)) {
     ErrnoType err = getLastError();
     std::string errMsgStr = getErrorMessage(err);
     log(ERROR, COMPONENT, "Failed to close the shared memory segment. Error %d: %s", err, errMsgStr.c_str());
@@ -312,7 +312,7 @@ uint64_t SharedMemory::open(bool powner) {
 
     // we want to close it since returning EAGAIN will likely cause the user
     // to retry opening it and we want to do if from scratch.
-    if (!closeSharedMemorySegment(fd, name.c_str(), nameRep)) {
+    if (!unlinkSharedMemorySegment(fd, name.c_str(), nameRep)) {
       ErrnoType tmpErr = getLastError();
       std::string tmpErrMsgStr = getErrorMessage(tmpErr);
       log(WARN, COMPONENT, "Failed to reclose the shared memory segment. Error %d: %s", tmpErr, tmpErrMsgStr.c_str());
@@ -355,7 +355,7 @@ uint64_t SharedMemory::open(bool powner) {
     std::string errMsgStr = getErrorMessage(err);
     log(WARN, COMPONENT, "%s Error %d: %s", errMsgPrefix, err, errMsgStr.c_str());
     if (closeSm) {
-      if (!closeSharedMemorySegment(fd, name.c_str(), nameRep)) {
+      if (!unlinkSharedMemorySegment(fd, name.c_str(), nameRep)) {
         ErrnoType tmpErr = getLastError();
         std::string tmpErrMsgStr = getErrorMessage(tmpErr);
         log(WARN, COMPONENT, "Failed to reclose the shared memory segment. Error %d: %s", tmpErr, tmpErrMsgStr.c_str());
