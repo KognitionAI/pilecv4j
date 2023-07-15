@@ -32,7 +32,7 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
   //  +--- to minimize this gap.
   //  |
   //  v
-  log(TRACE, COMPONENT, "truncating shm fd %d to %l", (int)(*fd), (long)size);
+  log(TRACE, COMPONENT, "truncating shm fd %d to %ld", (int)(*fd), (long)size);
   if (ftruncate(*fd, size) == -1)
     return false;
   return true;
