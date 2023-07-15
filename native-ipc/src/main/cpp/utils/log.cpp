@@ -49,17 +49,17 @@ void setLogLevel(LogLevel ll) {
     fputs( logLevelNames[llevel], LOGGING_IOSTREAM ); \
     fputs( "] ", LOGGING_IOSTREAM)
 
-static std::atomic_bool log_lock{false};
+//static std::atomic_bool log_lock{false};
 
 void log(LogLevel llevel, const char* component, const char *fmt, ...)
 {
   if (logLevel <= llevel) {
-    {
-      bool expected = false;
-      while(!log_lock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
-        expected = false;
-      }
-    }
+//    {
+//      bool expected = false;
+//      while(!log_lock.compare_exchange_weak(expected, true, std::memory_order_acquire)) {
+//        expected = false;
+//      }
+//    }
     va_list args;
     LOG_PREAMBLE;
     va_start( args, fmt );
@@ -67,9 +67,9 @@ void log(LogLevel llevel, const char* component, const char *fmt, ...)
     va_end( args );
     fputs( "\n", LOGGING_IOSTREAM );
     fflush(LOGGING_IOSTREAM);
-    {
-      log_lock.store(false, std::memory_order_release);
-    }
+//    {
+//      log_lock.store(false, std::memory_order_release);
+//    }
   }
 }
 
