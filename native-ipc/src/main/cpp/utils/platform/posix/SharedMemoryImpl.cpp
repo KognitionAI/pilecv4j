@@ -32,7 +32,10 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
   //  +--- to minimize this gap.
   //  |
   //  v
-  log(TRACE, COMPONENT, "truncating shm fd %d to %ld", (int)(*fd), (long)size);
+  size_t pagesize = sysconf(_SC_PAGESIZE);
+  size_t fsize = ((size % pagesize) != 0) ? (size_t)(((size / pagesize) + 1) * pagesize) : size;
+  log(TRACE, COMPONENT, "truncating shm fd %d to %ld, requested size was %ld with a page size of %ld",
+      (int)(*fd), (long)fsize, (long)size, (long)pagesize);
   if (ftruncate(*fd, size) == -1)
     return false;
   return true;
