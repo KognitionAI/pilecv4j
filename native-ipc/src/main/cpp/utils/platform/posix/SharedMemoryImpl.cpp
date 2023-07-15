@@ -65,11 +65,15 @@ bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescript
 
 bool SharedMemoryImpl::unmmapSharedMemorySegment(void* addr, std::size_t size) {
   PCV4K_IPC_TRACE;
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "munmap addr 0x%" PRIx64 " of size %ld", (uint64_t)addr, (long)size);
   return munmap(addr, size) != -1;
 }
 
 bool SharedMemoryImpl::closeSharedMemorySegment(SharedMemoryDescriptor fd, const char* name, int32_t nameRep) {
   PCV4K_IPC_TRACE;
+  if (isEnabled(TRACE))
+    log(TRACE, COMPONENT, "shm_unlink fd %d, %s", (int)fd, name);
   return !shm_unlink(name);
 }
 
