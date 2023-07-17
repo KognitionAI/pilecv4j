@@ -18,6 +18,8 @@ namespace ipc {
 
 static const char* implName = "Posix";
 
+static size_t pagesize = sysconf(_SC_PAGESIZE);
+
 const char* SharedMemory::implementationName() {
   return implName;
 }
@@ -28,7 +30,6 @@ bool SharedMemoryImpl::createSharedMemorySegment(SharedMemoryDescriptor* fd, con
   // we need to adjust the requested size to it's an even multiple of the page size
   std::size_t size;
   {
-    size_t pagesize = sysconf(_SC_PAGESIZE);
     size = ((psize % pagesize) != 0) ? (size_t)(((psize / pagesize) + 1) * pagesize) : psize;
     if (isEnabled(DEBUG))
       log(DEBUG, COMPONENT, "The total size was adjusted to %ld bytes from a requested size of %ld given a page size of %d",
@@ -73,10 +74,19 @@ bool SharedMemoryImpl::openSharedMemorySegment(SharedMemoryDescriptor* fd, const
   return (*fd != -1);
 }
 
-bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t size) {
+bool SharedMemoryImpl::mmapSharedMemorySegment(void** addr, SharedMemoryDescriptor fd, std::size_t psize) {
   PCV4K_IPC_TRACE;
 
   const bool trace = isEnabled(TRACE);
+
+  // we need to adjust the requested size to it's an even multiple of the page size
+  std::size_t size;
+  {
+    size = ((psize % pagesize) != 0) ? (size_t)(((psize / pagesize) + 1) * pagesize) : psize;
+    if (isEnabled(DEBUG))
+      log(DEBUG, COMPONENT, "For mmap, the total size was adjusted to %ld bytes from a requested size of %ld given a page size of %d",
+          (long)size, (long)psize, (int)pagesize);
+  }
 
   if (trace)
     log(TRACE, COMPONENT, "mmap fd %d of size %ld", (int)fd, (long)size);
