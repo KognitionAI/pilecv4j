@@ -226,10 +226,24 @@ public class CvMat extends Mat implements QuietCloseable {
      * </p>
      */
     public int[] dimSizes() {
-        final int ndims = dims();
+        return dimSizes(this);
+    }
+
+    /**
+     * This is equivalent to getting the full size array in C++
+     * using:
+     * <p>
+     * <code>
+     * auto sz = mat.size();<br>
+     * ... sz[dim] ..;
+     * </code>
+     * </p>
+     */
+    public static int[] dimSizes(final Mat mat) {
+        final int ndims = mat.dims();
         final int[] ret = new int[ndims];
         for(int i = 0; i < ndims; i++) {
-            ret[i] = size(i);
+            ret[i] = mat.size(i);
         }
         return ret;
     }
