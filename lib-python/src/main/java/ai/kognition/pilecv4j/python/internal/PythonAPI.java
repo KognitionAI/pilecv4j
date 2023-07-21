@@ -72,6 +72,8 @@ public class PythonAPI {
 
     public static native void pilecv4j_python_pyObject_incref(long nativeRef);
 
+    public static native long pilecv4j_python_pyObject_PyNone(int incref);
+
     // ===================================================
     // KogSys lifecycle and methods
     // ===================================================

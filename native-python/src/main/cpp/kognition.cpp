@@ -149,6 +149,18 @@ extern "C" {
     PythonEnvironment::instance()->addModulePath(modPath);
   }
 
+  KAI_EXPORT uint64_t pilecv4j_python_pyObject_PyNone(int32_t incref) {
+    PILECV4J_TRACE;
+    PyObject* val = Py_None;
+    if (incref != 0) {
+      CallPythonGuard gg;
+      if (isEnabled(TRACE))
+        log(TRACE, "incrementing refcnt on %" PRId64 " with a pre-inc refcnt: %d", (uint64_t)val, (int)val->ob_refcnt);
+      Py_INCREF(val);
+    }      
+    return (uint64_t)val;
+  }
+
   KAI_EXPORT void pilecv4j_python_pyObject_decref(uint64_t nativeRef) {
     PILECV4J_TRACE;
     if (nativeRef) {
