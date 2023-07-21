@@ -4,6 +4,7 @@ import static ai.kognition.pilecv4j.python.PythonHandle.throwIfNecessary;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 
 import org.apache.commons.lang3.mutable.MutableBoolean;
@@ -103,6 +104,12 @@ public class ParamBlock {
     public ParamBlock arg(final double val) {
         final int index = tupleCreator.size();
         tupleCreator.add(l2 -> throwIfNecessary(PythonAPI.pilecv4j_python_tuple_putFloat(l2, index, val)));
+        return this;
+    }
+
+    public ParamBlock optionally(final boolean doIt, final Consumer<ParamBlock> pbc) {
+        if(doIt)
+            pbc.accept(this);
         return this;
     }
 

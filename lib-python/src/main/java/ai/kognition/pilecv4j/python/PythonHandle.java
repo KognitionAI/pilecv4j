@@ -156,6 +156,7 @@ public class PythonHandle implements QuietCloseable {
 
     private String currentModule;
     private String currentFunction;
+    private Py_None none = null;
 
     private final get_image_source callback = new get_image_source() {
         @Override
@@ -176,6 +177,12 @@ public class PythonHandle implements QuietCloseable {
         nativeObj = PythonAPI.pilecv4j_python_kogSys_create(callback);
         if(nativeObj == 0L)
             throw new PythonException("Failed to instantiate native PyTorch instance.");
+    }
+
+    public synchronized Py_None none() {
+        if(none == null)
+            none = new Py_None();
+        return none;
     }
 
     /**
@@ -364,9 +371,12 @@ public class PythonHandle implements QuietCloseable {
      * for communication in ASYNCHRONOUS mode, and also close done the Python interpreter.
      */
     @Override
-    public void close() {
+    public synchronized void close() {
         if(imageSource != null)
             imageSource.close();
+
+        if(none != null)
+            none.close();
 
         if(nativeObj != 0)
             PythonAPI.pilecv4j_python_kogSys_destroy(nativeObj);
