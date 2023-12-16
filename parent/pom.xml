@@ -18,7 +18,7 @@
     <tensorflow-core-api.version>0.5.0</tensorflow-core-api.version>    
     <slf4j.version>1.7.30</slf4j.version>
 
-    <dempsy-commons.version>2.4.1</dempsy-commons.version>
+    <dempsy-commons.version>2.4.2-SNAPSHOT</dempsy-commons.version>
     
     <commons.cli.version>1.4</commons.cli.version>
     <tiff-java.version>2.0.1</tiff-java.version>
