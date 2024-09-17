@@ -47,7 +47,7 @@
     </dependency>
     <dependency>
       <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow-core-api</artifactId>
+      <artifactId>tensorflow-core-native</artifactId>
       <classifier>linux-x86_64-gpu</classifier>
     </dependency>
     
