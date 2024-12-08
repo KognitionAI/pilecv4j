@@ -106,6 +106,9 @@ public class ImageFile {
 
     }
 
+    /**
+     * In memory encode of an image file
+     */
     public static byte[] encodeToImageData(final Mat mat, final String ext) {
         try(Closer closer = new Closer();) {
             final MatOfByte mobOut = closer.addMat(new MatOfByte());
@@ -124,6 +127,16 @@ public class ImageFile {
             try(CvMat cvmat = CvMat.move(Imgcodecs.imdecode(mobOut, Imgcodecs.IMREAD_UNCHANGED));) {
                 return cvmat.returnMe();
             }
+        }
+    }
+
+    /**
+     * Given a Mat with raw byte data wrapped in a Mat (the Mat should be 1 row, numBytes cols, 1 channel,
+     * CvType.CV_8UC1) that contains an encoded image, decode the image into a Mat.
+     */
+    public static CvMat decodeImageData(final Mat rawByteData) {
+        try(CvMat ret = CvMat.move(Imgcodecs.imdecode(rawByteData, Imgcodecs.IMREAD_UNCHANGED));) {
+            return ret.returnMe();
         }
     }
 

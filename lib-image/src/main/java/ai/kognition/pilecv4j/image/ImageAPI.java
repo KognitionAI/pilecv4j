@@ -91,11 +91,11 @@ public class ImageAPI {
     // "sizes" is a literal uint32_t* to match java
     public static native long pilecv4j_image_CvRaster_makeMdMatFromRawDataReference(int ndims, Pointer sizes, int type, long dataLong);
 
-    public static native long pilecv4j_image_CvRaster_defaultMat();
-
     public static native void pilecv4j_image_CvRaster_inplaceReshape(long nativeRef, int cn, int ndims, Pointer sizes);
 
     public static native int pilecv4j_image_CvRaster_inplaceRemake(long nativeObj, int ndims, Pointer ptr, int type, long maxSize);
+
+    public static native void pilecv4j_image_CvRaster_zeroCopyDecode(long srcBuffer, int flags, long dstMatRef);
 
     // ==========================================================
     // Wrapped OpenCv HighGUI API.
