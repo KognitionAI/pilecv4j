@@ -36,8 +36,10 @@ import java.util.stream.IntStream;
 
 import org.opencv.core.CvType;
 
+import ai.kognition.pilecv4j.util.DetermineShowFlag;
+
 @SuppressWarnings("deprecation")
-public class UtilsForTesting {
+public class UtilsForTesting extends DetermineShowFlag {
 
     public static final Map<Integer, Integer> biTypeToPixDelta = new HashMap<>();
 

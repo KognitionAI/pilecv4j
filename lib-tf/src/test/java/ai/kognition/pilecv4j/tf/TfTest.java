@@ -7,14 +7,15 @@ import java.io.File;
 import java.util.Arrays;
 
 import org.junit.Test;
-import org.junit.Ignore;
 import org.opencv.core.CvType;
 import org.opencv.imgproc.Imgproc;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.tensorflow.SavedModelBundle;
 import org.tensorflow.Session;
 import org.tensorflow.Session.Runner;
-import org.tensorflow.TensorFlow;
 import org.tensorflow.Tensor;
+import org.tensorflow.TensorFlow;
 import org.tensorflow.proto.ConfigProto;
 import org.tensorflow.types.TFloat32;
 
@@ -23,6 +24,7 @@ import ai.kognition.pilecv4j.image.ImageFile;
 import ai.kognition.pilecv4j.image.Utils;
 import ai.kognition.pilecv4j.image.Utils.LetterboxDetails;
 import ai.kognition.pilecv4j.image.display.ImageDisplay;
+import ai.kognition.pilecv4j.util.DetermineShowFlag;
 
 // Interrogate the saved model in order to get the input/output
 // Operation names using the process described here:
@@ -31,8 +33,11 @@ import ai.kognition.pilecv4j.image.display.ImageDisplay;
 // import org.tensorflow.GraphOperation;
 // import java.util.Iterator;
 
-@Ignore
+//@Ignore
 public class TfTest {
+    public final static Logger LOG = LoggerFactory.getLogger(TfTest.class);
+
+    public final static boolean SHOW = DetermineShowFlag.SHOW;
 
     // public static final String MODEL = "/data/jim/kog/data/EV-models.testing/saved_ev_model_efficientnetv2-xl-21k";
     // public static final int MODEL_INPUT_DIM = 512;
@@ -47,7 +52,7 @@ public class TfTest {
     @Test
     public void test() throws Exception {
 
-        System.out.println("TensorFlow version: " + TensorFlow.version());
+        LOG.info("TensorFlow version: " + TensorFlow.version());
 
         final ConfigProto.Builder b = ConfigProto.newBuilder();
 
@@ -76,21 +81,21 @@ public class TfTest {
             .withConfigProto(p)
             .load();
             final Session session = mb.session();
-            final ImageDisplay id = new ImageDisplay.Builder().build();) {
+            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
 
-            System.out.println("Model loaded");
+            LOG.info("Model loaded");
 
             // final Graph graph = mb.graph();
             // final Iterator<GraphOperation> itr = graph.operations();
             // while(itr.hasNext()) {
             // final GraphOperation e = itr.next();
-            // System.out.println(e);
+            // LOG.info(e);
             // }
 
             final File dir = new File(IMAGE_DIR);
-            while(true) {
+            for(int i = 0; i < 2; i++) {
                 Arrays.stream(dir.listFiles()).forEach(f -> {
-                    System.out.println("Testing: " + f.getAbsolutePath());
+                    LOG.info("Testing: " + f.getAbsolutePath());
 
                     try(final CvMat mat = uncheck(() -> ImageFile.readMatFromFile(f.getAbsolutePath()));
                         final LetterboxDetails lbd = Utils.letterbox(mat, MODEL_INPUT_DIM);
@@ -99,24 +104,25 @@ public class TfTest {
                         CvMat ready = maybe.isContinuous() ? CvMat.shallowCopy(maybe) : CvMat.deepCopy(maybe);
                         Tensor tensor = TensorUtils.toTensor(ready, TFloat32.class);) {
 
-                        System.out.println("Loaded into tensor");
+                        LOG.trace("Loaded into tensor");
 
-                        id.update(lbd.mat());
+                        if(id != null)
+                            id.update(lbd.mat());
 
                         // Interrogate the saved model in order to get the input/output
                         // Operation names using the process described here:
                         // https://stackoverflow.com/questions/59263406/how-to-find-operation-names-in-tensorflow-graph
                         final Runner runner = session.runner();
 
-                        System.out.println("Running model");
+                        LOG.trace("Running model");
                         final var result = runner.feed("serving_default_input_1:0", tensor)
                             // .fetch("dense/kernel:0")
                             .fetch("StatefulPartitionedCall:0")
                             .run();
 
-                        System.out.println("Extracting results");
-                        System.out.println(result.get(0).shape());
-                        System.out.println(Arrays.toString(TensorUtils.getVector(result.get(0))));
+                        LOG.trace("Extracting results");
+                        LOG.debug("{}", result.get(0).shape());
+                        LOG.debug(Arrays.toString(TensorUtils.getVector(result.get(0))));
                     }
                 });
             }

@@ -73,7 +73,7 @@ public class TestHoughTransform {
     public void testTransformOnMovieImage() throws Exception {
 
         try(final InputStream is = new BufferedInputStream(getClass().getClassLoader().getResourceAsStream(testFileName));
-            final Closer closer = new Closer();) {
+            final Closer c = new Closer();) {
 
             // ======================================================================
             // prepare the input image
@@ -93,16 +93,16 @@ public class TestHoughTransform {
                 new LineSegment(new SimplePoint(HEIGHT, WIDTH), new SimplePoint(HEIGHT, 0), Direction.LEFT),
                 new LineSegment(new SimplePoint(HEIGHT, 0), new SimplePoint(0, 0), Direction.LEFT)));
 
-            final CvMat origImage = closer.add(ImageFile.readMatFromFile(testFile));
-            final CvMat sprocketInfoTiledImage = closer.add(new CvMat(origImage.rows(), origImage.cols(), CvType.CV_8UC1));
+            final CvMat origImage = c.add(ImageFile.readMatFromFile(testFile));
+            final CvMat sprocketInfoTiledImage = c.add(new CvMat(origImage.rows(), origImage.cols(), CvType.CV_8UC1));
 
             // convert to gray scale
-            final CvMat grayImage = closer.add(Operations.convertToGray(origImage));
+            final CvMat grayImage = c.add(Operations.convertToGray(origImage));
             Imgproc.GaussianBlur(grayImage, grayImage, new Size(kernelSize + 2, kernelSize + 2), 0.0);
             ImageFile.writeImageFile(grayImage, new File(rootDir, "tmpgray.bmp").getAbsolutePath());
 
             // find gradient image
-            final GradientImages gis = closer.add(Operations.gradient(grayImage, kernelSize));
+            final GradientImages gis = c.add(Operations.gradient(grayImage, kernelSize));
             final CvMat gradientDirRaster = gis.gradientDir;
             ImageFile.writeImageFile(gis.gradientDir, new File(rootDir, "tmpgradDir.bmp").getAbsolutePath());
             ImageFile.writeImageFile(gis.dx, new File(rootDir, "tmpdx.bmp").getAbsolutePath());
@@ -110,17 +110,17 @@ public class TestHoughTransform {
 
             // edge detection
             final double tlow = (tlowpct / 100.0) * thigh;
-            final CvMat edgeRaster = closer.add(Operations.canny(gis, tlow, thigh));
+            final CvMat edgeRaster = c.add(Operations.canny(gis, tlow, thigh));
             ImageFile.writeImageFile(edgeRaster, new File(rootDir, "tmpedge.bmp").getAbsolutePath());
 
             final Transform transform = new Transform(sm, quantFactor, 1.0, 10.0);
 
             final Transform.HoughSpace houghSpace = transform.transform(edgeRaster, gradientDirRaster, houghThreshold);
 
-            ImageFile.writeImageFile(closer.add(houghSpace.createTransformCvMat()), new File(rootDir, "tmpht.bmp").getAbsolutePath());
+            ImageFile.writeImageFile(c.add(houghSpace.createTransformCvMat()), new File(rootDir, "tmpht.bmp").getAbsolutePath());
 
-            ImageFile.writeImageFile(closer.addMat(transform.mask.getMaskImage()), new File(rootDir, "tmpmask.bmp").getAbsolutePath());
-            ImageFile.writeImageFile(closer.add(transform.gradDirMask.getMaskRaster()), new File(rootDir, "tmpdirmask.bmp").getAbsolutePath());
+            ImageFile.writeImageFile(c.addMat(transform.mask.getMaskImage()), new File(rootDir, "tmpmask.bmp").getAbsolutePath());
+            ImageFile.writeImageFile(c.add(transform.gradDirMask.getMaskRaster()), new File(rootDir, "tmpdirmask.bmp").getAbsolutePath());
 
             final List<HoughSpaceEntry> hse = houghSpace.inverseTransform(sprocketInfoTiledImage, COVERLAY, ROVERLAY);
 
