@@ -17,8 +17,8 @@
 package ai.kognition.pilecv4j.image.houghspace.internal;
 
 import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 
+import ai.kognition.pilecv4j.image.CvMat;
 import ai.kognition.pilecv4j.image.houghspace.Model;
 
 /**
@@ -79,10 +79,11 @@ public class Mask {
     /**
      * Generate an OpenCV Mat image that contains a view of the mask.
      */
-    public Mat getMaskImage() {
-        final Mat m = new Mat(mheight, mwidth, CvType.CV_8UC1);
-        m.put(0, 0, mask);
-        return m;
+    public CvMat getMaskImage() {
+        try(final CvMat m = new CvMat(mheight, mwidth, CvType.CV_8UC1);) {
+            m.put(0, 0, mask);
+            return m.returnMe();
+        }
     }
 
     /**
