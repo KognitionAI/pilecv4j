@@ -475,9 +475,10 @@ public class CvMat extends Mat implements QuietCloseable {
      * The underlying data buffer pointer as a long
      */
     public long getNativeAddressOfData() {
-        if(!isContinuous())
+        final long ret = Pointer.nativeValue(ImageAPI.pilecv4j_image_CvRaster_getData(nativeObj));
+        if(ret != 0 && !isContinuous())
             throw new IllegalArgumentException("Cannot retrieve the data reference of a Mat without a continuous buffer.");
-        return Pointer.nativeValue(ImageAPI.pilecv4j_image_CvRaster_getData(nativeObj));
+        return ret;
     }
 
     // public GpuMat upload() {
