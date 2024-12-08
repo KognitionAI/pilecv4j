@@ -89,6 +89,13 @@ extern "C" {
     *dst = *src;
   }
 
+  KAI_EXPORT void pilecv4j_image_CvRaster_zeroCopyDecode(uint64_t srcHandle, int32_t flags, uint64_t destHandle) {
+    cv::Mat* dst = (cv::Mat*) destHandle;
+    cv::Mat* src = (cv::Mat*) srcHandle;
+
+    cv::imdecode(*src, flags, dst);
+  }
+
   KAI_EXPORT uint64_t pilecv4j_image_CvRaster_makeMatFromRawDataReference(uint32_t rows, uint32_t cols, uint32_t type, uint64_t dataLong) {
     void* data = (void*) dataLong;
     cv::Mat* newMat = new cv::Mat(rows, cols, type, data);
@@ -158,11 +165,6 @@ extern "C" {
     cv::Mat remade(ndims, dims, type, data);
     (*mat) = remade;
     return 1;
-  }
-
-  KAI_EXPORT uint64_t pilecv4j_image_CvRaster_defaultMat() {
-    cv::Mat* ret = new cv::Mat();
-    return (uint64_t) ret;
   }
 
   KAI_EXPORT void pilecv4j_image_CvRaster_showImage(const char* name, uint64_t native) {
