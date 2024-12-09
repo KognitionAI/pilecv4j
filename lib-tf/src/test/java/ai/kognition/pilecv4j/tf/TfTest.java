@@ -45,88 +45,65 @@ public class TfTest {
     public static final String MODEL = "/data/jim/kog/data/EV-models.testing/saved_ev_model_efficientnetv2-s-21k";
     public static final int MODEL_INPUT_DIM = 384;
 
-    // public static final String IMAGE = "/data/jim/kog/data/EV unlabeled/1000.jpg";
     public static final String IMAGE_DIR = "/data/jim/kog/data/EV unlabeled";
-    // public static final String IMAGE_DIR = "/tmp/image";
 
     @Test
     public void test() throws Exception {
-
         LOG.info("TensorFlow version: " + TensorFlow.version());
 
-        final ConfigProto.Builder b = ConfigProto.newBuilder();
-
-        // final VirtualDevices vd = VirtualDevices.newBuilder()
-        // .setMemoryLimitMb(0, 128)
-        // .build();
-        //
-        // final Experimental e = Experimental.newBuilder()
-        // .setVirtualDevices(0, vd)
-        // .build();
-
-        final ConfigProto p = b
-            .setGpuOptions(
-
-                b.getGpuOptionsBuilder()
-                    .setAllowGrowth(true)
-                    .setPerProcessGpuMemoryFraction(0.4)
-                    // .setExperimental(e)
-                    .build()
-
-            )
+        // Create GPU options using the new API
+        ConfigProto config = ConfigProto.newBuilder()
+            .setGpuOptions(ConfigProto.GPUOptions.newBuilder()
+                .setAllowGrowth(true)
+                .setPerProcessGpuMemoryFraction(0.4)
+                .build())
             .build();
 
-        try(final SavedModelBundle mb = SavedModelBundle.loader(MODEL)
-            .withTags("serve")
-            .withConfigProto(p)
-            .load();
-            final Session session = mb.session();
-            final ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null;) {
+        // Load the model using the new SavedModelBundle API
+        try (SavedModelBundle mb = SavedModelBundle.loader(MODEL)
+                .withTags("serve")
+                .withConfigProto(config)
+                .load();
+             Session session = mb.session();
+             ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null) {
 
             LOG.info("Model loaded");
 
-            // final Graph graph = mb.graph();
-            // final Iterator<GraphOperation> itr = graph.operations();
-            // while(itr.hasNext()) {
-            // final GraphOperation e = itr.next();
-            // LOG.info(e);
-            // }
-
-            final File dir = new File(IMAGE_DIR);
-            for(int i = 0; i < 2; i++) {
+            File dir = new File(IMAGE_DIR);
+            for (int i = 0; i < 2; i++) {
                 Arrays.stream(dir.listFiles()).forEach(f -> {
                     LOG.info("Testing: " + f.getAbsolutePath());
 
-                    try(final CvMat mat = uncheck(() -> ImageFile.readMatFromFile(f.getAbsolutePath()));
-                        final LetterboxDetails lbd = Utils.letterbox(mat, MODEL_INPUT_DIM);
-                        final CvMat rgb = chain(new CvMat(), m -> Imgproc.cvtColor(lbd.mat(), m, Imgproc.COLOR_BGR2RGB));
-                        CvMat maybe = chain(new CvMat(), m -> rgb.convertTo(m, CvType.CV_32FC3, 1 / 255.0));
-                        CvMat ready = maybe.isContinuous() ? CvMat.shallowCopy(maybe) : CvMat.deepCopy(maybe);
-                        Tensor tensor = TensorUtils.toTensor(ready, TFloat32.class);) {
+                    try (CvMat mat = uncheck(() -> ImageFile.readMatFromFile(f.getAbsolutePath()));
+                         LetterboxDetails lbd = Utils.letterbox(mat, MODEL_INPUT_DIM);
+                         CvMat rgb = chain(new CvMat(), m -> Imgproc.cvtColor(lbd.mat(), m, Imgproc.COLOR_BGR2RGB));
+                         CvMat maybe = chain(new CvMat(), m -> rgb.convertTo(m, CvType.CV_32FC3, 1 / 255.0));
+                         CvMat ready = maybe.isContinuous() ? CvMat.shallowCopy(maybe) : CvMat.deepCopy(maybe);
+                         Tensor tensor = TensorUtils.toTensor(ready, TFloat32.class)) {
 
                         LOG.trace("Loaded into tensor");
 
-                        if(id != null)
+                        if (id != null) {
                             id.update(lbd.mat());
+                        }
 
-                        // Interrogate the saved model in order to get the input/output
-                        // Operation names using the process described here:
-                        // https://stackoverflow.com/questions/59263406/how-to-find-operation-names-in-tensorflow-graph
-                        final Runner runner = session.runner();
-
+                        Runner runner = session.runner();
                         LOG.trace("Running model");
-                        final var result = runner.feed("serving_default_input_1:0", tensor)
-                            // .fetch("dense/kernel:0")
+                        
+                        var result = runner
+                            .feed("serving_default_input_1:0", tensor)
                             .fetch("StatefulPartitionedCall:0")
                             .run();
 
                         LOG.trace("Extracting results");
                         LOG.debug("{}", result.get(0).shape());
                         LOG.debug(Arrays.toString(TensorUtils.getVector(result.get(0))));
+                        
+                        // Make sure to close the result tensors
+                        result.forEach(Tensor::close);
                     }
                 });
             }
-
         }
     }
 }
