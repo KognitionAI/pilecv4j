@@ -28,6 +28,7 @@
  import org.tensorflow.Tensor;
  import org.tensorflow.ndarray.Shape;
  import org.tensorflow.ndarray.buffer.DataBuffers;
+ import org.tensorflow.proto.framework.GraphDef;
  import org.tensorflow.types.TFloat32;
  import org.tensorflow.types.family.TType;
  
@@ -44,13 +45,16 @@
      public static Graph inflate(final byte[] graphBytes) throws InvalidProtocolBufferException {
          Graph graph = new Graph();
          try {
-             graph.importGraphDef(graphBytes);
+             GraphDef graphDef = GraphDef.parseFrom(graphBytes);
+             graph.importGraphDef(graphDef);
              return graph;
          } catch (Exception e) {
              graph.close();
              throw e;
          }
      }
+ 
+     // Rest of the class remains the same...
  
      public static float getScalar(final Tensor tensor) {
          if (!(tensor instanceof TFloat32)) {
