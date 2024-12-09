@@ -16,7 +16,7 @@ import org.tensorflow.Session;
 import org.tensorflow.Session.Runner;
 import org.tensorflow.Tensor;
 import org.tensorflow.TensorFlow;
-import org.tensorflow.proto.ConfigProto;
+import org.tensorflow.ndarray.Shape;
 import org.tensorflow.types.TFloat32;
 
 import ai.kognition.pilecv4j.image.CvMat;
@@ -36,34 +36,17 @@ import ai.kognition.pilecv4j.util.DetermineShowFlag;
 //@Ignore
 public class TfTest {
     public final static Logger LOG = LoggerFactory.getLogger(TfTest.class);
-
     public final static boolean SHOW = DetermineShowFlag.SHOW;
-
-    // public static final String MODEL = "/data/jim/kog/data/EV-models.testing/saved_ev_model_efficientnetv2-xl-21k";
-    // public static final int MODEL_INPUT_DIM = 512;
-
     public static final String MODEL = "/data/jim/kog/data/EV-models.testing/saved_ev_model_efficientnetv2-s-21k";
     public static final int MODEL_INPUT_DIM = 384;
-
     public static final String IMAGE_DIR = "/data/jim/kog/data/EV unlabeled";
 
     @Test
     public void test() throws Exception {
         LOG.info("TensorFlow version: " + TensorFlow.version());
 
-        // Create GPU options using the new API
-        ConfigProto config = ConfigProto.newBuilder()
-            .setGpuOptions(ConfigProto.GPUOptions.newBuilder()
-                .setAllowGrowth(true)
-                .setPerProcessGpuMemoryFraction(0.4)
-                .build())
-            .build();
-
-        // Load the model using the new SavedModelBundle API
-        try (SavedModelBundle mb = SavedModelBundle.loader(MODEL)
-                .withTags("serve")
-                .withConfigProto(config)
-                .load();
+        // In TF 0.5.0, we use the SavedModelBundle directly without ConfigProto
+        try (SavedModelBundle mb = SavedModelBundle.load(MODEL, "serve");
              Session session = mb.session();
              ImageDisplay id = SHOW ? new ImageDisplay.Builder().build() : null) {
 
@@ -96,11 +79,13 @@ public class TfTest {
                             .run();
 
                         LOG.trace("Extracting results");
-                        LOG.debug("{}", result.get(0).shape());
-                        LOG.debug(Arrays.toString(TensorUtils.getVector(result.get(0))));
+                        try (Tensor resultTensor = result.get(0)) {
+                            LOG.debug("{}", resultTensor.shape());
+                            LOG.debug(Arrays.toString(TensorUtils.getVector(resultTensor)));
+                        }
                         
-                        // Make sure to close the result tensors
-                        result.forEach(Tensor::close);
+                        // Clean up the result list
+                        result.close();
                     }
                 });
             }
