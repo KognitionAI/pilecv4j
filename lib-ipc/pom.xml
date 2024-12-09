@@ -5,7 +5,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>1.1.1-SNAPSHOT</version>
+    <version>1.1.2-SNAPSHOT</version>
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-ipc</artifactId>
@@ -15,13 +15,13 @@
     <!-- Third party deps -->
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-ipc-${ipc-impl}-${platform}</artifactId>
+      <artifactId>native-ipc-posix-linux-x86_64</artifactId>
       <classifier>bin</classifier>
       <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
-      <artifactId>native-image-${platform}</artifactId>
+      <artifactId>native-image-linux-x86_64</artifactId>
       <classifier>bin</classifier>
       <optional>true</optional>
     </dependency>
