@@ -59,6 +59,11 @@
           <version>${tensorflow-core-api.version}</version>
       </dependency>
       <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-proto</artifactId>
+        <version>${tensorflow-core-api.version}</version>
+    </dependency>
+      <dependency>
           <groupId>org.bytedeco</groupId>
           <artifactId>javacpp</artifactId>
           <version>${javacpp.version}</version>
