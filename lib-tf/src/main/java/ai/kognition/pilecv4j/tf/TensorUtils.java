@@ -28,7 +28,6 @@
  import org.tensorflow.Tensor;
  import org.tensorflow.ndarray.Shape;
  import org.tensorflow.ndarray.buffer.DataBuffers;
- import org.tensorflow.proto.tensorflow.GraphDef;
  import org.tensorflow.types.TFloat32;
  import org.tensorflow.types.family.TType;
  
@@ -45,8 +44,7 @@
      public static Graph inflate(final byte[] graphBytes) throws InvalidProtocolBufferException {
          Graph graph = new Graph();
          try {
-             GraphDef graphDef = GraphDef.parseFrom(graphBytes);
-             graph.importGraphDef(graphDef.toByteArray());
+             graph.importGraphDef(graphBytes);
              return graph;
          } catch (Exception e) {
              graph.close();
