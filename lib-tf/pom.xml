@@ -5,7 +5,7 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>1.1.1-SNAPSHOT</version>
+    <version>1.1.2-SNAPSHOT</version>
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-tf</artifactId>
@@ -42,13 +42,16 @@
     </dependency>
 
     <dependency>
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow-core-api</artifactId>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-api</artifactId>
     </dependency>
     <dependency>
-      <groupId>org.tensorflow</groupId>
-      <artifactId>tensorflow-core-native</artifactId>
-      <classifier>linux-x86_64-gpu</classifier>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-platform</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>org.bytedeco</groupId>
+        <artifactId>javacpp</artifactId>
     </dependency>
     
     <dependency>
