@@ -49,8 +49,9 @@
       
       <!-- Tensorflow -->
       <dependency>
+      <dependency>
           <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow-core-platform</artifactId>
+          <artifactId>tensorflow-core-api</artifactId>
           <version>${tensorflow.version}</version>
       </dependency>
       <dependency>
