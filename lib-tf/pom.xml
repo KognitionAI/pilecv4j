@@ -43,11 +43,8 @@
 
     <dependency>
         <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow-core-api</artifactId>
-    </dependency>
-    <dependency>
-        <groupId>org.tensorflow</groupId>
-        <artifactId>tensorflow-core-platform</artifactId>
+        <artifactId>tensorflow</artifactId>
+        <version>{tensorflow.version}</version>
     </dependency>
     <dependency>
         <groupId>org.bytedeco</groupId>

@@ -15,7 +15,7 @@
   <description>An image and video processing library for java.</description>
 
   <properties>
-    <tensorflow-core-api.version>1.15.0</tensorflow-core-api.version>
+    <tensorflow.version>1.15.0</tensorflow.version>
     <slf4j.version>1.7.30</slf4j.version>
 
     <dempsy-commons.version>2.4.2-SNAPSHOT</dempsy-commons.version>
@@ -50,13 +50,8 @@
       <!-- Tensorflow -->
       <dependency>
           <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow-core-api</artifactId>
-          <version>${tensorflow-core-api.version}</version>
-      </dependency>
-      <dependency>
-          <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow-core-platform</artifactId>
-          <version>${tensorflow-core-api.version}</version>
+          <artifactId>tensorflow</artifactId>
+          <version>${tensorflow.version}</version>
       </dependency>
       <dependency>
           <groupId>org.bytedeco</groupId>
