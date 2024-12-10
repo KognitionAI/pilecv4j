@@ -50,8 +50,14 @@
       <!-- Tensorflow -->
       <dependency>
           <groupId>org.tensorflow</groupId>
-          <artifactId>tensorflow</artifactId>
+          <artifactId>tensorflow-core-platform</artifactId>
           <version>${tensorflow.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-native</artifactId>
+        <version>${tensorflow.version}</version>
+        <classifier>${platform}</classifier>
       </dependency>
       <dependency>
           <groupId>org.bytedeco</groupId>
