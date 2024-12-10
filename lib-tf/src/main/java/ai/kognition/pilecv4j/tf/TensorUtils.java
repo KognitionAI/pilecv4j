@@ -27,12 +27,14 @@
  import org.tensorflow.Graph;
  import org.tensorflow.Tensor;
  import org.tensorflow.ndarray.Shape;
+ import org.tensorflow.ndarray.buffer.ByteDataBuffer;
  import org.tensorflow.ndarray.buffer.DataBuffers;
- import org.tensorflow.proto.framework.GraphDef;
+ import org.tensorflow.proto.GraphDef;
  import org.tensorflow.types.TFloat32;
  import org.tensorflow.types.family.TType;
  
  import net.dempsy.util.QuietCloseable;
+ 
  import ai.kognition.pilecv4j.image.CvMat;
  
  public class TensorUtils {
@@ -43,86 +45,52 @@
      }
  
      public static Graph inflate(final byte[] graphBytes) throws InvalidProtocolBufferException {
-         Graph graph = new Graph();
-         try {
-             GraphDef graphDef = GraphDef.parseFrom(graphBytes);
-             graph.importGraphDef(graphDef.toByteArray());
-             return graph;
-         } catch (Exception e) {
-             graph.close();
-             throw e;
-         }
+         final Graph graph = new Graph();
+         final GraphDef gd = GraphDef.parseFrom(graphBytes);
+         graph.importGraphDef(gd);
+         return graph;
      }
  
-     // Rest of the class remains the same...
- 
      public static float getScalar(final Tensor tensor) {
-         if (!(tensor instanceof TFloat32)) {
-             throw new IllegalArgumentException("Tensor must be of type TFloat32");
-         }
-         TFloat32 tFloat = (TFloat32) tensor;
-         return tFloat.getFloat();
+         // expect a 1 dim array with 1 value.
+         return ((TFloat32)tensor).getFloat();
      }
  
      public static float[] getVector(final Tensor tensor) {
-         if (!(tensor instanceof TFloat32)) {
-             throw new IllegalArgumentException("Tensor must be of type TFloat32");
-         }
-         TFloat32 tFloat = (TFloat32) tensor;
-         long[] shape = tensor.shape().asArray();
-         if (shape.length != 2) {
-             throw new IllegalArgumentException("Expected 2D tensor for vector extraction");
-         }
-         
-         int dim1 = (int) shape[1];
-         float[][] result = new float[1][dim1];
-         
-         for (int i = 0; i < 1; i++) {
-             for (int j = 0; j < dim1; j++) {
-                 result[i][j] = tFloat.getFloat(i, j);
+         // expect a 1 dim array with 1 value.
+         final int dim1 = (int)tensor.shape().asArray()[1];
+         final float[][] result = new float[1][dim1];
+         for(long i = 0; i < result.length; i++) {
+             for(long j = 0; j < dim1; j++) {
+                 result[(int)i][(int)j] = ((TFloat32)tensor).getFloat(i, j);
              }
          }
+ 
          return result[0];
      }
  
      public static float[][] getMatrix(final Tensor tensor) {
-         if (!(tensor instanceof TFloat32)) {
-             throw new IllegalArgumentException("Tensor must be of type TFloat32");
-         }
-         TFloat32 tFloat = (TFloat32) tensor;
-         
-         int[] dimensions = LongStream.of(tensor.shape().asArray())
-             .mapToInt(l -> (int) l)
+         final int[] dimentions = LongStream.of(tensor.shape().asArray())
+             .mapToInt(l -> (int)l)
              .toArray();
-             
-         float[][][] matrix = (float[][][]) Array.newInstance(float.class, dimensions);
-         
-         for (int i = 0; i < dimensions[0]; i++) {
-             for (int j = 0; j < dimensions[1]; j++) {
-                 for (int k = 0; k < dimensions[2]; k++) {
-                     matrix[i][j][k] = tFloat.getFloat(i, j, k);
+         final float[][][] matrix = (float[][][])Array.newInstance(float.class, dimentions);
+         for(long i = 0; i < dimentions[0]; i++) {
+             for(long j = 0; j < dimentions[1]; j++) {
+                 for(long k = 0; k < dimentions[2]; k++) {
+                     matrix[(int)i][(int)j][(int)k] = ((TFloat32)tensor).getFloat(i, j, k);
                  }
              }
          }
          return matrix[0];
      }
  
-     private static Tensor toTensor(final ByteBuffer bb, final int rows, final int cols, 
-             final int channels, final Class<? extends TType> clazz) {
-         Shape shape = Shape.of(1, rows, cols, channels);
+     private static Tensor toTensor(final ByteBuffer bb, final int rows, final int cols, final int channels, final Class<? extends TType> clazz) {
+         final Shape shape = Shape.of(new long[] {1,rows,cols,channels});
          bb.rewind();
-         
-         try (QuietCloseable qc = () -> bb.rewind()) {
-             if (clazz == TFloat32.class) {
-                 return TFloat32.tensorOf(shape, data -> {
-                     // Copy data from ByteBuffer to tensor
-                     for (int i = 0; i < bb.capacity() / 4; i++) {
-                         data.setFloat(bb.getFloat(), i);
-                     }
-                 });
-             } else {
-                 throw new IllegalArgumentException("Unsupported tensor type: " + clazz.getName());
-             }
+         try(QuietCloseable qc = () -> bb.rewind();) {
+             final ByteDataBuffer bdb = DataBuffers.of(bb);
+             return Tensor.of(clazz, shape, bdb);
          }
      }
+ 
  }
