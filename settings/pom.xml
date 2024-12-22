@@ -18,7 +18,7 @@
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
     <opencv-build.version>4.10.0</opencv-build.version>
-    <opencv-short.version>410</opencv-short.version>
+    <opencv-short.version>4100</opencv-short.version>
     <!-- <cuda.version>11.2</cuda.version> -->
 
     <!-- Normally the opencv-base version is the same as the opencv-build version   -->
