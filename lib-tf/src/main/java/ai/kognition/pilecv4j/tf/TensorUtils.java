@@ -29,7 +29,7 @@
  import org.tensorflow.ndarray.Shape;
  import org.tensorflow.ndarray.buffer.ByteDataBuffer;
  import org.tensorflow.ndarray.buffer.DataBuffers;
- import org.tensorflow.proto.GraphDef;
+ import org.tensorflow.proto.framework.GraphDef;
  import org.tensorflow.types.TFloat32;
  import org.tensorflow.types.family.TType;
  

@@ -85,7 +85,7 @@ public class TfTest {
                         }
                         
                         // Clean up the result list
-                        result.close();
+                        result.forEach(Tensor::close);
                     }
                 });
             }
