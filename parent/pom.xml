@@ -166,6 +166,17 @@
         <artifactId>junit</artifactId>
         <version>4.13.1</version>
       </dependency>
+      <dependency>
+        <groupId>org.tensorflow</groupId>
+        <artifactId>tensorflow-core-platform</artifactId>
+        <version>${tensorflow.version}</version>
+        <exclusions>
+            <exclusion>
+                <groupId>org.bytedeco</groupId>
+                <artifactId>javacpp</artifactId>
+            </exclusion>
+        </exclusions>
+      </dependency>
     </dependencies>
   </dependencyManagement>
 </project>
