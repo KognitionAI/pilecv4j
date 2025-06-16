@@ -1,4 +1,3 @@
-
 #ifndef _ENCODER_H_
 #define _ENCODER_H_
 
@@ -57,7 +56,7 @@ class VideoEncoder {
 
   // ==================================
   // valid once state becomes VE_ENABLED
-  AVCodec* video_avc = nullptr;
+  const AVCodec* video_avc = nullptr;
   int video_sindex = -1;
   AVRational video_stime_base;
   AVCodecContext* video_avcc = nullptr;
