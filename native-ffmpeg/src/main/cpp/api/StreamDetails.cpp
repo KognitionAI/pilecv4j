@@ -1,4 +1,4 @@
-
+#include <libavcodec/avcodec.h>
 #include "api/StreamDetails.h"
 
 namespace pilecv4j
