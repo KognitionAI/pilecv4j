@@ -14,6 +14,7 @@
 
 extern "C" {
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 }
 
 #include "utils/pilecv4j_ffmpeg_utils.h"
