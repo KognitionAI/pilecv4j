@@ -11,6 +11,7 @@
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
+#include <libavcodec/avcodec.h>
 }
 #include <stdint.h>
 #include "common/imagemaker.h"
