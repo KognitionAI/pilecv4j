@@ -34,7 +34,7 @@ uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCo
   *codecCtxPtr = nullptr;
 
   AVCodecParameters *pCodecParameters = pStream->codecpar;
-  AVCodec* pCodec = nullptr;
+  const AVCodec* pCodec = nullptr;
   {
     // we're going to use the named codec but only if the media type matches.
     if (decoderName) {
