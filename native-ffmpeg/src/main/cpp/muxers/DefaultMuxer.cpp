@@ -36,7 +36,7 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 /**
  * AV compliant callback for custom IO.
  */
-static int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size) {
+static int write_packet_to_custom_output(void* opaque, const uint8_t* buf, int buf_size) {
   PILECV4J_TRACE;
   DefaultMuxer const* c = (DefaultMuxer*)opaque;
   void* bufForCallback = c->ioBufferToWriteToJava;
