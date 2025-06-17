@@ -177,26 +177,24 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
 
   uint64_t result = 0;
   AVDictionary* opts = nullptr;
-
-  // llog(TRACE, "STEP 6: set_codec_params");
-
   int avres = 0;
+  const enum AVPixelFormat* supported_formats = nullptr;
+  AVCodecContext* video_avcc = nullptr;
+  AVStream* video_st = nullptr;
+  int video_sindex = -1;
 
   //llog(TRACE, "STEP 3: find codec");
   if (video_codec_isNull) {
     const AVOutputFormat* avof = enc->muxer->guessOutputFormat();
     if (!avof) {
-      llog(ERROR, "Cannot infer the appropriate video codec to use for encoding.");
-      result = MAKE_P_STAT(FAILED_CREATE_CODEC);
+      llog(ERROR, "Failed to guess output format");
       goto fail;
     }
-    if (avof->video_codec != AV_CODEC_ID_NONE)
-      video_avc = avcodec_find_encoder(avof->video_codec);
-  } else
+    video_avc = avcodec_find_encoder(avof->video_codec);
+  } else {
     video_avc = avcodec_find_encoder_by_name(video_codec.c_str());
+  }
 
-  const enum AVPixelFormat* supported_formats = nullptr;
-  
   if (!video_avc) {
     llog(ERROR, "Failed to find the codec");
     goto fail;
@@ -206,6 +204,13 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   if (!video_avcc) {
     llog(ERROR, "Failed to allocate the codec context");
     goto fail;
+  }
+
+  // Check if the codec supports the requested pixel format
+  if (avcodec_get_supported_config(video_avcc, video_avc, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&supported_formats, nullptr) >= 0 && supported_formats) {
+    video_avcc->pix_fmt = supported_formats[0]; // use the first one if there's one in the codec
+  } else {
+    video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
   }
 
   if (rcBufferSize >= 0) {
@@ -234,13 +239,6 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   video_avcc->time_base = av_inv_q(framerate);
   video_avcc->framerate = framerate;
 
-  // Check if the codec supports the requested pixel format
-  if (avcodec_get_supported_config(video_avc, AV_CODEC_CONFIG_PIX_FORMAT, &supported_formats) >= 0 && supported_formats) {
-    video_avcc->pix_fmt = supported_formats[0]; // use the first one if there's one in the codec
-  } else {
-    video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
-  }
-
   result = enc->muxer->createNextStream(video_avcc, &video_sindex);
   if (isError(result)) {
     llog(ERROR, "Failed to create stream in muxer");
@@ -254,21 +252,16 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   result = buildOptions(options, &opts);
   if (isError(result))
     return result;
-  int avres = avcodec_open2(video_avcc, video_avc, &opts);
+  avres = avcodec_open2(video_avcc, video_avc, &opts);
   result = MAKE_AV_STAT(avres);
   if (!isError(result) && options.size() > 0) {
     rebuildOptions(opts, options);
-    logRemainingOptions(INFO, COMPONENT, "after opening the video encoder", options);
+    logRemainingOptions(INFO, COMPONENT, "after opening the encoder", options);
   }
   if (opts != nullptr)
     av_dict_free(&opts);
-  if (isError(result)) {
-    if (avres == AVERROR(EINVAL))
-      llog(ERROR, "There was a bad codec option set.");
-    else
-      llog(ERROR, "could not open the codec");
+  if (isError(result))
     goto fail;
-  }
 
   // ======================================
   // This is a weird hack discovered here: https://stackoverflow.com/questions/48578088/streaming-flv-to-rtmp-with-ffmpeg-using-h264-codec-and-c-api-to-flv-js
@@ -276,16 +269,16 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   // If we don't do this then we get a double free if we close both the AVCodecContext
   // and the overall AVFormatContext
   {
-    AVStream* video_avs = enc->muxer->getStream(video_sindex);
-    if (!video_avs) {
+    video_st = enc->muxer->getStream(video_sindex);
+    if (!video_st) {
       result = MAKE_P_STAT(NO_STREAM);
       goto fail;
     }
 
-    streams_original_extradata = video_avs->codecpar->extradata;
-    streams_original_extradata_size = video_avs->codecpar->extradata_size;
-    video_avs->codecpar->extradata = video_avcc->extradata;
-    video_avs->codecpar->extradata_size = video_avcc->extradata_size;
+    streams_original_extradata = video_st->codecpar->extradata;
+    streams_original_extradata_size = video_st->codecpar->extradata_size;
+    video_st->codecpar->extradata = video_avcc->extradata;
+    video_st->codecpar->extradata_size = video_avcc->extradata_size;
     streams_original_set = true;
   }
   // ======================================
@@ -497,15 +490,15 @@ uint64_t VideoEncoder::stop(bool lock) {
   FakeMutextGuard g(enc->fake_mutex, lock);
 
   // need to put it back or we get a double free when closing the overall context
-  AVStream* video_avs = enc->muxer->getStream(video_sindex);
-  if (streams_original_set && video_avs) {
+  AVStream* video_st = enc->muxer->getStream(video_sindex);
+  if (streams_original_set && video_st) {
     if (isEnabled(TRACE))
-      llog(TRACE, "Resetting video_avs(%" PRId64 ")->codecpar(%" PRId64 ")->extradata(%" PRId64 ") to %" PRId64,
-          (uint64_t)video_avs, (uint64_t)(video_avs ? video_avs->codecpar : 0L),
-          (uint64_t)((video_avs && video_avs->codecpar) ? video_avs->codecpar->extradata : 0L),
+      llog(TRACE, "Resetting video_st(%" PRId64 ")->codecpar(%" PRId64 ")->extradata(%" PRId64 ") to %" PRId64,
+          (uint64_t)video_st, (uint64_t)(video_st ? video_st->codecpar : 0L),
+          (uint64_t)((video_st && video_st->codecpar) ? video_st->codecpar->extradata : 0L),
           (uint64_t)streams_original_set);
-    video_avs->codecpar->extradata = streams_original_extradata;
-    video_avs->codecpar->extradata_size = streams_original_extradata_size;
+    video_st->codecpar->extradata = streams_original_extradata;
+    video_st->codecpar->extradata_size = streams_original_extradata_size;
     streams_original_set = false;
   }
 
