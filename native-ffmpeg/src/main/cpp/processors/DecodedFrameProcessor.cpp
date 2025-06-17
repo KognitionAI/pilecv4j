@@ -221,12 +221,11 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
     if (response >= 0) {
       if (isEnabled(TRACE)) {
         llog(TRACE,
-            "Frame %d (type=%c, format=%d) pts %d [DTS %d]",
+            "Frame %d (type=%c, format=%d) pts %d",
             codecDetails->codecCtx->frame_num,
             av_get_picture_type_char(pFrame->pict_type),
             (AVPixelFormat)pFrame->format,
-            pFrame->best_effort_timestamp,
-            pFrame->coded_picture_number
+            pFrame->best_effort_timestamp
         );
       }
 
