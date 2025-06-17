@@ -237,10 +237,11 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   video_avcc->framerate = framerate;
 
   // video_avcc->sample_aspect_ratio = 0; // TODO: carry this over from the input: decoder_ctx->sample_aspect_ratio;
-  if (video_avc->pix_fmts)
-    video_avcc->pix_fmt = video_avc->pix_fmts[0]; // use the first one if there's one in the codec
-  else
-    video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
+  // Check if the codec supports the requested pixel format
+  const enum AVPixelFormat* supported_formats = nullptr;
+  if (avcodec_get_supported_config(video_avc, AV_CODEC_CONFIG_PIXEL_FORMAT, &supported_formats) >= 0 && supported_formats) {
+    video_avcc->pix_fmt = supported_formats[0]; // use the first one if there's one in the codec
+  }
 
   //llog(TRACE, "STEP 4: avformat_new_stream ( ctx, codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
   //  avformat_new_stream(enc->output_format_context, video_avc);
@@ -416,7 +417,12 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
     framecount++;
   }
 
-  av_init_packet(&output_packet);
+  // Initialize the output packet
+  AVPacket* output_packet = av_packet_alloc();
+  if (!output_packet) {
+    llog(ERROR, "Failed to allocate output packet");
+    return MAKE_P_STAT(FAILED_ALLOCATE_PACKET);
+  }
 
   for (bool frameSent = false; ! frameSent; ) {
     llog(TRACE, "avcodec_send_frame sending frame at %" PRId64, (uint64_t) frame);
@@ -438,7 +444,7 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
 
     bool packetReceived = false;
     while (rc >= 0) {
-      rc = avcodec_receive_packet(video_avcc, &output_packet);
+      rc = avcodec_receive_packet(video_avcc, output_packet);
       if (rc == AVERROR(EAGAIN) || rc == AVERROR_EOF) {
         if (isEnabled(TRACE))
           llog(TRACE, "avcodec_receive_packet needs more info: %d : %s", rc, av_err2str(rc));
@@ -454,23 +460,27 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
 
       packetReceived = true;
 
-      output_packet.stream_index = video_sindex;
+      output_packet->stream_index = video_sindex;
 
       if (isEnabled(TRACE)) {
         llog(TRACE, "Output Packet Timing[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64 " timebase: [ %d / %d ]",
-            (int) output_packet.stream_index,
-            (int64_t)output_packet.pts, (int64_t)output_packet.dts,
-            (int64_t)output_packet.duration,
+            (int) output_packet->stream_index,
+            (int64_t)output_packet->pts, (int64_t)output_packet->dts,
+            (int64_t)output_packet->duration,
             (int)video_stime_base.num, (int)video_stime_base.den);
       }
 
-      enc->muxer->writeFinalPacket(&output_packet);
+      enc->muxer->writeFinalPacket(output_packet);
     }
 
     if (packetReceived)
-      av_packet_unref(&output_packet);
+      av_packet_unref(output_packet);
   }
   // ==================================================================
+
+  // Clean up
+  av_packet_unref(output_packet);
+  av_packet_free(&output_packet);
 
   return result;
 }
