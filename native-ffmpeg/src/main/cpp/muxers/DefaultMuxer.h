@@ -24,6 +24,8 @@ namespace ffmpeg
 typedef uint64_t (*write_buffer)(int32_t numBytes);
 typedef int64_t (*seek_buffer_out)(int64_t offset, int whence);
 
+static int write_packet_to_custom_output(void* opaque, const uint8_t* buf, int buf_size);
+
 #ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
 class DefaultMuxer;
 static int write_packet_to_custom_output(void *opaque, uint8_t *buf, int buf_size);

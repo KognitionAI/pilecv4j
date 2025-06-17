@@ -35,7 +35,6 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 
 #ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
 class DefaultMuxer;
-static int write_packet_to_custom_output(void* opaque, const uint8_t* buf, int buf_size);
 static int64_t seek_in_custom_output(void* opaque, int64_t offset, int whence);
 static inline void* fetchBuffer(DefaultMuxer*);
 #endif
