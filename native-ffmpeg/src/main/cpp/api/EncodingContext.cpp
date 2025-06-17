@@ -195,18 +195,16 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   } else
     video_avc = avcodec_find_encoder_by_name(video_codec.c_str());
 
+  const enum AVPixelFormat* supported_formats = nullptr;
+  
   if (!video_avc) {
-    llog(ERROR, "could not find the proper codec");
-    result = MAKE_P_STAT(FAILED_CREATE_CODEC);
+    llog(ERROR, "Failed to find the codec");
     goto fail;
   }
-  llog(TRACE, "video codec id %d: %s", (int)video_avc->id, PO(video_avc->name));
 
-  //llog(TRACE, "STEP 5: avcodec_alloc_context3 ( codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
   video_avcc = avcodec_alloc_context3(video_avc);
   if (!video_avcc) {
-    llog(ERROR,"could not allocated memory for codec context");
-    result = MAKE_P_STAT(FAILED_CREATE_CODEC_CONTEXT);
+    llog(ERROR, "Failed to allocate the codec context");
     goto fail;
   }
 
@@ -236,16 +234,13 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   video_avcc->time_base = av_inv_q(framerate);
   video_avcc->framerate = framerate;
 
-  // video_avcc->sample_aspect_ratio = 0; // TODO: carry this over from the input: decoder_ctx->sample_aspect_ratio;
   // Check if the codec supports the requested pixel format
-  const enum AVPixelFormat* supported_formats = nullptr;
-  if (avcodec_get_supported_config(video_avc, AV_CODEC_CONFIG_PIXEL_FORMAT, &supported_formats) >= 0 && supported_formats) {
+  if (avcodec_get_supported_config(video_avc, AV_CODEC_CONFIG_PIX_FORMAT, &supported_formats) >= 0 && supported_formats) {
     video_avcc->pix_fmt = supported_formats[0]; // use the first one if there's one in the codec
+  } else {
+    video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
   }
 
-  //llog(TRACE, "STEP 4: avformat_new_stream ( ctx, codec (%d == %d)", (int)video_avc->id, (int)AV_CODEC_ID_H264 );
-  //  avformat_new_stream(enc->output_format_context, video_avc);
-  //llog(TRACE, "STEP 7: avcodec_parameters_from_context");
   result = enc->muxer->createNextStream(video_avcc, &video_sindex);
   if (isError(result)) {
     llog(ERROR, "Failed to create stream in muxer");
@@ -253,17 +248,13 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   }
   llog(TRACE, "video stream index %d", (int)video_sindex);
 
-
   if (enc->muxer->getFormatContext()->oformat->flags & AVFMT_GLOBALHEADER)
     video_avcc->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
-  //llog(TRACE, "STEP 8: avcodec_open2");
-
-  // set the options
   result = buildOptions(options, &opts);
   if (isError(result))
     return result;
-  avres = avcodec_open2(video_avcc, video_avc, &opts);
+  int avres = avcodec_open2(video_avcc, video_avc, &opts);
   result = MAKE_AV_STAT(avres);
   if (!isError(result) && options.size() > 0) {
     rebuildOptions(opts, options);
@@ -421,7 +412,7 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
   AVPacket* output_packet = av_packet_alloc();
   if (!output_packet) {
     llog(ERROR, "Failed to allocate output packet");
-    return MAKE_P_STAT(FAILED_ALLOCATE_PACKET);
+    return MAKE_P_STAT(FAILED_CREATE_PACKET);
   }
 
   for (bool frameSent = false; ! frameSent; ) {
