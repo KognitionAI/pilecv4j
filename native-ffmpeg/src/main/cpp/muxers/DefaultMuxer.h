@@ -40,6 +40,9 @@ static inline void* fetchBuffer(DefaultMuxer*);
  */
 class DefaultMuxer: public Muxer
 {
+private:
+  friend int write_packet_to_custom_output(void* opaque, const uint8_t* buf, int buf_size);
+
   std::string fmt;
   bool fmtNull;
   std::string outputUri;
@@ -121,7 +124,6 @@ public:
    * it will guess based on the format and uri that were specified.
    */
   virtual const AVOutputFormat* guessOutputFormat() override;
-
 };
 
 #ifdef __INSIDE_DEFAULT_MUXER_SOURCE_CPP
