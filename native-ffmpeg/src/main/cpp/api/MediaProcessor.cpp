@@ -43,13 +43,13 @@ uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCo
         llog(TRACE, "Checking if the codec '%s' has the media type %s for the stream %d", decoderName,
             av_get_media_type_string(streamMediaType), (int)pStream->index);
 
-      pCodec = avcodec_find_decoder_by_name(decoderName);
+      pCodec = safe_find_decoder_by_name(decoderName);
       if (!pCodec) {
         // Fallback: try to find by descriptor if available
         #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 0, 0)
         const AVCodecDescriptor *desc = avcodec_descriptor_get_by_name(decoderName);
         if (desc) {
-          pCodec = avcodec_find_decoder(desc->id);
+          pCodec = safe_find_decoder(desc->id);
           if (isEnabled(INFO) && pCodec)
             llog(INFO, "Matched decoder '%s' for codec '%s'.",
                 pCodec->name, desc->name);
@@ -70,7 +70,7 @@ uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCo
 
     if (!pCodec) { // if we didn't set the pCodec above either because of a mismatch with the media type
                    //   or because the decoderName was never set, then let's open the default codec.
-      pCodec = avcodec_find_decoder(pCodecParameters->codec_id);
+      pCodec = safe_find_decoder(pCodecParameters->codec_id);
       if (pCodec==NULL) {
         llog(ERROR, "Unsupported codec, ID %d",(int)pCodecParameters->codec_id);
         return MAKE_P_STAT(UNSUPPORTED_CODEC);

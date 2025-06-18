@@ -32,7 +32,7 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
         details.codec_id = pLocalCodecParameters->codec_id;
 
         // Try to get codec name using avcodec_find_decoder first, then fallback to descriptor
-        const AVCodec* codec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+        const AVCodec* codec = safe_find_decoder(pLocalCodecParameters->codec_id);
         if (codec && codec->name) {
           details.setCodecName(codec->name);
         } else {

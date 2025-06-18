@@ -127,7 +127,7 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
     {
       // finds the registered decoder for a codec ID
       // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-      const AVCodec* pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+      const AVCodec* pLocalCodec = safe_find_decoder(pLocalCodecParameters->codec_id);
       if (pLocalCodec==NULL) {
         llog(WARN, "ERROR unsupported codec at %d!", i);
         continue;
