@@ -31,9 +31,18 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
 
         details.codec_id = pLocalCodecParameters->codec_id;
 
-        const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
-        if (cd)
-          details.setCodecName(cd->name);
+        // Try to get codec name using avcodec_find_decoder first, then fallback to descriptor
+        const AVCodec* codec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+        if (codec && codec->name) {
+          details.setCodecName(codec->name);
+        } else {
+          // Fallback: try to get descriptor if available
+          #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 0, 0)
+          const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
+          if (cd && cd->name)
+            details.setCodecName(cd->name);
+          #endif
+        }
       }
     }
   } else

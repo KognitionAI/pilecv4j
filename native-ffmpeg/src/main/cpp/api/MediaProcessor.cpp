@@ -44,12 +44,17 @@ uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCo
             av_get_media_type_string(streamMediaType), (int)pStream->index);
 
       pCodec = avcodec_find_decoder_by_name(decoderName);
-      const AVCodecDescriptor *desc;
-      if (!pCodec && (desc = avcodec_descriptor_get_by_name(decoderName))) {
-        pCodec = avcodec_find_decoder(desc->id);
-        if (isEnabled(INFO) && pCodec)
-          llog(INFO, "Matched decoder '%s' for codec '%s'.",
-              pCodec->name, desc->name);
+      if (!pCodec) {
+        // Fallback: try to find by descriptor if available
+        #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 0, 0)
+        const AVCodecDescriptor *desc = avcodec_descriptor_get_by_name(decoderName);
+        if (desc) {
+          pCodec = avcodec_find_decoder(desc->id);
+          if (isEnabled(INFO) && pCodec)
+            llog(INFO, "Matched decoder '%s' for codec '%s'.",
+                pCodec->name, desc->name);
+        }
+        #endif
       }
       if (!pCodec) {
           llog(ERROR, "Unknown decoder '%s'\n", decoderName);
