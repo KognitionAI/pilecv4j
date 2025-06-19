@@ -214,6 +214,7 @@ void logAvailableDecoders() {
   llog(INFO, "UTIL", "MPEG4 decoder: %s", mpeg4_decoder ? mpeg4_decoder->name : "NOT AVAILABLE");
   llog(INFO, "UTIL", "AAC decoder: %s", aac_decoder ? aac_decoder->name : "NOT AVAILABLE");
   llog(INFO, "UTIL", "MP3 decoder: %s", mp3_decoder ? mp3_decoder->name : "NOT AVAILABLE");
+}
 
 extern "C" {
 
