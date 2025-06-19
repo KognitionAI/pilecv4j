@@ -116,35 +116,28 @@ void logRemainingOptions(LogLevel logLevel, const char* component, const char* h
 void logRemainingOptions(LogLevel logLevel, const char* component, const char* header,
                                        const std::map<std::string,std::string>& options);
 bool decoderExists(AVCodecID id);
+void logAvailableDecoders();
 
 extern AVRational millisecondTimeBase;
 
 // Safe codec finding function that works with different FFmpeg versions
 inline const AVCodec* safe_find_decoder(AVCodecID codec_id) {
-  #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(58, 0, 0)
+  // These functions have been available since very early FFmpeg versions
+  #ifdef avcodec_find_decoder
     return avcodec_find_decoder(codec_id);
   #else
-    // For older versions, try alternative approaches
-    #ifdef avcodec_find_decoder
-      return avcodec_find_decoder(codec_id);
-    #else
-      // Very old FFmpeg - return nullptr and let caller handle
-      return nullptr;
-    #endif
+    // Very old FFmpeg - return nullptr and let caller handle
+    return nullptr;
   #endif
 }
 
 inline const AVCodec* safe_find_decoder_by_name(const char* name) {
-  #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(58, 0, 0)
+  // These functions have been available since very early FFmpeg versions
+  #ifdef avcodec_find_decoder_by_name
     return avcodec_find_decoder_by_name(name);
   #else
-    // For older versions, try alternative approaches
-    #ifdef avcodec_find_decoder_by_name
-      return avcodec_find_decoder_by_name(name);
-    #else
-      // Very old FFmpeg - return nullptr and let caller handle
-      return nullptr;
-    #endif
+    // Very old FFmpeg - return nullptr and let caller handle
+    return nullptr;
   #endif
 }
 

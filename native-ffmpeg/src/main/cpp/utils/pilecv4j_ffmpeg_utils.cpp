@@ -168,10 +168,43 @@ bool decoderExists(AVCodecID id) {
   // finds the registered decoder for a codec ID
   // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
   const AVCodec *pLocalCodec = safe_find_decoder(id);
-  if (!pLocalCodec)
+  if (!pLocalCodec) {
     log(WARN, "UTIL", "ERROR unsupported codec (%d)!", id);
+    // Try to get more information about what codec this is
+    #ifdef avcodec_descriptor_get
+    const AVCodecDescriptor* desc = avcodec_descriptor_get(id);
+    if (desc) {
+      log(WARN, "UTIL", "Codec ID %d corresponds to '%s' but no decoder found", id, desc->name);
+    }
+    #endif
+  } else {
+    if (isEnabled(TRACE))
+      log(TRACE, "UTIL", "Found decoder for codec ID %d: %s", id, pLocalCodec->name);
+  }
 
   return pLocalCodec != nullptr;
+}
+
+void logAvailableDecoders() {
+  if (!isEnabled(INFO))
+    return;
+    
+  log(INFO, "UTIL", "Checking available decoders...");
+  
+  // Check for common video codecs
+  const AVCodec* h264_decoder = safe_find_decoder(AV_CODEC_ID_H264);
+  const AVCodec* h265_decoder = safe_find_decoder(AV_CODEC_ID_HEVC);
+  const AVCodec* mpeg4_decoder = safe_find_decoder(AV_CODEC_ID_MPEG4);
+  
+  // Check for common audio codecs
+  const AVCodec* aac_decoder = safe_find_decoder(AV_CODEC_ID_AAC);
+  const AVCodec* mp3_decoder = safe_find_decoder(AV_CODEC_ID_MP3);
+  
+  log(INFO, "UTIL", "H.264 decoder: %s", h264_decoder ? h264_decoder->name : "NOT AVAILABLE");
+  log(INFO, "UTIL", "H.265 decoder: %s", h265_decoder ? h265_decoder->name : "NOT AVAILABLE");
+  log(INFO, "UTIL", "MPEG4 decoder: %s", mpeg4_decoder ? mpeg4_decoder->name : "NOT AVAILABLE");
+  log(INFO, "UTIL", "AAC decoder: %s", aac_decoder ? aac_decoder->name : "NOT AVAILABLE");
+  log(INFO, "UTIL", "MP3 decoder: %s", mp3_decoder ? mp3_decoder->name : "NOT AVAILABLE");
 }
 
 extern "C" {

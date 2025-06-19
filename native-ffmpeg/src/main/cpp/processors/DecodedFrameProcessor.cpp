@@ -94,6 +94,9 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
   if (!psi)
     return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
 
+  // Log available decoders for debugging
+  logAvailableDecoders();
+
   uint64_t ret = 0;
   int numStreams;
   if (isError(ret = psi->numStreams(&numStreams)))
