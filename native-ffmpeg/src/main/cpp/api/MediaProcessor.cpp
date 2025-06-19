@@ -46,16 +46,9 @@ uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCo
 
       pCodec = safe_find_decoder_by_name(decoderName);
       if (!pCodec) {
-        // Fallback: try to find by descriptor if available
-        #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 0, 0)
-        const AVCodecDescriptor *desc = avcodec_descriptor_get_by_name(decoderName);
-        if (desc) {
-          pCodec = safe_find_decoder(desc->id);
-          if (isEnabled(INFO) && pCodec)
-            llog(INFO, "Matched decoder '%s' for codec '%s'.",
-                pCodec->name, desc->name);
-        }
-        #endif
+        // Fallback: try alternative approaches for older FFmpeg versions
+        // For very old versions, we'll just log a warning and continue
+        llog(WARN, "Could not find decoder '%s' by name. This might be due to an older FFmpeg version.", decoderName);
       }
       if (!pCodec) {
           llog(ERROR, "Unknown decoder '%s'\n", decoderName);

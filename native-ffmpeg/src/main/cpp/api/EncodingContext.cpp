@@ -207,11 +207,20 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
   }
 
   // Check if the codec supports the requested pixel format
+  #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(59, 0, 0)
   if (avcodec_get_supported_config(video_avcc, video_avc, AV_CODEC_CONFIG_PIX_FORMAT, 0, (const void**)&supported_formats, nullptr) >= 0 && supported_formats) {
     video_avcc->pix_fmt = supported_formats[0]; // use the first one if there's one in the codec
   } else {
     video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
   }
+  #else
+  // For older FFmpeg versions, use a simpler approach
+  if (video_avc->pix_fmts) {
+    video_avcc->pix_fmt = video_avc->pix_fmts[0]; // use the first one if there's one in the codec
+  } else {
+    video_avcc->pix_fmt = isRgb ? AV_PIX_FMT_RGB24 : AV_PIX_FMT_BGR24;
+  }
+  #endif
 
   if (rcBufferSize >= 0) {
     llog(TRACE, "Encoder buffer size: %ld", (long) rcBufferSize);

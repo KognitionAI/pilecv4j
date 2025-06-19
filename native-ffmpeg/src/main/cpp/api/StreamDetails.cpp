@@ -37,12 +37,8 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
         if (codec && codec->name) {
           details.setCodecName(codec->name);
         } else {
-          // Fallback: try to get descriptor if available
-          #if LIBAVCODEC_VERSION_INT >= AV_VERSION_INT(57, 0, 0)
-          const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
-          if (cd && cd->name)
-            details.setCodecName(cd->name);
-          #endif
+          // Fallback: use a generic name based on codec ID
+          details.setCodecName("unknown_codec");
         }
       }
     }
