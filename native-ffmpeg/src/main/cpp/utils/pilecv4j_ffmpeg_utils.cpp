@@ -1,9 +1,16 @@
 #include "common/kog_exports.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
-
+#include "utils/log.h"
 #include <libavutil/hwcontext.h>
 
 AVRational pilecv4j::ffmpeg::millisecondTimeBase = AVRational{1,1000};
+
+inline static void llog(LogLevel llevel, const char *fmt, ...) {
+  va_list args;
+  va_start( args, fmt );
+  log( llevel, COMPONENT, fmt, args );
+  va_end( args );
+}
 
 // status message descriptions corresponding to the custom codes.
 static const char* pcv4jStatMessages[MAX_PCV4J_CODE + 1] = {
@@ -76,7 +83,7 @@ std::string removeOption(const std::string& key, std::vector<std::tuple<std::str
 uint64_t buildOptions(const std::vector<std::tuple<std::string,std::string> >& options, AVDictionary** opts) {
   if (options.size() == 0) {
     if (isEnabled(TRACE))
-      log(TRACE,"UTIL","No options set. Setting opts to nullptr");
+      llog(TRACE,"UTIL","No options set. Setting opts to nullptr");
     *opts = nullptr;
     return 0;
   }
@@ -141,26 +148,26 @@ void rebuildOptions(const AVDictionary* opts, std::vector<std::tuple<std::string
 void logRemainingOptions(LogLevel logLevel, const char* component, const char* header,
                                        const std::vector<std::tuple<std::string,std::string> >& options) {
   if (options.size() == 0) {
-    log(logLevel, component, "All options were used. No remaining options %s", header);
+    llog(logLevel, component, "All options were used. No remaining options %s", header);
     return;
   }
 
-  log(logLevel, component, "Remaining options %s:", header);
+  llog(logLevel, component, "Remaining options %s:", header);
   for (auto o : options) {
-    log(logLevel, component, "  %s = %s", std::get<0>(o).c_str(), std::get<1>(o).c_str());
+    llog(logLevel, component, "  %s = %s", std::get<0>(o).c_str(), std::get<1>(o).c_str());
   }
 }
 
 void logRemainingOptions(LogLevel logLevel, const char* component, const char* header,
                                        const std::map<std::string,std::string>& options) {
   if (options.size() == 0) {
-    log(logLevel, component, "All options were used. No remaining options %s", header);
+    llog(logLevel, component, "All options were used. No remaining options %s", header);
     return;
   }
 
-  log(logLevel, component, "Remaining options %s:", header);
+  llog(logLevel, component, "Remaining options %s:", header);
   for (std::map<std::string, std::string>::const_iterator it = options.begin(); it != options.end(); it++) {
-    log(logLevel, component, "  %s = %s",  it->first.c_str(), it->second.c_str());
+    llog(logLevel, component, "  %s = %s",  it->first.c_str(), it->second.c_str());
   }
 }
 
@@ -169,17 +176,19 @@ bool decoderExists(AVCodecID id) {
   // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
   const AVCodec *pLocalCodec = safe_find_decoder(id);
   if (!pLocalCodec) {
-    log(WARN, "UTIL", "ERROR unsupported codec (%d)!", id);
+    llog(WARN, "UTIL", "ERROR unsupported codec (%d)!", id);
     // Try to get more information about what codec this is
-    #ifdef avcodec_descriptor_get
     const AVCodecDescriptor* desc = avcodec_descriptor_get(id);
     if (desc) {
-      log(WARN, "UTIL", "Codec ID %d corresponds to '%s' but no decoder found", id, desc->name);
+      llog(WARN, "UTIL", "Codec ID %d corresponds to '%s' but no decoder found", id, desc->nam    #ifdef avcodec_descriptor_get
+    const AVCodecDescriptor* desc = avcodec_descriptor_get(id);
+    if (desc) {
+      llog(WARN, "UTIL", "Codec ID %d corresponds to '%s' but no decoder found", id, desc->name);
     }
     #endif
   } else {
     if (isEnabled(TRACE))
-      log(TRACE, "UTIL", "Found decoder for codec ID %d: %s", id, pLocalCodec->name);
+      llog(TRACE, "UTIL", "Found decoder for codec ID %d: %s", id, pLocalCodec->name);
   }
 
   return pLocalCodec != nullptr;
@@ -189,7 +198,7 @@ void logAvailableDecoders() {
   if (!isEnabled(INFO))
     return;
     
-  log(INFO, "UTIL", "Checking available decoders...");
+  llog(INFO, "UTIL", "Checking available decoders...");
   
   // Check for common video codecs
   const AVCodec* h264_decoder = safe_find_decoder(AV_CODEC_ID_H264);
@@ -200,12 +209,11 @@ void logAvailableDecoders() {
   const AVCodec* aac_decoder = safe_find_decoder(AV_CODEC_ID_AAC);
   const AVCodec* mp3_decoder = safe_find_decoder(AV_CODEC_ID_MP3);
   
-  log(INFO, "UTIL", "H.264 decoder: %s", h264_decoder ? h264_decoder->name : "NOT AVAILABLE");
-  log(INFO, "UTIL", "H.265 decoder: %s", h265_decoder ? h265_decoder->name : "NOT AVAILABLE");
-  log(INFO, "UTIL", "MPEG4 decoder: %s", mpeg4_decoder ? mpeg4_decoder->name : "NOT AVAILABLE");
-  log(INFO, "UTIL", "AAC decoder: %s", aac_decoder ? aac_decoder->name : "NOT AVAILABLE");
-  log(INFO, "UTIL", "MP3 decoder: %s", mp3_decoder ? mp3_decoder->name : "NOT AVAILABLE");
-}
+  llog(INFO, "UTIL", "H.264 decoder: %s", h264_decoder ? h264_decoder->name : "NOT AVAILABLE");
+  llog(INFO, "UTIL", "H.265 decoder: %s", h265_decoder ? h265_decoder->name : "NOT AVAILABLE");
+  llog(INFO, "UTIL", "MPEG4 decoder: %s", mpeg4_decoder ? mpeg4_decoder->name : "NOT AVAILABLE");
+  llog(INFO, "UTIL", "AAC decoder: %s", aac_decoder ? aac_decoder->name : "NOT AVAILABLE");
+  llog(INFO, "UTIL", "MP3 decoder: %s", mp3_decoder ? mp3_decoder->name : "NOT AVAILABLE");
 
 extern "C" {
 
