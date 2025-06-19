@@ -2,10 +2,11 @@
 #include "utils/pilecv4j_ffmpeg_utils.h"
 #include "utils/log.h"
 #include <libavutil/hwcontext.h>
+#include <libavcodec/avcodec.h>
 
 AVRational pilecv4j::ffmpeg::millisecondTimeBase = AVRational{1,1000};
 
-inline static void llog(LogLevel llevel, const char *fmt, ...) {
+inline static void llog(pilecv4j::ffmpeg::LogLevel llevel, const char *fmt, ...) {
   va_list args;
   va_start( args, fmt );
   log( llevel, COMPONENT, fmt, args );
@@ -185,7 +186,6 @@ bool decoderExists(AVCodecID id) {
     if (desc) {
       llog(WARN, "UTIL", "Codec ID %d corresponds to '%s' but no decoder found", id, desc->name);
     }
-    #endif
   } else {
     if (isEnabled(TRACE))
       llog(TRACE, "UTIL", "Found decoder for codec ID %d: %s", id, pLocalCodec->name);
