@@ -10,6 +10,7 @@
 
 #include "utils/IMakerManager.h"
 #include "utils/log.h"
+#include "utils/pilecv4j_ffmpeg_utils.h"
 
 #include "common/kog_exports.h"
 #include "utils/timing.h"

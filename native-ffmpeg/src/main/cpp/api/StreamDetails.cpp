@@ -1,5 +1,6 @@
 #include <libavcodec/avcodec.h>
 #include "api/StreamDetails.h"
+#include "utils/pilecv4j_ffmpeg_utils.h"
 
 namespace pilecv4j
 {
