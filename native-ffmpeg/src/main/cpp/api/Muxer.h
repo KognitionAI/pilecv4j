@@ -6,10 +6,10 @@
  */
 
 #include "utils/pilecv4j_ffmpeg_utils.h"
+#include <libavcodec/avcodec.h>
 
 extern "C" {
 #include <libavformat/avformat.h>
-#include <libavcodec/avcodec.h>
 }
 
 #ifndef _PILECV4J_FFMPEG_MEDIAOUTPUT_H_
@@ -55,7 +55,7 @@ protected:
    * Create a stream in the output_format_context using the AVCodecContext (the AVCodec must be set on the AVCodecContext)
    * and if out is not null, return the newly created stream
    */
-  static uint64_t createStreamFromCodec(AVFormatContext* outputCtx, AVCodecContext* pars, AVStream** out);
+  static uint64_t createStreamFromCodec(AVFormatContext* outputCtx, const struct AVCodecContext* pars, AVStream** out);
 
 public:
   inline Muxer() = default;
@@ -104,7 +104,7 @@ public:
    *
    * It is fine for 'stream_index_out' to be null.
    */
-  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out) = 0;
+  virtual uint64_t createNextStream(const AVCodecContext* codec, int* stream_index_out) = 0;
 
   /**
    * This is essentially where the avformat_write_header should be called on the output

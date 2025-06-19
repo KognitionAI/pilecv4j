@@ -32,9 +32,8 @@ uint64_t UriMediaDataSource::open(AVFormatContext** preallocatedAvFormatCtx, AVD
     llog(TRACE, "     fmt: %s", fmtNull ? "null" : fmt.c_str());
     llog(TRACE, "     uri: %s", uriNull ? "null" : uri.c_str());
   }
-
   const char* lfmt = fmtNull ? nullptr : fmt.c_str();
-  const AVInputFormat* ifmt = lfmt ? av_find_input_format(lfmt) : nullptr;
+  AVInputFormat* ifmt = lfmt ? const_cast<AVInputFormat*>(av_find_input_format(lfmt)) : nullptr;
 
   if (lfmt && !ifmt) {
     llog(ERROR, "Failed to find the input format \"%s\"", lfmt);

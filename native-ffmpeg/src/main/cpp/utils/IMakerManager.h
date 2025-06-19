@@ -8,10 +8,10 @@
 #ifndef _IMAKERMANAGER_H_
 #define _IMAKERMANAGER_H_
 
+#include <libavcodec/avcodec.h>
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
-#include <libavcodec/avcodec.h>
 }
 #include <stdint.h>
 #include "common/imagemaker.h"
@@ -68,10 +68,9 @@ public:
    */
   static uint64_t createMatFromFrame(AVFrame *pFrame, int dstMaxDim, SwsContext** colorCvrt, int32_t& isRgb,
       AVPixelFormat& lastFormatUsed, int& dstWo, int& dstHo, AVPixelFormat pixFmt);
-
   static void freeImage(uint64_t mat);
 
-  static uint64_t setupTransform(uint64_t mat, bool isRgb, AVCodecContext* encoder, Transform* xform);
+  static uint64_t setupTransform(uint64_t mat, bool isRgb, struct AVCodecContext* encoder, Transform* xform);
 
   static uint64_t setupTransform(int srcWidth, int srcHeight, int srcStride, ai::kognition::pilecv4j::PixelFormat srcPixfmt, AVCodecContext* avcc, int dstW, int dstH, Transform* xform);
 

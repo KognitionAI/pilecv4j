@@ -1,6 +1,6 @@
-#include <libavcodec/avcodec.h>
+
 #include "api/StreamDetails.h"
-#include "utils/pilecv4j_ffmpeg_utils.h"
+#include <libavcodec/codec_desc.h>
 
 namespace pilecv4j
 {
@@ -32,14 +32,9 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
 
         details.codec_id = pLocalCodecParameters->codec_id;
 
-        // Try to get codec name using avcodec_find_decoder first, then fallback to descriptor
-        const AVCodec* codec = safe_find_decoder(pLocalCodecParameters->codec_id);
-        if (codec && codec->name) {
-          details.setCodecName(codec->name);
-        } else {
-          // Fallback: use a generic name based on codec ID
-          details.setCodecName("unknown_codec");
-        }
+        const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
+        if (cd)
+          details.setCodecName(cd->name);
       }
     }
   } else

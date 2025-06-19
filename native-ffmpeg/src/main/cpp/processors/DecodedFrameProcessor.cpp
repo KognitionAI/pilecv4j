@@ -10,7 +10,6 @@
 
 #include "utils/IMakerManager.h"
 #include "utils/log.h"
-#include "utils/pilecv4j_ffmpeg_utils.h"
 
 #include "common/kog_exports.h"
 #include "utils/timing.h"
@@ -94,9 +93,6 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
   if (!psi)
     return MAKE_P_STAT(NO_PACKET_SOURCE_INFO);
 
-  // Log available decoders for debugging
-  logAvailableDecoders();
-
   uint64_t ret = 0;
   int numStreams;
   if (isError(ret = psi->numStreams(&numStreams)))
@@ -129,9 +125,12 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
 
     // check if the decoder exists
     {
+      AVCodec *pLocalCodec = NULL;
+
       // finds the registered decoder for a codec ID
       // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-      const AVCodec* pLocalCodec = safe_find_decoder(pLocalCodecParameters->codec_id);
+      const AVCodec* tmpCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+      pLocalCodec = const_cast<AVCodec*>(tmpCodec);
       if (pLocalCodec==NULL) {
         llog(WARN, "ERROR unsupported codec at %d!", i);
         continue;
@@ -225,11 +224,14 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
     if (response >= 0) {
       if (isEnabled(TRACE)) {
         llog(TRACE,
-            "Frame %d (type=%c, format=%d) pts %d",
+            "Frame %d (type=%c, size=%d bytes, format=%d) pts %d, key_frame %d [DTS %d]",
             codecDetails->codecCtx->frame_num,
             av_get_picture_type_char(pFrame->pict_type),
+            pFrame->pkt_size,
             (AVPixelFormat)pFrame->format,
-            pFrame->best_effort_timestamp
+            pFrame->best_effort_timestamp,
+            pFrame->key_frame,
+            pFrame->pkt_dts
         );
       }
 
@@ -282,4 +284,3 @@ KAI_EXPORT void pcv4j_ffmpeg2_decodedFrameProcessor_replace(uint64_t native, pus
 
 }
 } /* namespace pilecv4j */
-

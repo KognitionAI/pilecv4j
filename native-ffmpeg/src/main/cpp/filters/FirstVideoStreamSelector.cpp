@@ -154,4 +154,3 @@ extern "C" {
 }
 } /* namespace pilecv4j */
 
-
