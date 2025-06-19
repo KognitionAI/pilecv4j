@@ -96,7 +96,7 @@ public:
    * This will be called if we have the AVCodec. If we only have the AVCodecParameters
    * then createNextStream(AVCodecParameters*) will be called instead.
    */
-  virtual uint64_t createNextStream(AVCodecContext* codec, int* stream_index_out) override;
+  virtual uint64_t createNextStream(const AVCodecContext* codec, int* stream_index_out) override;
 
   /**
    * This is essentially where the avformat_write_header should be called on the output

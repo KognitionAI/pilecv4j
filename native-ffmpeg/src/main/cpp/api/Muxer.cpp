@@ -39,7 +39,7 @@ uint64_t Muxer::createStreamFromCodecParams(AVFormatContext* output_format_conte
   return 0;
 }
 
-uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, AVCodecContext* codecc, AVStream** out) {
+uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, const AVCodecContext* codecc, AVStream** out) {
   const AVCodec* codec = codecc->codec;
   if (!codec) {
     log(ERROR, COMPONENT, "The AVCodecContext at %" PRId64 " doesn't have the codec set.", (uint64_t)codecc);

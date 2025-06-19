@@ -129,7 +129,8 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
 
       // finds the registered decoder for a codec ID
       // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-      pLocalCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+      const AVCodec* tmpCodec = avcodec_find_decoder(pLocalCodecParameters->codec_id);
+      pLocalCodec = const_cast<AVCodec*>(tmpCodec);
       if (pLocalCodec==NULL) {
         llog(WARN, "ERROR unsupported codec at %d!", i);
         continue;
@@ -224,13 +225,13 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
       if (isEnabled(TRACE)) {
         llog(TRACE,
             "Frame %d (type=%c, size=%d bytes, format=%d) pts %d, key_frame %d [DTS %d]",
-            codecDetails->codecCtx->frame_number,
+            codecDetails->codecCtx->frame_num,
             av_get_picture_type_char(pFrame->pict_type),
             pFrame->pkt_size,
             (AVPixelFormat)pFrame->format,
             pFrame->best_effort_timestamp,
             pFrame->key_frame,
-            pFrame->coded_picture_number
+            pFrame->pkt_dts
         );
       }
 

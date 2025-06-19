@@ -191,9 +191,9 @@ uint64_t VideoEncoder::enable(bool lock, bool isRgb, int width, int height, int 
       goto fail;
     }
     if (avof->video_codec != AV_CODEC_ID_NONE)
-      video_avc = avcodec_find_encoder(avof->video_codec);
+      video_avc = const_cast<AVCodec*>(avcodec_find_encoder(avof->video_codec));
   } else
-    video_avc = avcodec_find_encoder_by_name(video_codec.c_str());
+    video_avc = const_cast<AVCodec*>(avcodec_find_encoder_by_name(video_codec.c_str()));
 
   if (!video_avc) {
     llog(ERROR, "could not find the proper codec");

@@ -168,7 +168,7 @@ void logRemainingOptions(LogLevel logLevel, const char* component, const char* h
 bool decoderExists(AVCodecID id) {
   // finds the registered decoder for a codec ID
   // https://ffmpeg.org/doxygen/trunk/group__lavc__decoding.html#ga19a0ca553277f019dd5b0fec6e1f9dca
-  AVCodec *pLocalCodec = avcodec_find_decoder(id);
+  const AVCodec *pLocalCodec = avcodec_find_decoder(id);
   if (!pLocalCodec)
     log(WARN, "UTIL", "ERROR unsupported codec (%d)!", id);
 

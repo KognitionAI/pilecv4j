@@ -1,5 +1,6 @@
 
 #include "api/StreamDetails.h"
+#include <libavcodec/codec_desc.h>
 
 namespace pilecv4j
 {

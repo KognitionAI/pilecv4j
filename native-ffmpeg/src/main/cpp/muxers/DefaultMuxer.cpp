@@ -205,7 +205,7 @@ uint64_t DefaultMuxer::ready() {
     // So we're assuming that if the formatCtx->pb is set then the url can be null
     ioContext = avio_alloc_context(ioBuffer,PCV4J_CUSTOMIO_OUTPUT_BUFSIZE,AVIO_FLAG_WRITE,this,
         nullptr,
-        write_packet_to_custom_output,
+        reinterpret_cast<int (*)(void*, const uint8_t*, int)>(write_packet_to_custom_output),
         seekable() ? seek_in_custom_output : nullptr);
 
     // setup the AVFormatContext for the custom io. See above note.
@@ -256,7 +256,7 @@ uint64_t DefaultMuxer::createNextStream(AVCodecParameters* codecPars, int* strea
   return ret;
 }
 
-uint64_t DefaultMuxer::createNextStream(AVCodecContext* codecc, int* stream_index_out) {
+uint64_t DefaultMuxer::createNextStream(const AVCodecContext* codecc, int* stream_index_out) {
   if (!output_format_context) {
     llog(ERROR, "Cannot create a stream without a valid output_format_context already having been created. Did 'open' succeed?");
     return MAKE_P_STAT(NO_OUTPUT);

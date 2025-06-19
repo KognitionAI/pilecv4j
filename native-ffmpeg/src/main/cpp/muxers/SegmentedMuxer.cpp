@@ -159,7 +159,7 @@ static inline bool isKeyFrame(const AVPacket* packet) {
   return (packet->flags & AV_PKT_FLAG_KEY)? true : false;
 }
 
-uint64_t SegmentedMuxer::createNextStream(AVCodecContext* codecc, int* stream_index_out) {
+uint64_t SegmentedMuxer::createNextStream(const AVCodecContext* codecc, int* stream_index_out) {
   PILECV4J_TRACE;
   AVCodecParameters * params = avcodec_parameters_alloc();
   if (!params) {

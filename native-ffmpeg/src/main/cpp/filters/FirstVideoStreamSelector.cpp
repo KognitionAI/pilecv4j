@@ -83,7 +83,7 @@ static uint64_t findFirstSupportedVidCodec(PacketSourceInfo* psi, AVCodecParamet
 
       log(DEBUG, "Video Codec (%d): resolution %d x %d",pLocalCodecParameters->codec_id, pLocalCodecParameters->width, pLocalCodecParameters->height);
     } else if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_AUDIO) {
-      log(DEBUG, "Audio Codec: %d channels, sample rate %d", pLocalCodecParameters->channels, pLocalCodecParameters->sample_rate);
+      log(DEBUG, "Audio Codec: %d channels, sample rate %d", pLocalCodecParameters->ch_layout.nb_channels, pLocalCodecParameters->sample_rate);
     }
 
     // print its name, id and bitrate

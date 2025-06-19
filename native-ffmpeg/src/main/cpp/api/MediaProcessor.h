@@ -10,6 +10,7 @@
 
 #include "api/PacketSourceInfo.h"
 
+#include <libavcodec/avcodec.h>
 #include <vector>
 
 extern "C" {
@@ -67,7 +68,7 @@ protected:
    *
    * You can pass a decoderName and it will use that decoder. Otherwise the decoder is inferred from the stream
    */
-  static uint64_t open_codec(AVStream* pStream, AVDictionary** options,  AVCodecContext** codecCtxPtr, const char* decoderName);
+  static uint64_t open_codec(struct AVStream* pStream, struct AVDictionary** options, struct AVCodecContext** codecCtxPtr, const char* decoderName);
 
 };
 
