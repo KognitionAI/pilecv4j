@@ -49,12 +49,13 @@ uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCo
         tmpCodec = avcodec_find_decoder(desc->id);
         if (isEnabled(INFO) && tmpCodec)
           llog(INFO, "Matched decoder '%s' for codec '%s'.",
-              pCodec->name, desc->name);
+              tmpCodec->name, desc->name);
       }
-      if (!pCodec) {
+      if (!tmpCodec) {
           llog(ERROR, "Unknown decoder '%s'\n", decoderName);
           return MAKE_P_STAT(UNSUPPORTED_CODEC);
       }
+      pCodec = const_cast<AVCodec*>(tmpCodec);
       // we're not goint to use the decoder for this stream.
       if (pCodec->type != streamMediaType) {
         llog(INFO, "Specified decoder '%s' supporting %s doesn't apply to stream %d with a media type %s",
