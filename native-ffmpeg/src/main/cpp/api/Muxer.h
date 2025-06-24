@@ -6,10 +6,10 @@
  */
 
 #include "utils/pilecv4j_ffmpeg_utils.h"
-#include <libavcodec/avcodec.h>
 
 extern "C" {
 #include <libavformat/avformat.h>
+#include <libavcodec/avcodec.h>
 }
 
 #ifndef _PILECV4J_FFMPEG_MEDIAOUTPUT_H_
