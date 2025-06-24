@@ -1,8 +1,9 @@
-
 #include "common/kog_exports.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 
+extern "C" {
 #include <libavutil/hwcontext.h>
+}
 
 AVRational pilecv4j::ffmpeg::millisecondTimeBase = AVRational{1,1000};
 

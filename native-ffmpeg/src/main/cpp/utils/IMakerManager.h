@@ -8,10 +8,10 @@
 #ifndef _IMAKERMANAGER_H_
 #define _IMAKERMANAGER_H_
 
-#include <libavcodec/avcodec.h>
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libswscale/swscale.h>
+#include <libavcodec/avcodec.h>
 }
 #include <stdint.h>
 #include "common/imagemaker.h"
