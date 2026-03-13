@@ -19,7 +19,7 @@ public class FpsMonitor {
      */
     public Double apply(final long timestamp) {
         if(timestamp >= periodEnd) {
-            if(periodStart > 0) {
+            if(periodStart >= 0) {
                 // do the calculation and return
                 final double ret = ((double)count / (double)(periodEnd - periodStart)) * 1000D;
                 reset(timestamp);
