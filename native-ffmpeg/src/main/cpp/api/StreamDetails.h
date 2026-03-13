@@ -29,6 +29,10 @@ struct StreamDetails {
   int32_t codec_id = -1;
   char* codecName = nullptr;
 
+  int32_t width = -1;
+  int32_t height = -1;
+  int64_t bit_rate = -1;
+
   inline ~StreamDetails() {
     if (codecName)
       delete [] codecName;
