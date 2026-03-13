@@ -34,8 +34,14 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
 
         details.codec_id = pLocalCodecParameters->codec_id;
 
-        details.width = pLocalCodecParameters->width;
-        details.height = pLocalCodecParameters->height;
+        // width/height only meaningful for video streams — audio sets them to 0
+        // which would be misleading, so keep the -1 sentinel for non-video.
+        if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
+          details.width = pLocalCodecParameters->width;
+          details.height = pLocalCodecParameters->height;
+        }
+
+        // bit_rate is valid for all stream types (video and audio)
         details.bit_rate = pLocalCodecParameters->bit_rate;
 
         const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
