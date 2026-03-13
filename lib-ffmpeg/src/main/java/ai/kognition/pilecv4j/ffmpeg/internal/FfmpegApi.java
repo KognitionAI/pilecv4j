@@ -161,10 +161,14 @@ public class FfmpegApi {
         public int codec_id;
         public String codecName;
 
+        public int width;
+        public int height;
+        public long bit_rate;
+
         public static class ByReference extends internal_StreamDetails implements Structure.ByReference {}
 
         private static final List<String> fo = gfo(internal_StreamDetails.class, "stream_index", "mediaType", "fps_num", "fps_den", "tb_num", "tb_den",
-            "codec_id", "codecName");
+            "codec_id", "codecName", "width", "height", "bit_rate");
 
         public internal_StreamDetails() {}
 
@@ -180,7 +184,7 @@ public class FfmpegApi {
         @Override
         public String toString() {
             return "internal_StreamDetails [mediaType=" + mediaType + ", fps_num=" + fps_num + ", fps_den=" + fps_den + ", tb_num=" + tb_num + ", tb_den="
-                + tb_den + ", codecName=" + codecName + "]";
+                + tb_den + ", codecName=" + codecName + ", width=" + width + ", height=" + height + ", bit_rate=" + bit_rate + "]";
         }
     }
 

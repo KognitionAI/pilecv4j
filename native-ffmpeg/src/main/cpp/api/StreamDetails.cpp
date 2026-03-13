@@ -34,6 +34,10 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
 
         details.codec_id = pLocalCodecParameters->codec_id;
 
+        details.width = pLocalCodecParameters->width;
+        details.height = pLocalCodecParameters->height;
+        details.bit_rate = pLocalCodecParameters->bit_rate;
+
         const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
         if (cd)
           details.setCodecName(cd->name);

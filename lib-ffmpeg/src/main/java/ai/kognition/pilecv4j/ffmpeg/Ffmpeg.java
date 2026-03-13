@@ -773,6 +773,24 @@ public class Ffmpeg {
             public final int codecId;
             public final String codecName;
 
+            /**
+             * Video frame width in pixels, or -1 if not a video stream or unknown.
+             */
+            public final int width;
+
+            /**
+             * Video frame height in pixels, or -1 if not a video stream or unknown.
+             */
+            public final int height;
+
+            /**
+             * Stream bit rate in bits/sec as reported by the container/codec, or -1 if unknown.
+             * Note: for some codecs/containers (e.g. variable bitrate H.264 over RTSP) this may
+             * be 0 even though data is flowing. In those cases, bitrate must be estimated by
+             * measuring bytes received over time.
+             */
+            public final long bitRate;
+
             private StreamDetails(final FfmpegApi.internal_StreamDetails sd) {
                 streamIndex = sd.stream_index;
                 mediaType = sd.mediaType;
@@ -782,13 +800,16 @@ public class Ffmpeg {
                 tb_den = sd.tb_den;
                 codecId = sd.codec_id;
                 codecName = sd.codecName;
+                width = sd.width;
+                height = sd.height;
+                bitRate = sd.bit_rate;
             }
 
             @Override
             public String toString() {
                 return "StreamDetails [streamIndex=" + streamIndex + ", mediaType=" + mediaType + ", fps_num=" + fps_num + ", fps_den=" + fps_den
-                    + ", tb_num="
-                    + tb_num + ", tb_den=" + tb_den + ", codecId=" + codecId + ", codecName=" + codecName + "]";
+                    + ", tb_num=" + tb_num + ", tb_den=" + tb_den + ", codecId=" + codecId + ", codecName=" + codecName
+                    + ", width=" + width + ", height=" + height + ", bitRate=" + bitRate + "]";
             }
         }
 
