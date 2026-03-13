@@ -34,14 +34,15 @@ uint64_t StreamDetails::fillStreamDetails(AVFormatContext* formatCtx, StreamDeta
 
         details.codec_id = pLocalCodecParameters->codec_id;
 
-        // Only populate width/height/bit_rate for video streams.
-        // For audio and other stream types, FFmpeg sets these to 0 which
-        // would be misleading — keep the -1 sentinel from the default init.
+        // width/height only meaningful for video streams — audio sets them to 0
+        // which would be misleading, so keep the -1 sentinel for non-video.
         if (pLocalCodecParameters->codec_type == AVMEDIA_TYPE_VIDEO) {
           details.width = pLocalCodecParameters->width;
           details.height = pLocalCodecParameters->height;
-          details.bit_rate = pLocalCodecParameters->bit_rate;
         }
+
+        // bit_rate is valid for all stream types (video and audio)
+        details.bit_rate = pLocalCodecParameters->bit_rate;
 
         const AVCodecDescriptor* cd = avcodec_descriptor_get(pLocalCodecParameters->codec_id);
         if (cd)
