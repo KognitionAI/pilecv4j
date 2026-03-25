@@ -224,7 +224,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   hptr->numMailboxes = numMailboxes;
   for (std::size_t i = 0; i < numMailboxes; i++) {
     log(TRACE, COMPONENT, "Clearing mailbox %d at Header base 0x%" PRIx64 " field 'messageAvailable[%d]' at 0x%" PRIx64, (int)i, (uint64_t)hptr, (int)i, (uint64_t)(&(hptr->messageAvailable[i])));
-    hptr->messageAvailable[i] = 0;
+    __atomic_store_n(&hptr->messageAvailable[i], (std::size_t)0, __ATOMIC_RELAXED);
   }
 
   data = ((uint8_t*)addr) + offsetToBuffer;
@@ -382,10 +382,12 @@ uint64_t SharedMemory::postMessage(std::size_t mailbox) {
 
   Header* header = (Header*)addr;
   MAILBOX_CHECK(header, mailbox);
-  // don't reorder any write operation below this with any read/write operations above this line
-  std_atomic_fence(std::memory_order_release);
-  header->messageAvailable[mailbox] = 1;
-  //log(INFO, COMPONENT, "post: Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
+  // Use atomic store with release semantics to ensure all prior writes
+  // (response header, mat data) are visible before the flag is set.
+  // Previous implementation used a standalone fence + plain store, but
+  // plain stores are not guaranteed to be ordered by std::atomic_thread_fence
+  // per the C++ standard (fences only order atomic operations).
+  __atomic_store_n(&header->messageAvailable[mailbox], (std::size_t)1, __ATOMIC_RELEASE);
   return OK_RET;
 }
 
@@ -412,7 +414,7 @@ uint64_t SharedMemory::reset() {
   hptr->offset = offsetToBuffer;
   hptr->numMailboxes = numMailboxes;
   for (std::size_t i = 0; i < numMailboxes; i++)
-    hptr->messageAvailable[i] = 0;
+    __atomic_store_n(&hptr->messageAvailable[i], (std::size_t)0, __ATOMIC_RELAXED);
 
   data = ((uint8_t*)addr) + offsetToBuffer;
   if (isEnabled(DEBUG))
@@ -432,10 +434,8 @@ uint64_t SharedMemory::unpostMessage(std::size_t mailbox) {
 
   Header* header = (Header*)addr;
   MAILBOX_CHECK(header, mailbox);
-  // don't reorder any write operation below this with any read/write operations above this line
-  std_atomic_fence(std::memory_order_release);
-  header->messageAvailable[mailbox] = 0;
-  //log(INFO, COMPONENT, "unpost: Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
+  // Use atomic store with release semantics (symmetric with postMessage).
+  __atomic_store_n(&header->messageAvailable[mailbox], (std::size_t)0, __ATOMIC_RELEASE);
 
   return OK_RET;
 }
@@ -447,10 +447,10 @@ uint64_t SharedMemory::isMessageAvailable(bool& out, std::size_t mailbox) {
   Header* header = (Header*)addr;
   MAILBOX_CHECK(header, mailbox);
 
-  //log(INFO, COMPONENT, "isMessageAvailable: Header mailbox addr: 0x%llx : %llu", (void*)(&(header->messageAvailable[mailbox])), header->messageAvailable[mailbox]);
-  out = header->messageAvailable[mailbox] ? true : false;
-  // don't reorder the read above this with any read/write below this
-  std_atomic_fence(std::memory_order_acquire);
+  // Use atomic load with acquire semantics to ensure that if we see the
+  // flag set, all prior writes from the poster (response header, mat data)
+  // are visible to subsequent reads.
+  out = __atomic_load_n(&header->messageAvailable[mailbox], __ATOMIC_ACQUIRE) ? true : false;
   return OK_RET;
 }
 
