@@ -268,7 +268,12 @@ uint64_t IMakerManager::createFrameFromMat(const Transform* xform, uint64_t mat,
     const int dstW = xform->dstW;
     const int dstH = xform->dstH;
     *ppframe = frame = av_frame_alloc();
-    av_image_alloc(frame->data, frame->linesize, dstW, dstH, encoder->pix_fmt, 1);
+    // Align to 64 bytes: this buffer is the destination of sws_scale() below,
+    // whose SIMD writers can store past the end of unpadded (align=1) rows,
+    // corrupting the heap (same failure mode as portrait streams in
+    // createMatFromFrame). The encoder consumes frame->linesize, so padded
+    // strides are handled correctly.
+    av_image_alloc(frame->data, frame->linesize, dstW, dstH, encoder->pix_fmt, 64);
     frame->width = dstW;
     frame->height = dstH;
     frame->format = static_cast<int>(encoder->pix_fmt);
