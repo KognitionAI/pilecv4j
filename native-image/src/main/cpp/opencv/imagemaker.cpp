@@ -24,7 +24,18 @@ public:
   }
 
   virtual MatAndData allocateImage(int height, int width){
-    cv::Mat* cvmat = new cv::Mat(height, width, CV_8UC3);
+    // Over-allocate one slack row: this buffer is used as the destination for
+    // libswscale's sws_scale(), whose SIMD output writers can store past the
+    // end of the last row when (width * 3) isn't a multiple of the SIMD write
+    // size (e.g. any 1080-wide portrait stream: 1080*3 = 3240, not a multiple
+    // of 32). Without the slack this corrupts the heap and eventually aborts
+    // with "free(): invalid next size". Landscape 1920-wide frames only worked
+    // by luck (1920*3 = 5760 = 32*180).
+    // The returned Mat is a rowRange view of the padded backing buffer; the
+    // view keeps the refcounted backing alive, reports the true height, and
+    // remains continuous.
+    cv::Mat backing(height + 1, width, CV_8UC3);
+    cv::Mat* cvmat = new cv::Mat(backing.rowRange(0, height));
     return {(uint64_t)cvmat, cvmat->data};
   }
 
