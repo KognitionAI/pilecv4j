@@ -19,7 +19,10 @@
          OpenCV we're building against matches what we expect. -->
     <opencv-build.version>4.10.0</opencv-build.version>
     <opencv-short.version>4100</opencv-short.version>
-    <!-- <cuda.version>11.2</cuda.version> -->
+    <!-- CUDA version used to decorate the opencv artifact version on CUDA-built
+         platforms (see opencv-gpu.version-extention in the linux-64bit profile).
+         Must match the CUDA toolkit the opencv-build zip was compiled against. -->
+    <cuda.version>12.1</cuda.version>
 
     <!-- Normally the opencv-base version is the same as the opencv-build version   -->
     <!--  however, the build version needs to be unadulterated by version suffixes -->
@@ -288,8 +291,11 @@
         <swtversion>4.6</swtversion>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
-        <!-- <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention> -->
-        <opencv-gpu.version-extention></opencv-gpu.version-extention>
+        <!-- Align with what build-pilecv4j-opencv CI actually deploys to Nexus:
+             the CUDA build is versioned 1.0-opencv<ver>-cuda<cuda.version>. With this
+             blank, consumers resolved 1.0-opencv4.10.0 which only ever existed in
+             builder-local maven caches (caused the stale focal-lib incident 2026-08-29). -->
+        <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention>
         <platform.option></platform.option>
         <ipc-impl>posix</ipc-impl>
       </properties>
