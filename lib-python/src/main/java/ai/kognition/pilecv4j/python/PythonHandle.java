@@ -323,6 +323,10 @@ public class PythonHandle implements QuietCloseable {
                 try {
                     runPythonFunction(module, function, pb);
                 } catch(final RuntimeException rte) {
+                    // Record the failure so PythonRunningState.hasFailed()/waitUntilSourceInitialized()
+                    // and callers polling for results can detect the script died. Without this, callers
+                    // spinning on hasFailed() will wait forever after a python-side exception.
+                    ret.failed.set(rte);
                     LOGGER.error("Python function call {} (from module {}) with parameters {} failed", function, module, pb, rte);
                     rte.printStackTrace();
                     throw rte;
