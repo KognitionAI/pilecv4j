@@ -40,8 +40,12 @@ public class CvMatOfPoint2f extends MatOfPoint2f implements AutoCloseable {
     private static final Method nDelete;
     private boolean deletedAlready = false;
 
-    protected final RuntimeException stackTrace;
+    protected final RuntimeException stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     protected RuntimeException delStackTrace = null;
+
+    // Cleaner-based leak tracking (replaces the deprecated finalize()-based tracking, JEP-421).
+    private final ImageAPI.LeakGuard leakGuard = new ImageAPI.LeakGuard(getClass().getSimpleName(), stackTrace);
+    private final java.lang.ref.Cleaner.Cleanable cleanable = ImageAPI.registerLeakGuard(this, leakGuard);
 
     static {
         try {
@@ -55,21 +59,17 @@ public class CvMatOfPoint2f extends MatOfPoint2f implements AutoCloseable {
 
     protected CvMatOfPoint2f(final long nativeObj) {
         super(nativeObj);
-        this.stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     public CvMatOfPoint2f() {
-        this.stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     public CvMatOfPoint2f(final Point... a) {
         super(a);
-        this.stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     public CvMatOfPoint2f(final Mat mat) {
         super(mat);
-        this.stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     /**
@@ -112,6 +112,8 @@ public class CvMatOfPoint2f extends MatOfPoint2f implements AutoCloseable {
             if(!deletedAlready) {
                 doNativeDelete();
                 deletedAlready = true;
+                leakGuard.markClosed();
+                cleanable.clean();
                 if(TRACK_MEMORY_LEAKS) {
                     delStackTrace = new RuntimeException("Here's where I was closed");
                 }
@@ -134,15 +136,11 @@ public class CvMatOfPoint2f extends MatOfPoint2f implements AutoCloseable {
         }
     }
 
-    // Prevent Mat finalize from being called
+    // This EMPTY finalize() override is deliberate: OpenCV's Mat.finalize() calls n_delete()
+    // unconditionally, which would double-free the native Mat for every properly closed
+    // instance. An empty (trivial) finalizer is recognized by the JVM so instances are NOT
+    // registered for finalization. Leak tracking is handled by the Cleaner (ImageAPI.LeakGuard).
+    @SuppressWarnings({"deprecation","removal"})
     @Override
-    protected void finalize() throws Throwable {
-        if(!deletedAlready) {
-            LOGGER.warn("Finalizing a {} that hasn't been closed.", this.getClass()
-                .getSimpleName());
-            if(TRACK_MEMORY_LEAKS)
-                LOGGER.warn("TRACKING: Here's where I was instantiated: ", stackTrace);
-            close();
-        }
-    }
+    protected final void finalize() throws Throwable {}
 }

@@ -29,6 +29,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import ai.kognition.pilecv4j.image.CvMat;
+import ai.kognition.pilecv4j.image.ImageAPI;
 import ai.kognition.pilecv4j.tracking.Tracker;
 
 /**
@@ -46,7 +47,11 @@ public class TrackerCSRT extends legacy_TrackerCSRT implements Tracker {
     protected boolean deletedAlready = false;
     protected boolean skipOnceForDelete = false;
 
-    protected final RuntimeException stackTrace;
+    protected final RuntimeException stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
+
+    // Cleaner-based leak tracking (replaces the deprecated finalize()-based tracking, JEP-421).
+    private final ImageAPI.LeakGuard leakGuard = new ImageAPI.LeakGuard(getClass().getSimpleName(), stackTrace);
+    private final java.lang.ref.Cleaner.Cleanable cleanable = ImageAPI.registerLeakGuard(this, leakGuard);
     protected RuntimeException delStackTrace = null;
 
     static {
@@ -71,7 +76,6 @@ public class TrackerCSRT extends legacy_TrackerCSRT implements Tracker {
 
     protected TrackerCSRT(final long nativeAddr) {
         super(nativeAddr);
-        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     @Override
@@ -138,6 +142,8 @@ public class TrackerCSRT extends legacy_TrackerCSRT implements Tracker {
             if(!deletedAlready) {
                 doNativeDelete();
                 deletedAlready = true;
+                leakGuard.markClosed();
+                cleanable.clean();
                 if(TRACK_MEMORY_LEAKS)
                     delStackTrace = new RuntimeException("Here's where I was closed");
             } else if(TRACK_MEMORY_LEAKS) {
@@ -151,16 +157,13 @@ public class TrackerCSRT extends legacy_TrackerCSRT implements Tracker {
         }
     }
 
+    // This EMPTY finalize() override is deliberate: the OpenCV parent's finalize() calls
+    // delete() unconditionally, which would double-free the native object for every properly
+    // closed instance. An empty (trivial) finalizer is recognized by the JVM so instances are
+    // NOT registered for finalization. Leak tracking is handled by the Cleaner (ImageAPI.LeakGuard).
+    @SuppressWarnings({"deprecation","removal"})
     @Override
-    public void finalize() {
-        if(!deletedAlready) {
-            LOGGER.debug("Finalizing a {} that hasn't been closed.", this.getClass()
-                .getSimpleName());
-            if(TRACK_MEMORY_LEAKS)
-                LOGGER.debug("TRACKING: here's where I was instantiated: ", stackTrace);
-            close();
-        }
-    }
+    protected final void finalize() {}
 
     @Override
     public String toString() {
