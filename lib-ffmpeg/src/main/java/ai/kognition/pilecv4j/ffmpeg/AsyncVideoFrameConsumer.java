@@ -38,6 +38,17 @@ public class AsyncVideoFrameConsumer implements VideoFrameConsumer {
     public void close() {
         stop.set(true);
         thread.interrupt();
+        // wait for the worker to exit before closing the underlying consumer,
+        // otherwise the worker can still be mid-call to underlying.handle(..)
+        // when underlying.close() runs (use-after-close race).
+        try {
+            thread.join(5000);
+            if(thread.isAlive())
+                LOGGER.warn("Async video frame consumer thread didn't exit within 5 seconds. Closing the underlying consumer anyway.");
+        } catch(final InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            LOGGER.warn("Interrupted while waiting for the async video frame consumer thread to exit.");
+        }
         underlying.close();
     }
 

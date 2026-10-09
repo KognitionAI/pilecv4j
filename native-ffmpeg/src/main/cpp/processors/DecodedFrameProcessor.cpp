@@ -101,6 +101,10 @@ uint64_t DecodedFrameProcessor::setup(PacketSourceInfo* psi, std::vector<std::tu
   if (numStreams <= 0)
     return MAKE_P_STAT(NO_STREAM);
 
+  // record the stream count on the member (previously only the local was set,
+  // leaving the member at -1 so close() never freed any CodecDetails).
+  this->numStreams = numStreams;
+
   //llog(TRACE,"HERE1");
   std::string preferBgrStr = removeOption(PREFER_BGR, options);
   //llog(TRACE,"HERE2");
@@ -165,6 +169,10 @@ uint64_t DecodedFrameProcessor::handlePacket(AVPacket* pPacket, AVMediaType medi
     return MAKE_P_STAT(NO_SUPPORTED_CODEC);
   }
   const int stream_index = pPacket->stream_index;
+  if (stream_index < 0 || stream_index >= numStreams) {
+    llog(WARN, "packet has an out-of-range stream index (%d); expected [0, %d). Skipping.", stream_index, (int)numStreams);
+    return 0;
+  }
   if (codecs[stream_index])
     return decode_packet(codecs[pPacket->stream_index], pPacket);
   else {

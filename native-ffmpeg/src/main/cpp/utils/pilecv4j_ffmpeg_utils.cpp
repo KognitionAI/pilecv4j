@@ -1,6 +1,9 @@
 #include "common/kog_exports.h"
 #include "utils/pilecv4j_ffmpeg_utils.h"
 
+#include <cstdlib>
+#include <cstring>
+
 extern "C" {
 #include <libavutil/hwcontext.h>
 }
@@ -51,13 +54,19 @@ const char* errMessage(uint64_t status) {
   {
     uint32_t pcv4jCode = (status >> 32) & 0xffffffff;
     if (pcv4jCode != 0) {
-      if (pcv4jCode < 0 || pcv4jCode > MAX_PCV4J_CODE)
+      if (pcv4jCode > MAX_PCV4J_CODE)
         return strdup(totallyUnknownError);
       else
         return strdup(pcv4jStatMessages[pcv4jCode]);
     }
   }
-  char* ret = new char[AV_ERROR_MAX_STRING_SIZE + 1]{0};
+  // use malloc so all branches of errMessage return memory that can be released
+  // with free() (the strdup branches above are malloc-based; previously this branch
+  // used new[] while freeString used delete[], which was UB on the strdup results).
+  char* ret = static_cast<char*>(::malloc(AV_ERROR_MAX_STRING_SIZE + 1));
+  if (!ret)
+    return nullptr;
+  ret[0] = '\0';
   av_strerror((int)status, ret, AV_ERROR_MAX_STRING_SIZE);
   return ret;
 }
@@ -190,7 +199,7 @@ extern "C" {
   // free the string returned from pcv4j_ffmpeg_statusMessage
   KAI_EXPORT void pcv4j_ffmpeg2_utils_freeString(char* str) {
     if (str)
-      delete[] str;
+      ::free(str);
   }
 
   KAI_EXPORT int32_t pcv4j_ffmpeg2_utils_isGpuAvailable() {

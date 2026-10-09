@@ -344,7 +344,14 @@ public class ImageFile {
 
         @Override
         public void close() throws IOException {
-            stream.close();
+            // dispose the reader as well as closing the stream; otherwise the
+            // ImageReader (which can hold file handles/native codec resources)
+            // leaks whenever the caller exits exceptionally before disposing it.
+            try {
+                reader.dispose();
+            } finally {
+                stream.close();
+            }
         }
     }
 
@@ -400,9 +407,9 @@ public class ImageFile {
                     } catch(final IOException | RuntimeException ioe) {
                         LOGGER.debug("IIO attempt {} using reader {} failed with ", cur, reader, ioe);
                         lastException = ioe;
-                    } finally {
-                        reader.dispose();
                     }
+                    // note: the reader is disposed by ReaderAndStream.close() via the
+                    // try-with-resources, covering all exit paths.
                 } else
                     break;
             }
