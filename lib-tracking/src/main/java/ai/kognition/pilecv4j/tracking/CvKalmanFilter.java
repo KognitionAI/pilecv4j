@@ -131,6 +131,9 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
         return CvMat.move(super.predict());
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_statePre() {
         return CvMat.move(super.get_statePre());
@@ -146,12 +149,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setPredictionState(final Mat matrix) {
-        if(notAllowSet(getPredictionState(), matrix))
-            throw new ArithmeticException("Cannot set prediction state: wrong size.");
+        try(CvMat cur = getPredictionState()) {
+            if(notAllowSet(cur, matrix))
+                throw new ArithmeticException("Cannot set prediction state: wrong size.");
+        }
         super.set_statePre(matrix);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_statePost() {
         return CvMat.move(super.get_statePost());
@@ -170,12 +178,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
      * @param matrix a Mat of size [{@link CvKalmanFilter#dynamicParameters},1].
      */
     public CvKalmanFilter setCorrectedState(final Mat matrix) {
-        if(notAllowSet(getCorrectedState(), matrix))
-            throw new ArithmeticException("Cannot set corrected state: wrong size.");
+        try(CvMat cur = getCorrectedState()) {
+            if(notAllowSet(cur, matrix))
+                throw new ArithmeticException("Cannot set corrected state: wrong size.");
+        }
         super.set_statePost(matrix);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_transitionMatrix() {
         return CvMat.move(super.get_transitionMatrix());
@@ -191,12 +204,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setTransitionMatrix(final Mat transitionMatrix) {
-        if(notAllowSet(getTransitionMatrix(), transitionMatrix))
-            throw new ArithmeticException("Cannot set transition matrix: wrong size.");
+        try(CvMat cur = getTransitionMatrix()) {
+            if(notAllowSet(cur, transitionMatrix))
+                throw new ArithmeticException("Cannot set transition matrix: wrong size.");
+        }
         super.set_transitionMatrix(transitionMatrix);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_controlMatrix() {
         return CvMat.move(super.get_controlMatrix());
@@ -216,12 +234,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     public CvKalmanFilter setControlMatrix(final Mat controlMatrix) {
         if(controlParameters <= 0)
             throw new ArithmeticException("Cannot set control: no control parameters.");
-        if(notAllowSet(getControlMatrix(), controlMatrix))
-            throw new ArithmeticException("Cannot set control: wrong size.");
+        try(CvMat cur = getControlMatrix()) {
+            if(notAllowSet(cur, controlMatrix))
+                throw new ArithmeticException("Cannot set control: wrong size.");
+        }
         super.set_controlMatrix(controlMatrix);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_measurementMatrix() {
         return CvMat.move(super.get_measurementMatrix());
@@ -237,12 +260,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setMeasurementMatrix(final Mat measurementMatrix) {
-        if(notAllowSet(getMeasurementMatrix(), measurementMatrix))
-            throw new ArithmeticException("Cannot set measurement: wrong size.");
+        try(CvMat cur = getMeasurementMatrix()) {
+            if(notAllowSet(cur, measurementMatrix))
+                throw new ArithmeticException("Cannot set measurement: wrong size.");
+        }
         super.set_measurementMatrix(measurementMatrix);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_processNoiseCov() {
         return CvMat.move(super.get_processNoiseCov());
@@ -258,12 +286,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setProcessNoiseCovariance(final Mat processNoiseCov) {
-        if(notAllowSet(getProcessNoiseCovariance(), processNoiseCov))
-            throw new ArithmeticException("Cannot set process noise covariance: wrong size.");
+        try(CvMat cur = getProcessNoiseCovariance()) {
+            if(notAllowSet(cur, processNoiseCov))
+                throw new ArithmeticException("Cannot set process noise covariance: wrong size.");
+        }
         super.set_processNoiseCov(processNoiseCov);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_measurementNoiseCov() {
         return CvMat.move(super.get_measurementNoiseCov());
@@ -279,12 +312,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setMeasurementNoiseCovariance(final Mat measurementNoiseCovariance) {
-        if(notAllowSet(getMeasurementNoiseCovariance(), measurementNoiseCovariance))
-            throw new ArithmeticException("Cannot set measurement error covariance: wrong size.");
+        try(CvMat cur = getMeasurementNoiseCovariance()) {
+            if(notAllowSet(cur, measurementNoiseCovariance))
+                throw new ArithmeticException("Cannot set measurement error covariance: wrong size.");
+        }
         super.set_measurementNoiseCov(measurementNoiseCovariance);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_errorCovPre() {
         return CvMat.move(super.get_errorCovPre());
@@ -300,12 +338,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setPrioriErrorEstimateCovariance(final Mat errorCovPre) {
-        if(notAllowSet(getPrioriErrorEstimateCovariance(), errorCovPre))
-            throw new ArithmeticException("Cannot set priori error covariance: wrong size.");
+        try(CvMat cur = getPrioriErrorEstimateCovariance()) {
+            if(notAllowSet(cur, errorCovPre))
+                throw new ArithmeticException("Cannot set priori error covariance: wrong size.");
+        }
         super.set_errorCovPre(errorCovPre);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_gain() {
         return CvMat.move(super.get_gain());
@@ -321,12 +364,17 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setGain(final Mat gain) {
-        if(notAllowSet(getGain(), gain))
-            throw new ArithmeticException("Cannot set Kalman gain: wrong size.");
+        try(CvMat cur = getGain()) {
+            if(notAllowSet(cur, gain))
+                throw new ArithmeticException("Cannot set Kalman gain: wrong size.");
+        }
         super.set_gain(gain);
         return this;
     }
 
+    /**
+     * @return a newly owned {@link CvMat}; the caller MUST close it or it will leak native memory.
+     */
     @Override
     public CvMat get_errorCovPost() {
         return CvMat.move(super.get_errorCovPost());
@@ -342,8 +390,10 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     }
 
     public CvKalmanFilter setPosterioriErrorEstimateCovariance(final Mat errorCovPost) {
-        if(notAllowSet(getPosterioriErrorEstimateCovariance(), errorCovPost))
-            throw new ArithmeticException("Cannot set posteriori error covariance: wrong size.");
+        try(CvMat cur = getPosterioriErrorEstimateCovariance()) {
+            if(notAllowSet(cur, errorCovPost))
+                throw new ArithmeticException("Cannot set posteriori error covariance: wrong size.");
+        }
         super.set_errorCovPost(errorCovPost);
         return this;
     }
@@ -405,11 +455,12 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
     /**
      * OpenCV's JNI wrappers do no error checking since the set methods directly assign to the underlying kalman.cpp's state. Rather than getting an illegal
      * argument exception, a runtime error is potentially, eventually returned instead. This preempts that problem by doing error checking at set time.
+     * <p>
+     * NOTE: this does NOT take ownership of {@code original}; the caller is responsible for closing it (the setters do this via try-with-resources so the
+     * guard mat is released even when {@code super.get_xxx()} or the comparison throws).
      */
     private static boolean notAllowSet(final CvMat original, final Mat newMat) {
-        try(original) {
-            return original.rows() != newMat.rows() || original.cols() != newMat.cols() || original.channels() != newMat.channels();
-        }
+        return original.rows() != newMat.rows() || original.cols() != newMat.cols() || original.channels() != newMat.channels();
     }
 
     /**

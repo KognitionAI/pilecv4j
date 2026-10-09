@@ -35,13 +35,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.LockSupport;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import com.sun.jna.Pointer;
 import com.sun.jna.ptr.IntByReference;
@@ -900,8 +899,15 @@ public class Ffmpeg {
                     stop();
 
                     final long endTime = System.currentTimeMillis() + 10000; // give it 10 seconds to stop
-                    while(currentState() != FfmpegApi.STREAM_CONTEXT_STATE_ENDED && (System.currentTimeMillis() < endTime))
-                        Thread.yield();
+                    while(currentState() != FfmpegApi.STREAM_CONTEXT_STATE_ENDED && (System.currentTimeMillis() < endTime)) {
+                        // sleep rather than yield; yield in a tight loop burns 100% of a core for up to 10 seconds.
+                        try {
+                            Thread.sleep(5);
+                        } catch(final InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            break;
+                        }
+                    }
 
                     if(currentState() != FfmpegApi.STREAM_CONTEXT_STATE_ENDED)
                         LOGGER.warn("Couldn't stop the playing stream.");
@@ -1407,7 +1413,9 @@ public class Ffmpeg {
                     do {
                         curSample = onDeck.getAndSet(null);
                         if(curSample == null)
-                            Thread.yield();
+                            // park briefly rather than yield; yield in a tight loop pegs a core while
+                            // waiting for the first frame to show up.
+                            LockSupport.parkNanos(1_000_000L); // 1 ms
                     } while(curSample == null && !stopMe.get());
 
                     prev = curSample;
@@ -1936,10 +1944,15 @@ public class Ffmpeg {
     }
 
     private static void throwIfNecessary(final long status, final long... ignore) {
-        final Set<Long> toIgnore = Arrays.stream(ignore).mapToObj(Long::valueOf).collect(Collectors.toSet());
-        if(status != 0L && !toIgnore.contains(status)) {
-            throw new FfmpegException(status, errorMessage(status));
+        // fast-path the common case; this is called on every native call so avoid
+        // allocating a HashSet (plus boxing) per invocation.
+        if(status == 0L)
+            return;
+        for(final long ig: ignore) {
+            if(status == ig)
+                return;
         }
+        throw new FfmpegException(status, errorMessage(status));
     }
 
     private static String errorMessage(final long errorCode) {
