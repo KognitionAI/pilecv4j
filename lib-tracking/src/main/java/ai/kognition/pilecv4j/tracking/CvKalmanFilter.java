@@ -334,7 +334,7 @@ public class CvKalmanFilter extends KalmanFilter implements AutoCloseable {
      * @return a shallow copied Mat to be managed by the caller.
      */
     public CvMat getPosterioriErrorEstimateCovariance() {
-        return this.get_measurementNoiseCov();
+        return this.get_errorCovPost();
     }
 
     public CvKalmanFilter setPosterioriErrorEstimateCovariance(final Mat errorCovPost) {
