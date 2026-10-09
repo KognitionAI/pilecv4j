@@ -1,6 +1,8 @@
 #ifndef PILECV4J_NR_UTILS_H_
 #define PILECV4J_NR_UTILS_H_
 
+#include <math.h>
+
 #include "common/kog_exports.h"
 
 namespace pilecv4j {
@@ -46,7 +48,12 @@ inline int IMIN(const int a, const int b) {
   return a < b ? a : b;
 }
 
-#define SIGN(a,b) ((b) >= 0.0 ? fabs(a) : -fabs(a))
+// inline function rather than a macro to avoid double-evaluation of side-effecting
+// arguments. Takes/returns double exactly like the old macro did (operands were
+// promoted to double by fabs and the >= comparison), so numerics are unchanged.
+inline double SIGN(const double a, const double b) {
+  return b >= 0.0 ? fabs(a) : -fabs(a);
+}
 
 KAI_EXPORT void nrerror(const char error_text[]);
 /* My custom added methods for error handling */

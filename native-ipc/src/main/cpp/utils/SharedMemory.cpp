@@ -130,7 +130,7 @@ void SharedMemory::cleanup() {
     // value.
     if (owner && fd > 0) { // the means we're going to unlink it below.
       Header* header = (Header*)addr;
-      header->magic = 0x0;
+      __atomic_store_n(&header->magic, (uint64_t)0x0, __ATOMIC_RELEASE);
     }
     if (!unmmapSharedMemorySegment(addr, totalSize, true)) {
       ErrnoType err = getLastError();
@@ -211,7 +211,7 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   log(TRACE, COMPONENT, "Clearing addr 0x%" PRIx64 " of size %ld for %s", (uint64_t)addr, (long)totalSize, name.c_str());
   memset(addr,0,totalSize);
   log(TRACE, COMPONENT, "Clearing magic number at Header base 0x%" PRIx64 " field 'magic' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->magic)));
-  hptr->magic = 0L; // in case this is being reopened
+  __atomic_store_n(&hptr->magic, (uint64_t)0L, __ATOMIC_RELAXED); // in case this is being reopened
 
   // set the sizes
   log(TRACE, COMPONENT, "Setting totalSize at Header base 0x%" PRIx64 " field 'totalSize' at 0x%" PRIx64, (uint64_t)hptr, (uint64_t)(&(hptr->totalSize)));
@@ -231,10 +231,9 @@ uint64_t SharedMemory::create(std::size_t numBytes, bool powner, std::size_t num
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "Allocated shared mem at 0x%p with offset to data of %d bytes putting the data at 0x%p", addr, (int)offsetToBuffer, data);
 
-  // don't reorder any write operation below this with any read/write operations above this line
-  std::atomic_thread_fence(std::memory_order_release);
-  // set the magic number
-  hptr->magic = PILECV4J_SHM_HEADER_MAGIC;
+  // set the magic number with a release store: nothing written above this line may be
+  // reordered after it (the opener's acquire load of the magic pairs with this store).
+  __atomic_store_n(&hptr->magic, (uint64_t)PILECV4J_SHM_HEADER_MAGIC, __ATOMIC_RELEASE);
   this->m_isOpen = true;
   return OK_RET;
 
@@ -293,12 +292,14 @@ uint64_t SharedMemory::open(bool powner) {
 
   this->owner = powner;
 
-  // poll for the magic number to be set.
+  // poll for the magic number to be set. The load must be atomic (the creator process
+  // stores it concurrently - a plain load is a data race) and acquire so every store the
+  // creator made before publishing the magic is visible after we observe it.
   endTime.set(500ms);
-  while(header->magic != PILECV4J_SHM_HEADER_MAGIC && !endTime.isTimePast())
+  while(__atomic_load_n(&header->magic, __ATOMIC_ACQUIRE) != PILECV4J_SHM_HEADER_MAGIC && !endTime.isTimePast())
     std::this_thread::yield();
 
-  if (header->magic != PILECV4J_SHM_HEADER_MAGIC) {
+  if (__atomic_load_n(&header->magic, __ATOMIC_ACQUIRE) != PILECV4J_SHM_HEADER_MAGIC) {
     if (isEnabled(DEBUG))
       log(DEBUG, COMPONENT, "Timed out waiting for the create side to setup the semaphore");
 
@@ -409,7 +410,7 @@ uint64_t SharedMemory::reset() {
 
   memset(addr,0,totalSize);
 
-  hptr->magic = 0L; // in case this is being reopened
+  __atomic_store_n(&hptr->magic, (uint64_t)0L, __ATOMIC_RELAXED); // in case this is being reopened
 
   // set the sizes
   hptr->totalSize = totalSize;
@@ -423,10 +424,9 @@ uint64_t SharedMemory::reset() {
   if (isEnabled(DEBUG))
     log(DEBUG, COMPONENT, "Allocated shared mem at 0x%p with offset to data of %d bytes putting the data at 0x%p", addr, (int)offsetToBuffer, data);
 
-  // don't reorder any write operation below this with any read/write operations above this line
-  std::atomic_thread_fence(std::memory_order_release);
-  // set the magic number
-  hptr->magic = PILECV4J_SHM_HEADER_MAGIC;
+  // set the magic number with a release store: nothing written above this line may be
+  // reordered after it (the opener's acquire load of the magic pairs with this store).
+  __atomic_store_n(&hptr->magic, (uint64_t)PILECV4J_SHM_HEADER_MAGIC, __ATOMIC_RELEASE);
 
   return OK_RET;
 }

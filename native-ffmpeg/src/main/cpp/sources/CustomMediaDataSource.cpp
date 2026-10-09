@@ -42,8 +42,10 @@ static int read_packet_from_custom_source(void *opaque, uint8_t *buf, int buf_si
   log(TRACE, "num bytes read: %d", numBytesRead);
   if (numBytesRead != 0) {
     if (numBytesRead > buf_size) {
+      // This is a contract violation by the callback. Silently discarding the data
+      // (the previous behavior) corrupts the stream; propagate a real error instead.
       log(ERROR, "Too many bytes (%d) written when the buffer size is only %d", numBytesRead, buf_size);
-      numBytesRead = 0;
+      return AVERROR(EINVAL);
     } else {
       memcpy(buf, bufForCallback, numBytesRead);
     }

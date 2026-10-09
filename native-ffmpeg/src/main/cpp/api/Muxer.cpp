@@ -60,6 +60,11 @@ uint64_t Muxer::createStreamFromCodec(AVFormatContext* output_format_context, co
 
 uint64_t Muxer::writePacket(const AVPacket* inPacket, const AVRational& time_base, int output_stream_index) {
   AVFormatContext* output_format_context = getFormatContext();
+  if (output_stream_index < 0 || output_stream_index >= (int)output_format_context->nb_streams) {
+    log(ERROR, COMPONENT, "Received a packet for a stream at %d but there are only %d output streams.",
+        (int)output_stream_index, (int)output_format_context->nb_streams);
+    return MAKE_P_STAT(NO_STREAM);
+  }
   AVStream* out_stream = output_format_context->streams[output_stream_index];
 
   if (isEnabled(DEBUG))

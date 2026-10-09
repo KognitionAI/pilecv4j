@@ -61,6 +61,12 @@ struct CodecDetails {
   int dstW = -1;
   int dstH = -1;
 
+  /**
+   * Number of consecutive AVERROR_INVALIDDATA results from avcodec_send_packet.
+   * Used to escalate logging when a stream is persistently corrupt.
+   */
+  int64_t consecutiveInvalidData = 0;
+
   inline void close() {
     if (colorCvrt != nullptr)
       sws_freeContext(colorCvrt);
@@ -204,6 +210,15 @@ uint64_t DecodedFrameProcessor::decode_packet(CodecDetails* codecDetails, AVPack
     llog(ERROR, "Error while sending a packet to the decoder: %s", av_err2str(response));
     return MAKE_AV_STAT(response);
   }
+
+  // AVERROR_INVALIDDATA is tolerated (corrupt packets happen on live streams) but
+  // shouldn't be swallowed silently forever - escalate when it's persistent.
+  if (response == AVERROR_INVALIDDATA) {
+    const int64_t count = ++(codecDetails->consecutiveInvalidData);
+    if (count == 1L || (count % 1000L) == 0L)
+      llog(WARN, "Decoder rejected packet with AVERROR_INVALIDDATA (%ld consecutive so far).", (long)count);
+  } else if (response >= 0)
+    codecDetails->consecutiveInvalidData = 0;
 
   // https://ffmpeg.org/doxygen/trunk/structAVFrame.html
   AVFrame *pFrame = av_frame_alloc();

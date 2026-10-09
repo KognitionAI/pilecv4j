@@ -284,7 +284,7 @@ const AVOutputFormat* SegmentedMuxer::guessOutputFormat() {
 uint64_t SegmentedMuxer::writePacket(const AVPacket* inputPacket, const AVRational& inputPacketTimeBase, int output_stream_index) {
   uint64_t iret;
   int stream_index = output_stream_index;
-  if (stream_index >= streamCreators.size()) {
+  if (stream_index < 0 || (size_t)stream_index >= streamCreators.size()) {
     llog(ERROR, "Received a packet for a stream at %d that doesn't exist.", (int)stream_index);
     return MAKE_P_STAT(NO_STREAM);
   }

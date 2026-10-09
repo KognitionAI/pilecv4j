@@ -41,7 +41,8 @@ namespace python {
 
     void addModulePath(const char* moduleDir);
 
-    // GIL must be Ensured already
+    // GIL must be Ensured already.
+    // On success, *callable holds a NEW reference; the caller must Py_DECREF it.
     int32_t getFunctionFromModuleAtomic(const char* moduleName, const char* funcName, PyObject** callable);
 
     int32_t runFunction(const char* moduleName, const char* functionName, PyObject* tupleArgs, PyObject* paramDict, PyObject** result);
