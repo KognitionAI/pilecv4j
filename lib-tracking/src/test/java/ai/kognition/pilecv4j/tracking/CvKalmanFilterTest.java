@@ -16,6 +16,7 @@
 
 package ai.kognition.pilecv4j.tracking;
 
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import org.junit.Test;
@@ -35,6 +36,32 @@ public class CvKalmanFilterTest {
             try(final CvMat get = kf1.getGain()) {
                 assertNotNull(get);
                 CvKalmanFilter.dump(kf1);
+            }
+        }
+    }
+
+    /**
+     * Regression test: {@link CvKalmanFilter#getPosterioriErrorEstimateCovariance()} used to return the measurement
+     * noise covariance (R, measureParameters square) instead of errorCovPost (P(k), dynamicParameters square). Besides
+     * returning the wrong matrix, this made {@link CvKalmanFilter#setPosterioriErrorEstimateCovariance(org.opencv.core.Mat)}
+     * reject every correctly-sized matrix whenever dynamicParameters != measureParameters.
+     */
+    @Test
+    public void posterioriErrorCovarianceIsErrorCovPost() {
+        try(final CvKalmanFilter kf = new CvKalmanFilter(4, 2, 0, KalmanDataType.CV_32F)) {
+            try(final CvMat post = kf.getPosterioriErrorEstimateCovariance()) {
+                assertNotNull(post);
+                assertEquals(kf.dynamicParameters, post.rows());
+                assertEquals(kf.dynamicParameters, post.cols());
+            }
+
+            // the setter must accept a correctly-sized [dynamicParameters x dynamicParameters] matrix ...
+            try(final CvMat p = CvMat.identity(4, 4, KalmanDataType.CV_32F.cvType, new org.opencv.core.Scalar(7))) {
+                kf.setPosterioriErrorEstimateCovariance(p);
+            }
+            // ... and it must round-trip through the getter.
+            try(final CvMat roundtrip = kf.getPosterioriErrorEstimateCovariance()) {
+                assertEquals(7d, roundtrip.get(0, 0)[0], 1e-6);
             }
         }
     }
