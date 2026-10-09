@@ -9,6 +9,8 @@ public class FpsMonitor {
     private long periodEnd = -1;
 
     public FpsMonitor(final long periodMillis) {
+        if(periodMillis <= 0)
+            throw new IllegalArgumentException("periodMillis must be positive but was " + periodMillis);
         this.periodMillis = periodMillis;
     }
 

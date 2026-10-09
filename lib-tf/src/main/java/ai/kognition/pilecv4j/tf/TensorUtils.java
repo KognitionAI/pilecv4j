@@ -33,7 +33,6 @@
  import org.tensorflow.types.TFloat32;
  import org.tensorflow.types.family.TType;
  
- import net.dempsy.util.QuietCloseable;
  
  import ai.kognition.pilecv4j.image.CvMat;
  
@@ -87,10 +86,8 @@
      private static Tensor toTensor(final ByteBuffer bb, final int rows, final int cols, final int channels, final Class<? extends TType> clazz) {
          final Shape shape = Shape.of(new long[] {1,rows,cols,channels});
          bb.rewind();
-         try(QuietCloseable qc = () -> bb.rewind();) {
-             final ByteDataBuffer bdb = DataBuffers.of(bb);
-             return Tensor.of(clazz, shape, bdb);
-         }
+         final ByteDataBuffer bdb = DataBuffers.of(bb);
+         return Tensor.of(clazz, shape, bdb);
      }
  
  }

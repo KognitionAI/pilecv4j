@@ -453,6 +453,10 @@ public class PythonHandle implements QuietCloseable {
          * Once the Python script has set the result of an operation that was started using
          * {@link PythonHandle#sendMat(CvMat, boolean, ParamBlock)}, this will return those results. Until
          * then it will return null. You can poll for the result using {PythonResults{@link #hasResult()}.
+         * <p>
+         * NOTE: the returned {@link CvMat} is OWNED BY THE CALLER and must be closed (e.g. via
+         * try-with-resources) or the native memory will leak. Closing the enclosing
+         * {@link PythonResults} does NOT close mats previously returned from this method.
          */
         public CvMat getResultMat() {
             if(nativeObj != 0L) {

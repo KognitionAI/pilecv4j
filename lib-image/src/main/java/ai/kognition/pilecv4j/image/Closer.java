@@ -1,7 +1,5 @@
 package ai.kognition.pilecv4j.image;
 
-import static net.dempsy.util.Functional.uncheck;
-
 import java.util.LinkedList;
 import java.util.List;
 
@@ -33,6 +31,22 @@ public class Closer implements AutoCloseable {
 
     @Override
     public void close() {
-        toClose.stream().forEach(r -> uncheck(() -> r.close()));
+        // close EVERY resource even if one of them throws (a stream forEach would stop at
+        // the first failure, leaking the rest); collect subsequent failures as suppressed,
+        // mirroring try-with-resources semantics.
+        RuntimeException failure = null;
+        for(final AutoCloseable r: toClose) {
+            try {
+                r.close();
+            } catch(final Exception e) {
+                if(failure == null)
+                    failure = (e instanceof RuntimeException) ? (RuntimeException)e : new RuntimeException(e);
+                else
+                    failure.addSuppressed(e);
+            }
+        }
+        toClose.clear();
+        if(failure != null)
+            throw failure;
     }
 }

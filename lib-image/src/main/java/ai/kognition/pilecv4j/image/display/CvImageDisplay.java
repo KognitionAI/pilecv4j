@@ -46,7 +46,10 @@ public class CvImageDisplay extends ImageDisplay {
     // ==============================================================
     // This is basically a single threaded executor but we need to
     // check cv::waitKey or nothing happens in OpenCv::HighGUI
-    private static ArrayBlockingQueue<Consumer<WindowsState>> commands = new ArrayBlockingQueue<>(2);
+    // Capacity was previously 2, which could block the caller of commands.put() (including
+    // the HighGUI event thread via close callbacks) and deadlock the event loop. 128 gives
+    // plenty of headroom; the consumer drains one command per event-loop pass.
+    private static ArrayBlockingQueue<Consumer<WindowsState>> commands = new ArrayBlockingQueue<>(128);
     public static AtomicBoolean stillRunningEvents = new AtomicBoolean(true);
 
     private final CountDownLatch countDown = new CountDownLatch(1);

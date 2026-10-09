@@ -125,7 +125,9 @@ public class VideoFrame extends CvMat {
         public final int type;
 
         private final AtomicReference<ConcurrentLinkedQueue<VideoFrame>> resources = new AtomicReference<>(new ConcurrentLinkedQueue<>());
-        private boolean closed = false;
+        // volatile: getPool() spins on this from other threads; without volatile a spinning
+        // thread may never observe close() setting it and livelock at 100% CPU.
+        private volatile boolean closed = false;
         private final AtomicLong totalSize = new AtomicLong(0);
         private final AtomicLong resident = new AtomicLong(0);
 
@@ -188,6 +190,9 @@ public class VideoFrame extends CvMat {
                 final ConcurrentLinkedQueue<VideoFrame> ret = resources.getAndSet(null);
                 if(ret != null)
                     return ret;
+                // another thread holds the hand-off; hint the CPU rather than hammering
+                // getAndSet (which bounces the cache line) in a tight loop.
+                Thread.onSpinWait();
             }
             return null;
         }

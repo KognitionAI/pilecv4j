@@ -16,8 +16,6 @@
 
 package ai.kognition.pilecv4j.nr;
 
-import java.util.Arrays;
-
 import ai.kognition.pilecv4j.nr.Minimizer.Func;
 
 /**
@@ -51,8 +49,6 @@ public class LinearRegression implements Func {
         final double m = lineDefMb[0];
         final double b = lineDefMb[1];
 
-        System.out.println(Arrays.toString(lineDefMb));
-
         // translate the line so it goes through the origin and find a unit vector
         final double t = -b;
         final double yTransWhenXis1 = m;
@@ -83,13 +79,9 @@ public class LinearRegression implements Func {
             final double diffY = projYit - yit;
             final double curErr2 = (diffX * diffX) + (diffY * diffY);
 
-            System.out.print("" + curErr2 + " ");
-
             // sum the squared error.
             error2 += curErr2;
         }
-
-        System.out.println(" = " + error2);
 
         return error2;
     }
