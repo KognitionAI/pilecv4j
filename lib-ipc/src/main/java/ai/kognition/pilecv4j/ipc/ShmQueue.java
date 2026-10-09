@@ -90,7 +90,6 @@ public class ShmQueue implements QuietCloseable {
     private final LongByReference longResult = new LongByReference();
     private final PointerByReference ptrResult = new PointerByReference();
     private ByteBuffer reusedBb;
-    private final int[] rowCol = new int[2];
 
     /**
      * <p>
@@ -131,8 +130,10 @@ public class ShmQueue implements QuietCloseable {
     public void close() {
         if(isClosed)
             throw new IllegalStateException("Double close on " + this);
-        IpcApi.pilecv4j_ipc_destroy_shmQueue(nativeRef);
+        // set the flag BEFORE destroying the native resource so a re-entrant/erroneous
+        // second close can never double-free the native queue, even if the destroy throws.
         isClosed = true;
+        IpcApi.pilecv4j_ipc_destroy_shmQueue(nativeRef);
     }
 
     /**
@@ -435,10 +436,10 @@ public class ShmQueue implements QuietCloseable {
      * @see #accessAsMat(long, int[], int, long)
      */
     public ShmQueueCvMat accessAsMat(final long offset, final int rows, final int cols, final int type, final long millis) {
-        rowCol[0] = rows;
-        rowCol[1] = cols;
-
-        return accessAsMat(offset, rowCol, type, millis);
+        // local array rather than a shared mutable field: harmless under the documented
+        // single-threaded contract but removes the data race entirely for the cost of a
+        // tiny allocation.
+        return accessAsMat(offset, new int[] {rows,cols}, type, millis);
     }
 
     /**

@@ -176,7 +176,7 @@ public class NativeLibraryLoader {
                     if(loadMe) {
                         preLoadCallbacks.stream()
                             .forEach(ll -> ll.loading(tmpDir, ld.libName, libFileName));
-                        System.out.println("Loading: " + libFile.getAbsolutePath());
+                        LOGGER.info("Loading: {}", libFile.getAbsolutePath());
                         System.load(libFile.getAbsolutePath());
                         postLoadCallbacks.stream()
                             .forEach(ll -> ll.loading(tmpDir, ld.libName, libFileName));

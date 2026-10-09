@@ -64,8 +64,18 @@ public class Minimizer {
 
     /**
      * Default float tolerance.
+     * <p>
+     * NOTE: this is a global, mutable setting shared by every {@link Minimizer} in the JVM;
+     * it's declared {@code volatile} so concurrent readers at least see a consistent value
+     * (a plain {@code double} write is not guaranteed atomic). Prefer leaving it at the
+     * default.
+     * <p>
+     * Also note the underlying native minimizer operates in <b>single precision</b>: the
+     * positions passed to {@link Func#func(double[])} and the value returned from it are
+     * converted to/from {@code float}, so tolerances tighter than float epsilon (~1e-7)
+     * cannot actually be resolved by the minimization itself.
      */
-    public static double ftol = 1.0e-10;
+    public static volatile double ftol = 1.0e-10;
 
     /**
      * Construct the minimizer with the function to be minimized.
