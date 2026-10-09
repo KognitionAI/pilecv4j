@@ -294,11 +294,25 @@ KAI_EXPORT void free_f3tensor(float ***t, long nrl, long nrh, long ncl, long nch
 }
 
 extern "C" {
+/**
+ * Returns the current thread's error message and transfers OWNERSHIP to the caller:
+ * the returned pointer was allocated with malloc and the caller must release it with
+ * pilecv4j_image_nrFreeErrorMessage() (or free()). May return NULL.
+ */
 KAI_EXPORT char* pilecv4j_image_nrGetErrorMessage()
 {
   char* ret = errorText;
   errorText = NULL;
   return ret;
+}
+
+/**
+ * Companion to pilecv4j_image_nrGetErrorMessage(); frees a message returned by it.
+ */
+KAI_EXPORT void pilecv4j_image_nrFreeErrorMessage(char* msg)
+{
+  if (msg)
+    free(msg);
 }
 }
 }

@@ -83,10 +83,11 @@ uint64_t Muxer::writePacket(const AVPacket* inPacket, const AVRational& time_bas
   // ======================================================================================
   // adjust the packet timing
   if (pPacket->pts == AV_NOPTS_VALUE) {
-    if (!loggedPacketPtsDtsMissingAlready) {
-      log(WARN, COMPONENT, "Packet has no pts/dts set. It will be sent as is to the output");
-      loggedPacketPtsDtsMissingAlready = true;
-    }
+    // warn on the first occurrence and every 1000th thereafter - warning only once for
+    // the lifetime of the muxer masks persistent timestamp problems on long-running streams.
+    const int64_t count = ++packetPtsDtsMissingCount;
+    if (count == 1L || (count % 1000L) == 0L)
+      log(WARN, COMPONENT, "Packet has no pts/dts set (%ld occurrences so far). It will be sent as is to the output", (long)count);
   } else {
 //    if (isEnabled(TRACE))
 //      log(TRACE, COMPONENT, "in tb = %d/%d, out = %d/%d", time_base.num, time_base.den, out_stream->time_base.num, out_stream->time_base.den);

@@ -255,32 +255,6 @@ const AVOutputFormat* SegmentedMuxer::guessOutputFormat() {
   return currentMuxer ? currentMuxer->guessOutputFormat() : nullptr;
 }
 
-//uint64_t SegmentedMuxer::writePacket(AVPacket* outputPacket) {
-//  uint64_t iret;
-//  int stream_index = outputPacket->stream_index;
-//  if (stream_index >= streamCreators.size()) {
-//    llog(ERROR, "Received a packet for a stream at %d that doesn't exist.", (int)stream_index);
-//    return MAKE_P_STAT(NO_STREAM);
-//  }
-//
-//  AVStream* stream = getStream(stream_index);
-//  if (!stream) {
-//    llog(ERROR, "Received a packet for a stream at %d that's null.", (int)stream_index);
-//    return MAKE_P_STAT(NO_STREAM);
-//  }
-//
-//  if (!pendingClose && stream_index == reference_stream)
-//    pendingClose = (closeSeg)(outputPacket, streamMediaTypes[stream_index], stream->time_base);
-//
-//  if (pendingClose && stream_index == reference_stream && isKeyFrame(outputPacket)) {
-//    if (isError(iret = rotate()))
-//      return iret;
-//    pendingClose = false; // reset
-//  }
-//
-//  return Muxer::writePacket(outputPacket);
-//}
-
 uint64_t SegmentedMuxer::writePacket(const AVPacket* inputPacket, const AVRational& inputPacketTimeBase, int output_stream_index) {
   uint64_t iret;
   int stream_index = output_stream_index;
@@ -305,7 +279,6 @@ uint64_t SegmentedMuxer::writePacket(const AVPacket* inputPacket, const AVRation
   }
 
   return Muxer::writePacket(inputPacket, inputPacketTimeBase, output_stream_index);
-  //return currentMuxer->writePacket(inputPacket, inputPacketTimeBase, output_stream_index);
 }
 
 //========================================================================

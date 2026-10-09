@@ -212,9 +212,10 @@ extern "C" {
   // ==============================================================
   // ImageSource lifecycle and methods
   // ==============================================================
-  KAI_EXPORT uint64_t pilecv4j_python_imageSource_create(uint64_t pt) {
+  // NOTE: the JavaHandle parameter is currently unused (kept for ABI compatibility with
+  // the Java-side JNA binding); the ImageSource is not associated with the handle.
+  KAI_EXPORT uint64_t pilecv4j_python_imageSource_create(uint64_t) {
     PILECV4J_TRACE;
-    JavaHandle* ptorch = (JavaHandle*)pt;
     return uint64_t(new ImageSource());
   }
 
