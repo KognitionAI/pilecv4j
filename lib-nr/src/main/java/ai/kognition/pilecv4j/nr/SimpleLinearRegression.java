@@ -37,8 +37,10 @@ import ai.kognition.pilecv4j.nr.Minimizer.Func;
  */
 public class SimpleLinearRegression implements Func {
 
-    public final double[] y;
-    public final double[] x;
+    // private: external mutation of x/y during an active minimization would silently
+    // change the objective function mid-optimization and produce nonsensical results.
+    private final double[] y;
+    private final double[] x;
 
     public SimpleLinearRegression(final double[] x, final double[] y) {
         this.x = x;
