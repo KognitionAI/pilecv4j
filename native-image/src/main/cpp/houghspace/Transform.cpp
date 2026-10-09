@@ -140,7 +140,14 @@ KAI_EXPORT void pilecv4j_image_Transform_houghTransformNative(uint64_t imageA, i
 {
   short gradientDirSlopBytePM = (short)((1.0 + gradientDirSlopDeg * (256.0/360.0))/2.0);
 
-  int32_t hssize = hswidth * hsheight;
+  // guard against int32 overflow of the accumulator size (e.g. 64k x 64k wraps negative
+  // and the loops below would write far past the allocation).
+  const int64_t hssize64 = (int64_t)hswidth * (int64_t)hsheight;
+  if (hswidth <= 0 || hsheight <= 0 || hssize64 > (int64_t)INT32_MAX) {
+    fprintf(stderr, "pilecv4j houghTransform: invalid hough space dimensions %d x %d\n", (int)hswidth, (int)hsheight);
+    return;
+  }
+  int32_t hssize = (int32_t)hssize64;
   short * interimht = new short[ hssize ];
   list<BackMapPtr>** backMapListSpace = new list<BackMapPtr>*[ hssize ];
 

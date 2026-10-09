@@ -115,6 +115,10 @@ uint64_t Remuxer::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::strin
   // set up the output streams
   if (isError(iret = psi->numStreams(&number_of_streams)))
     return iret;
+  if (number_of_streams == 0) {
+    llog(ERROR, "The packet source reports no streams to remux.");
+    return MAKE_P_STAT(NO_STREAM);
+  }
   AVCodecParameters** in_codecparpp = new AVCodecParameters*[number_of_streams];
   streamTimeBases = new AVRational[number_of_streams];
 

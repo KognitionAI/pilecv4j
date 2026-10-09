@@ -94,13 +94,18 @@ namespace python {
         }
       }
     }
-    // if we got here we need to relent on the spinning
+    // if we got here we need to relent on the spinning. Back off exponentially
+    // (1us -> 1ms cap) so a fast result is picked up quickly but a slow producer
+    // (e.g. inference taking tens of ms) doesn't get hammered with 1us polls.
     KogMatWithResults* ret = nullptr;
     uint64_t count = 0;
+    std::chrono::microseconds delay(1);
+    constexpr std::chrono::microseconds maxDelay(1000);
     while (!ret) {
       count++;
-      using std::chrono::operator""us;
-      std::this_thread::sleep_until(std::chrono::steady_clock::now() + 1us);
+      std::this_thread::sleep_for(delay);
+      if (delay < maxDelay)
+        delay *= 2;
       {
         std::lock_guard<std::mutex> lck(ondeckMutex);
         ret = ondeck;

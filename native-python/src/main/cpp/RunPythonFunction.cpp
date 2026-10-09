@@ -184,7 +184,7 @@ namespace python {
       }
       case PyResultMAT: {
         Byteable<void*> value;
-        fetch(buf + 1, value);
+        fetch(buf + pos, value);
         cv::Mat* mat = (cv::Mat*)value.val;
         if (mat)
           delete mat;
