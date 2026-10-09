@@ -13,12 +13,14 @@
 namespace pilecv4j {
 namespace nr {
 
-static char* errorText = NULL;
-static int errorHappens = 0;
+static thread_local char* errorText = NULL;
+static thread_local int errorHappens = 0;
   
 KAI_EXPORT void nrerror2(const char error_text[])
    /* Numerical Recipes standard error handler */
 {
+  if (errorText)
+    free(errorText);
   errorText = (char*)(malloc(sizeof(char) * (strlen(error_text) + 1)));
   strcpy(errorText,error_text);
   errorHappens = 1;

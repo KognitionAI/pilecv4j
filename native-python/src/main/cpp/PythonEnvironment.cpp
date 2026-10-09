@@ -91,10 +91,15 @@ namespace python {
     // New reference
     PyObject* pFuncName = PyUnicode_FromString(funcName);
     log(TRACE, "Looking for function %s in module %s", funcName, moduleName);
-    // Borrowed reference
+    // Borrowed reference (borrowed from pDict/pModule)
     PyObject *pFunc = PyDict_GetItem(pDict, pFuncName);
     Py_DECREF(pFuncName);
 
+    // Take our own reference BEFORE releasing the module. pFunc is borrowed
+    // from the module's dict; if the module were released (e.g. removed from
+    // sys.modules) pFunc would dangle. The caller now owns *ret and must
+    // Py_DECREF it when done.
+    Py_XINCREF(pFunc);
     *ret = pFunc;
     if(!pFunc){
       log(ERROR, "Couldn't find func %s in module %s", funcName, moduleName);

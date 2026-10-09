@@ -9,6 +9,7 @@
 #define _FAKEMUTEXGUARD_H_
 
 #include <atomic>
+#include <thread>
 
 namespace ai
 {
@@ -32,8 +33,10 @@ public:
   inline FakeMutextGuard(std::atomic<bool>& pfmut, bool doIt = true) : fmut(pfmut) {
     if (doIt) {
       bool mfalse = false;
-      while(!fmut.compare_exchange_weak(mfalse,true)) {
+      while(!fmut.compare_exchange_weak(mfalse, true, std::memory_order_acquire, std::memory_order_relaxed)) {
         mfalse = false;
+        // back off so we don't peg a core busy-waiting under contention
+        std::this_thread::yield();
       }
       didIt = true;
     } else
@@ -42,10 +45,9 @@ public:
 
   inline ~FakeMutextGuard() {
     if (didIt) {
-      bool mtrue = true;
-      while(!fmut.compare_exchange_weak(mtrue, false)) {
-        mtrue = true;
-      }
+      // we hold the "lock" so the value is known to be true; a plain
+      // release store is sufficient (and cannot fail) to unlock it.
+      fmut.store(false, std::memory_order_release);
     }
   }
 };

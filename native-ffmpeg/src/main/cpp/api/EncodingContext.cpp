@@ -416,7 +416,15 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
     framecount++;
   }
 
-  av_init_packet(&output_packet);
+  // av_init_packet is deprecated (removed in FFmpeg 6); use a heap allocated
+  // packet managed with av_packet_alloc/av_packet_free instead.
+  if (!output_packet) {
+    output_packet = av_packet_alloc();
+    if (!output_packet) {
+      llog(ERROR, "Failed to allocate an AVPacket");
+      return MAKE_AV_STAT(AVERROR(ENOMEM));
+    }
+  }
 
   for (bool frameSent = false; ! frameSent; ) {
     llog(TRACE, "avcodec_send_frame sending frame at %" PRId64, (uint64_t) frame);
@@ -438,7 +446,7 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
 
     bool packetReceived = false;
     while (rc >= 0) {
-      rc = avcodec_receive_packet(video_avcc, &output_packet);
+      rc = avcodec_receive_packet(video_avcc, output_packet);
       if (rc == AVERROR(EAGAIN) || rc == AVERROR_EOF) {
         if (isEnabled(TRACE))
           llog(TRACE, "avcodec_receive_packet needs more info: %d : %s", rc, av_err2str(rc));
@@ -454,21 +462,21 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
 
       packetReceived = true;
 
-      output_packet.stream_index = video_sindex;
+      output_packet->stream_index = video_sindex;
 
       if (isEnabled(TRACE)) {
         llog(TRACE, "Output Packet Timing[stream %d]: pts/dts: [ %" PRId64 "/ %" PRId64 " ] duration: %" PRId64 " timebase: [ %d / %d ]",
-            (int) output_packet.stream_index,
-            (int64_t)output_packet.pts, (int64_t)output_packet.dts,
-            (int64_t)output_packet.duration,
+            (int) output_packet->stream_index,
+            (int64_t)output_packet->pts, (int64_t)output_packet->dts,
+            (int64_t)output_packet->duration,
             (int)video_stime_base.num, (int)video_stime_base.den);
       }
 
-      enc->muxer->writeFinalPacket(&output_packet);
+      enc->muxer->writeFinalPacket(output_packet);
     }
 
     if (packetReceived)
-      av_packet_unref(&output_packet);
+      av_packet_unref(output_packet);
   }
   // ==================================================================
 
@@ -527,6 +535,9 @@ VideoEncoder::~VideoEncoder() {
       llog(TRACE, "freeing video_avcc at %" PRId64, (uint64_t)video_avcc);
     avcodec_free_context(&video_avcc);
   }
+
+  if (output_packet)
+    av_packet_free(&output_packet);
 }
 
 extern "C" {

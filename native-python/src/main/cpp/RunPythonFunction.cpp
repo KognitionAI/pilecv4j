@@ -258,7 +258,7 @@ namespace python {
     PyObject* result = nullptr;
     PyObject *pFunc = nullptr;
 
-    // pFunc is a borrowed reference
+    // pFunc is a NEW reference (getFunctionFromModuleAtomic INCREFs it); we must DECREF it here.
     statusCode = PythonEnvironment::instance()-> getFunctionFromModuleAtomic(moduleName, funcName, &pFunc);
 
     if (statusCode != OK) {
@@ -283,6 +283,7 @@ namespace python {
       args = PyTuple_New(0);
     result = PyObject_Call(pFunc, args, paramDict);
     Py_DECREF(args);
+    Py_DECREF(pFunc);
 
     // did an error occurr in the script?
     if(PyErr_Occurred())

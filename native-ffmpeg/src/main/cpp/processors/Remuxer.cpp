@@ -123,7 +123,7 @@ uint64_t Remuxer::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::strin
 
     AVStream* in_stream;
     if (isError(iret = psi->getStream(i, &in_stream)))
-      return iret;
+      goto fail;
 
     streamTimeBases[i] = in_stream->time_base;
     AVCodecParameters *in_codecpar = in_stream->codecpar;
@@ -161,6 +161,16 @@ uint64_t Remuxer::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::strin
   }
 
   iret = setupStreams(in_codecparpp);
+
+  // The muxer copies the codec parameters (see createNextStream impls) so the
+  // local copies need to be freed whether or not setupStreams succeeded.
+  for (unsigned int i = 0; i < number_of_streams; i++) {
+    if (in_codecparpp[i])
+      avcodec_parameters_free(&(in_codecparpp[i]));
+  }
+  delete [] in_codecparpp;
+  in_codecparpp = nullptr;
+
   if (isError(iret))
     goto fail;
 
@@ -169,7 +179,7 @@ uint64_t Remuxer::setup(PacketSourceInfo* psi, std::vector<std::tuple<std::strin
 
   fail:
   if (in_codecparpp) {
-    for (int i = 0; i < number_of_streams; i++) {
+    for (unsigned int i = 0; i < number_of_streams; i++) {
       if (in_codecparpp[i])
         avcodec_parameters_free(&(in_codecparpp[i]));
     }

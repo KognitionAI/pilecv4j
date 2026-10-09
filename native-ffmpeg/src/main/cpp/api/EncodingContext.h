@@ -84,7 +84,7 @@ class VideoEncoder {
   // ==================================
 
   AVFrame* frame = nullptr;
-  AVPacket output_packet = {0};
+  AVPacket* output_packet = nullptr;
 
   // ==================================
   // stupid hack
