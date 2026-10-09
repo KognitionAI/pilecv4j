@@ -1,7 +1,5 @@
 package ai.kognition.pilecv4j.ffmpeg;
 
-import static net.dempsy.util.Functional.ignore;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,7 +63,10 @@ public class AsyncVideoFrameConsumer implements VideoFrameConsumer {
                     LOGGER.warn("Underlying video frame handler failed.", rte);
                 }
                 if(!gotit)
-                    ignore(() -> Thread.sleep(1));
+                    // park 100us rather than sleeping 1ms: reduces worst-case frame-pickup
+                    // latency ~10x while still yielding the CPU when no frame is on deck.
+                    // parkNanos also returns immediately on interrupt (close() interrupts us).
+                    java.util.concurrent.locks.LockSupport.parkNanos(100_000L);
             }
         }, THREAD_NAME + threadCount.getAndIncrement());
         ret.start();

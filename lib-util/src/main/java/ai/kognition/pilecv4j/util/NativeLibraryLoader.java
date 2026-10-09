@@ -22,7 +22,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -47,7 +46,9 @@ import org.slf4j.LoggerFactory;
 public class NativeLibraryLoader {
     private static final Logger LOGGER = LoggerFactory.getLogger(NativeLibraryLoader.class);
 
-    private static Set<String> loaded = new HashSet<>();
+    // concurrent set: libraries can be loaded from multiple threads during concurrent
+    // class initialization (common in Spring/CDI contexts); a plain HashSet can corrupt.
+    private static Set<String> loaded = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private static PlatformDetection platform = new PlatformDetection();
 

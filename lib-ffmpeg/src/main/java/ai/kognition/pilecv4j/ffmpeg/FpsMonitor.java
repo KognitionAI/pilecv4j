@@ -19,7 +19,7 @@ public class FpsMonitor {
      * passes the apply will return a non-null which represents the
      * FPS over the last period. Most of the time this will return null.
      */
-    public Double apply(final long timestamp) {
+    public synchronized Double apply(final long timestamp) {
         if(timestamp >= periodEnd) {
             if(periodStart >= 0) {
                 // do the calculation and return
