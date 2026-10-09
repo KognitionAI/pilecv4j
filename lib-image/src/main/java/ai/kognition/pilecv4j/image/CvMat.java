@@ -146,8 +146,14 @@ public class CvMat extends Mat implements QuietCloseable {
 
     private boolean deletedAlready = false;
 
-    protected final RuntimeException stackTrace;
+    protected final RuntimeException stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     protected RuntimeException delStackTrace = null;
+
+    // Cleaner-based leak tracking (replaces the deprecated finalize()-based tracking, JEP-421).
+    // The guard holds no reference to this object; it only logs a warning if this object is
+    // garbage collected without having been closed.
+    private final ImageAPI.LeakGuard leakGuard = new ImageAPI.LeakGuard(getClass().getSimpleName(), stackTrace);
+    private final java.lang.ref.Cleaner.Cleanable cleanable = ImageAPI.registerLeakGuard(this, leakGuard);
 
     static {
         try {
@@ -162,7 +168,6 @@ public class CvMat extends Mat implements QuietCloseable {
 
     protected CvMat(final long nativeObj) {
         super(nativeObj);
-        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     /**
@@ -170,7 +175,6 @@ public class CvMat extends Mat implements QuietCloseable {
      * This simply calls the parent classes equivalent constructor.
      */
     public CvMat() {
-        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     /**
@@ -184,7 +188,6 @@ public class CvMat extends Mat implements QuietCloseable {
      */
     public CvMat(final int rows, final int cols, final int type) {
         super(rows, cols, type);
-        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     /**
@@ -199,7 +202,6 @@ public class CvMat extends Mat implements QuietCloseable {
      */
     public CvMat(final int rows, final int cols, final int type, final ByteBuffer data) {
         super(rows, cols, type, data);
-        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     /**
@@ -212,7 +214,6 @@ public class CvMat extends Mat implements QuietCloseable {
      */
     public CvMat(final int[] sizes, final int type) {
         super(sizes, type);
-        stackTrace = TRACK_MEMORY_LEAKS ? new RuntimeException("Here's where I was instantiated: ") : null;
     }
 
     /**
@@ -495,6 +496,8 @@ public class CvMat extends Mat implements QuietCloseable {
             if(!deletedAlready) {
                 doNativeDelete();
                 deletedAlready = true;
+                leakGuard.markClosed();
+                cleanable.clean();
                 if(TRACK_MEMORY_LEAKS) {
                     delStackTrace = new RuntimeException("Here's where I was closed");
                 }
@@ -779,16 +782,15 @@ public class CvMat extends Mat implements QuietCloseable {
         }
     }
 
-    // Prevent Mat finalize from being called
+    // This EMPTY finalize() override is deliberate and must remain even though leak tracking
+    // has moved to the Cleaner API (see ImageAPI.LeakGuard): OpenCV's Mat.finalize() calls
+    // n_delete() unconditionally, which would double-free the native Mat for every properly
+    // closed CvMat when the garbage collector finalizes it. An empty (trivial) finalizer is
+    // recognized by the JVM, so instances of this class are NOT registered for finalization
+    // and incur no finalization overhead.
+    @SuppressWarnings({"deprecation","removal"})
     @Override
-    protected void finalize() throws Throwable {
-        if(!deletedAlready) {
-            LOGGER.warn("Finalizing a {} that hasn't been closed.", this.getClass().getSimpleName());
-            if(TRACK_MEMORY_LEAKS)
-                LOGGER.warn("TRACKING: Here's where I was instantiated: ", stackTrace);
-            close();
-        }
-    }
+    protected final void finalize() throws Throwable {}
 
     private static ByteBuffer _getData(final Mat mat) {
         if(!mat.isContinuous())

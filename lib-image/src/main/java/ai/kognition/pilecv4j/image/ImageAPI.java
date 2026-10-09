@@ -17,7 +17,9 @@ package ai.kognition.pilecv4j.image;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.ref.Cleaner;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.sun.jna.Callback;
 import com.sun.jna.Native;
@@ -37,6 +39,78 @@ public class ImageAPI {
     public static final String LIBNAME = "ai.kognition.pilecv4j.image";
 
     static void _init() {}
+
+    // ==================================================================
+    // Cleaner based leak tracking. This replaces the deprecated (JEP-421)
+    // finalize() based leak detection previously implemented on CvMat and
+    // friends.
+    // ==================================================================
+
+    /**
+     * Lazy holder so the Cleaner thread is only created if leak tracking is
+     * actually used (i.e. the first time a tracked resource is instantiated).
+     */
+    private static class CleanerHolder {
+        private static final Cleaner CLEANER = Cleaner.create(r -> {
+            final Thread t = new Thread(r, "pilecv4j-leak-tracker");
+            t.setDaemon(true);
+            return t;
+        });
+    }
+
+    /**
+     * <p>
+     * Leak-tracking state to be registered with the {@link Cleaner} via
+     * {@link ImageAPI#registerLeakGuard(Object, LeakGuard)}. When the tracked object is garbage
+     * collected without having been closed, a warning is logged (including the instantiation
+     * location when {@code CvMat.TRACK_MEMORY_LEAKS} is enabled).
+     * </p>
+     *
+     * <p>
+     * NOTE: this class deliberately does NOT free the native resources and deliberately holds
+     * NO reference to the tracked object. Holding a reference would prevent the tracked object
+     * from ever becoming phantom reachable (a permanent leak), and freeing the native resource
+     * from here would bypass the virtual {@code doNativeDelete()} overrides used by subclasses
+     * where the native memory is owned elsewhere (pooled {@code VideoFrame}s, shared-memory
+     * mats, frames owned by the native decode loop, ...).
+     * </p>
+     */
+    public static final class LeakGuard implements Runnable {
+        private final AtomicBoolean closed = new AtomicBoolean(false);
+        private final String className;
+        private final RuntimeException stackTrace;
+
+        public LeakGuard(final String className, final RuntimeException stackTrace) {
+            this.className = className;
+            this.stackTrace = stackTrace;
+        }
+
+        /**
+         * Mark the tracked resource as properly closed. Once marked, the cleaning action
+         * becomes a no-op.
+         */
+        public void markClosed() {
+            closed.set(true);
+        }
+
+        @Override
+        public void run() {
+            if(!closed.getAndSet(true)) {
+                LOGGER.warn("Garbage collecting a {} that was never closed. Its native resources were NOT freed.", className);
+                if(stackTrace != null)
+                    LOGGER.warn("TRACKING: Here's where I was instantiated: ", stackTrace);
+            }
+        }
+    }
+
+    /**
+     * Register a {@link LeakGuard} for the given object. The returned {@link Cleaner.Cleanable}
+     * should have {@code clean()} invoked (after {@link LeakGuard#markClosed()}) when the object
+     * is deterministically closed, which unregisters it from the Cleaner.
+     */
+    public static Cleaner.Cleanable registerLeakGuard(final Object tracked, final LeakGuard guard) {
+        return CleanerHolder.CLEANER.register(tracked, guard);
+    }
 
     // needs to match LogLevel enum in the C++ code.
     public static final int LOG_LEVEL_TRACE = 0;
