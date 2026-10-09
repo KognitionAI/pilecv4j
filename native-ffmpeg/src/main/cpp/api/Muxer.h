@@ -38,7 +38,7 @@ namespace ffmpeg
  */
 class Muxer
 {
-  bool loggedPacketPtsDtsMissingAlready = false;
+  int64_t packetPtsDtsMissingCount = 0;
   int nb_streams = -1;
   int64_t* starting_ts_offset = nullptr;
 protected:
