@@ -312,8 +312,11 @@ uint64_t SharedMemory::open(bool powner) {
     return fromErrno(EAGAIN);
   }
 
-  // don't reorder the read above this with any read/write below this
-  std::atomic_thread_fence(std::memory_order_release);
+  // don't reorder the read above this with any read/write below this.
+  // this must be an ACQUIRE fence: we just observed the creator's magic-number
+  // store and need to see every store it made before that. (a release fence
+  // provides no ordering for the loads that follow.)
+  std::atomic_thread_fence(std::memory_order_acquire);
 
   // okay, it's set up. re-map it to the correct size.
   lheader = *header; // copy the header

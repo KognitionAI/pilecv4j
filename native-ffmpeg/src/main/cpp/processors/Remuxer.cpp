@@ -218,11 +218,18 @@ uint64_t Remuxer::remuxPacket(const AVPacket * inPacket) {
   // then we're going to calculate it.
   if (toUse->pts == AV_NOPTS_VALUE) {
     toUse = av_packet_clone(inPacket);
+    if (!toUse)
+      return MAKE_P_STAT(FAILED_CREATE_PACKET);
     toUse->pts = av_rescale_q((int64_t)(now() - startTime), millisecondTimeBase, time_base);
-    toUse->dts = inPacket->pts;
+    // previously this assigned inPacket->pts (known to be AV_NOPTS_VALUE in this branch).
+    // preserve a valid original dts if there is one, otherwise use the synthesized pts.
+    if (toUse->dts == AV_NOPTS_VALUE || toUse->dts > toUse->pts)
+      toUse->dts = toUse->pts;
   }
 
-  auto ret = output->writePacket(inPacket, time_base, output_stream_index);
+  // write the (possibly timestamp-fixed) packet. This previously passed inPacket,
+  // which meant the synthesized pts/dts above were never actually used.
+  auto ret = output->writePacket(toUse, time_base, output_stream_index);
   if (toUse != inPacket)
     av_packet_free(&toUse);
 
