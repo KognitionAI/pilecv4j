@@ -314,7 +314,10 @@ public class ImageFile {
                 LOGGER.warn("OCV Failed to read '" + filename + "' using OpenCV");
                 try {
                     return Utils.img2CvMat(doReadBufferedImageFromFile(filename, false, 0));
-                } catch(final IllegalArgumentException iae) { //
+                } catch(final IllegalArgumentException iae) {
+                    // don't swallow the fallback failure silently - the ImageIO exception often
+                    // has more context than OpenCV's generic unreadable-file behavior.
+                    LOGGER.warn("Failed to read '{}' with the ImageIO fallback as well.", filename, iae);
                     return null;
                 }
             } // else {

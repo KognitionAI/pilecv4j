@@ -179,6 +179,12 @@ public class PythonHandle implements QuietCloseable {
             throw new PythonException("Failed to instantiate native PyTorch instance.");
     }
 
+    /**
+     * Returns the shared {@code Py_None} sentinel for this handle.
+     * <p>
+     * NOTE: the returned object's lifetime is bounded by this {@link PythonHandle} - it is
+     * closed when the handle is closed. Do not store or use it after the handle is closed.
+     */
     public synchronized Py_None none() {
         if(none == null)
             none = new Py_None();

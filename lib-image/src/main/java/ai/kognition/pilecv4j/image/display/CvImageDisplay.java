@@ -103,16 +103,23 @@ public class CvImageDisplay extends ImageDisplay {
                         } else
                             ignore(() -> Thread.sleep(1));
 
-                        // we need to check to see if there's any commands to execute.
-                        final Consumer<WindowsState> cmd = commands.poll();
+                        // we need to check to see if there's any commands to execute. Use a timed
+                        // poll so the wait-for-command and the idle sleep are one blocking call
+                        // (previously a poll() plus a separate 1ms sleep per loop pass).
+                        Consumer<WindowsState> cmd;
+                        try {
+                            cmd = commands.poll(1, java.util.concurrent.TimeUnit.MILLISECONDS);
+                        } catch(final InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            cmd = null;
+                        }
                         if(cmd != null) {
                             try {
                                 cmd.accept(state);
                             } catch(final Exception e) {
                                 LOGGER.error("OpenCv::HighGUI command \"{}\" threw an excetion.", cmd, e);
                             }
-                        } else
-                            ignore(() -> Thread.sleep(1));
+                        }
 
                     } catch(final Throwable th) {
                         LOGGER.error("OpenCv::HighGUI CRITICAL ERROR! But yet, I persist.", th);

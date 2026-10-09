@@ -88,9 +88,13 @@ public class BitrateMonitor {
 
     /**
      * @return the measured bitrate in bits/second from the last completed
-     *     measurement window, or 0 if no complete window has elapsed yet.
+     *     measurement window, or 0 if no complete window has elapsed yet, or 0 if the
+     *     measurement is stale (no packet recorded for more than two full windows -
+     *     e.g. the stream is paused or down - so callers don't see a frozen value forever).
      */
     public synchronized long getBitsPerSecond() {
+        if(windowStartTime >= 0 && (System.currentTimeMillis() - windowStartTime) > (2 * windowMillis))
+            return 0;
         return lastBitsPerSecond;
     }
 
@@ -98,14 +102,14 @@ public class BitrateMonitor {
      * @return the measured bitrate in kilobits/second (kbps).
      */
     public synchronized long getKbps() {
-        return lastBitsPerSecond / 1000;
+        return getBitsPerSecond() / 1000;
     }
 
     /**
      * @return the measured bitrate in megabits/second (Mbps).
      */
     public synchronized double getMbps() {
-        return lastBitsPerSecond / 1_000_000.0;
+        return getBitsPerSecond() / 1_000_000.0;
     }
 
     /**
