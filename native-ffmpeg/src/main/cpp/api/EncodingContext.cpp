@@ -426,6 +426,7 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
     }
   }
 
+  bool outputWriteFailed = false;
   for (bool frameSent = false; ! frameSent; ) {
     llog(TRACE, "avcodec_send_frame sending frame at %" PRId64, (uint64_t) frame);
     rc = avcodec_send_frame(video_avcc, frame);
@@ -472,11 +473,28 @@ uint64_t VideoEncoder::encode(bool lock, uint64_t matRef, bool isRgb) {
             (int)video_stime_base.num, (int)video_stime_base.den);
       }
 
-      enc->muxer->writeFinalPacket(output_packet);
+      // Propagate muxer write failures (e.g. ECONNRESET when the RTMP/RTSP peer
+      // drops the connection). Previously the status was discarded, so encode()
+      // appeared to succeed forever while every packet failed to be written,
+      // and callers (e.g. LiveFeedEncoder) could never detect the dead output.
+      {
+        const uint64_t writeStat = enc->muxer->writeFinalPacket(output_packet);
+        if (isError(writeStat)) {
+          result = writeStat;
+          outputWriteFailed = true;
+          break;
+        }
+      }
     }
 
     if (packetReceived)
       av_packet_unref(output_packet);
+
+    // If the output is dead there's no point retrying the send/receive cycle;
+    // bail out so the error makes it back to the caller. Also prevents a
+    // subsequent EAGAIN from resetting 'result' to 0 and masking the failure.
+    if (outputWriteFailed)
+      break;
   }
   // ==================================================================
 
