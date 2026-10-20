@@ -9,6 +9,7 @@
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-ffmpeg</artifactId>
+  <name>PileCv4j lib-ffmpeg</name>
   
   <dependencies>
     <dependency>
