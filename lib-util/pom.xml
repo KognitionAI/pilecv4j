@@ -5,12 +5,14 @@
   <parent>
     <artifactId>pilecv4j-parent</artifactId>
     <groupId>ai.kognition.pilecv4j</groupId>
-    <version>1.1.4-SNAPSHOT</version>
+    <version>1.1.4</version>
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
 
   <artifactId>lib-util</artifactId>
-  
+  <name>PileCv4j lib-util</name>
+  <description>Utility classes for pilecv4j including platform detection and native library loading.</description>
+
   <dependencies>
     <dependency>
       <groupId>junit</groupId>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <groupId>ai.kognition.pilecv4j</groupId>
-  <version>1.1.4-SNAPSHOT</version>
+  <version>1.1.4</version>
   <packaging>pom</packaging>
   <modelVersion>4.0.0</modelVersion>
   <artifactId>pilecv4j-settings</artifactId>
@@ -17,8 +17,8 @@
 
     <!-- This property is used in the native build to make sure the version of
          OpenCV we're building against matches what we expect. -->
-    <opencv-build.version>4.10.0</opencv-build.version>
-    <opencv-short.version>4100</opencv-short.version>
+    <opencv-build.version>4.5.2</opencv-build.version>
+    <opencv-short.version>452</opencv-short.version>
     <!-- CUDA version used to decorate the opencv artifact version on CUDA-built
          platforms (see opencv-gpu.version-extention in the linux-64bit profile).
          Must match the CUDA toolkit the opencv-build zip was compiled against. -->
@@ -38,7 +38,7 @@
     <cmake.options>${platform.option}</cmake.options>
   </properties>
 
-  <url>git@github.com:KognitionAI/pilecv4j</url>
+  <url>https://github.com/KognitionAI/pilecv4j</url>
   <developers>
     <developer>
       <id>jimfcarroll</id>
@@ -153,12 +153,12 @@
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-gpg-plugin</artifactId>
-          <version>1.6</version>
+          <version>3.2.8</version>
         </plugin>
         <plugin>
-          <groupId>org.sonatype.plugins</groupId>
-          <artifactId>nexus-staging-maven-plugin</artifactId>
-          <version>1.6.13</version>
+          <groupId>org.sonatype.central</groupId>
+          <artifactId>central-publishing-maven-plugin</artifactId>
+          <version>0.12.0</version>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -291,11 +291,10 @@
         <swtversion>4.6</swtversion>
         <platform>linux-x86_64</platform>
         <generator>Unix Makefiles</generator>
-        <!-- Align with what build-pilecv4j-opencv CI actually deploys to Nexus:
-             the CUDA build is versioned 1.0-opencv<ver>-cuda<cuda.version>. With this
-             blank, consumers resolved 1.0-opencv4.10.0 which only ever existed in
-             builder-local maven caches (caused the stale focal-lib incident 2026-08-29). -->
-        <opencv-gpu.version-extention>-cuda${cuda.version}</opencv-gpu.version-extention>
+        <!-- Public release: reference the non-CUDA opencv artifacts available on
+             Maven Central (1.0-opencv4.5.2). Internal CUDA builds use the
+             -cuda${cuda.version} suffixed artifacts from the Kognition nexus. -->
+        <opencv-gpu.version-extention></opencv-gpu.version-extention>
         <platform.option></platform.option>
         <ipc-impl>posix</ipc-impl>
       </properties>
@@ -407,18 +406,23 @@
             </executions>
           </plugin>
           <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
             <extensions>true</extensions>
             <configuration>
-              <serverId>ossrh</serverId>
-              <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-              <autoReleaseAfterClose>false</autoReleaseAfterClose>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>false</autoPublish>
             </configuration>
           </plugin>
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-gpg-plugin</artifactId>
+            <configuration>
+              <gpgArguments>
+                <arg>--pinentry-mode</arg>
+                <arg>loopback</arg>
+              </gpgArguments>
+            </configuration>
             <executions>
               <execution>
                 <id>sign-artifacts</id>
