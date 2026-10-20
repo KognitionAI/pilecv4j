@@ -9,6 +9,8 @@
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-image</artifactId>
+  <name>PileCv4j lib-image</name>
+  <description>Java image processing built on OpenCV for pilecv4j.</description>
   <dependencies> 
     <dependency>
       <groupId>junit</groupId>

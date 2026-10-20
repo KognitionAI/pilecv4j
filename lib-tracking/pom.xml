@@ -11,6 +11,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <artifactId>lib-tracking</artifactId>
+  <name>PileCv4j lib-tracking</name>
+  <description>Object tracking utilities (Kalman filtering) for pilecv4j.</description>
 
   <dependencies>
     <dependency>

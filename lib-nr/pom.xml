@@ -9,6 +9,8 @@
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-nr</artifactId>
+  <name>PileCv4j lib-nr</name>
+  <description>Numerical routines (nonlinear minimization) for pilecv4j.</description>
 
   <dependencies>
     <dependency>

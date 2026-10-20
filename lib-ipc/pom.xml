@@ -9,6 +9,8 @@
     <relativePath>../parent/pom.xml</relativePath>
   </parent>
   <artifactId>lib-ipc</artifactId>
+  <name>PileCv4j lib-ipc</name>
+  <description>Inter-process communication (shared memory) support for pilecv4j.</description>
 
   <dependencies>
     

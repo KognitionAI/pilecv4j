@@ -12,6 +12,8 @@
   </parent>
 
   <artifactId>native-ipc-${ipc-impl}-${platform}</artifactId>
+  <name>PileCv4j native-ipc</name>
+  <description>Native (JNI) shared-memory IPC library for pilecv4j.</description>
   <packaging>pom</packaging>
 
   <properties>

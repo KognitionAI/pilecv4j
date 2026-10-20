@@ -11,6 +11,8 @@
   </parent>
 
   <artifactId>native-ffmpeg-${platform}</artifactId>
+  <name>PileCv4j native-ffmpeg</name>
+  <description>Native (JNI) FFmpeg media processing library for pilecv4j.</description>
   <packaging>pom</packaging>
 
   <properties>

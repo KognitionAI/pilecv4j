@@ -12,6 +12,8 @@
   </parent>
 
   <artifactId>native-nr-${platform}</artifactId>
+  <name>PileCv4j native-nr</name>
+  <description>Native (JNI) numerical routines library for pilecv4j.</description>
   <packaging>pom</packaging>
 
   <properties>

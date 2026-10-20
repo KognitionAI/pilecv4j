@@ -12,6 +12,8 @@
   </parent>
 
   <artifactId>native-image-${platform}</artifactId>
+  <name>PileCv4j native-image</name>
+  <description>Native (JNI) image processing library for pilecv4j.</description>
   <packaging>pom</packaging>
 
   <properties>

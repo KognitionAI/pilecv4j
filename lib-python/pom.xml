@@ -10,6 +10,8 @@
   </parent>
 
   <artifactId>lib-python</artifactId>
+  <name>PileCv4j lib-python</name>
+  <description>Python integration for pilecv4j.</description>
 
   <dependencies>
     <dependency>

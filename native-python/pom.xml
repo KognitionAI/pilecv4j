@@ -12,6 +12,8 @@
   </parent>
 
   <artifactId>native-python-${platform}</artifactId>
+  <name>PileCv4j native-python</name>
+  <description>Native (JNI) Python embedding library for pilecv4j.</description>
   <packaging>pom</packaging>
 
   <properties>
