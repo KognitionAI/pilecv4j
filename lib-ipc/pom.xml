@@ -16,12 +16,14 @@
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>native-ipc-posix-linux-x86_64</artifactId>
+      <version>${project.version}</version>
       <classifier>bin</classifier>
       <optional>true</optional>
     </dependency>
     <dependency>
       <groupId>ai.kognition.pilecv4j</groupId>
       <artifactId>native-image-linux-x86_64</artifactId>
+      <version>${project.version}</version>
       <classifier>bin</classifier>
       <optional>true</optional>
     </dependency>
