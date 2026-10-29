@@ -47,8 +47,13 @@ namespace python {
     // Initialize python
     Py_Initialize();
 
-    // Initialize and acquire the GIL
+    // Initialize and acquire the GIL.
+    // PyEval_InitThreads() has been a no-op since Python 3.9 (Py_Initialize()
+    // initializes the GIL) and is deprecated; guard it out for >=3.12 so the
+    // build stays warning/werror-clean against newer CPython headers.
+#if PY_VERSION_HEX < 0x030C0000
     PyEval_InitThreads();
+#endif
 
     // Get the main thread state for the current thread.
     mainThreadState = PyEval_SaveThread();
