@@ -108,15 +108,24 @@ namespace python {
       buf = writeResultAndUnion(listSize, PyResultLIST, buf, capacity, pos);
       resultStatus = OK;
       {
+        // Hold the GIL for the entire iteration: the recursive write() calls
+        // CPython APIs (PyLong_AsLong, PyFloat_AsDouble, PyUnicode_AsUTF8AndSize,
+        // numpy checks) which are illegal without the GIL. The previous code
+        // released the GIL (ReleaseGilGuard) around each recursive call, which
+        // corrupted the interpreter whenever any other thread ran Python
+        // concurrently (SIGSEGV in libpython, e.g. release-build job 147757/148146).
         CallPythonGuard gg;
         for (Py_ssize_t i = 0; i < len && resultStatus == OK; i++) {
           PyObject *item = PyList_GetItem(toWrite, i);
-          ReleaseGilGuard rgg;
           if (!item) {
             resultStatus = ILLEGAL_ARGUMENT;
             return buf;
           }
-          write(item ? item : Py_None, buf, pos, capacity, resultStatus);
+          // write() may realloc the result buffer; the returned pointer MUST be
+          // kept. Discarding it (as before) left this frame writing through a
+          // dangling pointer once the serialized result crossed a capacity
+          // increment (e.g. embedding vectors > ~900 doubles).
+          buf = write(item, buf, pos, capacity, resultStatus);
         }
       }
       return buf;
@@ -126,15 +135,16 @@ namespace python {
       buf = writeResultAndUnion(listSize, PyResultLIST, buf, capacity, pos);
       resultStatus = OK;
       {
+        // See the PyList_Check branch above: hold the GIL across the recursion
+        // and keep the (possibly realloc'd) buffer pointer.
         CallPythonGuard gg;
         for (Py_ssize_t i = 0; i < len && resultStatus == OK; i++) {
           PyObject *item = PyTuple_GetItem(toWrite, i);
-          ReleaseGilGuard rgg;
           if (!item) {
             resultStatus = ILLEGAL_ARGUMENT;
             return buf;
           }
-          write(item ? item : Py_None, buf, pos, capacity, resultStatus);
+          buf = write(item, buf, pos, capacity, resultStatus);
         }
       }
       return buf;
@@ -239,7 +249,15 @@ namespace python {
     int32_t resultStat = OK;
     if (isEnabled(TRACE))
       log(TRACE, "Result obj pre-writing %" PRId64 " with refcnt: %d", (uint64_t)results, (int)(results ? results->ob_refcnt : -1));
-    ret = write(results, ret, pos, capacity, resultStat);
+    {
+      // write() and everything it calls (type checks, scalar extraction, numpy
+      // conversion) require the GIL. This entry point is reached from
+      // pilecv4j_python_runPythonFunction AFTER runFunction has released the
+      // GIL, so it must be re-acquired here or every scalar/list result is
+      // serialized while racing any other Python thread.
+      CallPythonGuard gg;
+      ret = write(results, ret, pos, capacity, resultStat);
+    }
     *parsedResults = ret;
     *resultSize = pos;
     return resultStat;

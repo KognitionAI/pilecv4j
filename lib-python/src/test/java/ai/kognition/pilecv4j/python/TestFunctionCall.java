@@ -142,4 +142,38 @@ public class TestFunctionCall extends BaseTest {
             }
         }
     }
+
+    /**
+     * Regression test for the native result-serialization realloc bug: the
+     * recursive write() in RunPythonFunction.cpp discarded the buffer pointer
+     * returned by its recursive calls, so once a returned list serialized past
+     * RESULT_BLOCK_SIZE_INCREMENT (8192 bytes, ~900 doubles) the parent frame
+     * kept writing through a dangling pointer (heap corruption, SIGSEGV in
+     * libpython — observed as release-build jobs 147757/148146 crashing in
+     * OpenCLIP embedding warmup, whose embedding vectors are exactly such
+     * large float lists).
+     */
+    @Test
+    public void testLargeListReturnSurvivesReallocation() throws Exception {
+        try(final PythonHandle pt = new PythonHandle();) {
+
+            // add the module path
+            pt.addModulePath("./src/test/resources/python");
+
+            final int count = 4096; // forces several result-buffer reallocations
+
+            try(final var res = pt.runPythonFunction("testLargeList", "make_floats", ParamBlock.builder()
+                .arg(count));) {
+
+                final Object parsed = res.parse();
+                assertTrue(parsed instanceof List);
+                final List<?> list = (List<?>)parsed;
+                assertEquals(count, list.size());
+                // spot-check values across the buffer, including both ends
+                assertEquals(0.0, ((Number)list.get(0)).doubleValue(), 0.0);
+                assertEquals(0.5 * (count / 2), ((Number)list.get(count / 2)).doubleValue(), 0.0);
+                assertEquals(0.5 * (count - 1), ((Number)list.get(count - 1)).doubleValue(), 0.0);
+            }
+        }
+    }
 }
