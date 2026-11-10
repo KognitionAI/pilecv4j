@@ -329,7 +329,13 @@ extern "C" {
     if (matRef) {
       cv::Mat* mat = (cv::Mat*)matRef;
       int resultInt = OK;
-      val = ImageSource::convertMatToNumPyArray(mat, SHALLOW_COPY, &resultInt, false);
+      // DEEP_COPY: the numpy array must not alias the Java-owned CvMat buffer.
+      // Shallow wraps let python (torch/PIL/cv2 or the delayed GC of km.npArray)
+      // touch memory the Java side already freed/reused: use-after-free on the C
+      // heap and the deterministic libpython+0x222888 GC crashes in release-build
+      // jobs 147757/148146/148288/148306/148737 (crashes followed ImageSource
+      // traffic across BOTH sync and loop transports).
+      val = ImageSource::convertMatToNumPyArray(mat, DEEP_COPY, &resultInt, false);
       if (resultInt != OK) {
         log(ERROR, "Failed to convert mat at (%" PRId64 ") to a numpy array", (uint64_t)matRef);
         Py_DECREF(val);
@@ -473,7 +479,13 @@ extern "C" {
     if (matRef) {
       cv::Mat* mat = (cv::Mat*)matRef;
       int resultInt = OK;
-      val = ImageSource::convertMatToNumPyArray(mat, SHALLOW_COPY, &resultInt, false);
+      // DEEP_COPY: the numpy array must not alias the Java-owned CvMat buffer.
+      // Shallow wraps let python (torch/PIL/cv2 or the delayed GC of km.npArray)
+      // touch memory the Java side already freed/reused: use-after-free on the C
+      // heap and the deterministic libpython+0x222888 GC crashes in release-build
+      // jobs 147757/148146/148288/148306/148737 (crashes followed ImageSource
+      // traffic across BOTH sync and loop transports).
+      val = ImageSource::convertMatToNumPyArray(mat, DEEP_COPY, &resultInt, false);
       if (resultInt != OK) {
         log(ERROR, "Failed to convert mat at (%" PRId64 ") to a numpy array", (uint64_t)matRef);
         Py_DECREF(val);

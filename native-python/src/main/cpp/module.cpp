@@ -169,7 +169,10 @@ static PyObject* ImageSource_steal(PImageSource* imsrc, PyObject* args)
   ret->npArray = nullptr;
 
   int statusCode;
-  ret->npArray = ImageSource::convertMatToNumPyArray(kmat->mat, SHALLOW_COPY, &statusCode, true);
+  // DEEP_COPY: see kognition.cpp — the numpy array must own its pixels; a shallow
+  // wrap aliases the Java-owned Mat buffer and is a use-after-free once the Java
+  // side closes the KogMat (heap corruption -> delayed SIGSEGV in CPython's GC).
+  ret->npArray = ImageSource::convertMatToNumPyArray(kmat->mat, DEEP_COPY, &statusCode, true);
   if (!ret->npArray) {
     kmat->decrement();
     return NULL;
