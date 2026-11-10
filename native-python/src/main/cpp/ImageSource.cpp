@@ -158,6 +158,14 @@ namespace python {
     return PyArray_Check(amI);
   }
 
+  // PyCapsule destructor for pinned mats (numpy calls this, GIL held, when the
+  // array that aliases the mat's pixel buffer is deallocated).
+  static void releasePinnedMat(PyObject* capsule) {
+    cv::Mat* pin = static_cast<cv::Mat*>(PyCapsule_GetPointer(capsule, nullptr));
+    if (pin)
+      delete pin;
+  }
+
   PyObject* ImageSource::convertMatToNumPyArray(cv::Mat* mat, ConvertMode convertMode, int* statusCode, bool fromPython) {
     *statusCode = OK;
     if (!PythonEnvironment::instance()->numpyImported) {
@@ -193,6 +201,43 @@ namespace python {
       PyArray_ENABLEFLAGS((PyArrayObject*) ret, NPY_ARRAY_OWNDATA);
       cv::Mat empty;
       (*mat) = empty;
+    }
+    if (convertMode == SHALLOW_COPY && ret) {
+      // The array aliases mat->data without owning it. If the Java side closes
+      // its CvMat while python still holds the array (torch/PIL/cv2 use, or just
+      // the delayed GC of km.npArray), any later touch is a use-after-free on the
+      // C heap. That corruption surfaced as the deterministic SIGSEGV at
+      // libpython+0x222888 (gcmodule walking a corrupted heap) in release-build
+      // jobs 147757/148146/148288/148306/148737 — on BOTH the sync and the
+      // loop/sendMat transports.
+      //
+      // Pin the pixel buffer for the array's lifetime: give numpy a base object
+      // owning a cv::Mat header copy. cv::Mat's internal refcounting then keeps
+      // the data block alive until BOTH the Java side and numpy have released
+      // it. Zero copy. (Limitation: mats wrapping unmanaged external buffers
+      // have no refcount to pin — those must be deep-copied upstream, exactly
+      // as VideoProcessing already does for FFmpeg-backed frames.)
+      cv::Mat* pin = new cv::Mat(*mat);
+      PyObject* capsule = PyCapsule_New(pin, nullptr, releasePinnedMat);
+      if (capsule == nullptr) {
+        delete pin;
+        Py_DECREF(ret);
+        log(ERROR, "Failed to create pin capsule for numpy array.");
+        *statusCode = ILLEGAL_ARGUMENT;
+        if (fromPython)
+          PyErr_SetString(PyExc_RuntimeError, "Failed to create pin capsule for numpy array.");
+        return NULL;
+      }
+      // PyArray_SetBaseObject steals the capsule reference on success.
+      if (PyArray_SetBaseObject(reinterpret_cast<PyArrayObject*>(ret), capsule) < 0) {
+        Py_DECREF(capsule);
+        Py_DECREF(ret);
+        log(ERROR, "Failed to set numpy array base object for mat pinning.");
+        *statusCode = ILLEGAL_ARGUMENT;
+        if (fromPython)
+          PyErr_SetString(PyExc_RuntimeError, "Failed to set numpy array base object for mat pinning.");
+        return NULL;
+      }
     }
     return ret;
   }
