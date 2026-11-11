@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 
 #include <opencv2/core/mat.hpp>
@@ -34,7 +35,9 @@ namespace python {
   struct PythonEnvironment
   {
     PyThreadState* mainThreadState;
-    bool numpyImported;
+    // atomic: read/set from multiple PyGILState threads (lazy import_array in
+    // ImageSource conversions); plain bool was a data race (pilecv4j#47 suspect 3).
+    std::atomic<bool> numpyImported;
 
     PythonEnvironment();
     virtual ~PythonEnvironment();

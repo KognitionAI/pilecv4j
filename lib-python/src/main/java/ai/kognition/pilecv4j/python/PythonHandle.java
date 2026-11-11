@@ -37,6 +37,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -235,7 +238,46 @@ public class PythonHandle implements QuietCloseable {
      * </ul>
      *
      */
+    /**
+     * All synchronous python invocations are funneled through this single long-lived
+     * daemon thread. Synchronous callers used to invoke the embedded CPython from
+     * whatever JVM thread they happened to run on (Dempsy workers, client executors,
+     * test threads), creating and tearing down PyGILState thread states across many
+     * short-lived threads. That churn is one of the remaining suspects for the
+     * persistent interpreter heap corruption (SIGSEGV libpython+0x222888 in the GC;
+     * see KognitionAI/pilecv4j#47) after serialization (#43), transport and buffer
+     * aliasing (#45/#46) were eliminated. Long-running loop functions started via
+     * {@link #runPythonFunctionAsynch} do NOT go through the funnel: they keep their
+     * own dedicated thread for the life of the loop.
+     */
+    private static final AtomicReference<Thread> PYTHON_DISPATCH_THREAD = new AtomicReference<>();
+    private static final ExecutorService PYTHON_DISPATCH = Executors.newSingleThreadExecutor(r -> {
+        final Thread t = new Thread(r, "pilecv4j-python-dispatch");
+        t.setDaemon(true);
+        PYTHON_DISPATCH_THREAD.set(t);
+        return t;
+    });
+
     public ResultBlock runPythonFunction(final String module, final String function, final ParamBlock params) {
+        // re-entrant call from the dispatch thread itself: run directly.
+        if(Thread.currentThread() == PYTHON_DISPATCH_THREAD.get())
+            return runPythonFunctionNow(module, function, params);
+        try {
+            return PYTHON_DISPATCH.submit(() -> runPythonFunctionNow(module, function, params)).get();
+        } catch(final InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted waiting for python dispatch of " + module + "." + function, ie);
+        } catch(final ExecutionException ee) {
+            final Throwable cause = ee.getCause();
+            if(cause instanceof RuntimeException)
+                throw (RuntimeException)cause;
+            if(cause instanceof Error)
+                throw (Error)cause;
+            throw new IllegalStateException("Python dispatch of " + module + "." + function + " failed", cause);
+        }
+    }
+
+    private ResultBlock runPythonFunctionNow(final String module, final String function, final ParamBlock params) {
         try(Tuple args = params.buildArgs();
             Dict kwds = params.buildKeywordArgs();) {
 
@@ -327,7 +369,9 @@ public class PythonHandle implements QuietCloseable {
                 ret.isRunning.set(true);
                 started.set(true);
                 try {
-                    runPythonFunction(module, function, pb);
+                    // direct call: the loop owns this dedicated thread for its whole
+                    // life — it must not occupy (and deadlock) the dispatch funnel.
+                    runPythonFunctionNow(module, function, pb);
                 } catch(final RuntimeException rte) {
                     // Record the failure so PythonRunningState.hasFailed()/waitUntilSourceInitialized()
                     // and callers polling for results can detect the script died. Without this, callers
