@@ -28,83 +28,138 @@ inline static void llog(LogLevel llevel, const char *fmt, ...) {
 
 static const AVRational UNKNOWN_TIME_BASE{0, 1};
 
+// Pseudo-decoder name that triggers automatic NVDEC codec selection based on the
+// stream's codec_id: h264→h264_cuvid, hevc→hevc_cuvid, av1→av1_cuvid, etc.
+// Falls back to the software decoder when the cuvid variant is unavailable or
+// when avcodec_open2 fails (no libnvcuvid, out of NVDEC surfaces, etc.).
+static const char* const AUTO_NVDEC_DECODER = "auto-nvdec";
+
+// Explicit opt-out: skip any hardware selection and use the default software decoder.
+static const char* const SOFTWARE_DECODER = "software";
+
 uint64_t MediaProcessor::open_codec(AVStream* pStream, AVDictionary** opts, AVCodecContext** codecCtxPtr, const char* decoderName) {
   PILECV4J_TRACE;
 
   *codecCtxPtr = nullptr;
 
   AVCodecParameters *pCodecParameters = pStream->codecpar;
+  AVMediaType streamMediaType = pStream->codecpar->codec_type;
   AVCodec* pCodec = nullptr;
-  {
-    // we're going to use the named codec but only if the media type matches.
-    if (decoderName) {
-      AVMediaType streamMediaType = pStream->codecpar->codec_type;
-      if (isEnabled(TRACE))
-        llog(TRACE, "Checking if the codec '%s' has the media type %s for the stream %d", decoderName,
-            av_get_media_type_string(streamMediaType), (int)pStream->index);
 
-      const AVCodec* tmpCodec = avcodec_find_decoder_by_name(decoderName);
-      const AVCodecDescriptor *desc;
-      if (!tmpCodec && (desc = avcodec_descriptor_get_by_name(decoderName))) {
-        tmpCodec = avcodec_find_decoder(desc->id);
-        if (isEnabled(INFO) && tmpCodec)
-          llog(INFO, "Matched decoder '%s' for codec '%s'.",
-              tmpCodec->name, desc->name);
-      }
-      if (!tmpCodec) {
-          llog(ERROR, "Unknown decoder '%s'\n", decoderName);
-          return MAKE_P_STAT(UNSUPPORTED_CODEC);
-      }
-      pCodec = const_cast<AVCodec*>(tmpCodec);
-      // we're not goint to use the decoder for this stream.
-      if (pCodec->type != streamMediaType) {
-        llog(INFO, "Specified decoder '%s' supporting %s doesn't apply to stream %d with a media type %s",
-            decoderName, av_get_media_type_string(pCodec->type), (int)pStream->index, av_get_media_type_string(streamMediaType));
-        pCodec = nullptr;
+  // Track whether the selected codec is a hardware decoder so we know whether
+  // to attempt a software fallback if avcodec_open2 later fails.
+  bool isHardwareDecoder = false;
+
+  {
+    if (decoderName && strcmp(decoderName, SOFTWARE_DECODER) != 0) {
+      if (isEnabled(TRACE))
+        llog(TRACE, "Requested decoder '%s' for stream %d (media type %s)",
+            decoderName, (int)pStream->index, av_get_media_type_string(streamMediaType));
+
+      if (strcmp(decoderName, AUTO_NVDEC_DECODER) == 0) {
+        // ── auto-nvdec: derive <codec>_cuvid from the stream's codec_id ──────
+        const char* codecName = avcodec_get_name(pCodecParameters->codec_id);
+        char cuvidName[64];
+        snprintf(cuvidName, sizeof(cuvidName), "%s_cuvid", codecName);
+        const AVCodec* tmpCodec = avcodec_find_decoder_by_name(cuvidName);
+        if (tmpCodec && tmpCodec->type == streamMediaType) {
+          pCodec = const_cast<AVCodec*>(tmpCodec);
+          isHardwareDecoder = true;
+          llog(INFO, "auto-nvdec: selected %s for stream codec %s", cuvidName, codecName);
+        } else {
+          llog(INFO, "auto-nvdec: no cuvid decoder for %s (tried %s), falling back to software",
+              codecName, cuvidName);
+          // pCodec stays null → software fallback below
+        }
+      } else {
+        // ── named decoder (e.g. hevc_cuvid, h264_nvmpi) ──────────────────────
+        const AVCodec* tmpCodec = avcodec_find_decoder_by_name(decoderName);
+        const AVCodecDescriptor *desc;
+        if (!tmpCodec && (desc = avcodec_descriptor_get_by_name(decoderName))) {
+          tmpCodec = avcodec_find_decoder(desc->id);
+          if (isEnabled(INFO) && tmpCodec)
+            llog(INFO, "Matched decoder '%s' for codec '%s'.", tmpCodec->name, desc->name);
+        }
+        if (!tmpCodec) {
+          llog(WARN, "Unknown decoder '%s'; falling back to software decoder\n", decoderName);
+          // pCodec stays null → software fallback below
+        } else if (tmpCodec->type != streamMediaType) {
+          llog(INFO, "Specified decoder '%s' supporting %s doesn't apply to stream %d with media type %s; ignoring",
+              decoderName, av_get_media_type_string(tmpCodec->type),
+              (int)pStream->index, av_get_media_type_string(streamMediaType));
+          // pCodec stays null → software fallback below
+        } else {
+          pCodec = const_cast<AVCodec*>(tmpCodec);
+          // Heuristic: any explicitly named _cuvid / _nvmpi / _vaapi decoder is HW.
+          isHardwareDecoder = (strstr(decoderName, "_cuvid")  != nullptr ||
+                               strstr(decoderName, "_nvmpi")  != nullptr ||
+                               strstr(decoderName, "_vaapi")  != nullptr ||
+                               strstr(decoderName, "_videotoolbox") != nullptr);
+        }
       }
     }
 
-    if (!pCodec) { // if we didn't set the pCodec above either because of a mismatch with the media type
-                   //   or because the decoderName was never set, then let's open the default codec.
+    if (!pCodec) {
+      // Software fallback: use the default codec for this stream.
       const AVCodec* tmpCodec = avcodec_find_decoder(pCodecParameters->codec_id);
-      if (tmpCodec==NULL) {
-        llog(ERROR, "Unsupported codec, ID %d",(int)pCodecParameters->codec_id);
+      if (tmpCodec == nullptr) {
+        llog(ERROR, "Unsupported codec, ID %d", (int)pCodecParameters->codec_id);
         return MAKE_P_STAT(UNSUPPORTED_CODEC);
       }
       pCodec = const_cast<AVCodec*>(tmpCodec);
+      isHardwareDecoder = false;
     }
   }
 
-  // https://ffmpeg.org/doxygen/trunk/structAVCodecContext.html
-  AVCodecContext* codecCtx = avcodec_alloc_context3(pCodec);
-  *codecCtxPtr = codecCtx;
-  if (!codecCtx) {
-    llog(ERROR, "failed to allocated memory for AVCodecContext");
-    return MAKE_P_STAT(FAILED_CREATE_CODEC_CONTEXT);
+  // Helper lambda: allocate + fill a codec context for pCodec.
+  // Returns the context in *codecCtxPtr; caller checks the return stat.
+  auto openWithCodec = [&](AVCodec* codec) -> uint64_t {
+    AVCodecContext* ctx = avcodec_alloc_context3(codec);
+    *codecCtxPtr = ctx;
+    if (!ctx) {
+      llog(ERROR, "failed to allocate memory for AVCodecContext");
+      return MAKE_P_STAT(FAILED_CREATE_CODEC_CONTEXT);
+    }
+    // https://stackoverflow.com/questions/40275242
+    AVRational demuxTimeBase = pStream->time_base;
+    if (!(demuxTimeBase.num == UNKNOWN_TIME_BASE.num && demuxTimeBase.den == UNKNOWN_TIME_BASE.den)) {
+      llog(TRACE, "initializing decode codec context time_base to: %d/%d",
+          (int)demuxTimeBase.num, (int)demuxTimeBase.den);
+      ctx->time_base = demuxTimeBase;
+    }
+    uint64_t s = MAKE_AV_STAT(avcodec_parameters_to_context(ctx, pCodecParameters));
+    if (isError(s)) return s;
+    s = avcodec_open2(ctx, codec, opts);
+    if (isEnabled(TRACE))
+      llog(TRACE, "decode codec context time_base: %d/%d (after open)",
+          ctx->time_base.num, ctx->time_base.den);
+    return s;
+  };
+
+  uint64_t stat = openWithCodec(pCodec);
+
+  // ── Hardware open failed: attempt software fallback ───────────────────────
+  if (isError(stat) && isHardwareDecoder) {
+    llog(WARN, "Hardware decoder '%s' failed to open (stat=0x%llx); retrying with software decoder",
+        pCodec->name, (unsigned long long)stat);
+
+    // Free the failed context before allocating a new one.
+    if (*codecCtxPtr) {
+      avcodec_free_context(codecCtxPtr);
+      *codecCtxPtr = nullptr;
+    }
+
+    const AVCodec* swCodec = avcodec_find_decoder(pCodecParameters->codec_id);
+    if (!swCodec) {
+      llog(ERROR, "Software fallback: unsupported codec ID %d", (int)pCodecParameters->codec_id);
+      return MAKE_P_STAT(UNSUPPORTED_CODEC);
+    }
+    llog(INFO, "Hardware fallback: opening software decoder '%s'", swCodec->name);
+    stat = openWithCodec(const_cast<AVCodec*>(swCodec));
   }
-
-  // See the accepted answer here: https://stackoverflow.com/questions/40275242/libav-ffmpeg-copying-decoded-video-timestamps-to-encoder
-  AVRational demuxTimeBase = pStream->time_base;
-  if (!(demuxTimeBase.num == UNKNOWN_TIME_BASE.num && demuxTimeBase.den == UNKNOWN_TIME_BASE.den)) {
-    llog(TRACE, "initializing decode codec context time_base to: %d/%d (this may be reset when the codec is open)", (int)(demuxTimeBase.num), (int)(demuxTimeBase.den));
-    codecCtx->time_base = demuxTimeBase;
-  }
-
-  // Fill the codec context based on the values from the supplied codec parameters
-  // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#gac7b282f51540ca7a99416a3ba6ee0d16
-  uint64_t stat = MAKE_AV_STAT(avcodec_parameters_to_context(codecCtx, pCodecParameters));
-  if (isError(stat))
-    return stat;
-
-  // Initialize the AVCodecContext to use the given AVCodec.
-  // https://ffmpeg.org/doxygen/trunk/group__lavc__core.html#ga11f785a188d7d9df71621001465b0f1d
-  stat = avcodec_open2(codecCtx, pCodec, opts);
-
-  if (isEnabled(TRACE))
-    llog(TRACE, "decode codec context time_base: %d/%d (after open)", codecCtx->time_base.num, codecCtx->time_base.den);
 
   if (isError(stat)) {
-    llog(ERROR, "failed to open codec through avcodec_open2");
+    llog(ERROR, "failed to open codec '%s' through avcodec_open2", pCodec->name);
     return stat;
   }
 
